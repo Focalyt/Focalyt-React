@@ -176,6 +176,7 @@ const helperRoutes = require("./helpers");
 app.use("/", routes);
 app.use("/admin/helper", helperRoutes);
 app.use("/panel/helper", helperRoutes);
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(express.static(path.join(__dirname, "/angular-app/")));
 // app.use(/^((?!(api|public|helper|app-assets)).)*/, (req, res) => {
