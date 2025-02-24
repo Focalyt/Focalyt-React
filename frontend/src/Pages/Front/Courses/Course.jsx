@@ -9,13 +9,16 @@ function Course() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  
 
   useEffect(() => {
     // Fetch courses data from API
     const fetchData = async () => {
       try {
-        const response = await axios.get('/api/courses');
-        console.log("Courses data received:", response.data.courses);
+        
+        const response = await axios.get(`${backendUrl}/courses`);
+        console.log("Courses data received:", response);
         setCourses(response.data.courses);
         setUniqueSectors(response.data.uniqueSectors);
       } catch (error) {
@@ -361,7 +364,7 @@ function Course() {
                                     <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
                                       <a 
                                         className="btn cta-callnow btn-bg-color"
-                                        href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}
+                                        href={`${backendUrl}/candidate/login?returnUrl=/candidate/course/${course._id}`}
                                       >
                                         Apply Now
                                       </a>
@@ -391,7 +394,7 @@ function Course() {
                             <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
                               <div className="row py-2">
                                 <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                  <a href={`/coursedetails/${course._id}`}>
+                                  <a href={`${backendUrl}/coursedetails/${course._id}`}>
                                     <span className="learnn pt-1 text-white">Learn More</span> 
                                     <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
                                   </a>
