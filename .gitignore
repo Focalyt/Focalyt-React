@@ -11,6 +11,11 @@ node_modules/
 **/dist
 frontend/node_modules/.cache/
 frontend/node_modules/.cache/default-development/
+backend/node_modules/.cache/
+backend/node_modules/.cache/default-development/
+backend/node_modules/
+frontend/node_modules/
+
 
 # Production
 /build
