@@ -1,4 +1,10 @@
 # dependencies
+**/node_modules
+**/.cache
+*.cache
+node_modules
+
+
 /node_modules
 /.pnp
 .pnp.js
@@ -9,7 +15,7 @@
 /backend/focalyt-new-key.json
 /backend/focalyt-1720520815248-f2cba8605a03.json
 /backend/public/documents/candidates.csv
-
+/node_modules
 # testing
 /coverage
 
