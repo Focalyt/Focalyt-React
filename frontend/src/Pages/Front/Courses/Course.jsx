@@ -364,7 +364,7 @@ function Course() {
                                     <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
                                       <a 
                                         className="btn cta-callnow btn-bg-color"
-                                        href={`${backendUrl}/candidate/login?returnUrl=/candidate/course/${course._id}`}
+                                        href={`https://app.focalyt.com//candidate/login?returnUrl=/candidate/course/${course._id}`}
                                       >
                                         Apply Now
                                       </a>
@@ -394,7 +394,7 @@ function Course() {
                             <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
                               <div className="row py-2">
                                 <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                  <a href={`${backendUrl}/coursedetails/${course._id}`}>
+                                  <a href={`https://app.focalyt.com//coursedetails/${course._id}`}>
                                     <span className="learnn pt-1 text-white">Learn More</span> 
                                     <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
                                   </a>
