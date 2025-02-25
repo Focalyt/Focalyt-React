@@ -71,15 +71,16 @@ function Course() {
    
 
     try {
-      const response = await axios.post("http://localhost:8080/callback", {
+      const response = await axios.post(`${backendUrl}/callback`, {
         ...formData
       }, {
         headers: { "Content-Type": "application/json" }
       });
 
       if (response.status === 200 || response.status === 201) {
-        setSuccessMessage("Form submitted successfully!");
-        setFormData({ name: "", state: "", mobile: "", email: "", message: "" });
+        alert("Form submitted successfully!"); // ✅ Alert दिखाएगा
+        window.location.reload(); // ✅ Page Refresh करेगा
+       
         
       }
     } catch (error) {
