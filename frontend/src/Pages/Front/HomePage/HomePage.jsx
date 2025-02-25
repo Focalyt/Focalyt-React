@@ -288,7 +288,7 @@ const HomePage = () => {
                     <div className="row justify-content-center justify-content-lg-between gutter-y-10 ">
                       <div className="col-xl-6 col-lg-6 "></div>
                       <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 mt-0" >
-                        <div className="content">
+                        <div className="content m-0">
                           <div className="content-text-block">
                             <h2 className="content-title text-capitalize heading-md how_focal">
                               What Focalyt Does
@@ -637,7 +637,7 @@ const HomePage = () => {
 
                       <div className="col-lg-6 col-md-12 col-sm-12 col-12 mt-0 aos-init aos-animation" data-aos="fade-down" data-aos-duration="1000" data-aos-once="false">
 
-                        <div className="content">
+                        <div className="content m-0">
                           <div className="content-text-block">
                             <h2 className="content-title heading-md  how_focal m-0">
                               Future Technology Labs for Institute
@@ -1181,7 +1181,7 @@ const HomePage = () => {
                       {/* <!-- <h4 className="reach_header">
                       Google Review
                     </h4> --> */}
-                      <a href="#"><figure> <img src="/Assets/public_assets/images/icons/google.avif" /></figure></a>
+                      <a href="#"><figure> <img src="/Assets/public_assets/images/icons/google.avif" style={{width:"100%"}}/></figure></a>
                       <div className="review-box">
                         <p> <span id="rating"></span> out of 5 stars from <sapn id="reviews"></sapn> reviews</p>
                       </div>

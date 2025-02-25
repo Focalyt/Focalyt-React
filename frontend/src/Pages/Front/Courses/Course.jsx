@@ -508,7 +508,7 @@ function Course() {
 
       {/* Callback Modal */}
       <div className="modal fade" id="callbackModal" tabIndex="-1" aria-labelledby="callbackModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered">
+        <div className="modal-dialog modal-dialog-centered newWidth">
           <div className="modal-content">
             <div className="modal-header">
               <h5 className="modal-title text-black" id="callbackModalLabel">
