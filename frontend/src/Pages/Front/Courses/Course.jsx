@@ -68,7 +68,7 @@ function Course() {
     setSuccessMessage("");
     setErrorMessage("");
 
-   
+
 
     try {
       const response = await axios.post(`${backendUrl}/callback`, {
@@ -80,8 +80,8 @@ function Course() {
       if (response.status === 200 || response.status === 201) {
         alert("Form submitted successfully!"); // ✅ Alert दिखाएगा
         window.location.reload(); // ✅ Page Refresh करेगा
-       
-        
+
+
       }
     } catch (error) {
       setErrorMessage("Failed to submit the form. Please try again.");
@@ -95,7 +95,7 @@ function Course() {
     // Fetch courses data from API
     const fetchData = async () => {
       try {
-        
+
         const response = await axios.get(`${backendUrl}/courses`);
         console.log("Courses data received:", response);
         setCourses(response.data.courses);
@@ -108,37 +108,37 @@ function Course() {
     fetchData();
   }, []);
 
-  
+
   // Filter courses based on selected sector and search term
   const getFilteredCourses = () => {
-    
-    
-    
+
+
+
     // Start with all courses
     let filtered = [...courses];
-    
+
     // Then filter by sector if not "all"
     if (activeFilter !== "all") {
       const sectorId = activeFilter.replace("id_", "");
       console.log("Filtering by sector ID:", sectorId);
-      
+
       filtered = filtered.filter(course => {
         if (!course.sectors || !Array.isArray(course.sectors)) {
           return false;
         }
-        
+
         const hasMatchingSector = course.sectors.some(s => s && s.toString() === sectorId);
         return hasMatchingSector;
       });
-      
+
       console.log("After sector filter, courses count:", filtered.length);
     }
-    
+
     // Then filter by search term if it exists
     if (searchTerm && searchTerm.trim() !== "") {
       const term = searchTerm.toLowerCase().trim();
       console.log("Filtering by search term:", term);
-      
+
       filtered = filtered.filter(course => {
         // Check multiple fields
         const nameMatch = course.name && course.name.toLowerCase().includes(term);
@@ -148,23 +148,44 @@ function Course() {
         const stateMatch = course.state && course.state.toLowerCase().includes(term);
         const modeMatch = course.trainingMode && course.trainingMode.toLowerCase().includes(term);
         const typeMatch = course.courseType && course.courseType.toLowerCase().includes(term);
-        const sectorMatch = course.sectorNames && course.sectorNames.some(name => 
+        const sectorMatch = course.sectorNames && course.sectorNames.some(name =>
           name.toLowerCase().includes(term)
         );
-        
-        return nameMatch || qualificationMatch || durationMatch || cityMatch || 
-               stateMatch || modeMatch || typeMatch || sectorMatch;
+
+        return nameMatch || qualificationMatch || durationMatch || cityMatch ||
+          stateMatch || modeMatch || typeMatch || sectorMatch;
       });
-      
+
       console.log("After search filter, courses count:", filtered.length);
     }
-    
+
     console.log("Final filtered courses count:", filtered.length);
     return filtered;
   };
 
   const filteredCourses = getFilteredCourses();
 
+  const chatContainerRef = useRef(null);
+  const bootmBoxRef = useRef(null);
+  const [isChatActive, setIsChatActive] = useState(false);
+
+  const openChatbot = () => {
+    const chatContainer = document.getElementById("iframe-box");
+    if (chatContainer) {
+      chatContainer.classList.toggle("active");
+    } else {
+      console.error("Chat container (iframe-box) not found!");
+    }
+  
+    // Trigger the bootm-box click event to initialize the chat
+    const bootmBox = document.getElementById("bootm-box");
+    if (bootmBox) {
+      bootmBox.click();
+    } else {
+      console.error("Element with ID 'bootm-box' not found!");
+    }
+   
+  };
 
 
   return (
@@ -441,9 +462,15 @@ function Course() {
                                       </a>
                                     </div>
                                     <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
-                                      <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow">
+                                      {/* <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow">
                                         Chat Now
-                                      </a>
+                                      </a> */}
+                                      {/* <a onClick={openChatbot} className="btn cta-callnow">
+                                        Chat Now
+                                      </a> */}
+                                      <button onClick={openChatbot} className="btn cta-callnow">
+                                        Chat Now
+                                      </button>
                                     </div>
                                     <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
                                       <div className="row pt-2">
@@ -517,7 +544,7 @@ function Course() {
               <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div className="modal-body">
-            <form id="callbackForm" onSubmit={handleSubmit}>
+              <form id="callbackForm" onSubmit={handleSubmit}>
                 <div className="row mb-3">
                   <div className="col-md-6 col-6">
                     <label className="form-label">Name</label>
@@ -550,7 +577,7 @@ function Course() {
                   <textarea className="form-control" name="message" value={formData.message} onChange={handleChange} required placeholder="Enter your message here..."></textarea>
                 </div>
 
-             
+
 
                 <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Submitting..." : "Submit"}</button>
                 {successMessage && <p className="text-success">{successMessage}</p>}
