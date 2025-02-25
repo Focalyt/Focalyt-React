@@ -121,7 +121,7 @@ const HomePage = () => {
                 <div className="col-xxl-12 mx-auto mt-xxl-5 mt-xl-3 mt-lg-3 mt-md-3 mt-sm-3 mt-3">
                   <div className="row justify-content-start" id="features_cta">
                     <div className="col-xxl-3 col-xl-3 col-lg-3 col-md-3 col-sm-6 col-6 text-center mb-sm-3 mb-3 cta_cols">
-                      <a href="/joblisting" target="_blank">
+                      <a href="/joblisting">
                         <figure className="figure">
                           <img className="Sirv image-main" src="/Assets/public_assets/images/newpage/index/job_search.png"
                             data-src="/Assets/public_assets/images/newpage/index/job_search.png" />
@@ -221,7 +221,7 @@ const HomePage = () => {
                 <div className="col-xxl-12 mx-auto mt-xxl-5 mt-xl-3 mt-lg-3 mt-md-3 mt-sm-3 mt-3">
                   <div className="row justify-content-start" id="features_cta">
                     <div className="col-xxl-3 col-xl-3 col-lg-3 col-md-3 col-sm-4 col-4 text-center mb-sm-3 mb-3 cta_cols">
-                      <a href="/joblisting" target="_blank">
+                      <a href="/joblisting">
                         <figure className="figure">
                           <img className="Sirv image-main" src="/Assets/public_assets/images/newpage/index/job_search.png"
                             data-src="/Assets/public_assets/images/newpage/index/job_search.png" />
@@ -561,7 +561,7 @@ const HomePage = () => {
                   <h5 className="text-black fw-bold">STUDENT</h5>
                   <p className="text-black fw-normal pt-1 px-2">Aspiring to launch your career</p>
                   {/* <!-- <h6 className="color-pink pt-2">Get Started ></h6> --> */}
-                  <a href="/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
+                  <a href="https://app.focalyt.com/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
                   {/* <!-- <figure>
                   <img src="public_assets/images/newpage/index/student.svg" className="img-fluid" draggable="false">
                 </figure> --> */}
@@ -572,7 +572,7 @@ const HomePage = () => {
                   <h5 className="text-black fw-bold">JOB SEEKER</h5>
                   <p className="text-black fw-normal pt-1 px-2">Find jobs and Internships</p>
                   {/* <!-- <h6 className="color-pink pt-2">Get Started ></h6> --> */}
-                  <a href="/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
+                  <a href="https://app.focalyt.com/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
                   {/* <!-- <figure>
                   <img src="public_assets/images/newpage/index/employee.svg" className="img-fluid" draggable="false">
                 </figure> --> */}
@@ -583,7 +583,7 @@ const HomePage = () => {
                   <h5 className="text-black fw-bold">EMPLOYER</h5>
                   <p className="text-black fw-normal pt-1 px-2">Seeking skilled talent</p>
                   {/* <!-- <h6 className="color-pink pt-2">Get Started ></h6> --> */}
-                  <a href="/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
+                  <a href="https://app.focalyt.com/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
 
                   {/* <!-- <figure>
                   <img src="public_assets/images/newpage/index/employer.svg" className="img-fluid" draggable="false">
@@ -595,7 +595,7 @@ const HomePage = () => {
                   <h5 className="text-black fw-bold">INSTITUTE</h5>
                   <p className="text-black fw-normal pt-1 px-2">Schools and Colleges</p>
                   {/* <!-- <h6 className="color-pink pt-2">Get Started ></h6> --> */}
-                  <a href="/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
+                  <a href="https://app.focalyt.com/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
                   {/* <!-- <figure>
                   <img src="public_assets/images/newpage/index/employee.svg" className="img-fluid" draggable="false">
                 </figure> --> */}
@@ -606,7 +606,7 @@ const HomePage = () => {
                   <h5 className="text-black fw-bold">SKILL-EDUCATOR</h5>
                   <p className="text-black fw-normal pt-1 px-2">Passionate for Training</p>
                   {/* <!-- <h6 className="color-pink pt-2">Get Started ></h6> --> */}
-                  <a href="/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
+                  <a href="https://app.focalyt.com/candidate/login" className="color-pink pt-2">Get Started &gt;</a>
                   {/* <!-- <figure className="pt-2">
                   <img src="public_assets/images/newpage/index/skill-educator.svg" className="img-fluid" draggable="false">
                 </figure> --> */}

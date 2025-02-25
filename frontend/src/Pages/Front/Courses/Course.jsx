@@ -290,8 +290,8 @@ function Course() {
 
                 {/* Selected Sector Display */}
                 <div className="flex items-center gap-3 text-gray-600 mb-4 mt-3">
-                  <span className="font-medium text-uppercase text-white me-2">Selected Sector:</span>
-                  <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                  {/* <span className="font-medium text-uppercase text-white me-2">Selected Sector:</span> */}
+                  <span className="px-4 py-1 font-medium  text-uppercase rounded-pill small smallText">
                     {activeFilter === "all"
                       ? "ALL"
                       : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}

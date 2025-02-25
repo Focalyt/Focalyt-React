@@ -441,7 +441,7 @@
     resize: vertical;
 }
 #careerModal .modal-xl {
-max-width: 1140px;
+max-width: 530px;
 }
 
 #careerModal .hero-section {
@@ -475,7 +475,7 @@ margin-left: 4px;
 #careerModal .career-form {
 max-width: 800px;
 margin: 0 auto;
-padding: 2rem;
+padding: 1.2rem;
 }
 
 #careerModal .form-label {
@@ -616,7 +616,7 @@ display: none;
 
 @media (max-width: 768px) {
   .images {
-    gap: 10px;
+    gap: 3px;
   }
     .ar_labs figure{
       display: flex;

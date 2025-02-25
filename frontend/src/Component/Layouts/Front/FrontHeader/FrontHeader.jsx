@@ -143,7 +143,7 @@ const FrontHeader = () => {
                     <li class="nav-item nav-item-has-children">
                       {/* <!-- <a href="https://about.focalyt.com/" target="_blank" class="nav-link-item drop-trigger">About Us
                   </a> --> */}
-                      <a href="/about" class="nav-link-item drop-trigger">About Us
+                      <a href="https://app.focalyt.com/about" class="nav-link-item drop-trigger">About Us
                       </a>
                     </li>
                     <li class="nav-item">
@@ -171,8 +171,8 @@ const FrontHeader = () => {
 
                         {/* <!-- Dropdown Menu --> */}
                         <ul class="dropdown-menu" id="loginDropdown">
-                          <li><a href="https://app.focalyt.com/company/login" target="_blank" class="dropdown-item">Login as Corporate</a></li>
-                          <li><a href="https://app.focalyt.com/candidate/login" target="_blank" class="dropdown-item">Login as Student</a></li>
+                          <li><a href="https://app.focalyt.com/company/login" class="dropdown-item">Login as Corporate</a></li>
+                          <li><a href="https://app.focalyt.com/candidate/login" class="dropdown-item">Login as Student</a></li>
                         </ul>
                       </div>
                     </li>
