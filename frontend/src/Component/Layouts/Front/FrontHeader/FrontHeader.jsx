@@ -171,8 +171,8 @@ const FrontHeader = () => {
 
                         {/* <!-- Dropdown Menu --> */}
                         <ul class="dropdown-menu" id="loginDropdown">
-                          <li><a href="app.focalyt.com/company/login" target="_blank" class="dropdown-item">Login as Corporate</a></li>
-                          <li><a href="app.focalyt.com/candidate/login" target="_blank" class="dropdown-item">Login as Student</a></li>
+                          <li><a href="https://app.focalyt.com/company/login" target="_blank" class="dropdown-item">Login as Corporate</a></li>
+                          <li><a href="https://app.focalyt.com/candidate/login" target="_blank" class="dropdown-item">Login as Student</a></li>
                         </ul>
                       </div>
                     </li>
