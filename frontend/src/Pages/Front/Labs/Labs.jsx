@@ -330,7 +330,7 @@ function Labs() {
         <div className="icon-wrapper">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
         </div>
-        <div className="content">
+        <div className="content m-0">
           <h2>Expert Support</h2>
           <p>Our team of skilled trainers and engineers provides proper guidance and hands-on training to your students and faculty. You will receive continuous support at every step of the process.</p>
         </div>
@@ -340,7 +340,7 @@ function Labs() {
         <div className="icon-wrapper">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
         </div>
-        <div className="content">
+        <div className="content m-0">
           <h2>Reduced Costs</h2>
           <p>No need for heavy investments in infrastructure and equipment. We offer modern technology & innovative training solutions that fit your budget without requiring significant capital expenditure.</p>
         </div>
@@ -350,7 +350,7 @@ function Labs() {
         <div className="icon-wrapper">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
         </div>
-        <div className="content">
+        <div className="content m-0">
           <h2>Enhanced Market Visibility</h2>
           <p>Your institute will be recognized as a modern, innovative institution that provides cutting-edge technology and future-ready education, strengthening your reputation in the education sector.</p>
         </div>
@@ -360,7 +360,7 @@ function Labs() {
         <div className="icon-wrapper">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
         </div>
-        <div className="content">
+        <div className="content m-0">
           <h2>Hands-On Practical Training</h2>
           <p>Students gain not just theoretical knowledge but also practical, real-world experience. With advanced tools and technologies, they develop industry-ready skills that are highly in demand today.</p>
         </div>
@@ -370,7 +370,7 @@ function Labs() {
         <div className="icon-wrapper">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
         </div>
-        <div className="content">
+        <div className="content m-0">
           <h2>Access Emerging Technologies</h2>
           <p>Stay ahead with access to the latest tools and kits for every new innovation. This ensures that your students are always in sync with global technological advancements.</p>
         </div>
@@ -380,7 +380,7 @@ function Labs() {
         <div className="icon-wrapper">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"></path></svg>
         </div>
-        <div className="content">
+        <div className="content m-0">
           <h2>Focus on Learning Outcomes</h2>
           <p>Free yourself from infrastructure and maintenance worries and focus solely on enhancing student learning and growth. All backend and hardware management is handled by us.</p>
         </div>
