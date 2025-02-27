@@ -268,13 +268,31 @@ function Course() {
                 </div>
 
                 {/* Selected Sector Display */}
-                <div className="flex items-center gap-3 text-gray-600 mb-4 mt-3">
+                <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
+                  <div>
                   <span className="font-medium text-uppercase text-white me-2">Selected Sector:</span>
                   <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
                     {activeFilter === "all"
                       ? "ALL"
                       : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
                   </span>
+                  </div>
+                  <div className='d-flex gap-1' ><span className="font-medium text-uppercase text-white me-2">Select Course Type:</span>
+                  <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                    {activeFilter === "all"
+                      ? "ALL"
+                      : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
+                  </span>
+                  <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                    {activeFilter === "all"
+                      ? "Paid"
+                      : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "Paid"}
+                  </span>
+                  <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                    {activeFilter === "all"
+                      ? "Free"
+                      : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "Free"}
+                  </span></div>
                 </div>
 
                 {/* Course Cards */}
