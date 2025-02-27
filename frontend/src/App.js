@@ -13,15 +13,15 @@ import CourseDetails from './Pages/Front/CourseDetails/CourseDetails';
 import "./App.css";
 import CompanyLogin from './Component/Layouts/App/Company/CompanyLogin';
 import Community from './Pages/Front/Community/Community';
-import MetaPixel from './Component/MetaPixel';
+
 
 const Layout = () => {
   const location = useLocation(); 
 
   return (
     <>
-    <MetaPixel /> {/* ✅ Ye Pixel Tracking Start Karega */}
-      <FrontHeader />
+    
+      
       <Routes>
         <Route exact path="/" element={<HomePage />} />
         <Route exact path="/about" element={<About />} />
@@ -35,7 +35,6 @@ const Layout = () => {
       </Routes>
 
 
-      {location.pathname !== "/community" && <FrontFooter />}
     </>
   );
 };
