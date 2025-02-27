@@ -11,6 +11,8 @@ import CourseDetails from './Pages/Front/CourseDetails/CourseDetails';
 import "./App.css";
 import CompanyLogin from './Component/Layouts/App/Company/CompanyLogin';
 import Community from './Pages/Front/Community/Community';
+import CandidateLayout from './Component/Layouts/App/Candidates';
+import CandidateDashboard from './Pages/App/Candidate/CandidateDashboard/CandidateDashboard';
 
 
 const Layout = () => {
@@ -29,7 +31,7 @@ const Layout = () => {
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/company/login" element={<CompanyLogin />} />
         <Route exact path="/community" element={<Community />} />
-        {/* <Route exact={true} path="/side" element ={<CandidateSidebar/>}/> */}
+        <Route exact={true} path ="/candidate/dashboard" element={<CandidateDashboard/>}/>
       </Routes>
 
 
