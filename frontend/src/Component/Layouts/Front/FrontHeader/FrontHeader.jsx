@@ -109,7 +109,7 @@ const FrontHeader = () => {
 
   return (
     <>
-    <MetaPixel /> {/* ✅ Ye Pixel Tracking Start Karega */}
+   
       <div class="page-wrapper overflow-hidden">
         {/* <!--~~~~~~~~~~~~~~~~~~~~~~~~
      Header Area
