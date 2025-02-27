@@ -374,12 +374,12 @@ div#features_cta figure {
   box-shadow: rgb(165, 214, 208) 5px 5px;
   border-radius: 10px;
 }
-#skills .role:hover {
+/* #skills .role:hover {
   transform: scale(1.05);
-}
-#skills .role:hover {
+} */
+/* #skills .role:hover {
   transform: scale(1.05) rotateX(5deg) rotateY(5deg);
-}
+} */
 .role {
   text-align: center;
   height: 100%;

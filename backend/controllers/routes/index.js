@@ -15,6 +15,7 @@ const fetch = require("cross-fetch");
 const { authChat } = require("../../helpers");
 const { updateSpreadSheetLabLeadsValues } = require("./services/googleservice");
 const { updateSpreadSheetRequestCallValues } = require("./services/googleservice");
+const { updateSpreadSheetCarrerValues } = require("./services/googleservice");
 const moment = require("moment");
 
 router.use('/', frontRoutes);
@@ -528,6 +529,108 @@ router.post('/callback', async (req, res) => {
       <script>
         alert('Message sent successfully!');
         window.location.href = '/courses';
+      </script>
+    `);
+
+  } catch (err) {
+    console.error("Error:", err);
+    req.flash("error", "Something went wrong!");
+    return res.send({ status: "failure", error: "Something went wrong!" });
+  }
+});
+router.post('/career', async (req, res) => {
+  try {
+    const { name, number, location, email, position ,experience ,cv ,info , termsAccepted } = req.body;
+    console.log("Form Data:", req.body);
+
+    if (!name || !number || !location || !email || !position || !experience || !cv || !info || !termsAccepted) {
+      req.flash("error", "Please fill all fields");
+      return res.redirect("/courses");
+    }
+
+    function capitalizeWords(str) {
+      if (!str) return '';
+      return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+    }
+
+    const sheetData = [
+      moment(new Date()).utcOffset('+05:30').format('DD/MM/YYYY'),
+      moment(new Date()).utcOffset('+05:30').format('hh:mm A'),
+      capitalizeWords(name),
+      number,
+      email,
+      experience,
+      position,
+      cv,
+      info,
+      termsAccepted
+    ];
+
+    await updateSpreadSheetCarrerValues(sheetData);
+
+    let subject = "Call Back Request for Course Lead";
+    let msg = `
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+      </head>
+      <body>
+        <div>
+          <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
+            <tbody>
+              <tr>
+                <td align="center">
+                  <table border="0" cellspacing="0" style="width: 600px;">
+                    <tbody>
+                      <tr>
+                        <td align="center" style="font-family:'Manrope',sans-serif!important">
+                          <table border="0" cellspacing="0" cellpadding="0" style="background-color: #F4F3F3; border-radius: 4px; width: 620px;">
+                            <tbody>
+                              <tr>
+                                <td style="background-color:#FC2B5A;color:#ffffff!important" valign="top">
+                                  <a>
+                                    <img src="${baseUrl}/images/logo/logo.png" alt="pic" style="display: block; margin: 40px auto 0; width: 170px;">
+                                  </a>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td align="left" style="font-family:'Manrope',sans-serif!important">
+                                  <p style="text-align:left;line-height:32px;font-size:18px!important;margin:10px 50px 21px">
+                                    You have received a new message with the following details:
+                                  </p>
+                                  <ul style="list-style-type:none;padding-left:0px;margin:20px 50px">
+                                    <li><span style="line-height:32px;font-size:18px!important;">User Name: ${name} (${number})</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Email: ${email}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Position: ${position}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Experience: ${experience}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">CV: ${cv}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Additional Information: ${info}</span></li>
+                                  </ul>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </body>
+    </html>
+    `;
+
+    sendMail(subject, msg, 'info@focalyt.com');
+
+    req.flash("success", "Message sent successfully!");
+    res.send(`
+      <script>
+        alert('Message sent successfully!');
+        window.location.href = '/';
       </script>
     `);
 

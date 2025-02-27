@@ -32,6 +32,9 @@
     color: #fff;
     z-index: 1;
 }
+.fa-2x {
+font-size: 1.2em;}
+
 #mobile-footer-nav figure img{
     border: 1px solid #FC2B5A;
     border-radius: 50px;   

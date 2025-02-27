@@ -4,12 +4,13 @@ const {sheetId} = require('../../../config')
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 const serviceAccountKeyFile = "./focalyt-new-key.json";
 const tabName = 'candidates';
-const futureTechnologyLabstabName = 'FutureTechnology Lab'
-
+const futureTechnologyLabstabName = 'FutureTechnology Lab';
+const carrertabName ='Carrer Page';
 
 module.exports = {
   updateSpreadSheetValues,
-  updateSpreadSheetLabLeadsValues
+  updateSpreadSheetLabLeadsValues,
+  updateSpreadSheetCarrerValues
 }
 
 async function getAuthToken() {
@@ -44,6 +45,19 @@ async function updateSpreadSheetLabLeadsValues(data) {
   googleSheetClient.spreadsheets.values.append({
     spreadsheetId:sheetId,
     range: `${futureTechnologyLabstabName}`,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    resource: {
+      "majorDimension": "ROWS",
+      "values": [data]
+    },
+  });
+}
+async function updateSpreadSheetCarrerValues(data) {
+  const googleSheetClient = await getAuthToken();
+  googleSheetClient.spreadsheets.values.append({
+    spreadsheetId:sheetId,
+    range: `${carrertabName}`,
     valueInputOption: 'USER_ENTERED',
     insertDataOption: 'INSERT_ROWS',
     resource: {

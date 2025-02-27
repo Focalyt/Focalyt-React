@@ -51,14 +51,20 @@ img.group1 {
     font-weight: 700;
     font-family: 'INTER', sans-serif;
 }
+
 .courseCard{
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
+  border-radius: 12px!important;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
 }
 video#courseVid {
     width: 100%;
     height: auto;
     border-radius: 6px;
+}
+.smallText{
+  color: #fff;
+  background-color: #FC2B5A!important;
 }
 button.close {
     z-index: 9;
@@ -414,4 +420,34 @@ button.close span {
 }
 .apply_date{
     font-size: 16px;
+}
+
+#callbackForm input , #callbackForm select{
+  background-color: transparent;
+  padding: 7px 12px;
+  border: 1px solid ;
+  height: 37px;
+}
+#callbackForm textarea{
+  margin-bottom: 20px;
+  border: 1px solid ;
+}
+#callbackForm button{
+  border: 1px solid #fc2b5a;
+  transition: 0.4s ease-in-out;
+}
+#callbackForm button:hover{
+  border: 1px solid #FC2B5A;
+  color: #FC2B5A;
+  font-weight: bold;
+  background: transparent!important;
+  scale: 1.1;
+}
+.newWidth{
+  width: 30%!important;
+}
+@media (max-width:992px){
+  .newWidth{
+    width: 100%!important;
+  }
 }

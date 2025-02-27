@@ -68,7 +68,7 @@ function Course() {
     setSuccessMessage("");
     setErrorMessage("");
 
-   
+
 
     try {
       const response = await axios.post(`${backendUrl}/callback`, {
@@ -80,8 +80,8 @@ function Course() {
       if (response.status === 200 || response.status === 201) {
         alert("Form submitted successfully!"); // ✅ Alert दिखाएगा
         window.location.reload(); // ✅ Page Refresh करेगा
-       
-        
+
+
       }
     } catch (error) {
       setErrorMessage("Failed to submit the form. Please try again.");
@@ -95,7 +95,7 @@ function Course() {
     // Fetch courses data from API
     const fetchData = async () => {
       try {
-        
+
         const response = await axios.get(`${backendUrl}/courses`);
         console.log("Courses data received:", response);
         setCourses(response.data.courses);
@@ -108,37 +108,37 @@ function Course() {
     fetchData();
   }, []);
 
-  
+
   // Filter courses based on selected sector and search term
   const getFilteredCourses = () => {
-    
-    
-    
+
+
+
     // Start with all courses
     let filtered = [...courses];
-    
+
     // Then filter by sector if not "all"
     if (activeFilter !== "all") {
       const sectorId = activeFilter.replace("id_", "");
       console.log("Filtering by sector ID:", sectorId);
-      
+
       filtered = filtered.filter(course => {
         if (!course.sectors || !Array.isArray(course.sectors)) {
           return false;
         }
-        
+
         const hasMatchingSector = course.sectors.some(s => s && s.toString() === sectorId);
         return hasMatchingSector;
       });
-      
+
       console.log("After sector filter, courses count:", filtered.length);
     }
-    
+
     // Then filter by search term if it exists
     if (searchTerm && searchTerm.trim() !== "") {
       const term = searchTerm.toLowerCase().trim();
       console.log("Filtering by search term:", term);
-      
+
       filtered = filtered.filter(course => {
         // Check multiple fields
         const nameMatch = course.name && course.name.toLowerCase().includes(term);
@@ -148,17 +148,17 @@ function Course() {
         const stateMatch = course.state && course.state.toLowerCase().includes(term);
         const modeMatch = course.trainingMode && course.trainingMode.toLowerCase().includes(term);
         const typeMatch = course.courseType && course.courseType.toLowerCase().includes(term);
-        const sectorMatch = course.sectorNames && course.sectorNames.some(name => 
+        const sectorMatch = course.sectorNames && course.sectorNames.some(name =>
           name.toLowerCase().includes(term)
         );
-        
-        return nameMatch || qualificationMatch || durationMatch || cityMatch || 
-               stateMatch || modeMatch || typeMatch || sectorMatch;
+
+        return nameMatch || qualificationMatch || durationMatch || cityMatch ||
+          stateMatch || modeMatch || typeMatch || sectorMatch;
       });
-      
+
       console.log("After search filter, courses count:", filtered.length);
     }
-    
+
     console.log("Final filtered courses count:", filtered.length);
     return filtered;
   };
@@ -295,159 +295,159 @@ function Course() {
                   </span></div>
                 </div>
 
-                {/* Course Cards */}
-                <div className="row">
-                  {filteredCourses.length > 0 ? (
-                    filteredCourses.map((course) => (
-                      <div key={course._id} className="col-lg-4 col-md-6 col-sm-12 col-12 pb-4 card-padd">
-                        <div className="card bg-dark courseCard">
-                          <div className="bg-img">
-                            <a
-                              href="#"
-                              data-bs-target="#videoModal"
-                              data-bs-toggle="modal"
-                              data-bs-link={course.videos && course.videos[0] ? `${bucketUrl}/${course.videos[0]}` : ""}
-                              className="pointer img-fluid"
-                            >
-                              <img
-                                src={course.thumbnail
-                                  ? `${bucketUrl}/${course.thumbnail}`
-                                  : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                                className="digi"
-                                alt={course.name}
-                              />
-                              <img
-                                src="/Assets/public_assets/images/newjoblisting/play.svg"
-                                alt="Play"
-                                className="group1"
-                              />
-                            </a>
-                            <div className="flag"></div>
-                            <div className="right_obj shadow">
-                              {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'}
-                            </div>
+              {/* Course Cards */}
+              <div className="row">
+                {filteredCourses.length > 0 ? (
+                  filteredCourses.map((course) => (
+                    <div key={course._id} className="col-lg-4 col-md-6 col-sm-12 col-12 pb-4 card-padd">
+                      <div className="card bg-dark courseCard">
+                        <div className="bg-img">
+                          <a
+                            href="#"
+                            data-bs-target="#videoModal"
+                            data-bs-toggle="modal"
+                            data-bs-link={course.videos && course.videos[0] ? `${bucketUrl}/${course.videos[0]}` : ""}
+                            className="pointer img-fluid"
+                          >
+                            <img
+                              src={course.thumbnail
+                                ? `${bucketUrl}/${course.thumbnail}`
+                                : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
+                              className="digi"
+                              alt={course.name}
+                            />
+                            <img
+                              src="/Assets/public_assets/images/newjoblisting/play.svg"
+                              alt="Play"
+                              className="group1"
+                            />
+                          </a>
+                          <div className="flag"></div>
+                          <div className="right_obj shadow">
+                            {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'}
                           </div>
+                        </div>
 
-                          <div className="card-body px-0 pb-0">
-                            <h4
-                              className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
-                              title={course.name}
-                            >
-                              {course.name}
-                            </h4>
+                        <div className="card-body px-0 pb-0">
+                          <h4
+                            className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
+                            title={course.name}
+                          >
+                            {course.name}
+                          </h4>
 
-                            <div className="row" id="course_height">
-                              <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                <div className="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-10 mx-auto mb-2">
-                                  <div className="row">
-                                    {/* Eligibility */}
-                                    <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                      <div className="row">
-                                        <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                          <figure className="text-end">
-                                            <img
-                                              src="/Assets/public_assets/images/icons/eligibility.png"
-                                              className="img-fluid new_img p-0"
-                                              draggable="false"
-                                            />
-                                          </figure>
-                                        </div>
-                                        <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                          <p className="mb-0 text-white">Eligibility</p>
-                                          <p className="mb-0 text-white">
-                                            <small className="sub_head">({course.qualification})</small>
+                          <div className="row" id="course_height">
+                            <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                              <div className="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-10 mx-auto mb-2">
+                                <div className="row">
+                                  {/* Eligibility */}
+                                  <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
+                                    <div className="row">
+                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
+                                        <figure className="text-end">
+                                          <img
+                                            src="/Assets/public_assets/images/icons/eligibility.png"
+                                            className="img-fluid new_img p-0"
+                                            draggable="false"
+                                          />
+                                        </figure>
+                                      </div>
+                                      <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
+                                        <p className="mb-0 text-white">Eligibility</p>
+                                        <p className="mb-0 text-white">
+                                          <small className="sub_head">({course.qualification})</small>
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Duration */}
+                                  <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
+                                    <div className="row">
+                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
+                                        <figure className="text-end">
+                                          <img
+                                            src="/Assets/public_assets/images/icons/duration.png"
+                                            className="img-fluid new_img p-0"
+                                            draggable="false"
+                                          />
+                                        </figure>
+                                      </div>
+                                      <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
+                                        <p className="mb-0 text-white">Duration</p>
+                                        <p className="mb-0 text-white">
+                                          <small className="sub_head">({course.duration})</small>
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Location */}
+                                  <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
+                                    <div className="row">
+                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
+                                        <figure className="text-end">
+                                          <img
+                                            src="/Assets/public_assets/images/icons/location-pin.png"
+                                            className="img-fluid new_img p-0"
+                                            draggable="false"
+                                          />
+                                        </figure>
+                                      </div>
+                                      <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
+                                        <p className="mb-0 text-white">Location</p>
+                                        <div className="ellipsis-wrapper">
+                                          <p
+                                            className="mb-0 text-white para_ellipsis"
+                                            title={course.city ? `${course.city}, ${course.state}` : 'NA'}
+                                          >
+                                            <small className="sub_head">
+                                              {course.city
+                                                ? `(${course.city}, ${course.state})`
+                                                : 'NA'}
+                                            </small>
                                           </p>
                                         </div>
                                       </div>
                                     </div>
+                                  </div>
 
-                                    {/* Duration */}
-                                    <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                      <div className="row">
-                                        <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                          <figure className="text-end">
-                                            <img
-                                              src="/Assets/public_assets/images/icons/duration.png"
-                                              className="img-fluid new_img p-0"
-                                              draggable="false"
-                                            />
-                                          </figure>
-                                        </div>
-                                        <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                          <p className="mb-0 text-white">Duration</p>
-                                          <p className="mb-0 text-white">
-                                            <small className="sub_head">({course.duration})</small>
-                                          </p>
-                                        </div>
+                                  {/* Mode */}
+                                  <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
+                                    <div className="row">
+                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
+                                        <figure className="text-end">
+                                          <img
+                                            src="/Assets/public_assets/images/icons/job-mode.png"
+                                            className="img-fluid new_img p-0"
+                                            draggable="false"
+                                          />
+                                        </figure>
+                                      </div>
+                                      <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
+                                        <p className="mb-0 text-white">Mode</p>
+                                        <p className="mb-0 text-white">
+                                          <small className="sub_head">({course.trainingMode})</small>
+                                        </p>
                                       </div>
                                     </div>
+                                  </div>
 
-                                    {/* Location */}
-                                    <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                      <div className="row">
-                                        <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                          <figure className="text-end">
-                                            <img
-                                              src="/Assets/public_assets/images/icons/location-pin.png"
-                                              className="img-fluid new_img p-0"
-                                              draggable="false"
-                                            />
-                                          </figure>
-                                        </div>
-                                        <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                          <p className="mb-0 text-white">Location</p>
-                                          <div className="ellipsis-wrapper">
-                                            <p
-                                              className="mb-0 text-white para_ellipsis"
-                                              title={course.city ? `${course.city}, ${course.state}` : 'NA'}
-                                            >
-                                              <small className="sub_head">
-                                                {course.city
-                                                  ? `(${course.city}, ${course.state})`
-                                                  : 'NA'}
-                                              </small>
-                                            </p>
-                                          </div>
-                                        </div>
+                                  {/* Last Date */}
+                                  <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-2 text-center">
+                                    <div className="row">
+                                      <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 my-auto">
+                                        <p className="text-white apply_date">Last Date for apply</p>
+                                      </div>
+                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 text-white courses_features ps-0">
+                                        <p className="color-yellow fw-bold">
+                                          {course.lastDateForApply
+                                            ? moment(course.lastDateForApply).utcOffset("+05:30").format('MMM DD YYYY')
+                                            : 'NA'}
+                                        </p>
                                       </div>
                                     </div>
-
-                                    {/* Mode */}
-                                    <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                      <div className="row">
-                                        <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                          <figure className="text-end">
-                                            <img
-                                              src="/Assets/public_assets/images/icons/job-mode.png"
-                                              className="img-fluid new_img p-0"
-                                              draggable="false"
-                                            />
-                                          </figure>
-                                        </div>
-                                        <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                          <p className="mb-0 text-white">Mode</p>
-                                          <p className="mb-0 text-white">
-                                            <small className="sub_head">({course.trainingMode})</small>
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Last Date */}
-                                    <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-2 text-center">
-                                      <div className="row">
-                                        <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 my-auto">
-                                          <p className="text-white apply_date">Last Date for apply</p>
-                                        </div>
-                                        <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 text-white courses_features ps-0">
-                                          <p className="color-yellow fw-bold">
-                                            {course.lastDateForApply
-                                              ? moment(course.lastDateForApply).utcOffset("+05:30").format('MMM DD YYYY')
-                                              : 'NA'}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
+                                  </div>
 
                                     {/* Action Buttons */}
                                     <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
@@ -479,32 +479,32 @@ function Course() {
                               </div>
                             </div>
 
-                            {/* Footer */}
-                            <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
-                              <div className="row py-2">
-                                <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                  <a href={`https://app.focalyt.com/coursedetails/${course._id}`}>
-                                    <span className="learnn pt-1 text-white">Learn More</span>
-                                    <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
-                                  </a>
-                                </div>
+                          {/* Footer */}
+                          <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
+                            <div className="row py-2">
+                              <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
+                                <a href={`https://app.focalyt.com/coursedetails/${course._id}`}>
+                                  <span className="learnn pt-1 text-white">Learn More</span>
+                                  <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
+                                </a>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="col-12 text-center py-5">
-                      <h3 className="text-muted">No courses found matching your criteria</h3>
-                      <p>Try adjusting your search or filters to find more courses</p>
                     </div>
-                  )}
-                </div>
+                  ))
+                ) : (
+                  <div className="col-12 text-center py-5">
+                    <h3 className="text-muted">No courses found matching your criteria</h3>
+                    <p>Try adjusting your search or filters to find more courses</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
+
       </section>
 
       {/* Video Modal */}
@@ -526,7 +526,7 @@ function Course() {
 
       {/* Callback Modal */}
       <div className="modal fade" id="callbackModal" tabIndex="-1" aria-labelledby="callbackModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered">
+        <div className="modal-dialog modal-dialog-centered newWidth">
           <div className="modal-content">
             <div className="modal-header">
               <h5 className="modal-title text-black" id="callbackModalLabel">
@@ -535,7 +535,7 @@ function Course() {
               <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div className="modal-body">
-            <form id="callbackForm" onSubmit={handleSubmit}>
+              <form id="callbackForm" onSubmit={handleSubmit}>
                 <div className="row mb-3">
                   <div className="col-md-6 col-6">
                     <label className="form-label">Name</label>
@@ -568,7 +568,7 @@ function Course() {
                   <textarea className="form-control" name="message" value={formData.message} onChange={handleChange} required placeholder="Enter your message here..."></textarea>
                 </div>
 
-             
+
 
                 <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Submitting..." : "Submit"}</button>
                 {successMessage && <p className="text-success">{successMessage}</p>}

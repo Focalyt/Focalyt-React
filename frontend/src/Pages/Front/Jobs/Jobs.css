@@ -3,12 +3,11 @@
 }
 
 .margin-top-120 {
-    margin-top: 120px;
+    margin-top: 94px;
 }
 .input-group {
     position: relative;
-    display: flex
-;
+    display: flex;
     flex-wrap: wrap;
     align-items: stretch;
     width: 100%;

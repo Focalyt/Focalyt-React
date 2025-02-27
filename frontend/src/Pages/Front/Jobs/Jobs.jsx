@@ -3,7 +3,7 @@ import "./Jobs.css"
 function Jobs() {
   return (
     <>
-  <section class="pattern py-5 section-padding-120 margin-top-120" >
+  {/* <section class="pattern py-5 section-padding-120 margin-top-120" >
     <div class="container">
       <form method="get" id="myForm">
       <div class="row">
@@ -60,64 +60,15 @@ function Jobs() {
         </div>
         <div class="col-xxl-8 col-xl-8 col-md-8 col-sm-12 col-12 mx-auto">
           <div class="row justify-content-around overflow-x-auto feature_cta_row" id="features_cta">
-         {/* <!--  <input type="hidden" name="sector" id="sector"/>
-              <li class="cta_cols">
-                <figure class="figure">
-                  <img class="Sirv image-main sirv-image-loaded" src="public_assets/images/newjoblisting/hospitality.png"
-                    data-src="public_assets/images/newjoblisting/hospitality.png"
-                    referrerpolicy="no-referrer-when-downgrade" id="responsive-image-5225031" loading="lazy">
-                  <img class="Sirv image-hover sirv-image-loaded"
-                    data-src="public_assets/images/newjoblisting/hospitality_v.png"
-                    referrerpolicy="no-referrer-when-downgrade" id="responsive-image-5217695" loading="lazy"
-                    src="public_assets/images/newjoblisting/hospitality_v.png">
-                </figure>
-                <h4 class="head mb-0">Hospitality</h4>
-              </li>
-              <li class="cta_cols">
-                <figure class="figure">
-                  <img class="Sirv image-main sirv-image-loaded" src="public_assets/images/newjoblisting/manufacturing_v.png"
-                    data-src="public_assets/images/newjoblisting/manufacturing_v.png"
-                    referrerpolicy="no-referrer-when-downgrade" id="responsive-image-2031342" loading="lazy">
-                  <img class="Sirv image-hover sirv-image-loaded"
-                    data-src="public_assets/images/newjoblisting/manufacturing.png"
-                    referrerpolicy="no-referrer-when-downgrade" id="responsive-image-8987766" loading="lazy"
-                    src="public_assets/images/newjoblisting/manufacturing.png">
-                </figure>
-                <h4 class="head mb-0">Manufacturing</h4>
-              </li>
-              <li class="cta_cols">
-                <figure class="figure">
-                  <img class="Sirv image-main sirv-image-loaded" src="public_assets/images/newjoblisting/banking.png"
-                    data-src="public_assets/images/newjoblisting/banking.png"
-                    referrerpolicy="no-referrer-when-downgrade" id="responsive-image-5772549" loading="lazy">
-                  <img class="Sirv image-hover sirv-image-loaded"
-                    data-src="public_assets/images/newjoblisting/banking_v.png"
-                    referrerpolicy="no-referrer-when-downgrade" id="responsive-image-5669033" loading="lazy"
-                    src="public_assets/images/newjoblisting/banking_v.png">
-                </figure>
-                <h4 class="head mb-0">Banking</h4>
-              </li>
-              <li class="cta_cols">
-                <figure class="figure">
-                  <img class="Sirv image-main sirv-image-loaded" src="public_assets/images/newjoblisting/hospitality.png"
-                    data-src="public_assets/images/newjoblisting/hospitality.png"
-                    referrerpolicy="no-referrer-when-downgrade" id="responsive-image-5225031" loading="lazy">
-                  <img class="Sirv image-hover sirv-image-loaded"
-                    data-src="public_assets/images/newjoblisting/hospitality_v.png"
-                    referrerpolicy="no-referrer-when-downgrade" id="responsive-image-5217695" loading="lazy"
-                    src="public_assets/images/newjoblisting/hospitality_v.png">
-                </figure>
-                <h4 class="head mb-0">Hospitality</h4>
-              </li>
-            </ul> --> */}
+     
           </div>
         </div>
       </div>
     </form>
     </div>
     
-  </section>
-  <section>
+  </section> */}
+  <section className='mt-5 section-padding-120'>
     <div class="container">
       <div class="row">
         <div class="col-md-8 mx-auto">
