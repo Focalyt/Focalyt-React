@@ -1,9 +1,10 @@
 import React from 'react'
 import "./Labs.css";
+import FrontLayout from '../../../Component/Layouts/Front';
 function Labs() {
   return (
     <>
-
+<FrontLayout>
 <section className="section-padding-120 mt-5 bg-white">
   <div className="container">
     <div className="labs_section">
@@ -1970,113 +1971,7 @@ useful in their future prospect.
   </div>
 </section>
 
-{/* <!-- faqs  --> */}
-
-{/* <script src="/js/newpage/js/animation.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/MotionPathPlugin.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollToPlugin.min.js"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    gsap.registerPlugin(MotionPathPlugin, ScrollToPlugin);
-
-    // Create drone element
-    const drone = document.createElement('div');
-    drone.classNameName = 'flying-drone';
-    drone.innerHTML = `
-        <video className="drone-video" autoplay loop muted playsinline>
-            <source src="public_assets/videos/drone.mp" type="video/mp4">
-        </video>
-    `;
-    drone.style.cssText = `
-        position: fixed;
-        display: none;
-        z-index: 9999;
-        pointer-events: none;
-        transform: translate(-50%, -50%);
-        width: 50px;
-        height: 50px;
-    `;
-    document.body.appendChild(drone);
-
-    // Add click handlers
-    const icons = document.querySelectorAll('.icon-container');
-    
-    icons.forEach(icon => {
-        icon.addEventListener('click', function() {
-            const targetSection = this.getAttribute('data-target');
-            const targetElement = document.getElementById(targetSection);
-            
-            if (!targetElement) return;
-
-            console.log('Icon clicked, target:', targetSection); // Debug log
-
-            // Get positions
-            const iconRect = this.getBoundingClientRect();
-            const targetRect = targetElement.getBoundingClientRect();
-            
-            // Calculate positions
-            const startX = iconRect.left + iconRect.width / 2;
-            const startY = iconRect.top + window.scrollY + iconRect.height / 2;
-            const endX = targetRect.left + targetRect.width / 2;
-            const endY = targetRect.top + window.scrollY;
-
-            // Debug logs
-            console.log('Start position:', startX, startY);
-            console.log('End position:', endX, endY);
-
-            // Show drone and animate
-            gsap.set(drone, {
-                display: 'block',
-                x: startX,
-                y: startY,
-                scale: 0
-            });
-
-            const tl = gsap.timeline({
-                onStart: () => console.log('Animation started'),
-                onComplete: () => {
-                    console.log('Animation completed');
-                    gsap.set(drone, { display: 'none' });
-                }
-            });
-
-            tl.to(drone, {
-                scale: 1,
-                duration: 0.3,
-                ease: 'back.out'
-            })
-            .to(drone, {
-                duration: 1.5,
-                motionPath: {
-                    path: [
-                        { x: startX, y: startY },
-                        { x: startX + (endX - startX)/2, y: startY - 100 },
-                        { x: endX, y: endY }
-                    ],
-                    curviness: 1.5
-                },
-                ease: 'power2.inOut'
-            }, '-=0.1')
-            .to(window, {
-                duration: 1.5,
-                scrollTo: {
-                    y: targetElement,
-                    offsetY: 50
-                },
-                ease: 'power2.inOut'
-            }, '-=1.5')
-            .to(drone, {
-                scale: 0,
-                duration: 0.3,
-                ease: 'back.in'
-            }, '-=0.3');
-        });
-    });
-});
-</script> */}
+</FrontLayout>
 
     </>
   )

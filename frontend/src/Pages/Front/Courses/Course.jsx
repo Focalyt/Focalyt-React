@@ -3,6 +3,7 @@ import "./Course.css";
 import moment from 'moment';
 import axios from 'axios';
 import ReCAPTCHA from "react-google-recaptcha";
+import FrontLayout from '../../../Component/Layouts/Front';
 
 function Course() {
   const [courses, setCourses] = useState([]);
@@ -190,6 +191,8 @@ function Course() {
 
   return (
     <>
+
+    <FrontLayout>
       <section className="bg_pattern py-xl-5 py-lg-5 py-md-5 py-sm-2 py-2 d-none">
         {/* Background pattern section - hidden by default (d-none) */}
         <div className="container">
@@ -588,6 +591,7 @@ function Course() {
           </div>
         </div>
       </div>
+      </FrontLayout>
     </>
   );
 }
