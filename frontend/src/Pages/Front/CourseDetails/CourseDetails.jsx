@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import "./CourseDetails.css"
+import FrontLayout from '../../../Component/Layouts/Front';
 
 function CourseDetails() {
     const { courseId } = useParams();
@@ -67,7 +68,7 @@ function CourseDetails() {
 
     return (
         <>
-
+<FrontLayout>
             <section className="section-padding-120 mt-5">
                 <div className="container">
                     <div className="row">
@@ -709,7 +710,7 @@ function CourseDetails() {
                 </div>
             </div>
 
-
+</FrontLayout>
         </>
     )
 }

@@ -338,8 +338,8 @@ function Jobs() {
       </div>
     </div>
   </div>
-</div>  
-</FrontLayout>    
+</div>      
+</FrontLayout>
     </>
   )
 }

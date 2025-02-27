@@ -4,6 +4,7 @@ import $ from 'jquery';
 import 'slick-carousel';
 import "slick-carousel/slick/slick.css"; 
 import "slick-carousel/slick/slick-theme.css";
+import FrontLayout from "../../../Component/Layouts/Front";
 function About() {
 
     useEffect(() => {
@@ -107,6 +108,7 @@ function About() {
 
     return (
         <>
+        <FrontLayout>
             <section className="section-padding-30 mt-5"></section>
             <section className="bg-white">
                 <div className="focalBanner">
@@ -865,6 +867,7 @@ function About() {
                     </div>
                 </div>
             </section>
+            </FrontLayout>
         </>
     )
 }

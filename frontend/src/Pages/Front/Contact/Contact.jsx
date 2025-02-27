@@ -3,10 +3,11 @@ import "./Contact.css"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHome, faPhone, faEnvelope } from '@fortawesome/free-solid-svg-icons';
 import { faFacebook, faInstagram, faYoutube, faLinkedin } from '@fortawesome/free-brands-svg-icons';
+import FrontLayout from '../../../Component/Layouts/Front';
 function Contact() {
   return (
     <>
-      
+      <FrontLayout>
       <script src="https://www.google.com/recaptcha/api.js"></script>
     <section className="section-padding-120 mt-5 bg-white">
 
@@ -56,7 +57,7 @@ function Contact() {
             referrerpolicy="no-referrer-when-downgrade">
         </iframe>    
       </section>
-
+</FrontLayout>
     </>
   )
 }

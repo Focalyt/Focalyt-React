@@ -10,8 +10,7 @@ const FrontLayout = ({ children }) => {
       <main className="">
         {children}
       </main>
-
-      <FrontFooter/>
+      <FrontFooter />
     </div>
     
   );
