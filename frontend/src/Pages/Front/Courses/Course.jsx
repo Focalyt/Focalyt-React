@@ -166,27 +166,6 @@ function Course() {
 
   const filteredCourses = getFilteredCourses();
 
-  const chatContainerRef = useRef(null);
-  const bootmBoxRef = useRef(null);
-  const [isChatActive, setIsChatActive] = useState(false);
-
-  const openChatbot = () => {
-    const chatContainer = document.getElementById("iframe-box");
-    if (chatContainer) {
-      chatContainer.classList.toggle("active");
-    } else {
-      console.error("Chat container (iframe-box) not found!");
-    }
-  
-    // Trigger the bootm-box click event to initialize the chat
-    const bootmBox = document.getElementById("bootm-box");
-    if (bootmBox) {
-      bootmBox.click();
-    } else {
-      console.error("Element with ID 'bootm-box' not found!");
-    }
-   
-  };
 
 
   return (
@@ -292,13 +271,31 @@ function Course() {
                 </div>
 
                 {/* Selected Sector Display */}
-                <div className="flex items-center gap-3 text-gray-600 mb-4 mt-3">
-                  {/* <span className="font-medium text-uppercase text-white me-2">Selected Sector:</span> */}
-                  <span className="px-4 py-1 font-medium  text-uppercase rounded-pill small smallText">
-                    {activeFilter === "all"
-                      ? "ALL"
-                      : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
-                  </span>
+                <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
+                  <div>
+                    <span className="font-medium text-uppercase text-white me-2">Selected Sector:</span>
+                    <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                      {activeFilter === "all"
+                        ? "ALL"
+                        : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
+                    </span>
+                  </div>
+                  <div className='d-flex gap-1' ><span className="font-medium text-uppercase text-white me-2">Select Course Type:</span>
+                    <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                      {activeFilter === "all"
+                        ? "ALL"
+                        : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
+                    </span>
+                    <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                      {activeFilter === "all"
+                        ? "Paid"
+                        : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "Paid"}
+                    </span>
+                    <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                      {activeFilter === "all"
+                        ? "Free"
+                        : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "Free"}
+                    </span></div>
                 </div>
 
                 {/* Course Cards */}
@@ -465,15 +462,9 @@ function Course() {
                                       </a>
                                     </div>
                                     <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
-                                      {/* <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow">
+                                      <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow">
                                         Chat Now
-                                      </a> */}
-                                      {/* <a onClick={openChatbot} className="btn cta-callnow">
-                                        Chat Now
-                                      </a> */}
-                                      <button onClick={openChatbot} className="btn cta-callnow">
-                                        Chat Now
-                                      </button>
+                                      </a>
                                     </div>
                                     <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
                                       <div className="row pt-2">
@@ -516,7 +507,8 @@ function Course() {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+
       </section>
 
       {/* Video Modal */}

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import "./FrontHeader.css";
 import $ from 'jquery'; 
+import MetaPixel from '../../../../Component/MetaPixel';
 
 
 const FrontHeader = () => {
@@ -108,6 +109,7 @@ const FrontHeader = () => {
 
   return (
     <>
+   
       <div class="page-wrapper overflow-hidden">
         {/* <!--~~~~~~~~~~~~~~~~~~~~~~~~
      Header Area

@@ -3,6 +3,7 @@ import "./Jobs.css"
 import FrontLayout from '../../../Component/Layouts/Front'
 function Jobs() {
   return (
+
     <>
     <FrontLayout>
   {/* <section class="pattern py-5 section-padding-120 margin-top-120" >

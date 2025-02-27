@@ -5,7 +5,8 @@ import FrontFooter from './FrontFooter/FrontFooter';
 const FrontLayout = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col">
-      <FrontHeader />
+      <FrontHeader/>
+      
       <main className="">
         {children}
       </main>
