@@ -329,7 +329,26 @@ router.post('/courses',async (req, res) => {
 
 
     ];
-    await updateSpreadSheetRequestCallValues(sheetData);
+    
+    console.log("Preparing to update Google Sheet with data:", sheetData);
+
+    try {
+        const sheetUpdateResponse = await updateSpreadSheetRequestCallValues(sheetData);
+        console.log("Google Sheet Update Response:", sheetUpdateResponse);
+        
+        // Agar sheet update nahi hoti toh yahin rok dena hai
+        if (!sheetUpdateResponse || sheetUpdateResponse.error) {
+            console.log("Error: Google Sheet update failed!", sheetUpdateResponse.error || "Unknown Error");
+            req.flash("error", "Failed to update Google Sheet!");
+            return res.redirect("/courses");
+        }
+    } catch (sheetError) {
+        console.log("Google Sheet Update Error:", sheetError);
+        req.flash("error", "Google Sheet update failed due to an error.");
+        return res.redirect("/courses");
+    }
+
+    console.log("Google Sheet Updated Successfully!");
 
 
 
