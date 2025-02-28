@@ -466,7 +466,7 @@ router.post('/callback', async (req, res) => {
       message
     ];
 
-    // await updateSpreadSheetRequestCallValues(sheetData);
+    await updateSpreadSheetRequestCallValues(sheetData);
 
     let subject = "Call Back Request for Course Lead";
     let msg = `
