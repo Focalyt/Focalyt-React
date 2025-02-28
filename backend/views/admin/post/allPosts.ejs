@@ -1,0 +1,185 @@
+<link rel="stylesheet" href="/css/newpages/blog.css">
+
+
+<% include ../partials/header %>
+  <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+    <div class="content-header-left col-md-9 col-12 mb-2">
+      <div class="row breadcrumbs-top">
+        <div class="col-12">
+          <h3 class="content-header-title float-left mb-0">All Post</h3>
+          <div class="breadcrumb-wrapper col-12">
+            <ol class="breadcrumb">
+              <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+              <li class="breadcrumb-item active">All Post</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="add-model">
+    <div class="content-body">
+      <% include ../partials/flash %>
+        <div class="">
+          <% if (posts && posts.length> 0) { %>
+            <% posts.forEach((post, i)=> { %>
+              <div class="blog--card">
+                <!-- Header Section -->
+                <div class="card-header">
+                  <div class="inner__card">
+                    <div class="user-info">
+                      <div class="user_image text-black">
+                        <figure>
+                          <img src="/public_assets/images/newpage/favicon.png" alt>
+                        </figure>
+                      </div>
+                      <h3 class="user__name text-black">
+                        <span class="start__name"><b>Focalyt</b></span>
+
+                        <% if (post.tags && post.tags.length> 0) { %>
+                          <span class="tag__user">
+                            is with <b>
+                              <%= post.tags[0].name %>
+                            </b>
+                          </span>
+
+                          <% if (post.tags.length> 1) { %>
+                            <span class="more__user strong"> & <b>
+                                <%= post.tags.length - 1 %>
+                              </b></span>
+                            <span class="other"><b> Others</b></span>
+                            <% } %>
+                              <% } %>
+                      </h3>
+                    </div>
+                    <div class="dropdown-wrapper">
+                      <div class="dropdown-container-post">
+                        <div class="dropdown-trigger-post">
+                          <i class="fas fa-ellipsis-v" style="color: black; cursor: pointer;"></i>
+                        </div>
+                        <div class="dropdown-post">
+                          <div class="dropdown-items">
+                            <i class="fas fa-edit"></i>
+                            <span>Edit</span>
+                          </div>
+                          <div class="dropdown-items">
+                            <div class="custom-control custom-switch custom-control-inline">
+                              <% if(post.status) { %>
+                                <input type="checkbox" onclick="myOnOffFunc('<%= post._id %>', '<%= post.status %>');"
+                                  class="custom-control-input" id="customSwitch<%= i %>" checked />
+                                <label class="custom-control-label" for="customSwitch<%= i %>">
+                                </label>
+                                <% } else { %>
+                                  <input type="checkbox" onclick="myOnOffFunc('<%= post._id %>', '<%= post.status %>');"
+                                    class="custom-control-input" id="customSwitch<%= i %>" />
+                                  <label class="custom-control-label" for="customSwitch<%= i %>">
+                                  </label>
+                                  <% } %>
+                            </div>
+                            <span>Status</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- <h5 class="blog__title text-black">Secure Your Future with Cybersecurity! <span>more...</span></h5> -->
+                  <h5 class="blog__title text-black">
+                    <span class="hidden-text">
+                      <%= post.content || "No content available" %>
+                    </span>
+                    <span class="toggle-more see-more-hidden">See more...</span> <!-- Changed ID to class -->
+                  </h5>
+
+
+                </div>
+
+                <!-- Main Content -->
+                <div class="card-content" id="post-<%= post._id || index %>">
+                  <div class="card-image">
+                    <div class="happy_candidates" id="blog--images">
+                      <div class="happy_candidate_images">
+                        <% if (post.files && post.files.length> 0) { %>
+                          <% post.files.forEach((file)=> { %>
+                            <% if (file.fileType==="image" ) { %>
+                              <div>
+                                <img src="<%= file.fileURL %>" class="d-block w-100" alt="image">
+                              </div>
+                              <% } else if (file.fileType==="video" ) { %>
+                                <div>
+                                  <video class="d-block w-100 video_height lazy-video" muted controls autoplay
+                                    playsinline>
+                                    <source src="<%= file.fileURL %>" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                  </video>
+                                </div>
+                                <% } %>
+                                  <% }); %>
+                                    <% } %>
+
+
+
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+              <% }); %>
+                <% } else { %>
+                  <p>No posts available.</p>
+                  <% } %>
+
+
+        </div>
+
+
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        initCarousel(); // Initialize image carousel
+        // initDropdown(); // Dropdown functionality
+        // initToggleMore(); // Read more functionality
+        // initLazyVideo(); // Video autoplay optimization
+        // initShareButton(); // Sharing functionality
+        // initEdit(); // Edit modal functionality
+        // initTagModal(); // Tagging modal
+      });
+
+      // 🔹 1️⃣ Initialize Carousel (Image Slider)
+      function initCarousel() {
+        document.querySelectorAll(".happy_candidate_images").forEach(container => {
+          const slides = [...container.children];
+          if (slides.length <= 1) return;
+
+          container.insertAdjacentHTML("beforebegin", `
+      <button class="carousel-btn prev">❮</button>
+      <button class="carousel-btn next">❯</button>
+    `);
+          let currentSlide = 0;
+          const updateSlides = () => slides.forEach((slide, i) => slide.style.display = i === currentSlide ? "block" : "none");
+          container.parentNode.querySelector(".prev").addEventListener("click", () => { currentSlide = (currentSlide - 1 + slides.length) % slides.length; updateSlides(); });
+          container.parentNode.querySelector(".next").addEventListener("click", () => { currentSlide = (currentSlide + 1) % slides.length; updateSlides(); });
+          updateSlides();
+        });
+      }
+    </script>
+
+    <style>
+      /* .carousel-btn{
+        border: none;
+        background: transparent;
+      } */
+
+    </style>
+
+
+
+
+  </div>
+
+
+
+  <% include ../partials/footer %>

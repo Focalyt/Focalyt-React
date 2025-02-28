@@ -1,0 +1,182 @@
+<% include ../partials/header %>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12 d-flex justify-content-center">
+            <form id="team-form" class="add-team" enctype="multipart/form-data">
+                <div class="contain">
+                    <label for="image">Add Image</label>
+                    <input type="file" id="image" accept="image/png, image/jpeg" required>
+                    <span id="error-message" style="color: red; display: none;">Only JPG and PNG images are allowed!</span>
+                </div>
+                
+                <div class="contain">
+                    <label for="position">Position</label>
+                    <select name="position" id="level" required>
+                        <option value="Senior Management">Senior Management</option>
+                        <option value="Management">Management</option>
+                        <option value="Staff">Staff</option>
+                    </select>
+                </div>
+                <div class="contain">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" required>
+                </div>
+                <div class="contain">
+                    <label for="designation">Designation</label>
+                    <input type="text" id="designation" required>
+                </div>
+                
+                <div class="contain" id="description-container">
+                    <label for="description">Description</label>
+                    <!-- <input type="text" id="description"> -->
+                    <textarea name="" id="" rows="3" ></textarea>
+                </div>
+                <button type="submit" class="submit-btn">Submit</button>
+            </form>
+        </div>
+    </div>
+</div>
+<style>
+     .add-team {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .add-team label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .add-team input,
+    .add-team select,
+    .add-team textarea {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 15px;
+        background: #f9f9f9;
+        transition: 0.3s ease-in-out;
+        width: 100%;
+        margin-bottom: 15px;
+    }
+    .add-team input:focus,
+    .add-team select:focus,
+    .add-team textarea:focus {
+        border-color: #fc2b5a;
+        outline: none;
+        background: #ffffff;
+        box-shadow: 0px 0px 5px rgba(252, 43, 90, 0.2);
+    }
+
+        .add-team input[type="file"] {
+            padding: 5px;
+            background: transparent;
+        }
+        .add-team textarea {
+        resize: none;
+    }
+    .add-team select {
+        cursor: pointer;
+    }
+        .submit-btn {
+        background: #fc2b5a;
+        color: white;
+        font-size: 16px;
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s ease-in-out, transform 0.2s;
+    }
+
+    .submit-btn:hover {
+        background: #fc2b5a;
+        transform: scale(1.02);
+    }
+</style>
+<script>
+    document.getElementById("level").addEventListener("change", function() {
+        var descriptionContainer = document.getElementById("description-container");
+        
+        if (this.value === "Staff") {
+            descriptionContainer.style.display = "none"; 
+        } else {
+            descriptionContainer.style.display = "block"; 
+        }
+    });
+</script>
+<script>
+     document.getElementById("image").addEventListener("change", function() {
+        var file = this.files[0];
+        if (file) {
+            var fileType = file.type;
+            if (fileType !== "image/png" && fileType !== "image/jpeg") {
+                document.getElementById("error-message").style.display = "block";
+                this.value = ""; 
+            } else {
+                document.getElementById("error-message").style.display = "none";
+            }
+        }
+    });
+
+    
+
+    $(document).ready(function () {
+  $("#team-form").on("submit", function (e) {
+    e.preventDefault(); // डिफ़ॉल्ट फॉर्म सबमिशन रोकें
+
+    const formData = new FormData();
+    
+    // FormData में फाइल और अन्य डेटा जोड़ें
+    formData.append("file", $("#image")[0].files[0]); // ✅ "file" के नाम से जोड़ें, क्योंकि backend इसे `req.files.file` से एक्सेस कर रहा है
+    formData.append("name", $("#name").val());
+    formData.append("position", $("#level").val());
+    formData.append("designation", $("#designation").val());
+    const position =document.getElementById("level").value;
+    
+    
+        
+        if (position != "Staff") {
+            formData.append("description", $("textarea").val());
+        } 
+   
+
+    // Submit बटन को disable करें और लोडिंग दिखाएँ
+    $("button[type=submit]").text("Posting...").attr("disabled", true);
+
+    $.ajax({
+      url: "/admin/team/add", // ✅ Backend API का सही endpoint
+      type: "POST",
+      data: formData,
+      processData: false,  // ⚠️ इसे `false` रखें ताकि jQuery डेटा को ऑटोमैटिक प्रोसेस न करे
+      contentType: false,  // ⚠️ इसे `false` रखें ताकि सही `Content-Type` सेट हो
+      success: function (response) {
+        console.log("Response:", response);
+        alert("Team Member created successfully!");
+        
+        // फ़ॉर्म रीसेट करें
+        $("#team-form")[0].reset();
+        $("button[type=submit]").text("Submit").attr("disabled", false);
+      },
+      error: function (xhr, status, error) {
+        console.error("Error:", error);
+        alert("Failed to create post. Please try again.");
+        $("button[type=submit]").text("Submit").attr("disabled", false);
+      },
+    });
+  });
+});
+
+
+</script>
+
+
+
+<% include ../partials/footer %>

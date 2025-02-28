@@ -1,0 +1,53 @@
+/* .nav-link{
+    display: flex;
+} */
+
+/* Pages/App/Sidebar/Sidebar.css */
+.sidebar {
+    width: 320px;
+    min-height: 100vh;
+    background-color: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    position: fixed;
+    left: 0;
+    top: 0;
+    padding-top: 60px; /* Adjust based on your header height */
+  }
+  
+  .main-content {
+    margin-left: 320px;
+    padding: 20px;
+    min-height: 100vh;
+    width: calc(100% - 320px);
+  }
+
+  body.vertical-layout.vertical-menu-modern.menu-expanded .main-menu {
+    width: 230px;
+}
+@media (min-width: 992px) {
+    body.vertical-layout.vertical-menu-modern .main-menu {
+        width: 230px;
+    }
+}
+body.vertical-layout.vertical-menu-modern .main-menu {
+    transition: 0.4scubic-bezier(0.25, 0.8, 0.25, 1);
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+}
+.main-menu.menu-shadow {
+    box-shadow: 0 0 15px 0 rgba(0, 0, 0, 0.05);
+}
+.main-menu.menu-fixed {
+    position: fixed;
+}
+.main-menu.menu-light {
+    color: #626262;
+    background: #fff;
+}
+.main-menu {
+    z-index: 1031;
+    position: absolute;
+    display: table-cell;
+    height: 100%;
+    overflow: hidden;
+}

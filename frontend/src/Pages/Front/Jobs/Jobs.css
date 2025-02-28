@@ -1,0 +1,142 @@
+#why{
+    background: #121212;
+}
+
+.margin-top-120 {
+    margin-top: 94px;
+}
+.input-group {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    width: 100%;
+}
+.input-group:not(.has-validation)>.dropdown-toggle:nth-last-child(n+3), .input-group:not(.has-validation)>.form-floating:not(:last-child)>.form-control, .input-group:not(.has-validation)>.form-floating:not(:last-child)>.form-select, .input-group:not(.has-validation)>:not(:last-child):not(.dropdown-toggle):not(.dropdown-menu):not(.form-floating) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.input-group button.btn.btn-outline-secondary {
+    border-color: transparent !important;
+}
+button.btn.btn-outline-secondary {
+    border-radius: 50px;
+}
+button.btn.btn-outline-secondary {
+    background-color: #fff;
+}
+.input-group .btn {
+    position: relative;
+    z-index: 2;
+}
+div#two_slect img {
+    width: 20px;
+}
+div#two_slect select {
+    border-top-right-radius: 0px;
+    border-top-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    border-bottom-left-radius: 0px;
+}
+select.city_form {
+    border-top-right-radius: 0px !important;
+    border-top-left-radius: 0px;
+    border-bottom-right-radius: 0px !important;
+    border-bottom-left-radius: 0px;
+}
+.pattern {
+    background-image: url(../../../../public/Assets/public_assets/images/pattern-bg.jpg);
+    background-position: center center;
+    transform-origin: 0 0;
+    background-size: initial;
+    background-repeat: repeat;
+    position: relative !important;
+    box-shadow: inset 0 0 0 1000px rgba(18, 18, 18, 0.92);
+}
+button.btn.btn-outline-secondary.exp {
+    border-top-right-radius: 0px;
+    border-top-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    border-bottom-left-radius: 0px;
+}
+button.btn.btn-outline-secondary {
+    border-radius: 50px;
+}
+button.btn.btn-outline-secondary {
+    background-color: #fff;
+}
+.form-select.last_select {
+    border-top-right-radius: 50px !important;
+    border-top-left-radius: 0px;
+    border-bottom-right-radius: 50px !important;
+    border-bottom-left-radius: 0px;
+}
+.year {
+    font-size: 12px;
+}
+button.btn.btn-outline-secondary.exp:hover {
+    color: #000;
+}
+.input-group button.btn.btn-outline-secondary {
+    border-color: transparent !important;
+}
+
+.carousel-indicators button {
+    color: white;
+    width: 10px !important;
+    height: 10px !important;
+    border-radius: 50%;
+    border: 1px solid #FC2B5A !important;
+}
+#carouselExampleIndicators .carousel-indicators button.active {
+    width: 10px;
+    height: 10px;
+    border-radius: 100%;
+    background-color: rgba(255, 42, 86, 1);
+}
+.bg-img img {
+    width: 100%;
+    border-radius: 10px;
+}
+figure img {
+    width: 20px;
+    padding-top: 4px;
+}
+.jobFigImg{
+    width: 20px!important;
+    padding-top: 4px;
+}
+.alter-card-body {
+    background-size: 100% !important;
+    background-position: center;
+    background-image: url(../../../../public/Assets/public_assets/images/newjoblisting/pattern-bg.jpg) !important;
+    background-repeat: no-repeat;
+    position: relative !important;
+    box-shadow: inset 0 0 0 1000px rgba(0, 0, 0, 0.89);
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+}       
+.section-heading {
+    margin-bottom: 40px;
+}
+.primary-gradient {
+    background-image: linear-gradient(to right, rgba(255, 42, 86, 1) 30%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 47%, rgba(255, 255, 255, 1) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.bg-primary-opacity-l2 {
+    background-color: rgba(var(--l2-primary-rgb), 0.03);
+}
+
+
+@media (min-width: 992px) {
+    .section-heading {
+        margin-bottom: 40px;
+    }
+}
+@media (min-width: 575px) {
+    .section-heading {
+        margin-bottom: 60px;
+    }
+}
