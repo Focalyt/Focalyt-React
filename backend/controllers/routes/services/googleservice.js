@@ -11,7 +11,8 @@ const carrertabName ='Carrer Page';
 module.exports = {
   updateSpreadSheetValues,
   updateSpreadSheetLabLeadsValues,
-  updateSpreadSheetCarrerValues
+  updateSpreadSheetCarrerValues,
+  updateSpreadSheetRequestCallValues
 }
 
 async function getAuthToken() {
