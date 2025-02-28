@@ -23,6 +23,7 @@ function Course() {
   const [errorMessage, setErrorMessage] = useState("");
   const recaptchaRef = useRef(null);
   const [videoSrc, setVideoSrc] = useState("");
+  const [feeFilter, setFeeFilter] = useState("all");
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -64,10 +65,14 @@ function Course() {
       }
     };
   }, []);
-  
- 
+
+
   const handleFilterClick = (selectedId) => {
     setActiveFilter(selectedId);
+  };
+
+  const handleFeeFilterClick = (feeType) => {
+    setFeeFilter(feeType); // ✅ Update the selected fee filter (All, Paid, Free)
   };
 
   const handleSearchChange = (event) => {
@@ -176,10 +181,16 @@ function Course() {
 
       console.log("After search filter, courses count:", filtered.length);
     }
+    // ✅ Filter by Fee Type (Paid/Free)
+    if (feeFilter !== "all") {
+      filtered = filtered.filter(course => course.courseFeeType?.toLowerCase() === feeFilter);
+    }
 
     console.log("Final filtered courses count:", filtered.length);
     return filtered;
   };
+
+
 
   const filteredCourses = getFilteredCourses();
 
@@ -289,30 +300,36 @@ function Course() {
 
                   {/* Selected Sector Display */}
                   <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
-                    <div>
-                      <span className="font-medium text-uppercase text-white me-2">Selected Sector:</span>
-                      <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
+                    <div className='d-flex align-items-center'>
+                      <span className="font-medium text-uppercase me-2">Selected Sector:</span>
+                      <span className="filter-button active text-uppercase">
                         {activeFilter === "all"
                           ? "ALL"
                           : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
                       </span>
                     </div>
-                    <div className='d-flex gap-1' ><span className="font-medium text-uppercase text-white me-2">Select Course Type:</span>
-                      <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
-                        {activeFilter === "all"
-                          ? "ALL"
-                          : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
-                      </span>
-                      <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
-                        {activeFilter === "all"
-                          ? "Paid"
-                          : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "Paid"}
-                      </span>
-                      <span className="px-4 py-1 font-medium bg-light text-danger text-uppercase rounded-pill small">
-                        {activeFilter === "all"
-                          ? "Free"
-                          : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "Free"}
-                      </span></div>
+                    <div className='d-flex gap-1' ><span className="font-medium text-uppercase align-content-center me-2">Select Course Type:</span>
+                      <button
+                        className={`filter-button text-uppercase ${feeFilter === "all" ? "active" : ""}`}
+                        onClick={() => handleFeeFilterClick("all")}
+                      >
+                       
+                        ALL
+                      </button>
+                      <button
+                        className={`filter-button text-uppercase ${feeFilter === "paid" ? "active" : ""}`}
+                        onClick={() => handleFeeFilterClick("paid")}
+                      >
+                        Paid
+                      </button>
+                      <button
+                        className={`filter-button text-uppercase ${feeFilter === "free" ? "active" : ""}`}
+                        onClick={() => handleFeeFilterClick("free")}
+                      >
+                        Free
+                      </button>
+
+                    </div>
                   </div>
 
                   {/* Course Cards */}
@@ -565,7 +582,7 @@ function Course() {
         </div> */}
         {/* Video Modal */}
         <div className="modal fade" id="videoModal" tabIndex="-1" aria-labelledby="videoModalTitle" aria-hidden="true"
-          onClick={() => setVideoSrc("")} 
+          onClick={() => setVideoSrc("")}
         >
           <div className="modal-dialog modal-dialog-centered" role="document">
             <div className="modal-content">
@@ -573,7 +590,7 @@ function Course() {
                 <span aria-hidden="true">&times;</span>
               </button>
               <div className="modal-body p-0 text-center embed-responsive">
-                <video key={videoSrc} id="courseVid" controls  className="video-fluid text-center">
+                <video key={videoSrc} id="courseVid" controls className="video-fluid text-center">
                   <source src={videoSrc} type="video/mp4" className="img-fluid video-fluid" />
                   Your browser does not support the video tag.
                 </video>
