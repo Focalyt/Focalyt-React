@@ -280,7 +280,6 @@ router.post('/labs',async (req, res) => {
     return res.send({ status: "failure", error: "Something went wrong!" });
   }
 });
-
 router.post('/courses',async (req, res) => {
   try {
    

@@ -250,7 +250,7 @@ function Course() {
 
                           {/* Search Bar */}
 
-                          <div className="col-md-3 col-">
+                          <div className="col-md-3 col-12">
                             <div className="search-container">
                               <input
                                 type="text"
