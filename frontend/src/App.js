@@ -3,7 +3,7 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from "react";
 import HomePage from '../src/Pages/Front/HomePage/HomePage';
-import { initGA, logPageView } from "./utils/analytics";
+
 import About from './Pages/Front/About/About';
 import Labs from "./Pages/Front/Labs/Labs";
 import Course from './Pages/Front/Courses/Course';
@@ -19,11 +19,7 @@ import Community from './Pages/Front/Community/Community';
 const Layout = () => {
   const location = useLocation(); 
 
-  useEffect(() => {
-    initGA();
-    logPageView();
-    console.log("analytics working")
-}, [location]);
+ 
 
   return (
     <>
