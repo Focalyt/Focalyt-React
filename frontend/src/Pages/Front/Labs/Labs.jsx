@@ -246,91 +246,91 @@ function Labs() {
                                                 {/* Include all your state options here */}
                                                 <option value="Andhra Pradesh">Andhra Pradesh</option>
                                                 <option value="Arunachal Pradesh">
-                                                      Arunachal
-                                                      Pradesh</option>
-                                                    <option value="Assam">Assam
-                                                    </option>
-                                                    <option value="Bihar">Bihar
-                                                    </option>
-                                                    <option value="Chhattisgarh">
-                                                      Chhattisgarh</option>
-                                                    <option value="Goa">Goa</option>
-                                                    <option value="Gujarat">Gujarat
-                                                    </option>
-                                                    <option value="Haryana">Haryana
-                                                    </option>
-                                                    <option value="Himachal Pradesh">
-                                                      Himachal
-                                                      Pradesh</option>
-                                                    <option value="Jharkhand">
-                                                      Jharkhand</option>
-                                                    <option value="Karnataka">
-                                                      Karnataka</option>
-                                                    <option value="Kerala">Kerala
-                                                    </option>
-                                                    <option value="Madhya Pradesh">
-                                                      Madhya
-                                                      Pradesh</option>
-                                                    <option value="Maharashtra">
-                                                      Maharashtra</option>
-                                                    <option value="Manipur">Manipur
-                                                    </option>
-                                                    <option value="Meghalaya">
-                                                      Meghalaya</option>
-                                                    <option value="Mizoram">Mizoram
-                                                    </option>
-                                                    <option value="Nagaland">
-                                                      Nagaland</option>
-                                                    <option value="Odisha">Odisha
-                                                    </option>
-                                                    <option value="Punjab">Punjab
-                                                    </option>
-                                                    <option value="Rajasthan">
-                                                      Rajasthan</option>
-                                                    <option value="Sikkim">Sikkim
-                                                    </option>
-                                                    <option value="Tamil Nadu">Tamil
-                                                      Nadu</option>
-                                                    <option value="Telangana">
-                                                      Telangana</option>
-                                                    <option value="Tripura">Tripura
-                                                    </option>
-                                                    <option value="Uttar Pradesh">
-                                                      Uttar
-                                                      Pradesh</option>
-                                                    <option value="Uttarakhand">
-                                                      Uttarakhand</option>
-                                                    <option value="West Bengal">West
-                                                      Bengal</option>
-                                                    <option value="Andaman and Nicobar Islands">
-                                                      Andaman
-                                                      and
-                                                      Nicobar
-                                                      Islands
-                                                    </option>
-                                                    <option value="Chandigarh">
-                                                      Chandigarh</option>
-                                                    <option value="Dadra and Nagar Haveli and Daman and Diu">
-                                                      Dadra
-                                                      and
-                                                      Nagar
-                                                      Haveli
-                                                      and
-                                                      Daman
-                                                      and
-                                                      Diu</option>
-                                                    <option value="Delhi">Delhi
-                                                    </option>
-                                                    <option value="Lakshadweep">
-                                                      Lakshadweep</option>
-                                                    <option value="Puducherry">
-                                                      Puducherry</option>
-                                                    <option value="Ladakh">Ladakh
-                                                    </option>
-                                                    <option value="Jammu and Kashmir">
-                                                      Jammu
-                                                      and
-                                                      Kashmir</option>
+                                                  Arunachal
+                                                  Pradesh</option>
+                                                <option value="Assam">Assam
+                                                </option>
+                                                <option value="Bihar">Bihar
+                                                </option>
+                                                <option value="Chhattisgarh">
+                                                  Chhattisgarh</option>
+                                                <option value="Goa">Goa</option>
+                                                <option value="Gujarat">Gujarat
+                                                </option>
+                                                <option value="Haryana">Haryana
+                                                </option>
+                                                <option value="Himachal Pradesh">
+                                                  Himachal
+                                                  Pradesh</option>
+                                                <option value="Jharkhand">
+                                                  Jharkhand</option>
+                                                <option value="Karnataka">
+                                                  Karnataka</option>
+                                                <option value="Kerala">Kerala
+                                                </option>
+                                                <option value="Madhya Pradesh">
+                                                  Madhya
+                                                  Pradesh</option>
+                                                <option value="Maharashtra">
+                                                  Maharashtra</option>
+                                                <option value="Manipur">Manipur
+                                                </option>
+                                                <option value="Meghalaya">
+                                                  Meghalaya</option>
+                                                <option value="Mizoram">Mizoram
+                                                </option>
+                                                <option value="Nagaland">
+                                                  Nagaland</option>
+                                                <option value="Odisha">Odisha
+                                                </option>
+                                                <option value="Punjab">Punjab
+                                                </option>
+                                                <option value="Rajasthan">
+                                                  Rajasthan</option>
+                                                <option value="Sikkim">Sikkim
+                                                </option>
+                                                <option value="Tamil Nadu">Tamil
+                                                  Nadu</option>
+                                                <option value="Telangana">
+                                                  Telangana</option>
+                                                <option value="Tripura">Tripura
+                                                </option>
+                                                <option value="Uttar Pradesh">
+                                                  Uttar
+                                                  Pradesh</option>
+                                                <option value="Uttarakhand">
+                                                  Uttarakhand</option>
+                                                <option value="West Bengal">West
+                                                  Bengal</option>
+                                                <option value="Andaman and Nicobar Islands">
+                                                  Andaman
+                                                  and
+                                                  Nicobar
+                                                  Islands
+                                                </option>
+                                                <option value="Chandigarh">
+                                                  Chandigarh</option>
+                                                <option value="Dadra and Nagar Haveli and Daman and Diu">
+                                                  Dadra
+                                                  and
+                                                  Nagar
+                                                  Haveli
+                                                  and
+                                                  Daman
+                                                  and
+                                                  Diu</option>
+                                                <option value="Delhi">Delhi
+                                                </option>
+                                                <option value="Lakshadweep">
+                                                  Lakshadweep</option>
+                                                <option value="Puducherry">
+                                                  Puducherry</option>
+                                                <option value="Ladakh">Ladakh
+                                                </option>
+                                                <option value="Jammu and Kashmir">
+                                                  Jammu
+                                                  and
+                                                  Kashmir</option>
                                               </select>
                                               <label className="label">State <span className="imp">*</span></label>
                                             </div>
@@ -608,7 +608,7 @@ function Labs() {
               </div>
             </div>
 
-            <a href="#contact" className="cta-button">Get Started Today</a>
+            <a href="/contact" className="cta-button">Get Started Today</a>
           </div>
         </section>
         <section className="solution">
@@ -675,6 +675,11 @@ function Labs() {
                   <p>Free yourself from infrastructure and maintenance worries and focus solely on enhancing student learning and growth. All backend and hardware management is handled by us.</p>
                 </div>
               </div>
+            </div>
+            <div className="book_a_demo text-center">
+              <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
+                Book a free demo
+              </button>
             </div>
           </div>
         </section>
@@ -929,212 +934,17 @@ useful in their future prospect.
 
                     </div>
                   </div>
-                  <div className="col-md-12 text-center">
-                    {/* <!-- <div className="book_a_demo ">
-              <a href="#" id="book_a_demo" className="a_btn text-uppercase">
-                View Full Menu
-              </a>
-            </div> --> */}
-                    <div>
-                      <div className="book_a_demo">
-                        <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
-                          Book a free demo
-                        </button>
-                        {/* <!-- Modal --> */}
-                        <div className="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                          <div className="modal-dialog new-model-dialog">
-                            <div className="modal-content">
-                              <div className="modal-header">
-                                <h5 className="modal-title" id="staticBackdropLabel">Book your Free Demo Today!</h5>
-                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div className="modal-body new-modal-body">
-                                <div className="container">
-                                  <div className="row">
 
-                                    <div className="col-md-12">
-                                      <div className="demo_table">
-                                        <form method="post" id="demoForm">
-                                          <div className="demo_form">
-
-                                            <div className="form_name">
-                                              <div className="first_name">
-                                                <input name="name" type="text" className="form_input" placeholder id="fullName" required />
-                                                <label className="label">Full
-                                                  Name
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="email">
-                                                <input name="email" type="text" className="form_input" placeholder id="email" required />
-                                                <label className="label">Email
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                            </div>
-                                            <div className="form_name">
-                                              <div className="phone">
-                                                <input name="mobile" className="form_input" type="text" placeholder id="phone" required maxlength="10" pattern="^\d{10}$" oninput="this.value = this.value.slice(0, 10).replace(/[^0-9]/g, '')" />
-                                                <label className="label">Phone
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="Organisation">
-                                                <input name="organisation" className="form_input" required placeholder type="text" id="organisation" />
-                                                <label className="label">Name
-                                                  of
-                                                  Institute
-                                                  <span>*</span></label>
-                                              </div>
-                                            </div>
-                                            <div className="form_name">
-                                              <div className="designation select-container">
-                                                <select name="designation" className="form_designation_input" id="designation" required>
-                                                  <option value disabled selected>Select
-                                                    your
-                                                    designation</option>
-                                                  <option value="manager">Manager
-                                                  </option>
-                                                  <option value="developer">
-                                                    Developer</option>
-                                                  <option value="designer">
-                                                    Designer</option>
-                                                  <option value="tester">Tester
-                                                  </option>
-                                                </select>
-                                                <label className="label" for="Designation">
-                                                  Designation
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="state">
-                                                <select name="state" className="form_designation_input" id="state" required>
-                                                  <option value disabled selected>Select
-                                                    your
-                                                    State
-                                                  </option>
-                                                  <option value="Andhra Pradesh">
-                                                    Andhra
-                                                    Pradesh</option>
-                                                  <option value="Arunachal Pradesh">
-                                                    Arunachal
-                                                    Pradesh</option>
-                                                  <option value="Assam">Assam
-                                                  </option>
-                                                  <option value="Bihar">Bihar
-                                                  </option>
-                                                  <option value="Chhattisgarh">
-                                                    Chhattisgarh</option>
-                                                  <option value="Goa">Goa</option>
-                                                  <option value="Gujarat">Gujarat
-                                                  </option>
-                                                  <option value="Haryana">Haryana
-                                                  </option>
-                                                  <option value="Himachal Pradesh">
-                                                    Himachal
-                                                    Pradesh</option>
-                                                  <option value="Jharkhand">
-                                                    Jharkhand</option>
-                                                  <option value="Karnataka">
-                                                    Karnataka</option>
-                                                  <option value="Kerala">Kerala
-                                                  </option>
-                                                  <option value="Madhya Pradesh">
-                                                    Madhya
-                                                    Pradesh</option>
-                                                  <option value="Maharashtra">
-                                                    Maharashtra</option>
-                                                  <option value="Manipur">Manipur
-                                                  </option>
-                                                  <option value="Meghalaya">
-                                                    Meghalaya</option>
-                                                  <option value="Mizoram">Mizoram
-                                                  </option>
-                                                  <option value="Nagaland">
-                                                    Nagaland</option>
-                                                  <option value="Odisha">Odisha
-                                                  </option>
-                                                  <option value="Punjab">Punjab
-                                                  </option>
-                                                  <option value="Rajasthan">
-                                                    Rajasthan</option>
-                                                  <option value="Sikkim">Sikkim
-                                                  </option>
-                                                  <option value="Tamil Nadu">Tamil
-                                                    Nadu</option>
-                                                  <option value="Telangana">
-                                                    Telangana</option>
-                                                  <option value="Tripura">Tripura
-                                                  </option>
-                                                  <option value="Uttar Pradesh">
-                                                    Uttar
-                                                    Pradesh</option>
-                                                  <option value="Uttarakhand">
-                                                    Uttarakhand</option>
-                                                  <option value="West Bengal">West
-                                                    Bengal</option>
-                                                  <option value="Andaman and Nicobar Islands">
-                                                    Andaman
-                                                    and
-                                                    Nicobar
-                                                    Islands
-                                                  </option>
-                                                  <option value="Chandigarh">
-                                                    Chandigarh</option>
-                                                  <option value="Dadra and Nagar Haveli and Daman and Diu">
-                                                    Dadra
-                                                    and
-                                                    Nagar
-                                                    Haveli
-                                                    and
-                                                    Daman
-                                                    and
-                                                    Diu</option>
-                                                  <option value="Delhi">Delhi
-                                                  </option>
-                                                  <option value="Lakshadweep">
-                                                    Lakshadweep</option>
-                                                  <option value="Puducherry">
-                                                    Puducherry</option>
-                                                  <option value="Ladakh">Ladakh
-                                                  </option>
-                                                  <option value="Jammu and Kashmir">
-                                                    Jammu
-                                                    and
-                                                    Kashmir</option>
-                                                </select>
-                                                <label className="label">State
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                            </div>
-
-                                            {/* <!-- <textarea className="form-contro mb-3 message-to pe-1" name="message" id="exampleFormControlTextarea1"
-                                  placeholder="Message us" rows="2" ></textarea> --> */}
-                                            <div className="textarea-container">
-                                              <textarea id="message" name="message" placeholder=" " rows="2" required></textarea>
-                                              <label for="exampleTextarea">Your
-                                                Message</label>
-                                            </div>
-
-                                            <button type="submit" className="submit_btn g-recaptcha" data-callback='onSubmit' data-sitekey="6Lej1gsqAAAAAEs4KUUi8MjisY4_PKrC5s9ArN1v">Book
-                                              Demo</button>
-                                          </div>
-
-                                          <div className="alertLoginSuccess alert-success alert-dismissible error_login text-danger" role="alert">
-                                          </div>
-
-                                        </form>
-
-                                      </div>
-
-                                    </div>
-
-                                  </div>
-                                </div>
-                              </div>
-
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                  <div className='col-md-12 m-0'>
+                    <div className="book_a_demo text-center">
+                      <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
+                        Book a free demo
+                      </button>
                     </div>
                   </div>
+                </div>
+                <div className="row justify-content-center py-3">
+
                 </div>
               </div>
             </div>
@@ -1167,205 +977,14 @@ useful in their future prospect.
                         Traditional learning methods rely on textbooks, videos, and simulations. AR/VR Labs take learning beyond the classNameroom by providing a real-time, interactive environment where students and professionals can visualize concepts, explore virtual environments, and gain hands-on experience with complex subjects.
                       </p>
                     </div>
+                    <div className="book_a_demo text-center">
+                      <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
+                        Book a free demo
+                      </button>
+                    </div>
 
                     <div>
-                      <div className="book_a_demo">
-                        <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
-                          Book a free demo
-                        </button>
-                        {/* <!-- Modal --> */}
-                        <div className="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                          <div className="modal-dialog new-model-dialog">
-                            <div className="modal-content">
-                              <div className="modal-header">
-                                <h5 className="modal-title" id="staticBackdropLabel">Book your FREE Demo Today!</h5>
-                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div className="modal-body new-modal-body">
-                                <div className="container">
-                                  <div className="row">
 
-                                    <div className="col-md-12">
-                                      <div className="demo_table">
-                                        <form method="post" id="demoForm">
-                                          <div className="demo_form">
-
-                                            <div className="form_name">
-                                              <div className="first_name">
-                                                <input name="name" type="text" className="form_input" placeholder id="fullName" required />
-                                                <label className="label">Full
-                                                  Name
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="email">
-                                                <input name="email" type="text" className="form_input" placeholder id="email" required />
-                                                <label className="label">Email
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                            </div>
-                                            <div className="form_name">
-                                              <div className="phone">
-                                                <input name="mobile" className="form_input" type="text" placeholder id="phone" required maxlength="10" pattern="^\d{10}$" oninput="this.value = this.value.slice(0, 10).replace(/[^0-9]/g, '')" />
-                                                <label className="label">Phone
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="Organisation">
-                                                <input name="organisation" className="form_input" required placeholder type="text" id="organisation" />
-                                                <label className="label">Name
-                                                  of
-                                                  Institute
-                                                  <span>*</span></label>
-                                              </div>
-                                            </div>
-                                            <div className="form_name">
-                                              <div className="designation select-container">
-                                                <select name="designation" className="form_designation_input" id="designation" required>
-                                                  <option value disabled selected>Select
-                                                    your
-                                                    designation</option>
-                                                  <option value="manager">Manager
-                                                  </option>
-                                                  <option value="developer">
-                                                    Developer</option>
-                                                  <option value="designer">
-                                                    Designer</option>
-                                                  <option value="tester">Tester
-                                                  </option>
-                                                </select>
-                                                <label className="label" for="Designation">
-                                                  Designation
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="state">
-                                                <select name="state" className="form_designation_input" id="state" required>
-                                                  <option value disabled selected>Select
-                                                    your
-                                                    State
-                                                  </option>
-                                                  <option value="Andhra Pradesh">
-                                                    Andhra
-                                                    Pradesh</option>
-                                                  <option value="Arunachal Pradesh">
-                                                    Arunachal
-                                                    Pradesh</option>
-                                                  <option value="Assam">Assam
-                                                  </option>
-                                                  <option value="Bihar">Bihar
-                                                  </option>
-                                                  <option value="Chhattisgarh">
-                                                    Chhattisgarh</option>
-                                                  <option value="Goa">Goa</option>
-                                                  <option value="Gujarat">Gujarat
-                                                  </option>
-                                                  <option value="Haryana">Haryana
-                                                  </option>
-                                                  <option value="Himachal Pradesh">
-                                                    Himachal
-                                                    Pradesh</option>
-                                                  <option value="Jharkhand">
-                                                    Jharkhand</option>
-                                                  <option value="Karnataka">
-                                                    Karnataka</option>
-                                                  <option value="Kerala">Kerala
-                                                  </option>
-                                                  <option value="Madhya Pradesh">
-                                                    Madhya
-                                                    Pradesh</option>
-                                                  <option value="Maharashtra">
-                                                    Maharashtra</option>
-                                                  <option value="Manipur">Manipur
-                                                  </option>
-                                                  <option value="Meghalaya">
-                                                    Meghalaya</option>
-                                                  <option value="Mizoram">Mizoram
-                                                  </option>
-                                                  <option value="Nagaland">
-                                                    Nagaland</option>
-                                                  <option value="Odisha">Odisha
-                                                  </option>
-                                                  <option value="Punjab">Punjab
-                                                  </option>
-                                                  <option value="Rajasthan">
-                                                    Rajasthan</option>
-                                                  <option value="Sikkim">Sikkim
-                                                  </option>
-                                                  <option value="Tamil Nadu">Tamil
-                                                    Nadu</option>
-                                                  <option value="Telangana">
-                                                    Telangana</option>
-                                                  <option value="Tripura">Tripura
-                                                  </option>
-                                                  <option value="Uttar Pradesh">
-                                                    Uttar
-                                                    Pradesh</option>
-                                                  <option value="Uttarakhand">
-                                                    Uttarakhand</option>
-                                                  <option value="West Bengal">West
-                                                    Bengal</option>
-                                                  <option value="Andaman and Nicobar Islands">
-                                                    Andaman
-                                                    and
-                                                    Nicobar
-                                                    Islands
-                                                  </option>
-                                                  <option value="Chandigarh">
-                                                    Chandigarh</option>
-                                                  <option value="Dadra and Nagar Haveli and Daman and Diu">
-                                                    Dadra
-                                                    and
-                                                    Nagar
-                                                    Haveli
-                                                    and
-                                                    Daman
-                                                    and
-                                                    Diu</option>
-                                                  <option value="Delhi">Delhi
-                                                  </option>
-                                                  <option value="Lakshadweep">
-                                                    Lakshadweep</option>
-                                                  <option value="Puducherry">
-                                                    Puducherry</option>
-                                                  <option value="Ladakh">Ladakh
-                                                  </option>
-                                                  <option value="Jammu and Kashmir">
-                                                    Jammu
-                                                    and
-                                                    Kashmir</option>
-                                                </select>
-                                                <label className="label">State
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                            </div>
-
-                                            {/* <!-- <textarea className="form-contro mb-3 message-to pe-1" name="message" id="exampleFormControlTextarea1"
-                              placeholder="Message us" rows="2" ></textarea> --> */}
-                                            <div className="textarea-container">
-                                              <textarea id="message" name="message" placeholder=" " rows="2" required></textarea>
-                                              <label for="exampleTextarea">Your
-                                                Message</label>
-                                            </div>
-
-                                            <button type="submit" className="submit_btn g-recaptcha" data-callback='onSubmit' data-sitekey="6Lej1gsqAAAAAEs4KUUi8MjisY4_PKrC5s9ArN1v">Book
-                                              Demo</button>
-                                          </div>
-                                          <div className="alertLoginSuccess alert-success alert-dismissible error_login text-danger" role="alert">
-
-                                          </div>
-
-                                        </form>
-
-                                      </div>
-
-                                    </div>
-
-                                  </div>
-                                </div>
-                              </div>
-
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1387,207 +1006,13 @@ useful in their future prospect.
                         Drones are transforming industries like agriculture, defense, construction, filmmaking, logistics, and disaster management. With the rise of drone technology, certified drone pilots and experts are in high demand. A Drone Lab gives students the skills, knowledge, and hands-on experience to excel in this futuristic career path.
                       </p>
                     </div>
-
+                    <div className="book_a_demo text-center">
+                      <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
+                        Book a free demo
+                      </button>
+                    </div>
                     <div>
-                      <div className="book_a_demo">
-                        <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
-                          Book a free demo
-                        </button>
-                        {/* <!-- Modal --> */}
-                        <div className="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                          <div className="modal-dialog new-model-dialog">
-                            <div className="modal-content">
-                              <div className="modal-header">
-                                <h5 className="modal-title" id="staticBackdropLabel">Book your Free Demo Today!</h5>
-                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div className="modal-body new-modal-body">
-                                <div className="container">
-                                  <div className="row">
 
-                                    <div className="col-md-12">
-                                      <div className="demo_table">
-                                        <form method="post" id="demoForm">
-                                          <div className="demo_form">
-
-                                            <div className="form_name">
-                                              <div className="first_name">
-                                                <input name="name" type="text" className="form_input" placeholder id="fullName" required />
-                                                <label className="label">Full
-                                                  Name
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="email">
-                                                <input name="email" type="text" className="form_input" placeholder id="email" required />
-                                                <label className="label">Email
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                            </div>
-                                            <div className="form_name">
-                                              <div className="phone">
-                                                <input name="mobile" className="form_input" type="text" placeholder id="phone" required maxlength="10" pattern="^\d{10}$" oninput="this.value = this.value.slice(0, 10).replace(/[^0-9]/g, '')" />
-                                                <label className="label">Phone
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="Organisation">
-                                                <input name="organisation" className="form_input" required placeholder type="text" id="organisation" />
-                                                <label className="label">Name
-                                                  of
-                                                  Institute
-                                                  <span>*</span></label>
-                                              </div>
-                                            </div>
-                                            <div className="form_name">
-                                              <div className="designation select-container">
-                                                <select name="designation" className="form_designation_input" id="designation" required>
-                                                  <option value disabled selected>Select
-                                                    your
-                                                    designation</option>
-                                                  <option value="manager">Manager
-                                                  </option>
-                                                  <option value="developer">
-                                                    Developer</option>
-                                                  <option value="designer">
-                                                    Designer</option>
-                                                  <option value="tester">Tester
-                                                  </option>
-                                                </select>
-                                                <label className="label" for="Designation">
-                                                  Designation
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="state">
-                                                <select name="state" className="form_designation_input" id="state" required>
-                                                  <option value disabled selected>Select
-                                                    your
-                                                    State
-                                                  </option>
-                                                  <option value="Andhra Pradesh">
-                                                    Andhra
-                                                    Pradesh</option>
-                                                  <option value="Arunachal Pradesh">
-                                                    Arunachal
-                                                    Pradesh</option>
-                                                  <option value="Assam">Assam
-                                                  </option>
-                                                  <option value="Bihar">Bihar
-                                                  </option>
-                                                  <option value="Chhattisgarh">
-                                                    Chhattisgarh</option>
-                                                  <option value="Goa">Goa</option>
-                                                  <option value="Gujarat">Gujarat
-                                                  </option>
-                                                  <option value="Haryana">Haryana
-                                                  </option>
-                                                  <option value="Himachal Pradesh">
-                                                    Himachal
-                                                    Pradesh</option>
-                                                  <option value="Jharkhand">
-                                                    Jharkhand</option>
-                                                  <option value="Karnataka">
-                                                    Karnataka</option>
-                                                  <option value="Kerala">Kerala
-                                                  </option>
-                                                  <option value="Madhya Pradesh">
-                                                    Madhya
-                                                    Pradesh</option>
-                                                  <option value="Maharashtra">
-                                                    Maharashtra</option>
-                                                  <option value="Manipur">Manipur
-                                                  </option>
-                                                  <option value="Meghalaya">
-                                                    Meghalaya</option>
-                                                  <option value="Mizoram">Mizoram
-                                                  </option>
-                                                  <option value="Nagaland">
-                                                    Nagaland</option>
-                                                  <option value="Odisha">Odisha
-                                                  </option>
-                                                  <option value="Punjab">Punjab
-                                                  </option>
-                                                  <option value="Rajasthan">
-                                                    Rajasthan</option>
-                                                  <option value="Sikkim">Sikkim
-                                                  </option>
-                                                  <option value="Tamil Nadu">Tamil
-                                                    Nadu</option>
-                                                  <option value="Telangana">
-                                                    Telangana</option>
-                                                  <option value="Tripura">Tripura
-                                                  </option>
-                                                  <option value="Uttar Pradesh">
-                                                    Uttar
-                                                    Pradesh</option>
-                                                  <option value="Uttarakhand">
-                                                    Uttarakhand</option>
-                                                  <option value="West Bengal">West
-                                                    Bengal</option>
-                                                  <option value="Andaman and Nicobar Islands">
-                                                    Andaman
-                                                    and
-                                                    Nicobar
-                                                    Islands
-                                                  </option>
-                                                  <option value="Chandigarh">
-                                                    Chandigarh</option>
-                                                  <option value="Dadra and Nagar Haveli and Daman and Diu">
-                                                    Dadra
-                                                    and
-                                                    Nagar
-                                                    Haveli
-                                                    and
-                                                    Daman
-                                                    and
-                                                    Diu</option>
-                                                  <option value="Delhi">Delhi
-                                                  </option>
-                                                  <option value="Lakshadweep">
-                                                    Lakshadweep</option>
-                                                  <option value="Puducherry">
-                                                    Puducherry</option>
-                                                  <option value="Ladakh">Ladakh
-                                                  </option>
-                                                  <option value="Jammu and Kashmir">
-                                                    Jammu
-                                                    and
-                                                    Kashmir</option>
-                                                </select>
-                                                <label className="label">State
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                            </div>
-
-                                            {/* <!-- <textarea className="form-contro mb-3 message-to pe-1" name="message" id="exampleFormControlTextarea1"
-                                  placeholder="Message us" rows="2" ></textarea> --> */}
-                                            <div className="textarea-container">
-                                              <textarea id="message" name="message" placeholder=" " rows="2" required></textarea>
-                                              <label for="exampleTextarea">Your
-                                                Message</label>
-                                            </div>
-
-                                            <button type="submit" className="submit_btn g-recaptcha" data-callback='onSubmit' data-sitekey="6Lej1gsqAAAAAEs4KUUi8MjisY4_PKrC5s9ArN1v">Book
-                                              Demo</button>
-                                          </div>
-
-                                          <div className="alertLoginSuccess alert-success alert-dismissible error_login text-danger" role="alert">
-
-                                          </div>
-
-
-                                        </form>
-
-                                      </div>
-
-                                    </div>
-
-                                  </div>
-                                </div>
-                              </div>
-
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                   <div className="desc_img">
@@ -1619,204 +1044,10 @@ useful in their future prospect.
                       </p>
                     </div>
                     <div>
-                      <div className="book_a_demo">
+                      <div className="book_a_demo text-center">
                         <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
                           Book a free demo
                         </button>
-                        {/* <!-- Modal --> */}
-                        <div className="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                          <div className="modal-dialog new-model-dialog">
-                            <div className="modal-content">
-                              <div className="modal-header">
-                                <h5 className="modal-title" id="staticBackdropLabel">Book your Free Demo Today!</h5>
-                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div className="modal-body new-modal-body">
-                                <div className="container">
-                                  <div className="row">
-
-                                    <div className="col-md-12">
-                                      <div className="demo_table">
-                                        <form method="post" id="demoForm">
-                                          <div className="demo_form">
-
-                                            <div className="form_name">
-                                              <div className="first_name">
-                                                <input name="name" type="text" className="form_input" placeholder id="fullName" required />
-                                                <label className="label">Full
-                                                  Name
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="email">
-                                                <input name="email" type="text" className="form_input" placeholder id="email" required />
-                                                <label className="label">Email
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                            </div>
-                                            <div className="form_name">
-                                              <div className="phone">
-                                                <input name="mobile" className="form_input" type="text" placeholder id="phone" required maxlength="10" pattern="^\d{10}$" oninput="this.value = this.value.slice(0, 10).replace(/[^0-9]/g, '')" />
-                                                <label className="label">Phone
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="Organisation">
-                                                <input name="organisation" className="form_input" required placeholder type="text" id="organisation" />
-                                                <label className="label">Name
-                                                  of
-                                                  Institute
-                                                  <span>*</span></label>
-                                              </div>
-                                            </div>
-                                            <div className="form_name">
-                                              <div className="designation select-container">
-                                                <select name="designation" className="form_designation_input" id="designation" required>
-                                                  <option value disabled selected>Select
-                                                    your
-                                                    designation</option>
-                                                  <option value="manager">Manager
-                                                  </option>
-                                                  <option value="developer">
-                                                    Developer</option>
-                                                  <option value="designer">
-                                                    Designer</option>
-                                                  <option value="tester">Tester
-                                                  </option>
-                                                </select>
-                                                <label className="label" for="Designation">
-                                                  Designation
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                              <div className="state">
-                                                <select name="state" className="form_designation_input" id="state" required>
-                                                  <option value disabled selected>Select
-                                                    your
-                                                    State
-                                                  </option>
-                                                  <option value="Andhra Pradesh">
-                                                    Andhra
-                                                    Pradesh</option>
-                                                  <option value="Arunachal Pradesh">
-                                                    Arunachal
-                                                    Pradesh</option>
-                                                  <option value="Assam">Assam
-                                                  </option>
-                                                  <option value="Bihar">Bihar
-                                                  </option>
-                                                  <option value="Chhattisgarh">
-                                                    Chhattisgarh</option>
-                                                  <option value="Goa">Goa</option>
-                                                  <option value="Gujarat">Gujarat
-                                                  </option>
-                                                  <option value="Haryana">Haryana
-                                                  </option>
-                                                  <option value="Himachal Pradesh">
-                                                    Himachal
-                                                    Pradesh</option>
-                                                  <option value="Jharkhand">
-                                                    Jharkhand</option>
-                                                  <option value="Karnataka">
-                                                    Karnataka</option>
-                                                  <option value="Kerala">Kerala
-                                                  </option>
-                                                  <option value="Madhya Pradesh">
-                                                    Madhya
-                                                    Pradesh</option>
-                                                  <option value="Maharashtra">
-                                                    Maharashtra</option>
-                                                  <option value="Manipur">Manipur
-                                                  </option>
-                                                  <option value="Meghalaya">
-                                                    Meghalaya</option>
-                                                  <option value="Mizoram">Mizoram
-                                                  </option>
-                                                  <option value="Nagaland">
-                                                    Nagaland</option>
-                                                  <option value="Odisha">Odisha
-                                                  </option>
-                                                  <option value="Punjab">Punjab
-                                                  </option>
-                                                  <option value="Rajasthan">
-                                                    Rajasthan</option>
-                                                  <option value="Sikkim">Sikkim
-                                                  </option>
-                                                  <option value="Tamil Nadu">Tamil
-                                                    Nadu</option>
-                                                  <option value="Telangana">
-                                                    Telangana</option>
-                                                  <option value="Tripura">Tripura
-                                                  </option>
-                                                  <option value="Uttar Pradesh">
-                                                    Uttar
-                                                    Pradesh</option>
-                                                  <option value="Uttarakhand">
-                                                    Uttarakhand</option>
-                                                  <option value="West Bengal">West
-                                                    Bengal</option>
-                                                  <option value="Andaman and Nicobar Islands">
-                                                    Andaman
-                                                    and
-                                                    Nicobar
-                                                    Islands
-                                                  </option>
-                                                  <option value="Chandigarh">
-                                                    Chandigarh</option>
-                                                  <option value="Dadra and Nagar Haveli and Daman and Diu">
-                                                    Dadra
-                                                    and
-                                                    Nagar
-                                                    Haveli
-                                                    and
-                                                    Daman
-                                                    and
-                                                    Diu</option>
-                                                  <option value="Delhi">Delhi
-                                                  </option>
-                                                  <option value="Lakshadweep">
-                                                    Lakshadweep</option>
-                                                  <option value="Puducherry">
-                                                    Puducherry</option>
-                                                  <option value="Ladakh">Ladakh
-                                                  </option>
-                                                  <option value="Jammu and Kashmir">
-                                                    Jammu
-                                                    and
-                                                    Kashmir</option>
-                                                </select>
-                                                <label className="label">State
-                                                  <span className="imp">*</span></label>
-                                              </div>
-                                            </div>
-
-                                            {/* <!-- <textarea className="form-contro mb-3 message-to pe-1" name="message" id="exampleFormControlTextarea1"
-                                  placeholder="Message us" rows="2" ></textarea> --> */}
-                                            <div className="textarea-container">
-                                              <textarea id="message" name="message" placeholder=" " rows="2" required></textarea>
-                                              <label for="exampleTextarea">Your
-                                                Message</label>
-                                            </div>
-
-                                            <button type="submit" className="submit_btn g-recaptcha" data-callback='onSubmit' data-sitekey="6Lej1gsqAAAAAEs4KUUi8MjisY4_PKrC5s9ArN1v">Book
-                                              Demo</button>
-                                          </div>
-
-                                          <div className="alertLoginSuccess alert-success alert-dismissible error_login text-danger" role="alert">
-
-                                          </div>
-
-
-                                        </form>
-
-                                      </div>
-
-                                    </div>
-
-                                  </div>
-                                </div>
-                              </div>
-
-                            </div>
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -1840,204 +1071,10 @@ useful in their future prospect.
                     </div>
                     <div>
                       <div>
-                        <div className="book_a_demo">
+                        <div className="book_a_demo text-center">
                           <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
                             Book a free demo
                           </button>
-                          {/* <!-- Modal --> */}
-                          <div className="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                            <div className="modal-dialog new-model-dialog">
-                              <div className="modal-content">
-                                <div className="modal-header">
-                                  <h5 className="modal-title" id="staticBackdropLabel">Book your Free Demo Today!</h5>
-                                  <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div className="modal-body new-modal-body">
-                                  <div className="container">
-                                    <div className="row">
-
-                                      <div className="col-md-12">
-                                        <div className="demo_table">
-                                          <form method="post" id="demoForm">
-                                            <div className="demo_form">
-
-                                              <div className="form_name">
-                                                <div className="first_name">
-                                                  <input name="name" type="text" className="form_input" placeholder id="fullName" required />
-                                                  <label className="label">Full
-                                                    Name
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                                <div className="email">
-                                                  <input name="email" type="text" className="form_input" placeholder id="email" required />
-                                                  <label className="label">Email
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                              </div>
-                                              <div className="form_name">
-                                                <div className="phone">
-                                                  <input name="mobile" className="form_input" type="text" placeholder id="phone" required maxlength="10" pattern="^\d{10}$" oninput="this.value = this.value.slice(0, 10).replace(/[^0-9]/g, '')" />
-                                                  <label className="label">Phone
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                                <div className="Organisation">
-                                                  <input name="organisation" className="form_input" required placeholder type="text" id="organisation" />
-                                                  <label className="label">Name
-                                                    of
-                                                    Institute
-                                                    <span>*</span></label>
-                                                </div>
-                                              </div>
-                                              <div className="form_name">
-                                                <div className="designation select-container">
-                                                  <select name="designation" className="form_designation_input" id="designation" required>
-                                                    <option value disabled selected>Select
-                                                      your
-                                                      designation</option>
-                                                    <option value="manager">Manager
-                                                    </option>
-                                                    <option value="developer">
-                                                      Developer</option>
-                                                    <option value="designer">
-                                                      Designer</option>
-                                                    <option value="tester">Tester
-                                                    </option>
-                                                  </select>
-                                                  <label className="label" for="Designation">
-                                                    Designation
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                                <div className="state">
-                                                  <select name="state" className="form_designation_input" id="state" required>
-                                                    <option value disabled selected>Select
-                                                      your
-                                                      State
-                                                    </option>
-                                                    <option value="Andhra Pradesh">
-                                                      Andhra
-                                                      Pradesh</option>
-                                                    <option value="Arunachal Pradesh">
-                                                      Arunachal
-                                                      Pradesh</option>
-                                                    <option value="Assam">Assam
-                                                    </option>
-                                                    <option value="Bihar">Bihar
-                                                    </option>
-                                                    <option value="Chhattisgarh">
-                                                      Chhattisgarh</option>
-                                                    <option value="Goa">Goa</option>
-                                                    <option value="Gujarat">Gujarat
-                                                    </option>
-                                                    <option value="Haryana">Haryana
-                                                    </option>
-                                                    <option value="Himachal Pradesh">
-                                                      Himachal
-                                                      Pradesh</option>
-                                                    <option value="Jharkhand">
-                                                      Jharkhand</option>
-                                                    <option value="Karnataka">
-                                                      Karnataka</option>
-                                                    <option value="Kerala">Kerala
-                                                    </option>
-                                                    <option value="Madhya Pradesh">
-                                                      Madhya
-                                                      Pradesh</option>
-                                                    <option value="Maharashtra">
-                                                      Maharashtra</option>
-                                                    <option value="Manipur">Manipur
-                                                    </option>
-                                                    <option value="Meghalaya">
-                                                      Meghalaya</option>
-                                                    <option value="Mizoram">Mizoram
-                                                    </option>
-                                                    <option value="Nagaland">
-                                                      Nagaland</option>
-                                                    <option value="Odisha">Odisha
-                                                    </option>
-                                                    <option value="Punjab">Punjab
-                                                    </option>
-                                                    <option value="Rajasthan">
-                                                      Rajasthan</option>
-                                                    <option value="Sikkim">Sikkim
-                                                    </option>
-                                                    <option value="Tamil Nadu">Tamil
-                                                      Nadu</option>
-                                                    <option value="Telangana">
-                                                      Telangana</option>
-                                                    <option value="Tripura">Tripura
-                                                    </option>
-                                                    <option value="Uttar Pradesh">
-                                                      Uttar
-                                                      Pradesh</option>
-                                                    <option value="Uttarakhand">
-                                                      Uttarakhand</option>
-                                                    <option value="West Bengal">West
-                                                      Bengal</option>
-                                                    <option value="Andaman and Nicobar Islands">
-                                                      Andaman
-                                                      and
-                                                      Nicobar
-                                                      Islands
-                                                    </option>
-                                                    <option value="Chandigarh">
-                                                      Chandigarh</option>
-                                                    <option value="Dadra and Nagar Haveli and Daman and Diu">
-                                                      Dadra
-                                                      and
-                                                      Nagar
-                                                      Haveli
-                                                      and
-                                                      Daman
-                                                      and
-                                                      Diu</option>
-                                                    <option value="Delhi">Delhi
-                                                    </option>
-                                                    <option value="Lakshadweep">
-                                                      Lakshadweep</option>
-                                                    <option value="Puducherry">
-                                                      Puducherry</option>
-                                                    <option value="Ladakh">Ladakh
-                                                    </option>
-                                                    <option value="Jammu and Kashmir">
-                                                      Jammu
-                                                      and
-                                                      Kashmir</option>
-                                                  </select>
-                                                  <label className="label">State
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                              </div>
-
-                                              {/* <!-- <textarea className="form-contro mb-3 message-to pe-1" name="message" id="exampleFormControlTextarea1"
-                                  placeholder="Message us" rows="2" ></textarea> --> */}
-                                              <div className="textarea-container">
-                                                <textarea id="message" name="message" placeholder=" " rows="2" required></textarea>
-                                                <label for="exampleTextarea">Your
-                                                  Message</label>
-                                              </div>
-
-                                              <button type="submit" className="submit_btn g-recaptcha" data-callback='onSubmit' data-sitekey="6Lej1gsqAAAAAEs4KUUi8MjisY4_PKrC5s9ArN1v">Book
-                                                Demo</button>
-                                            </div>
-
-                                            <div className="alertLoginSuccess alert-success alert-dismissible error_login text-danger" role="alert">
-
-                                            </div>
-
-
-                                          </form>
-
-                                        </div>
-
-                                      </div>
-
-                                    </div>
-                                  </div>
-                                </div>
-
-                              </div>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -2071,202 +1108,10 @@ useful in their future prospect.
                         </p>
                       </div>
                       <div>
-                        <div className="book_a_demo">
+                        <div className="book_a_demo text-center">
                           <button type="button" className="a_btn text-uppercase model_btn plan--demo" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
                             Book a free demo
                           </button>
-                          {/* <!-- Modal --> */}
-                          <div className="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                            <div className="modal-dialog new-model-dialog">
-                              <div className="modal-content">
-                                <div className="modal-header">
-                                  <h5 className="modal-title" id="staticBackdropLabel">Book your Free Demo Today!</h5>
-                                  <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div className="modal-body new-modal-body">
-                                  <div className="container">
-                                    <div className="row">
-
-                                      <div className="col-md-12">
-                                        <div className="demo_table">
-                                          <form method="post" id="demoForm">
-                                            <div className="demo_form">
-
-                                              <div className="form_name">
-                                                <div className="first_name">
-                                                  <input name="name" type="text" className="form_input" placeholder id="fullName" required />
-                                                  <label className="label">Full
-                                                    Name
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                                <div className="email">
-                                                  <input name="email" type="text" className="form_input" placeholder id="email" required />
-                                                  <label className="label">Email
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                              </div>
-                                              <div className="form_name">
-                                                <div className="phone">
-                                                  <input name="mobile" className="form_input" type="text" placeholder id="phone" required maxlength="10" pattern="^\d{10}$" oninput="this.value = this.value.slice(0, 10).replace(/[^0-9]/g, '')" />
-                                                  <label className="label">Phone
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                                <div className="Organisation">
-                                                  <input name="organisation" className="form_input" required placeholder type="text" id="organisation" />
-                                                  <label className="label">Name
-                                                    of
-                                                    Institute
-                                                    <span>*</span></label>
-                                                </div>
-                                              </div>
-                                              <div className="form_name">
-                                                <div className="designation select-container">
-                                                  <select name="designation" className="form_designation_input" id="designation" required>
-                                                    <option value disabled selected>Select
-                                                      your
-                                                      designation</option>
-                                                    <option value="manager">Manager
-                                                    </option>
-                                                    <option value="developer">
-                                                      Developer</option>
-                                                    <option value="designer">
-                                                      Designer</option>
-                                                    <option value="tester">Tester
-                                                    </option>
-                                                  </select>
-                                                  <label className="label" for="Designation">
-                                                    Designation
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                                <div className="state">
-                                                  <select name="state" className="form_designation_input" id="state" required>
-                                                    <option value disabled selected>Select
-                                                      your
-                                                      State
-                                                    </option>
-                                                    <option value="Andhra Pradesh">
-                                                      Andhra
-                                                      Pradesh</option>
-                                                    <option value="Arunachal Pradesh">
-                                                      Arunachal
-                                                      Pradesh</option>
-                                                    <option value="Assam">Assam
-                                                    </option>
-                                                    <option value="Bihar">Bihar
-                                                    </option>
-                                                    <option value="Chhattisgarh">
-                                                      Chhattisgarh</option>
-                                                    <option value="Goa">Goa</option>
-                                                    <option value="Gujarat">Gujarat
-                                                    </option>
-                                                    <option value="Haryana">Haryana
-                                                    </option>
-                                                    <option value="Himachal Pradesh">
-                                                      Himachal
-                                                      Pradesh</option>
-                                                    <option value="Jharkhand">
-                                                      Jharkhand</option>
-                                                    <option value="Karnataka">
-                                                      Karnataka</option>
-                                                    <option value="Kerala">Kerala
-                                                    </option>
-                                                    <option value="Madhya Pradesh">
-                                                      Madhya
-                                                      Pradesh</option>
-                                                    <option value="Maharashtra">
-                                                      Maharashtra</option>
-                                                    <option value="Manipur">Manipur
-                                                    </option>
-                                                    <option value="Meghalaya">
-                                                      Meghalaya</option>
-                                                    <option value="Mizoram">Mizoram
-                                                    </option>
-                                                    <option value="Nagaland">
-                                                      Nagaland</option>
-                                                    <option value="Odisha">Odisha
-                                                    </option>
-                                                    <option value="Punjab">Punjab
-                                                    </option>
-                                                    <option value="Rajasthan">
-                                                      Rajasthan</option>
-                                                    <option value="Sikkim">Sikkim
-                                                    </option>
-                                                    <option value="Tamil Nadu">Tamil
-                                                      Nadu</option>
-                                                    <option value="Telangana">
-                                                      Telangana</option>
-                                                    <option value="Tripura">Tripura
-                                                    </option>
-                                                    <option value="Uttar Pradesh">
-                                                      Uttar
-                                                      Pradesh</option>
-                                                    <option value="Uttarakhand">
-                                                      Uttarakhand</option>
-                                                    <option value="West Bengal">West
-                                                      Bengal</option>
-                                                    <option value="Andaman and Nicobar Islands">
-                                                      Andaman
-                                                      and
-                                                      Nicobar
-                                                      Islands
-                                                    </option>
-                                                    <option value="Chandigarh">
-                                                      Chandigarh</option>
-                                                    <option value="Dadra and Nagar Haveli and Daman and Diu">
-                                                      Dadra
-                                                      and
-                                                      Nagar
-                                                      Haveli
-                                                      and
-                                                      Daman
-                                                      and
-                                                      Diu</option>
-                                                    <option value="Delhi">Delhi
-                                                    </option>
-                                                    <option value="Lakshadweep">
-                                                      Lakshadweep</option>
-                                                    <option value="Puducherry">
-                                                      Puducherry</option>
-                                                    <option value="Ladakh">Ladakh
-                                                    </option>
-                                                    <option value="Jammu and Kashmir">
-                                                      Jammu
-                                                      and
-                                                      Kashmir</option>
-                                                  </select>
-                                                  <label className="label">State
-                                                    <span className="imp">*</span></label>
-                                                </div>
-                                              </div>
-
-                                              {/* <!-- <textarea className="form-contro mb-3 message-to pe-1" name="message" id="exampleFormControlTextarea1"
-                                  placeholder="Message us" rows="2" ></textarea> --> */}
-                                              <div className="textarea-container">
-                                                <textarea id="message" name="message" placeholder=" " rows="2" required></textarea>
-                                                <label for="exampleTextarea">Your
-                                                  Message</label>
-                                              </div>
-
-                                              <button type="submit" className="submit_btn g-recaptcha" data-callback='onSubmit' data-sitekey="6Lej1gsqAAAAAEs4KUUi8MjisY4_PKrC5s9ArN1v">Book
-                                                Demo</button>
-                                            </div>
-                                            <div className="alertLoginSuccess alert-success alert-dismissible error_login text-danger" role="alert">
-
-                                            </div>
-
-                                          </form>
-
-                                        </div>
-
-                                      </div>
-
-                                    </div>
-                                  </div>
-                                </div>
-
-                              </div>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </div>
