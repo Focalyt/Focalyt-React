@@ -22,7 +22,8 @@ const Layout = () => {
   useEffect(() => {
     initGA();
     logPageView();
-}, []);
+    console.log("analytics working")
+}, [location]);
 
   return (
     <>
