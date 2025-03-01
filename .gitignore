@@ -43,3 +43,4 @@ node_modules/
 frontend/.env
 frontend/.env
 frontend/src/Component/Layouts/App/Candidates
+frontend/src/Pages/App/Candidate

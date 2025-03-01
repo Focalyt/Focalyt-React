@@ -514,19 +514,26 @@ function Course() {
                                           </div>
                                         </div>
                                       </div>
+                                     
 
                                       {/* Action Buttons */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
+                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
                                         <a
-                                          className="btn cta-callnow btn-bg-color"
+                                          className="btn cta-callnow btn-bg-color shr--width"
                                           href={`https://app.focalyt.com/candidate/login?returnUrl=/candidate/course/${course._id}`}
                                         >
                                           Apply Now
                                         </a>
                                       </div>
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
-                                        <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow">
+                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
+                                        <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow shr--width">
                                           Chat Now
+                                        </a>
+                                      </div>
+                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
+                                        <a href="#" className="btn cta-callnow shr--width">
+                                        {/* <Share2 size={16} className="mr-1" /> */}
+                                          Share
                                         </a>
                                       </div>
                                       <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">

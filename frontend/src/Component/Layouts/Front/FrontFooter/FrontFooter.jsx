@@ -155,7 +155,7 @@ function Footer() {
               <a href="#">Blog &amp; Articles</a>
             </li> --> */}
                   <li>
-                    <a href="/community">community</a>
+                    <a href="https://app.focalyt.com/community">community</a>
                   </li>
                 </ul>
               </div>

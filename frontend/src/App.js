@@ -1,9 +1,7 @@
 
 
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect } from "react";
 import HomePage from '../src/Pages/Front/HomePage/HomePage';
-import { initGA, logPageView } from "./utils/analytics";
 import About from './Pages/Front/About/About';
 import Labs from "./Pages/Front/Labs/Labs";
 import Course from './Pages/Front/Courses/Course';
@@ -13,16 +11,12 @@ import CourseDetails from './Pages/Front/CourseDetails/CourseDetails';
 import "./App.css";
 import CompanyLogin from './Component/Layouts/App/Company/CompanyLogin';
 import Community from './Pages/Front/Community/Community';
-
+import CandidateLayout from './Component/Layouts/App/Candidates';
+import CandidateDashboard from './Pages/App/Candidate/CandidateDashboard/CandidateDashboard';
 
 
 const Layout = () => {
   const location = useLocation(); 
-
-  useEffect(() => {
-    initGA();
-    logPageView();
-}, []);
 
   return (
     <>
@@ -37,7 +31,7 @@ const Layout = () => {
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/company/login" element={<CompanyLogin />} />
         <Route exact path="/community" element={<Community />} />
-        {/* <Route exact={true} path="/side" element ={<CandidateSidebar/>}/> */}
+        <Route exact={true} path ="/candidate/dashboard" element={<CandidateDashboard />}/>
       </Routes>
 
 
