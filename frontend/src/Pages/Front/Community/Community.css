@@ -349,7 +349,7 @@
 
 /* Header Section */
 .card-header {
-  padding: 5px 15px;
+  padding: 10px 15px!important;
   color: #fff;
 }
 
@@ -361,7 +361,6 @@
 
 .card-header .blog__title {
   font-size: 22px;
-  padding-block: 10px;
 }
 
 .inner__card {
@@ -506,6 +505,7 @@
   position: relative;
   width: 100%;
   margin-bottom: 5px;
+  margin-top: 10px;
 }
 
 /* Hidden text with fixed line count */
