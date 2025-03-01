@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import FrontLayout from '../../../Component/Layouts/Front';
 import "./Community.css";
 
 function Community() {
@@ -281,9 +283,20 @@ function Community() {
     );
   };
 
+  useEffect(() => {
+    // Handle post scrolling from URL hash on load
+    const postId = window.location.hash.substring(1);
+    if (postId) {
+      const postElement = document.getElementById(postId);
+      if (postElement) {
+        postElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, [posts]);
+
   return (
-    <>
-      <section className="section-padding-top-120 mt-1">
+    <FrontLayout>
+      <section className="section-padding-top-40 mt-5">
         <div className="container-fluid p-0">
           <div className="mainContentLayout">
             <div className="mainContainer">
@@ -295,7 +308,7 @@ function Community() {
                     <h4>New Lab Program!</h4>
                     <p>Special offer available for Focalyt future technology labs</p>
                   </div>
-              
+
                   {/* Lab Programs */}
                   <div className="section">
                     <div className="section-titles">
@@ -306,7 +319,7 @@ function Community() {
                       <p>Starting at ₹0</p>
                     </div>
                   </div>
-              
+
                   {/* Latest Updates */}
                   <div className="section">
                     <div className="section-titles">
@@ -321,7 +334,7 @@ function Community() {
                       <p>100 labs established in Bihar</p>
                     </div>
                   </div>
-              
+
                   {/* Special Offers */}
                   <div className="section">
                     <div className="section-titles">
@@ -336,7 +349,7 @@ function Community() {
                       <span>with every lab installation</span>
                     </div>
                   </div>
-              
+
                   {/* Success Stories */}
                   <div className="section">
                     <div className="section-titles">
@@ -355,80 +368,86 @@ function Community() {
               </div>
 
               <div className="mainBody">
-                <div className="blog--card" id="post">
-                  {/* Header Section */}
-                  <div className="card-header">
-                    <div className="inner__card">
-                      <div className="user_image text-black">
-                        <figure>
-                          <img src="public_assets/images/newpage/favicon.png" alt="favicon" />
-                        </figure>
-                      </div>
-                      <h3 className="user__name text-black">
-                        <span className="start__name"><b>Focalyt</b></span>
-                        <span className="tag__user">
-                          is with <b></b>
-                        </span>
-                        <span className="more__user strong"> & <b></b></span>
-                        <span className="other"><b> Others</b></span>
-                      </h3>
-                    </div>
-                    
-                    <h5 className="blog__title text-black">
-                      <span 
-                        ref={hiddenTextRef}
-                        className={`${!isExpanded ? 'hidden-text' : ''}`}
-                      >See more
-                      </span>
-                      {isTextTruncated && (
-                        <span 
-                          className={`toggle-more ${isExpanded ? 'see-more-hidden' : 'see-more-visible'}`}
-                          onClick={toggleText}
-                        >
-                          {isExpanded ? 'See less...' : 'See more...'}
-                        </span>
-                      )}
-                    </h5>
-                  </div>
+                {posts && posts.length > 0 ? (
+                  posts.map((post, index) => {
+                    const postId = post._id ? `post-${post._id}` : `post-${index}`;
 
-                  {/* Main Content */}
-                  <div className="card-content">
-                    <div className="card-image">
-                      <div className="happy_candidates" id="blog--images">
-                        <div className="happy_candidate_images">
-                          <div>
-                            <img src="/Assets/public_assets" className="d-block w-100" alt="post" />
+                    return (
+                      <div className="blog--card" id={postId} key={post._id || index}>
+                        {/* Header Section */}
+                        <div className="card-header">
+                          <div className="inner__card">
+                            <div className="user_image text-black">
+                              <figure>
+                                <img src="/favicon.ico" alt="" />
+                              </figure>
+                            </div>
+                            <h3 className="user__name text-black">
+                              <span className="start__name"><b>Focalyt</b></span>
+
+                              {post.tags && post.tags.length > 0 && (
+                                <>
+                                  <span className="tag__user">
+                                    is with <b>{post.tags[0].name}</b>
+                                  </span>
+
+                                  {post.tags.length > 1 && (
+                                    <>
+                                      <span className="more__user strong"> & <b>{post.tags.length - 1}</b></span>
+                                      <span className="other"><b> Others</b></span>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </h3>
                           </div>
-                          <div>
-                            <video 
-                              className="d-block w-100 video_height lazy-video" 
-                              muted 
-                              controls 
-                              autoPlay
-                              playsInline
+
+                          <h5 className="blog__title text-black">
+                            <PostText
+                              content={post.content}
+                              postId={postId}
+                            />
+                          </h5>
+                        </div>
+
+                        {/* Main Content */}
+                        <div className="card-content">
+                          {post.files && post.files.length > 0 && (
+                            <div className="card-image">
+                              <div className="happy_candidates" id="blog--images">
+                                <PostCarousel
+                                  files={post.files}
+                                  postId={postId}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Interaction Buttons */}
+                          <div className="interaction-buttons d-flex align-items-center justify-content-center">
+                            <div
+                              className="share_link"
+                              onClick={() => handleShare(postId)}
                             >
-                              <source src="" type="video/mp4" />
-                              Your browser does not support the video tag.
-                            </video>
+                              <i className="fas fa-share"></i> Share
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Interaction Buttons */}
-                    <div className="interaction-buttons d-flex align-items-center justify-content-center">
-                      <div className="share_link">
-                        <i className="fas fa-share"></i> Share
-                      </div>
-                    </div>
+                    );
+                  })
+                ) : (
+                  <div className="col-12 text-center py-5">
+                    <h3 className="text-muted">No posts available.</h3>
+                    <p>Check back later for new content</p>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </section>
-    </>
+    </FrontLayout>  
   );
 }
 
