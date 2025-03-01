@@ -2,32 +2,283 @@ import React, { useState, useEffect, useRef } from 'react';
 import "./Community.css";
 
 function Community() {
-  const hiddenTextRef = useRef(null);
-  const [isTextTruncated, setIsTextTruncated] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [posts, setPosts] = useState([]);
+  const [expandedPosts, setExpandedPosts] = useState({});
+  const [currentSlides, setCurrentSlides] = useState({});
 
-  const checkTextTruncation = () => {
-    const element = hiddenTextRef.current;
-    if (element) {
-      const computedStyle = window.getComputedStyle(element);
-      const lineHeight = parseFloat(computedStyle.lineHeight);
-      const maxLines = 4;
-      const actualLines = Math.ceil(element.scrollHeight / lineHeight);
-      setIsTextTruncated(actualLines > maxLines);
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`${backendUrl}/community`);
+        setPosts(response.data.posts);
+
+        // Initialize current slide for each post
+        const initialSlides = {};
+        response.data.posts.forEach((post, index) => {
+          const postId = post._id ? `post-${post._id}` : `post-${index}`;
+          initialSlides[postId] = 0;
+        });
+        setCurrentSlides(initialSlides);
+      } catch (error) {
+        console.error("Error fetching posts data:", error);
+      }
+    };
+    fetchData();
+  }, [backendUrl]);
+
+  // Text expansion toggle handler
+  const toggleExpand = (postId) => {
+    setExpandedPosts(prev => {
+      const newState = {
+        ...prev,
+        [postId]: !prev[postId]
+      };
+      
+      // Force recalculation of element heights after state change
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 50);
+      
+      return newState;
+    });
+  };
+
+  // Share handler
+  const handleShare = (postId) => {
+    const postUrl = `${window.location.origin}${window.location.pathname}#${postId}`;
+
+    const shareData = {
+      title: "Check this out!",
+      text: "This is an awesome post. Check it out!",
+      url: postUrl,
+    };
+
+    if (navigator.share) {
+      navigator
+        .share(shareData)
+        .then(() => console.log("Shared successfully!"))
+        .catch((error) => console.error("Error sharing:", error));
+    } else {
+      // Fallback: Copy link to clipboard
+      const tempInput = document.createElement("input");
+      document.body.appendChild(tempInput);
+      tempInput.value = postUrl;
+      tempInput.select();
+      document.execCommand("copy");
+      document.body.removeChild(tempInput);
+      alert("Link copied to clipboard! Share it manually.");
     }
   };
 
-  useEffect(() => {
-    checkTextTruncation();
-    window.addEventListener('resize', checkTextTruncation);
-    
-    return () => {
-      window.removeEventListener('resize', checkTextTruncation);
-    };
-  }, []);
+  // PostText component with fixed line count
+  const PostText = ({ content, postId }) => {
+    const textRef = useRef(null);
+    const [truncated, setTruncated] = useState(false);
+    const isExpanded = expandedPosts[postId];
 
-  const toggleText = () => {
-    setIsExpanded(!isExpanded);
+    // Check if content exceeds the defined line count
+    useEffect(() => {
+      const checkTruncation = () => {
+        if (textRef.current) {
+          const element = textRef.current;
+          
+          // Calculate how many lines of text we have
+          const style = window.getComputedStyle(element);
+          const lineHeight = parseFloat(style.lineHeight) || 1.5 * parseFloat(style.fontSize);
+          
+          // Force the element to temporarily show all content to measure it
+          const originalStyles = {
+            maxHeight: element.style.maxHeight,
+            overflow: element.style.overflow,
+            webkitLineClamp: element.style.webkitLineClamp
+          };
+          
+          element.style.maxHeight = 'none';
+          element.style.overflow = 'visible';
+          element.style.webkitLineClamp = 'unset';
+          
+          // Get the full height
+          const fullHeight = element.scrollHeight;
+          
+          // Calculate the number of lines
+          const lineCount = Math.ceil(fullHeight / lineHeight);
+          
+          // Set truncated flag if lines exceed our limit
+          setTruncated(lineCount > 3); // 3 lines limit
+          
+          // Restore original styles
+          element.style.maxHeight = originalStyles.maxHeight;
+          element.style.overflow = originalStyles.overflow;
+          element.style.webkitLineClamp = originalStyles.webkitLineClamp;
+        }
+      };
+
+      // Run after a small delay to ensure content is rendered
+      const timer = setTimeout(checkTruncation, 10);
+      
+      // Also check on window resize
+      window.addEventListener('resize', checkTruncation);
+      
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('resize', checkTruncation);
+      };
+    }, [content]);
+
+    return (
+      <div className="post-text-container">
+        <div 
+          ref={textRef}
+          className={isExpanded ? "show-text" : "hidden-text"}
+        >
+          {content || "No content available"}
+        </div>
+        
+        {truncated && (
+          <div 
+            className={`toggle-more ${truncated ? 'toggle-more-visible' : 'toggle-more-hidden'}`}
+            onClick={() => toggleExpand(postId)}
+          >
+            {isExpanded ? "See less..." : "See more..."}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Carousel component
+  const PostCarousel = ({ files, postId }) => {
+    const carouselRef = useRef(null);
+    const [touchPosition, setTouchPosition] = useState(null);
+    const currentIndex = currentSlides[postId] || 0;
+
+    // Go to next slide
+    const goToNextSlide = () => {
+      setCurrentSlides((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] + 1) % files.length,
+      }));
+    };
+
+    // Go to previous slide
+    const goToPrevSlide = () => {
+      setCurrentSlides((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] - 1 + files.length) % files.length,
+      }));
+    };
+
+    // Handle swipe gestures
+    const handleTouchStart = (e) => {
+      setTouchPosition(e.touches[0].clientX);
+    };
+
+    const handleTouchMove = (e) => {
+      if (touchPosition === null) return;
+      const currentPosition = e.touches[0].clientX;
+      const direction = touchPosition - currentPosition;
+
+      if (direction > 10) goToNextSlide();
+      if (direction < -10) goToPrevSlide();
+      setTouchPosition(null);
+    };
+
+    // Auto-slide every 5 seconds
+    useEffect(() => {
+      if (files.length <= 1) return;
+      const interval = setInterval(goToNextSlide, 5000);
+      return () => clearInterval(interval);
+    }, [currentIndex, files.length]);
+
+    if (!files || files.length === 0) return null;
+
+    // Only show the current file/slide
+    const currentFile = files[currentIndex];
+
+    return (
+      <div
+        className="carousel-container"
+        ref={carouselRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+      >
+        {/* Only render the current slide */}
+        <div className="carousel-content">
+          {currentFile.fileType === "image" ? (
+            <img
+              src={currentFile.fileURL}
+              alt={`Slide ${currentIndex + 1}`}
+              style={{
+                width: "100%",
+                height: "400px",
+                maxHeight: "400px",
+                objectFit: "contain",
+                display: "block",
+                margin: "0 auto",
+              }}
+            />
+          ) : currentFile.fileType === "video" ? (
+            <video
+              style={{
+                width: "100%",
+                height: "400px",
+                maxHeight: "400px",
+                objectFit: "contain",
+                margin: "0 auto",
+              }}
+              controls
+              muted
+              playsInline
+              className="lazy-video"
+            >
+              <source src={currentFile.fileURL} type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+          ) : null}
+        </div>
+
+        {/* Navigation Arrows */}
+        {files.length > 1 && (
+          <>
+            <button
+              className="carousel-nav-button prev"
+              onClick={goToPrevSlide}
+            >
+              ❮
+            </button>
+            <button
+              className="carousel-nav-button next"
+              onClick={goToNextSlide}
+            >
+              ❯
+            </button>
+          </>
+        )}
+
+        {/* Pagination Dots */}
+        {files.length > 1 && (
+          <div className="carousel-indicators">
+            {files.map((_, index) => (
+              <button
+                key={index}
+                className={`carousel-indicator ${index === currentIndex ? 'active' : ''}`}
+                onClick={() => setCurrentSlides((prev) => ({ ...prev, [postId]: index }))}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Slide Counter */}
+        {files.length > 1 && (
+          <div className="carousel-counter">
+            {currentIndex + 1}/{files.length}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
