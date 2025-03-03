@@ -191,6 +191,37 @@ function Course() {
     console.log("Final filtered courses count:", filtered.length);
     return filtered;
   };
+  const handleShare = async (courseId, courseName, courseThumbnail) => {
+    if (!courseId || !courseName) {
+      console.error("Course ID or Name is missing.");
+      alert("Unable to share. Invalid course.");
+      return;
+    }
+  
+    const courseUrl = `${window.location.origin}${window.location.pathname}#${courseId}`;
+  
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: courseName, // ✅ Course name as title
+          text: `Check out this course: ${courseName}`, // ✅ Course name in text
+          url: courseUrl, // ✅ Course URL
+        });
+        console.log("Shared successfully!");
+      } catch (error) {
+        console.error("Error sharing:", error);
+      }
+    } else {
+      // Fallback: Copy link to clipboard
+      try {
+        await navigator.clipboard.writeText(`Check out this course: ${courseName}\n${courseUrl}`);
+        alert("Course link copied to clipboard! Share it manually.");
+      } catch (error) {
+        console.error("Clipboard copy failed:", error);
+      }
+    }
+  };
+  
 
 
 
@@ -531,10 +562,11 @@ function Course() {
                                         </a>
                                       </div>
                                       <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                        <a href="#" className="btn cta-callnow shr--width">
+                                        <button  
+ onClick={() => handleShare(course._id,  course.name, course.thumbnail)} className="btn cta-callnow shr--width">
                                         {/* <Share2 size={16} className="mr-1" /> */}
                                           Share
-                                        </a>
+                                        </button>
                                       </div>
                                       <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
                                         <div className="row pt-2">

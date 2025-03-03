@@ -32,9 +32,9 @@ img.group1 {
     font-family: inter;
     border-radius: 50px;
     font-weight: 500;
-    padding: 4px 10px;
+    padding: 4px 4px;
     width: 100%;
-    font-size: 13px;
+    font-size: 12px;
     letter-spacing: 1px;
     transition: .3s;
 }
