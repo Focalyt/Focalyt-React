@@ -15,7 +15,12 @@ import CandidateLayout from './Component/Layouts/App/Candidates';
 import CandidateDashboard from './Pages/App/Candidate/CandidateDashboard/CandidateDashboard';
 import CandidateProfile from './Pages/App/Candidate/CandidateProfile/CandidateProfile';
 import CandidatesDocuments from "./Pages/App/Candidate/CandidateDocuments/CandidateDocumets"
-
+import SearchCourses from "./Pages/App/Candidate/CandidateCourses/CandidateCourses"
+import AppliedCourses from './Pages/App/Candidate/CandidateCourses/AppliedCourses';
+import CandidatesJobs from './Pages/App/Candidate/CandidatesJobs/CandidatesJobs';
+import NearbyJobs from './Pages/App/Candidate/CandidatesJobs/NearByJobs';
+import CandidateAppliedJobs from './Pages/App/Candidate/CandidatesJobs/CandidateAppliesJobs';
+import CandidateWallet from './Component/Layouts/App/Candidates/CandidateWallet/CandidateWallet';
 const Layout = () => {
   const location = useLocation(); 
 
@@ -38,6 +43,12 @@ const Layout = () => {
                 <Route path="dashboard" element={<CandidateDashboard />} />
                 <Route path ="myprofile" element={<CandidateProfile/>}/>
                 <Route path ="document" element={<CandidatesDocuments/>}/>
+                <Route path ="searchcourses" element={<SearchCourses/>}/>
+                <Route path="appliedCourses" element={<AppliedCourses/>}/>
+                <Route path ="searchjob" element={<CandidatesJobs/>}/>
+                <Route path ="nearbyJobs" element={<NearbyJobs/>}/>
+                <Route path ="appliedJobs" element={<CandidateAppliedJobs/>}/>
+                <Route path ="cashback" element={<CandidateWallet/>}/>
             </Route>
       </Routes>
 
