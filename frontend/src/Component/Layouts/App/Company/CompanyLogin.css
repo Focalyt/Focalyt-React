@@ -506,9 +506,15 @@ html {
   .main-menu.menu-light .navigation>li:not(.open)>ul {
     display: none;
   }
-  
+  .main-menu.menu-light .navigation>li.active>a .menu-title{
+    color: #fff;
+  }
+  .nav-item.active > a {
+    background-color: #FC2B5A !important; /* Background for active item */
+    color: #fff !important; /* White text */
+}
   .main-menu.menu-light .navigation>li.active>a {
-    background: #102660;
+    background: #FC2B5A;
     box-shadow: none;
     color: #fff;
     font-weight: 400;

@@ -21,6 +21,7 @@
     "react": "^19.0.0",
     "react-bootstrap": "^2.10.9",
     "react-dom": "^19.0.0",
+    "react-google-autocomplete": "^2.7.4",
     "react-google-recaptcha": "^3.1.0",
     "react-router-dom": "^7.1.5",
     "react-scripts": "^5.0.1",

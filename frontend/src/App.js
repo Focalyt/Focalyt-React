@@ -20,7 +20,17 @@ import AppliedCourses from './Pages/App/Candidate/CandidateCourses/AppliedCourse
 import CandidatesJobs from './Pages/App/Candidate/CandidatesJobs/CandidatesJobs';
 import NearbyJobs from './Pages/App/Candidate/CandidatesJobs/NearByJobs';
 import CandidateAppliedJobs from './Pages/App/Candidate/CandidatesJobs/CandidateAppliesJobs';
+import CourseDetail from "./Pages/App/Candidate/CandidateCourses/CourseDetails"
 import CandidateWallet from './Component/Layouts/App/Candidates/CandidateWallet/CandidateWallet';
+import CandidateEarning from './Pages/App/Candidate/CandidateEarning/CandidateEarning';
+import ReferAndEarn from './Pages/App/Candidate/CandidateEarning/ReferAndEarn';
+import CoinsPage from './Pages/App/Candidate/CandidateEarning/CoinsPage';
+import LoanApplicationPage from "./Pages/App/Candidate/CandidateEarning/LoanApplicationPage";
+import WatchVideosPage from './Component/Layouts/App/Candidates/CandidateVideo/WatchVideosPage';
+import CandidateShare from './Pages/App/Candidate/CandidateShare/CandidateShare';
+import CandidateNotification from './Pages/App/Candidate/CandidateNotification/CandidateNotification';
+import RegisterForInterview from './Pages/App/Candidate/CandidatesJobs/RegisterForInterview';
+import Shortlisting from './Pages/App/Candidate/CandidatesJobs/Shortlisting';
 const Layout = () => {
   const location = useLocation(); 
 
@@ -49,6 +59,17 @@ const Layout = () => {
                 <Route path ="nearbyJobs" element={<NearbyJobs/>}/>
                 <Route path ="appliedJobs" element={<CandidateAppliedJobs/>}/>
                 <Route path ="cashback" element={<CandidateWallet/>}/>
+                <Route path ="myEarnings" element={<CandidateEarning/>}/>
+                <Route path ="referral" element={<ReferAndEarn/>}/>
+                <Route path = "Coins" element={<CoinsPage/>}/>
+                <Route path = "requestLoan" element={<LoanApplicationPage/>}/>
+                <Route path ="watchVideos" element={<WatchVideosPage/>}/>
+                <Route path = "shareCV" element={<CandidateShare/>}/>
+                <Route path ="notifications" element={<CandidateNotification/>}/>
+                <Route path ="registerInterviewsList" element={<RegisterForInterview/>}/>
+                <Route path='InterestedCompanies' element={<Shortlisting/>}/>
+                {/* <Route path="course" element={<CourseDetail/>}/> */}
+                <Route path="/candidate/course/:courseId" element={<CourseDetails />} />
             </Route>
       </Routes>
 
