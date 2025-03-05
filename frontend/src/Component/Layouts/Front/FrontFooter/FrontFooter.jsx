@@ -77,7 +77,7 @@ function Footer() {
                 </li>
                 {/* <!----> */}
                 <li className="login_col">
-                  <a href="/candidate/login">
+                  <a href="https://app.focalyt.com/candidate/login">
                     <span className="text-white login_ty bg-transparent" style={{ backgroundColor: "transparent;" }}>Login</span>
                   </a>
                 </li>
