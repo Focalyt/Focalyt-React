@@ -1,0 +1,90 @@
+input[type="text"], 
+input[type="email"], 
+input[type="number"],
+input[type="tel"],
+input[type="date"],
+select {
+  background-color: transparent !important;
+  border: var(--bs-border-width) solid var(--bs-border-color);
+}
+.card {
+    margin-bottom: 2.2rem;
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0px 4px 25px 0px rgba(0, 0, 0, 0.1);
+    transition: all .3sease-in-out;
+}
+.card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    word-wrap: break-word;
+    background-color: #fff;
+    background-clip: border-box;
+    border: 1px solid rgba(34, 41, 47, 0.125);
+    border-radius: 0.5rem;
+}
+.bg-intext {
+    background-color: #FC2B5A;
+}
+.new-bg-text {
+    background-color: #FC2B5A;
+}
+.float-left {
+    float: left !important;
+}
+.breadcrumb .breadcrumb-item+.breadcrumb-item:before {
+    content: "\e847";
+    font-family: 'feather';
+    color: #626262;
+}
+.breadcrumb-item+.breadcrumb-item::before {
+    display: inline-block;
+    padding-right: 0.5rem;
+    color: #b8c2cc;
+    content: "/";
+}
+.breadcrumb .breadcrumb-item+.breadcrumb-item {
+    padding-left: 0;
+}
+.breadcrumb {
+    font-size: 1rem;
+    font-family: "Montserrat", Helvetica, Arial, serif;
+    background-color: transparent;
+    padding: 0.5rem 0 0.5rem 1rem !important;
+    border-left: 1px solid #d6dce1;
+    border-radius: 0;
+}
+.breadcrumbs-top .breadcrumb {
+    margin: 0;
+    padding: 0;
+}
+
+.breadcrumb>li+li::before {
+    padding-right: .6rem;
+    padding-left: .6rem;
+}
+a {
+    color: #FC2B5A;
+    text-decoration: none;
+    background-color: transparent;
+}
+.mandatory {
+    color: red;
+}
+label {
+    font-size: 0.80rem !important;
+}
+.input-group {
+    position: relative;
+    display: flex
+;
+    flex-wrap: wrap;
+    align-items: stretch;
+    width: 100%;
+}
+#siteforcomp {
+    height: 29px;
+
+}

@@ -1,0 +1,159 @@
+* {
+  -webkit-overflow-scrolling: touch;
+}
+/* CandidateSidebar.css */
+.main-screen-width{
+  display: flex;
+  width: 100%;
+}
+
+.main-menu {
+    background-color: white;
+    width: 230px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 998;
+    box-shadow: 0 0 15px 0 rgba(0, 0, 0, 0.05);
+  }
+  img#profile-visibility-status {
+    width: 35px;
+}
+.navbar-collapse{
+  flex-direction: row-reverse;
+}
+  .navbar-header {
+    height: 60px;
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .logocs {
+    max-height: 40px;
+  }
+  
+  .shadow-bottom {
+    height: 2px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
+  }
+  
+  .main-menu-content {
+    height: calc(100% - 60px);
+    overflow-y: auto;
+    padding-bottom: 60px;
+  }
+  
+  .navigation {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+  
+  .nav-item {
+    position: relative;
+    margin-bottom: 2px;
+  }
+  
+  .nav-item a, .nav-item > a {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    color: #626262;
+    text-decoration: none;
+    font-size: 15px;
+    transition: all 0.2s ease;
+  }
+  
+  .nav-item.active > a, 
+  .nav-item a:hover, 
+  .nav-item > a:hover {
+    /* background-color: #f8f8f8; */
+    color: #ff365b;
+  }
+  
+  .nav-item a.active {
+    /* background-color: #ff365b; */
+    color: #ff365b;
+    border-radius: 5px;
+    margin: 0 10px;
+  }
+  
+  /* For the dashboard link */
+ 
+  .nav-item i {
+    margin-right: 10px;
+    font-size: 18px;
+    width: 20px;
+    text-align: center;
+  }
+  
+  .menu-title {
+    margin-left: 10px;
+    color: #000;
+  }
+  .nav-item svg{
+    color: #ff365b;
+    font-size: 20px;
+  }
+  
+  /* Dropdown styling */
+  .menu-content {
+    list-style: none;
+    padding-left: 34px;
+    margin: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out;
+  }
+  
+  .nav-item.open .menu-content {
+    max-height: 500px; /* Large enough to contain all items */
+  }
+  
+  .menu-content li a {
+    padding: 7px 15px;
+    font-size: 14px;
+  }
+  
+  /* Arrow indicator for dropdown */
+  .nav-item > a::after {
+    content: '\f105'; /* Font Awesome right arrow */
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    transition: transform 0.3s ease;
+  }
+  
+  .nav-item.open > a::after {
+    transform: rotate(90deg);
+  }
+  
+  /* Hide arrow for non-dropdown items */
+  .nav-item:not(:has(ul)) > a::after {
+    display: none;
+  }
+  .main-menu.menu-light .navigation li a {
+    color: #fff;
+    padding: 10px 10px 10px 10px;
+    line-height: 1.45;
+    transition: padding 0.35sease 0s !important;
+}
+.navigation li a {
+  display: block;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.app-content.content {
+  scroll-behavior: smooth;
+  overflow-y: auto;
+  height: calc(100vh - 4rem); /* Adjust based on your header height */
+}
+.main-menu.menu-light .navigation>li ul .active>a {
+  color: #fff;
+}

@@ -1,0 +1,446 @@
+.card .card-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    border-bottom: none;
+    padding: 1.5rem 1.5rem 0;
+    background-color: transparent;
+}
+.card-header {
+    padding: 1.5rem 1.5rem;
+    margin-bottom: 0;
+    background-color: rgba(34, 41, 47, 0.03);
+    border-bottom: 1px solid rgba(34, 41, 47, 0.125);
+}
+.card-header:first-child {
+    border-radius: calc(0.5rem - 1px) calc(0.5rem - 1px) 0 0;
+}
+.fliter-block {
+    display: block !important;
+}
+form #debt-amount-slider {
+    display: flex
+;
+    flex-direction: row;
+    align-content: stretch;
+    position: relative;
+    width: 100%;
+    height: 50px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+form #debt-amount-slider::before {
+    content: " ";
+    position: absolute;
+    height: 2px;
+    width: 100%;
+    width: calc(100%*(4 / 5));
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #a39a9a;
+}
+form #debt-amount-slider input {
+    display: none;
+}
+form #debt-amount-slider input, form #debt-amount-slider label {
+    box-sizing: border-box;
+    flex: 1;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    cursor: pointer;
+}
+form #debt-amount-slider label {
+    display: inline-block;
+    position: relative;
+    width: 20%;
+    height: 100%;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+form:valid #debt-amount-slider input + label::before {
+    transform: translate(-50%, 45px) scale(0.9);
+    transition: all 0.15slinear;
+}
+form #debt-amount-slider label::before {
+    content: attr(data-debt-amount);
+    position: absolute;
+    left: 50%;
+    padding-top: 10px;
+    transform: translate(-50%, 45px);
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    font-weight: 400;
+    white-space: nowrap;
+    opacity: 0.85;
+    transition: all 0.15sease-in-out;
+}
+form #debt-amount-slider label::after {
+    content: " ";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border: 2px solid #625c5c;
+    background: #fff;
+    border-radius: 50%;
+    pointer-events: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    z-index: 1;
+    cursor: pointer;
+    transition: all 0.15sease-in-out;
+}
+form #debt-amount-slider input:checked:nth-child(9) ~ #debt-amount-pos {
+    left: 90%;
+}
+form #debt-amount-slider input:checked ~ #debt-amount-pos {
+    opacity: 1;
+}
+form #debt-amount-slider #debt-amount-pos {
+    display: block;
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    background: #FC2B5A;
+    border-radius: 50%;
+    transition: all 0.15sease-in-out;
+    transform: translate(-50%, -50%);
+    border: 2px solid #fff;
+    opacity: 0;
+    z-index: 2;
+}
+/* .card-body {
+    flex: 1 1 auto;
+    padding: 1.5rem;
+} */
+form:valid #debt-amount-slider input:checked + label::before {
+    color: #FC2B5A;
+    transform: translate(-50%, 45px) scale(1.1);
+    transition: all 0.15slinear;
+}
+form #debt-amount-slider input:checked + label::before {
+    font-weight: 800;
+    opacity: 1;
+}
+form #debt-amount-slider input:checked:nth-child(1) ~ #debt-amount-pos {
+    left: 10%;
+}
+
+
+
+
+
+
+
+
+.searchjobspage .card {
+    border-radius: 8px;
+    box-shadow: 0 4px 24px 0 rgba(34, 41, 47, 0.1);
+    margin-bottom: 1rem;
+  }
+  
+  .fliter-block {
+    background-color: #fff;
+    border-bottom: 1px solid #dfe3e7;
+  }
+  
+  .filterSearchJob {
+    margin-bottom: 1rem;
+  }
+  
+  .filterSearchJob label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Course/Job Card Styles */
+  .course_nw {
+    margin-top: 1rem;
+  }
+  
+  .cr_nw_in {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 24px 0 rgba(34, 41, 47, 0.1);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+  }
+  
+  .cr_nw_in:hover {
+    transform: translateY(-5px);
+  }
+  
+  .video_thum {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+  }
+  
+  .course_inf {
+    padding: 1rem;
+  }
+  
+  .course_inf h5 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  
+  .job_cate {
+    color: #6e6b7b;
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  
+  .course_spec {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+  
+  .spe_icon {
+    background-color: rgba(115, 103, 240, 0.1);
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.75rem;
+  }
+  
+  .spe_icon i {
+    color: #7367f0;
+    font-size: 1.5rem;
+  }
+  
+  .spe_detail h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+  
+  .spe_detail span {
+    color: #6e6b7b;
+    font-size: 0.8rem;
+  }
+  
+  .jobDetails-wrap {
+    margin-bottom: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+  }
+  
+  /* Job action buttons */
+  .act_btn {
+    margin-top: 1rem;
+  }
+  
+  .apply-thisjob {
+    background-color: #7367f0;
+    border-radius: 4px;
+    color: #fff;
+    display: inline-block;
+    font-size: 0.9rem;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    width: 100%;
+  }
+  
+  .apply-thisjob:hover {
+    background-color: #5e50ee;
+    color: #fff;
+    text-decoration: none;
+  }
+  
+  .apply-thisjob i {
+    margin-right: 0.5rem;
+  }
+  
+  .call-btn {
+    background-color: #28c76f;
+  }
+  
+  .call-btn:hover {
+    background-color: #24b263;
+  }
+  
+  .same-plane {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .plane-font {
+    font-size: 1.2rem;
+  }
+  
+  /* Map section styles */
+  .map {
+    margin-top: 1rem;
+  }
+  
+  #map {
+    border-radius: 8px;
+    box-shadow: 0 4px 24px 0 rgba(34, 41, 47, 0.1);
+  }
+  
+  /* Distance slider styles */
+  #debt-amount-slider {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    height: 50px;
+    margin-top: 1rem;
+  }
+  
+  #debt-amount-slider input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+  }
+  
+  #debt-amount-slider label {
+    cursor: pointer;
+    position: relative;
+    display: block;
+    width: 20%;
+    height: 100%;
+    text-align: center;
+  }
+  
+  #debt-amount-slider label:after {
+    content: attr(data-debt-amount);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    color: #6e6b7b;
+  }
+  
+  #debt-amount-slider label:before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #ddd;
+    transition: background-color 0.3s ease;
+  }
+  
+  #debt-amount-slider input[type="radio"]:checked + label:before {
+    background-color: #7367f0;
+  }
+  
+  #debt-amount-pos {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 2px;
+    background-color: #7367f0;
+    pointer-events: none;
+    transition: width 0.2s ease, left 0.2s ease;
+  }
+  
+  /* Pagination styles */
+  .pagination {
+    margin-top: 1rem;
+  }
+  
+  .page-link {
+    color: #7367f0;
+    border-radius: 4px;
+    margin: 0 2px;
+  }
+  
+  .page-item.active .page-link {
+    background-color: #7367f0;
+    border-color: #7367f0;
+  }
+  
+  .pagi_custom {
+    background-color: #7367f0;
+    color: #fff;
+  }
+  
+  .pagi_customtwo:hover {
+    background-color: rgba(115, 103, 240, 0.1);
+  }
+  
+  /* Responsive styles */
+  @media (max-width: 768px) {
+    .content-header {
+      display: none;
+    }
+    
+    .searchjobspage .card-body {
+      padding: 0.75rem;
+    }
+    
+    .forsmallscrn {
+      display: block !important;
+    }
+    
+    .forlrgscreen {
+      display: none;
+    }
+    
+    .cr_nw_in {
+      margin-bottom: 1rem;
+    }
+    
+    .act_btn .col-xl-6 {
+      margin-bottom: 0.5rem;
+    }
+  }
+  
+  /* Modal styles */
+  .modal-content {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .modal-header {
+    background-color: #7367f0;
+    color: #fff;
+  }
+  
+  .modal-title {
+    font-weight: 600;
+  }
+  
+  .close {
+    color: #fff;
+  }
+  
+  .btn-primary {
+    background-color: #7367f0;
+    border-color: #7367f0;
+  }
+  
+  .btn-primary:hover {
+    background-color: #5e50ee;
+    border-color: #5e50ee;
+  }
