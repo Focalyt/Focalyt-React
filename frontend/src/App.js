@@ -69,7 +69,7 @@ const Layout = () => {
                 <Route path ="registerInterviewsList" element={<RegisterForInterview/>}/>
                 <Route path='InterestedCompanies' element={<Shortlisting/>}/>
                 {/* <Route path="course" element={<CourseDetail/>}/> */}
-                <Route path="/candidate/course/:courseId" element={<CourseDetails />} />
+                <Route path="course/:courseId" element={<CourseDetail />} />
             </Route>
       </Routes>
 

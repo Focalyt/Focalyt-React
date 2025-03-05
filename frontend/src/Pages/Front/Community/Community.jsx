@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import FrontLayout from '../../../Component/Layouts/Front';
 import "./Community.css";
-
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faShare } from '@fortawesome/free-solid-svg-icons';  
 function Community() {
   const [posts, setPosts] = useState([]);
   const [expandedPosts, setExpandedPosts] = useState({});
@@ -429,7 +430,7 @@ function Community() {
                               className="share_link"
                               onClick={() => handleShare(postId)}
                             >
-                              <i className="fas fa-share"></i> Share
+                               <FontAwesomeIcon icon={faShare} /> Share
                             </div>
                           </div>
                         </div>

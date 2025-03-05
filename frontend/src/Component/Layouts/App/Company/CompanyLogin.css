@@ -26,7 +26,7 @@ html {
   }
   
   html body .content.app-content {
-    overflow: hidden;
+    overflow-x: hidden;
   }
   
   html body .content.app-content.show-overlay .content-overlay {

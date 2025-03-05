@@ -192,36 +192,34 @@ function Course() {
     return filtered;
   };
   const handleShare = async (courseId, courseName, courseThumbnail) => {
-    if (!courseId || !courseName) {
-      console.error("Course ID or Name is missing.");
-      alert("Unable to share. Invalid course.");
-      return;
-    }
-  
     const courseUrl = `${window.location.origin}${window.location.pathname}#${courseId}`;
-  
     if (navigator.share) {
       try {
         await navigator.share({
-          title: courseName, // ✅ Course name as title
-          text: `Check out this course: ${courseName}`, // ✅ Course name in text
-          url: courseUrl, // ✅ Course URL
+          title: courseName,
+          text: `Check out this course: ${courseName}`,
+          url: courseUrl,
         });
         console.log("Shared successfully!");
       } catch (error) {
         console.error("Error sharing:", error);
+        fallbackCopyText(courseName, courseUrl);
       }
     } else {
-      // Fallback: Copy link to clipboard
-      try {
-        await navigator.clipboard.writeText(`Check out this course: ${courseName}\n${courseUrl}`);
-        alert("Course link copied to clipboard! Share it manually.");
-      } catch (error) {
-        console.error("Clipboard copy failed:", error);
-      }
+      fallbackCopyText(courseName, courseUrl);
     }
-  };
-  
+  }
+
+  function fallbackCopyText(courseName, courseUrl) {
+    const shareText = `Check out this course: ${courseName} - ${courseUrl}`;
+    navigator.clipboard.writeText(shareText).then(() => {
+      alert("Course link copied! You can paste it anywhere.");
+    }).catch(err => {
+      console.error("Clipboard copy failed:", err);
+    });
+  }
+
+
 
 
 
@@ -291,7 +289,7 @@ function Course() {
                                 onChange={handleSearchChange} style={{ background: "transparent", border: "1px solid" }}
                               />
                               <span className="search-icon">
-                              <FontAwesomeIcon icon={faSearch} />
+                                <FontAwesomeIcon icon={faSearch} />
                               </span>
                             </div>
                           </div>
@@ -329,19 +327,19 @@ function Course() {
                         ))}
                       </div>
                       <div className='d-flex align-items-center d-md-none d-sm-block'>
-                      <span className="font-medium text-uppercase me-2">Selected Sector:</span>
-                      <span className="filter-button active text-uppercase">
-                        {activeFilter === "all"
-                          ? "ALL"
-                          : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
-                      </span>
-                    </div>
+                        <span className="font-medium text-uppercase me-2">Selected Sector:</span>
+                        <span className="filter-button active text-uppercase">
+                          {activeFilter === "all"
+                            ? "ALL"
+                            : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Selected Sector Display */}
                   <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
-                  <div className='sector--select'>
+                    <div className='sector--select'>
                       <span className="font-medium text-uppercase me-2">Selected Sector:</span>
                       <span className="filter-button active text-uppercase">
                         {activeFilter === "all"
@@ -354,7 +352,7 @@ function Course() {
                         className={`filter-button text-uppercase ${feeFilter === "all" ? "active" : ""}`}
                         onClick={() => handleFeeFilterClick("all")}
                       >
-                       
+
                         ALL
                       </button>
                       <button
@@ -545,7 +543,7 @@ function Course() {
                                           </div>
                                         </div>
                                       </div>
-                                     
+
 
                                       {/* Action Buttons */}
                                       <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
@@ -562,9 +560,9 @@ function Course() {
                                         </a>
                                       </div>
                                       <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                        <button  
- onClick={() => handleShare(course._id,  course.name, course.thumbnail)} className="btn cta-callnow shr--width">
-                                        {/* <Share2 size={16} className="mr-1" /> */}
+                                        <button
+                                          onClick={() => handleShare(course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">
+                                          {/* <Share2 size={16} className="mr-1" /> */}
                                           Share
                                         </button>
                                       </div>
@@ -572,9 +570,14 @@ function Course() {
                                         <div className="row pt-2">
                                           <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
                                             <a href="#" data-bs-toggle="modal" data-bs-target="#callbackModal">
-                                              <span className="learnn pt-1 btn cta-callnow w-100">
+                                              <span
+                                                className="learnn btn cta-callnow w-100"
+                                                style={{ padding: "10px 14px", cursor: "pointer" }}
+                                                onClick={() => alert("Callback request received!")}
+                                              >
                                                 Request for Call Back
                                               </span>
+
                                             </a>
                                           </div>
                                         </div>

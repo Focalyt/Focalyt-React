@@ -26,7 +26,7 @@ html body .content {
 }
 
 html body .content.app-content {
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 html body .content.app-content.show-overlay .content-overlay {
@@ -3864,12 +3864,12 @@ input[type="month"].form-control {
 .select2-container--classic .select2-selection--multiple:focus,
 .select2-container--default .select2-selection--multiple:focus {
   outline: 0;
-  border-color: #102660 box-shadow: 0 3px 10px 0 rgba(0, 0, 0, 0.15) !important;
+  border-color: #102660 ; box-shadow: 0 3px 10px 0 rgba(0, 0, 0, 0.15) !important;
 }
 
 .select2-container--classic .select2-selection--multiple .select2-selection__choice,
 .select2-container--default .select2-selection--multiple .select2-selection__choice {
-  background-color: #102660 border-color: #102660 color: #fff;
+  background-color: #102660 ;border-color: #102660; color: #fff;
   padding: 5px;
 }
 
@@ -4067,7 +4067,7 @@ table.dataTable.complex-headers tfoot td {
 
 table.dataTable tbody tr.selected {
   background-color: rgba(115, 103, 240, 0.05) !important;
-  color: #102660 box-shadow: 0 0 1px 0 #102660 border-radius: 5px;
+  color: #102660; box-shadow: 0 0 1px 0 #102660; border-radius: 5px;
 }
 
 table.dataTable tbody tr.selected td,

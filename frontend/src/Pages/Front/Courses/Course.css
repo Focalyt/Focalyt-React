@@ -32,8 +32,8 @@ img.group1 {
     font-family: inter;
     border-radius: 50px;
     font-weight: 500;
-    padding: 4px 4px;
-    width: 100%;
+    padding: 10px 4px;
+    width: 120%;
     font-size: 12px;
     letter-spacing: 1px;
     transition: .3s;
@@ -42,6 +42,9 @@ img.group1 {
     transition: .5s;
     background: #FC2B5A;
     color: #fff;
+}
+.learnn{
+  padding: 10px 14px;
 }
 .course_card_footer {
     background: #FC2B5A;
@@ -123,20 +126,7 @@ button.close span {
     .card {
         width: 95% !important;
     }
-    .btn.cta-callnow {
-        background: #fff;
-        color: #FC2B5A;
-        font-family: inter;
-        border-radius: 50px;
-        font-weight: 500;
-        /* padding: 4px 10px; */
-        padding: 4px 2px;
-        width: 100%;
-        font-size: 12px;
-        /* font-size: 14px; */
-        letter-spacing: 1px;
-        transition: .3s;
-    }
+    
     .jobs-heading {
         font-size: 22px;
     }
@@ -147,10 +137,7 @@ button.close span {
     }
 }
 @media (max-width: 578px) {
-  .btn.cta-callnow{
-    padding: 7px;
-    font-size: 11px;
-  }
+ 
     .jobs-heading {
         font-size: 27px !important;
     }
@@ -161,35 +148,13 @@ button.close span {
     }
 }
 @media (max-width: 392px) {
-    .btn.cta-callnow {
-        background: #fff;
-        color: #FC2B5A;
-        font-family: inter;
-        border-radius: 50px;
-        font-weight: 500;
-        padding: 2px;
-        width: 100%;
-        font-size: 12px;
-        letter-spacing: 1px;
-        transition: .3s;
-    }
+   
     .courses_features p{
         font-size: 14px;
     }
 }
 @media (max-width: 375px) {
-    .btn.cta-callnow {
-        background: #fff;
-        color: #FC2B5A;
-        font-family: inter;
-        border-radius: 50px;
-        font-weight: 500;
-        padding: 4px 9px;
-        width: 100%;
-        font-size: 9px;
-        letter-spacing: 1px;
-        transition: .3s;
-    }
+   
     
 }
 
