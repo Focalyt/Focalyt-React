@@ -444,7 +444,7 @@ const HomePage = () => {
                 <div className="col-xl-6 col-lg-6 "></div>
                 <div className="col-lg-6 col-12 d-xl-none d-lg-none d-md-block d-sm-block d-block" data-aos-duration="1000" data-aos="fade-down"
                   data-aos-delay="300">
-                  <div className="content">
+                  <div className="content m-0">
                     <div className="content-text-block">
                       <h2 className="content-title heading-md text-capitalize how_focal">
                         What Focalyt Does
@@ -903,7 +903,7 @@ const HomePage = () => {
             </div>
             <div className="col-lg-6 col-12 d-xl-none d-lg-none d-md-block d-sm-block d-block">
               <div className="small-screen new-small-screen">
-                <div className="content">
+                <div className="content m-0">
                   <div className="content-text-block">
                     <h2 className="content-title heading-md how_focal pb-4">
                       Future Technology Labs for Institute
