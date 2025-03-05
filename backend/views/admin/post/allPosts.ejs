@@ -172,6 +172,71 @@
         border: none;
         background: transparent;
       } */
+/* 🌟 Carousel Buttons - Fix Visibility & Positioning */
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgb(254, 4, 4);
+    /* Semi-transparent black */
+    color: white;
+    border: none;
+    font-size: 24px;
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    border-radius: 50%;
+    z-index: 1000; /* Ensures it's above images */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease-in-out;
+}
+
+/* Left Button */
+.carousel-btn.prev {
+    left: 10px;
+}
+
+/* Right Button */
+.carousel-btn.next {
+    right: 10px;
+}
+
+/* Hover Effect */
+.carousel-btn:hover {
+  background-color: rgb(254, 4, 4);
+    color: black;
+}
+
+/* 🖼️ Ensure Images & Videos Fit Properly */
+.happy_candidates {
+    position: relative; /* Needed for absolute buttons */
+    overflow: hidden;
+}
+
+.happy_candidates img,
+.happy_candidates video {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: cover;
+}
+
+/* ⚠️ Prevent Buttons From Getting Hidden */
+.happy_candidates .carousel-btn {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 📌 Mobile Responsiveness */
+@media (max-width: 768px) {
+    .carousel-btn {
+        font-size: 20px;
+        width: 40px;
+        height: 40px;
+    }
+}
 
     </style>
 
