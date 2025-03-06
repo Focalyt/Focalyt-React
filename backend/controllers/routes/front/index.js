@@ -223,10 +223,21 @@ router.get("/employersTermsofService", (req, res) => {
 	});
 });
 
-router.get("/team", (req, res) => {
-	rePath = res.render(`${req.vPath}/front/team`, {
-	});
+router.get("/team", async(req, res) => {
+	const seniorManagement = await Team.find({ status: true, position: "Senior Management" }).sort({ sequence: 1 });
+    const management = await Team.find({ status: true, position: "Management" }).sort({ sequence: 1 });
+    const staff = await Team.find({ status: true, position: "Staff" }).sort({ sequence: 1 });
+
+			
+		// **Render `about_us` पेज**
+		return res.json({
+			seniorManagement,
+			management,
+			staff
+		});
 });
+
+
 router.get("/userAgreement", (req, res) => {
 	rePath = res.render(`${req.vPath}/front/userAgreement`, {
 	});
