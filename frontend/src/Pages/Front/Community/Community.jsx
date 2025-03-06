@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import FrontLayout from '../../../Component/Layouts/Front';
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import "./Community.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShare , faDownload } from '@fortawesome/free-solid-svg-icons';  
+import { faShare, faDownload } from '@fortawesome/free-solid-svg-icons';
 function Community() {
   const [posts, setPosts] = useState([]);
   const [expandedPosts, setExpandedPosts] = useState({});
@@ -39,15 +41,168 @@ function Community() {
         ...prev,
         [postId]: !prev[postId]
       };
-      
+
       // Force recalculation of element heights after state change
       setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
       }, 50);
-      
+
       return newState;
     });
   };
+
+
+
+  const handleDownloadAllImages = async (files) => {
+    if (!files || files.length === 0) {
+      alert("No files to download!");
+      return;
+    }
+  
+   
+      if (files.length === 1) {
+        // For single file download
+        const fileURL = files[0];
+        const fileName = fileURL.split('/').pop().split('?')[0]; // Handle query params in URL
+        
+        try {
+          // Fetch the file first to handle CORS issues
+          const response = await fetch(fileURL);
+          if (!response.ok) throw new Error(`Failed to fetch: ${fileURL}`);
+          
+          const blob = await response.blob();
+          const blobUrl = window.URL.createObjectURL(blob);
+          
+          const link = document.createElement("a");
+          link.href = blobUrl;
+          link.setAttribute("download", fileName);
+          document.body.appendChild(link);
+          link.click();
+          
+          // Clean up
+          setTimeout(() => {
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(link);
+          }, 100);
+          
+        } catch (error) {
+          console.error("Error downloading file:", error);
+          alert(`Failed to download file: ${fileName}. Please try again.`);
+        }
+        
+        return;
+      }
+  
+    // For multiple files, create a ZIP
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder("Downloaded_Images");
+      let failedFiles = [];
+      let successCount = 0;
+      
+      // Show loading message
+      
+      
+      // Fetch files one by one and add to ZIP
+      for (let i = 0; i < files.length; i++) {
+        const fileURL = files[i];
+        const fileName = fileURL.split('/').pop() || `image${i+1}.jpg`;
+        
+        try {
+          // Explicitly fetch each file
+          const response = await fetch(fileURL, { 
+            mode: 'cors',
+            cache: 'no-cache'
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+          }
+          
+          // Get the actual file content as blob
+          const blob = await response.blob();
+          
+          // Add the blob to the ZIP file with proper filename
+          folder.file(fileName, blob);
+          successCount++;
+          
+          console.log(`Added file ${i+1}/${files.length} to ZIP: ${fileName}`);
+        } catch (error) {
+          console.error(`Failed to add file ${i+1}:`, error);
+          failedFiles.push(fileURL);
+        }
+      }
+      
+      if (successCount === 0) {
+        alert("Failed to download any files. Please check your network connection.");
+        return;
+      }
+      
+      // Generate and download the ZIP file
+      console.log("Generating ZIP with", successCount, "files");
+      const content = await zip.generateAsync({ 
+        type: "blob",
+        compression: "DEFLATE" 
+      });
+      
+      console.log("ZIP generated, size:", content.size);
+      saveAs(content, "Images.zip");
+      
+      if (failedFiles.length > 0) {
+        console.warn("Failed files:", failedFiles);
+        alert(`Downloaded ${successCount} of ${files.length} files. Some files couldn't be downloaded.`);
+      }
+    } catch (error) {
+      console.error("Error creating ZIP:", error);
+      alert("An error occurred while creating the ZIP file. Please try again.");
+    }
+  };
+
+// Alternative approach without using JSZip for browsers that block it
+const downloadFilesSequentially = (files) => {
+  console.log("Sequential download method for files:", files);
+  
+  if (!files || files.length === 0) {
+    alert("No files to download!");
+    return;
+  }
+  
+  // Create hidden iframe for downloads to avoid page navigation
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+  
+  let downloadCount = 0;
+  
+  const downloadNext = (index) => {
+    if (index >= files.length) {
+      document.body.removeChild(iframe);
+      alert(`Downloaded ${downloadCount} of ${files.length} files`);
+      return;
+    }
+    
+    const fileURL = files[index];
+    console.log(`Downloading file ${index+1}/${files.length}:`, fileURL);
+    
+    try {
+      iframe.src = fileURL;
+      downloadCount++;
+      
+      // Schedule next download with delay
+      setTimeout(() => downloadNext(index + 1), 1000);
+    } catch (error) {
+      console.error(`Error downloading file ${index+1}:`, error);
+      // Continue to next file even if current fails
+      setTimeout(() => downloadNext(index + 1), 500);
+    }
+  };
+  
+  // Start the download sequence
+  downloadNext(0);
+};
+
+
+
 
   // Share handler
   const handleShare = (postId) => {
@@ -87,31 +242,31 @@ function Community() {
       const checkTruncation = () => {
         if (textRef.current) {
           const element = textRef.current;
-          
+
           // Calculate how many lines of text we have
           const style = window.getComputedStyle(element);
           const lineHeight = parseFloat(style.lineHeight) || 1.5 * parseFloat(style.fontSize);
-          
+
           // Force the element to temporarily show all content to measure it
           const originalStyles = {
             maxHeight: element.style.maxHeight,
             overflow: element.style.overflow,
             webkitLineClamp: element.style.webkitLineClamp
           };
-          
+
           element.style.maxHeight = 'none';
           element.style.overflow = 'visible';
           element.style.webkitLineClamp = 'unset';
-          
+
           // Get the full height
           const fullHeight = element.scrollHeight;
-          
+
           // Calculate the number of lines
           const lineCount = Math.ceil(fullHeight / lineHeight);
-          
+
           // Set truncated flag if lines exceed our limit
           setTruncated(lineCount > 3); // 3 lines limit
-          
+
           // Restore original styles
           element.style.maxHeight = originalStyles.maxHeight;
           element.style.overflow = originalStyles.overflow;
@@ -121,10 +276,10 @@ function Community() {
 
       // Run after a small delay to ensure content is rendered
       const timer = setTimeout(checkTruncation, 10);
-      
+
       // Also check on window resize
       window.addEventListener('resize', checkTruncation);
-      
+
       return () => {
         clearTimeout(timer);
         window.removeEventListener('resize', checkTruncation);
@@ -133,15 +288,15 @@ function Community() {
 
     return (
       <div className="post-text-container">
-        <div 
+        <div
           ref={textRef}
           className={isExpanded ? "show-text" : "hidden-text"}
         >
           {content || "No content available"}
         </div>
-        
+
         {truncated && (
-          <div 
+          <div
             className={`toggle-more ${truncated ? 'toggle-more-visible' : 'toggle-more-hidden'}`}
             onClick={() => toggleExpand(postId)}
           >
@@ -430,14 +585,15 @@ function Community() {
                               className="share_link"
                               onClick={() => handleShare(postId)}
                             >
-                               <FontAwesomeIcon icon={faShare} /> Share
+                              <FontAwesomeIcon icon={faShare} /> Share
                             </div>
                             <div
                               className="share_link"
-                              
+                              onClick={() => handleDownloadAllImages(post.files.map(file => file.fileURL))}
                             >
-                               <FontAwesomeIcon icon={faDownload} /> Download
+                              <FontAwesomeIcon icon={faDownload} /> Download All
                             </div>
+
 
                           </div>
                         </div>
@@ -455,7 +611,7 @@ function Community() {
           </div>
         </div>
       </section>
-    </FrontLayout>  
+    </FrontLayout>
   );
 }
 
