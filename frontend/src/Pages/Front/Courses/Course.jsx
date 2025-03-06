@@ -224,6 +224,7 @@ function Course() {
 
 
   const filteredCourses = getFilteredCourses();
+  console.log(courses)
 
 
 
