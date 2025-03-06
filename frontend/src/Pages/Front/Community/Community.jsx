@@ -335,8 +335,8 @@ const downloadFilesSequentially = (files) => {
           slidesToShow: 1,
           slidesToScroll: 1,
           arrows: true,
-          autoplay: false,
-          autoplaySpeed: 5000, // Match your existing 5-second interval
+          autoplay: true,
+          autoplaySpeed: 1500, // Match your existing 5-second interval
           responsive: [
             { breakpoint: 1366, settings: { slidesToShow: 1 } },
             { breakpoint: 768, settings: { slidesToShow: 1 } },
