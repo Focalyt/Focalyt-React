@@ -663,6 +663,129 @@
   padding-inline: 45px;
 }
 
+/* Container for the slider */
+/* Custom styles for Slick Slider */
+
+/* Container for the slider */
+.postsection {
+  position: relative;
+  margin: 15px 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+/* Image and Video container styles */
+.postsection .slider_images {
+  width: 100%;
+  max-height: 400px;
+}
+
+.postsection .slider_images img,
+.postsection .slider_images video {
+  width: 100%;
+  height: 400px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+/* Style the Slick arrows */
+.postsection .slick-prev, 
+.postsection .slick-next {
+  width: 40px;
+  height: 40px;
+  background-color: rgb(254, 4, 4) !important;
+  border-radius: 50%;
+  z-index: 10;
+}
+
+.postsection .slick-prev {
+  left: 10px;
+}
+
+.postsection .slick-next {
+  right: 10px;
+}
+
+.postsection .slick-prev:hover,
+.postsection .slick-next:hover,
+.postsection .slick-prev:focus,
+.postsection .slick-next:focus {
+  background-color: rgb(254, 4, 4) !important;
+  opacity: 1;
+}
+
+.postsection .slick-prev:before,
+.postsection .slick-next:before {
+  font-size: 20px;
+  color: white;
+  opacity: 1;
+}
+
+/* Style the Slick dots with proper spacing */
+.postsection .slick-dots {
+  bottom: -28px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px; /* Add spacing between dots */
+}
+
+/* Style for all dots (inactive state) */
+.postsection .slick-dots li {
+  width: 12px;
+  height: 12px;
+}
+
+.postsection .slick-dots li button {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #000; /* Black for inactive dots */
+  border: none;
+  padding: 0;
+}
+
+/* Hide the default dot text content */
+.postsection .slick-dots li button:before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #000;
+  opacity: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Style for active dot */
+.postsection .slick-dots li.slick-active button {
+  background-color: rgb(254, 4, 4);
+}
+
+.postsection .slick-dots li.slick-active button:before {
+  background-color: rgb(254, 4, 4);
+  opacity: 1;
+}
+
+/* Custom slide counter */
+.postsection .carousel-counter {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgb(254, 4, 4);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  z-index: 10;
+}
+
+/* Ensure slides transition smoothly */
+.postsection .slick-slide {
+  transition: opacity 0.3s ease;
+}
+
 .share_link {
   display: flex;
   align-items: center;

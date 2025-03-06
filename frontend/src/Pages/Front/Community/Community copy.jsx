@@ -4,9 +4,6 @@ import FrontLayout from '../../../Component/Layouts/Front';
 import "./Community.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShare , faDownload } from '@fortawesome/free-solid-svg-icons';  
-import $ from 'jquery';
-import 'slick-carousel/slick/slick.css';
-import 'slick-carousel/slick/slick-theme.css';
 function Community() {
   const [posts, setPosts] = useState([]);
   const [expandedPosts, setExpandedPosts] = useState({});
@@ -157,113 +154,127 @@ function Community() {
 
   // Carousel component
   const PostCarousel = ({ files, postId }) => {
-    const sliderRef = useRef(null);
-    const slickInitialized = useRef(false);
+    const carouselRef = useRef(null);
+    const [touchPosition, setTouchPosition] = useState(null);
     const currentIndex = currentSlides[postId] || 0;
-    
-    // Function to initialize Slick Slider
-    const initSlickSlider = (selector, options) => {
-      if (typeof $ !== 'undefined') {
-        $(selector).slick(options);
-      }
+
+    // Go to next slide
+    const goToNextSlide = () => {
+      setCurrentSlides((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] + 1) % files.length,
+      }));
     };
-    
-    // Initialize the slider when component mounts
+
+    // Go to previous slide
+    const goToPrevSlide = () => {
+      setCurrentSlides((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] - 1 + files.length) % files.length,
+      }));
+    };
+
+    // Handle swipe gestures
+    const handleTouchStart = (e) => {
+      setTouchPosition(e.touches[0].clientX);
+    };
+
+    const handleTouchMove = (e) => {
+      if (touchPosition === null) return;
+      const currentPosition = e.touches[0].clientX;
+      const direction = touchPosition - currentPosition;
+
+      if (direction > 10) goToNextSlide();
+      if (direction < -10) goToPrevSlide();
+      setTouchPosition(null);
+    };
+
+    // Auto-slide every 5 seconds
     useEffect(() => {
-      if (!files || files.length === 0) return;
-      
-      // Only initialize slick if it hasn't been already
-      if (sliderRef.current && !slickInitialized.current) {
-        const slickOptions = {
-          dots: true,
-          infinite: true,
-          slidesToShow: 1,
-          slidesToScroll: 1,
-          arrows: true,
-          autoplay: false,
-          autoplaySpeed: 5000, // Match your existing 5-second interval
-          responsive: [
-            { breakpoint: 1366, settings: { slidesToShow: 1 } },
-            { breakpoint: 768, settings: { slidesToShow: 1 } },
-          ],
-          // Synchronize slick's state with your React state
-          beforeChange: (current, next) => {
-            setCurrentSlides((prev) => ({
-              ...prev,
-              [postId]: next,
-            }));
-          },
-          initialSlide: currentIndex // Start at the current index
-        };
-        
-        // Initialize slick slider
-        initSlickSlider(`#slider-${postId}`, slickOptions);
-        slickInitialized.current = true;
-      }
-      
-      // Cleanup function to destroy slick when component unmounts
-      return () => {
-        if (slickInitialized.current && sliderRef.current) {
-          try {
-            $(`#slider-${postId}`).slick('unslick');
-            slickInitialized.current = false;
-          } catch (e) {
-            console.error("Error unslicking slider:", e);
-          }
-        }
-      };
-    }, [files, postId]);
-    
-    // Update slick slider when currentIndex changes
-    useEffect(() => {
-      if (slickInitialized.current && sliderRef.current) {
-        try {
-          $(`#slider-${postId}`).slick('slickGoTo', currentIndex);
-        } catch (e) {
-          console.error("Error going to slide:", e);
-        }
-      }
-    }, [currentIndex, postId]);
-    
+      if (files.length <= 1) return;
+      const interval = setInterval(goToNextSlide, 5000);
+      return () => clearInterval(interval);
+    }, [currentIndex, files.length]);
+
     if (!files || files.length === 0) return null;
-    
+
+    // Only show the current file/slide
+    const currentFile = files[currentIndex];
+
     return (
-      <div className="postsection" id={`post-${postId}`}>
-        <div className="slider_images" id={`slider-${postId}`} ref={sliderRef}>
-          {files.map((file, index) => (
-            <div key={index}>
-              {file.fileType === "image" ? (
-                <img
-                  src={file.fileURL}
-                  className="d-block w-100"
-                  alt={`Slide ${index + 1}`}
-                  style={{
-                    height: "400px",
-                    maxHeight: "400px",
-                    objectFit: "contain",
-                  }}
-                />
-              ) : file.fileType === "video" ? (
-                <video
-                  className="d-block w-100"
-                  controls
-                  muted
-                  playsInline
-                  style={{
-                    height: "400px",
-                    maxHeight: "400px",
-                    objectFit: "contain",
-                  }}
-                >
-                  <source src={file.fileURL} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-              ) : null}
-            </div>
-          ))}
+      <div
+        className="carousel-container"
+        ref={carouselRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+      >
+        {/* Only render the current slide */}
+        <div className="carousel-content">
+          {currentFile.fileType === "image" ? (
+            <img
+              src={currentFile.fileURL}
+              alt={`Slide ${currentIndex + 1}`}
+              style={{
+                width: "100%",
+                height: "400px",
+                maxHeight: "400px",
+                objectFit: "contain",
+                display: "block",
+                margin: "0 auto",
+              }}
+            />
+          ) : currentFile.fileType === "video" ? (
+            <video
+              style={{
+                width: "100%",
+                height: "400px",
+                maxHeight: "400px",
+                objectFit: "contain",
+                margin: "0 auto",
+              }}
+              controls
+              muted
+              playsInline
+              className="lazy-video"
+            >
+              <source src={currentFile.fileURL} type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+          ) : null}
         </div>
-        
-        {/* Custom Slide Counter */}
+
+        {/* Navigation Arrows */}
+        {files.length > 1 && (
+          <>
+            <button
+              className="carousel-nav-button prev"
+              onClick={goToPrevSlide}
+            >
+              ❮
+            </button>
+            <button
+              className="carousel-nav-button next"
+              onClick={goToNextSlide}
+            >
+              ❯
+            </button>
+          </>
+        )}
+
+        {/* Pagination Dots */}
+        {files.length > 1 && (
+          <div className="carousel-indicators">
+            {files.map((_, index) => (
+              <button
+                key={index}
+                className={`carousel-indicator ${index === currentIndex ? 'active' : ''}`}
+                onClick={() => setCurrentSlides((prev) => ({ ...prev, [postId]: index }))}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Slide Counter */}
         {files.length > 1 && (
           <div className="carousel-counter">
             {currentIndex + 1}/{files.length}
@@ -272,6 +283,7 @@ function Community() {
       </div>
     );
   };
+
   useEffect(() => {
     // Handle post scrolling from URL hash on load
     const postId = window.location.hash.substring(1);

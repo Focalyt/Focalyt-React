@@ -336,16 +336,16 @@ function About() {
 
                                         {
                                             seniorManagement.map((a) => (
-                                                <div class="col-md-6 pb-4">
+                                                <div class="col-md-4 pb-4">
                                                     <div class="elementor-widget-containers">
                                                         <div class="elementor-image-box-wrapper">
-                                                            <figure class="elementor-image-box-img">
+                                                            <figure class="elementor-image-box-img pb-3">
                                                                 <img src={a.image.fileURL} alt="" />
                                                             </figure>
                                                             <div class="elementor-image-box-content">
                                                                 <h3 class="elementor-image-box-title text-black text-center">
                                                                     {a.name}<br />
-                                                                    <span class="founder"> {a.designation} </span>
+                                                                    <span class="founder fw-bolder"> {a.designation} </span>
                                                                 </h3>
                                                                 <p class="elementor-image-box-description text-black">
                                                                     {a.description}
@@ -363,18 +363,18 @@ function About() {
 
                                 <div className="col-md-12">
 
-                                    <div className="row justify-content-evenly g-4">
+                                    <div className="row justify-content-evenly align-items-center g-4">
                                         {management.map ((a)=>(
                                         <div className="col-md-4 pb-4">
                                             <div className="elementor-widget-containers">
                                                 <div className="elementor-image-box-wrapper">
-                                                    <figure className="elementor-image-box-img">
+                                                    <figure className="elementor-image-box-img pb-3">
                                                         <img src= {a.image.fileURL} alt="" />
                                                     </figure>
                                                     <div className="elementor-image-box-content">
                                                     <h3 class="elementor-image-box-title text-black text-center">
                                                                     {a.name}<br />
-                                                                    <span class="founder"> {a.designation} </span>
+                                                                    <span class="founder fw-bolder"> {a.designation} </span>
                                                                 </h3>
                                                                 <p class="elementor-image-box-description text-black">
                                                                     {a.description}
@@ -390,13 +390,13 @@ function About() {
                                         <div className="col-md-4">
                                             <div className="elementor-widget-containers">
                                                 <div className="elementor-image-box-wrapper">
-                                                    <figure className="elementor-image-box-img">
+                                                    <figure className="elementor-image-box-img pb-3">
                                                         <img src={a.image.fileURL}alt="" />
                                                     </figure>
                                                     <div className="elementor-image-box-content">
                                                     <h3 class="elementor-image-box-title text-black text-center">
                                                                     {a.name}<br />
-                                                                    <span class="founder"> {a.designation} </span>
+                                                                    <span class="founder fw-bolder"> {a.designation} </span>
                                                                 </h3>
                                                     </div>
                                                 </div>
