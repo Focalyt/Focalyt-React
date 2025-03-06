@@ -591,7 +591,7 @@ const downloadFilesSequentially = (files) => {
                               className="share_link"
                               onClick={() => handleDownloadAllImages(post.files.map(file => file.fileURL))}
                             >
-                              <FontAwesomeIcon icon={faDownload} /> Download All
+                              <FontAwesomeIcon icon={faDownload} /> Download
                             </div>
 
 
