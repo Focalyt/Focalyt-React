@@ -254,20 +254,27 @@ form #debt-amount-slider input:checked:nth-child(1) ~ #debt-amount-pos {
   }
   
   .apply-thisjob {
-    background-color: #7367f0;
-    border-radius: 4px;
+    background-color: #FC2B5A;
+    float: left;
+    width: calc(100% - 30px);
+    border: 2px solid #FC2B5A;
+    text-align: center;
     color: #fff;
-    display: inline-block;
-    font-size: 0.9rem;
-    padding: 0.75rem 1rem;
-    text-decoration: none;
-    transition: background-color 0.2s ease;
-    width: 100%;
+    -webkit-border-radius: 8px;
+    -moz-border-radius: 8px;
+    -ms-border-radius: 8px;
+    -o-border-radius: 8px;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 12px;
+    font-family: Open Sans;
+    font-weight: bold;
   }
   
   .apply-thisjob:hover {
-    background-color: #5e50ee;
-    color: #fff;
+    border: 2px solid #FC2B5A;
+    background: #fff;
+    color: #FC2B5A;
     text-decoration: none;
   }
   

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import HomePage from '../src/Pages/Front/HomePage/HomePage';
+// import About from './Pages/Front/About/About';
 import About from './Pages/Front/About/About';
 import Labs from "./Pages/Front/Labs/Labs";
 import Course from './Pages/Front/Courses/Course';
@@ -40,6 +41,7 @@ const Layout = () => {
       <Routes>
         <Route exact path="/" element={<HomePage />} />
         <Route exact path="/about" element={<About />} />
+        {/* <Route exact path="/about_us" element={<About />} /> */}
         <Route exact path="/labs" element={<Labs />} />
         <Route exact path="/courses" element={<Course />} />
         <Route exact path="/joblisting" element={<Jobs />} />

@@ -3,7 +3,7 @@ import axios from 'axios';
 import FrontLayout from '../../../Component/Layouts/Front';
 import "./Community.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShare } from '@fortawesome/free-solid-svg-icons';  
+import { faShare , faDownload } from '@fortawesome/free-solid-svg-icons';  
 function Community() {
   const [posts, setPosts] = useState([]);
   const [expandedPosts, setExpandedPosts] = useState({});
@@ -425,13 +425,20 @@ function Community() {
                           )}
 
                           {/* Interaction Buttons */}
-                          <div className="interaction-buttons d-flex align-items-center justify-content-center">
+                          <div className="interaction-buttons d-flex align-items-center justify-content-around">
                             <div
                               className="share_link"
                               onClick={() => handleShare(postId)}
                             >
                                <FontAwesomeIcon icon={faShare} /> Share
                             </div>
+                            <div
+                              className="share_link"
+                              
+                            >
+                               <FontAwesomeIcon icon={faDownload} /> Download
+                            </div>
+
                           </div>
                         </div>
                       </div>
