@@ -211,7 +211,28 @@ function Course() {
   const filteredCourses = getFilteredCourses();
   console.log(courses)
 
+  const chatContainerRef = useRef(null);
+  const bootmBoxRef = useRef(null);
+  const [isChatActive, setIsChatActive] = useState(false);
 
+  const openChatbot = () => {
+    console.log("On click start")
+    const chatContainer = document.getElementById("iframe-box");
+    if (chatContainer) {
+      chatContainer.classList.toggle("active");
+      console.log("class added")
+    } else {
+      console.error("Chat container (iframe-box) not found!");
+    }
+  
+    // Trigger the bootm-box click event to initialize the chat
+    const bootmBox = document.getElementById("bootm-box");
+    if (bootmBox) {
+      bootmBox.click();
+    } else {
+      console.error("Element with ID 'bootm-box' not found!");
+    }}
+  
 
   return (
     <>
@@ -540,11 +561,17 @@ function Course() {
                                           Apply Now
                                         </a>
                                       </div>
-                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
+                                      {/* <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
                                         <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow shr--width">
                                           Chat Now
                                         </a>
-                                      </div>
+                                      </div> */}
+                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
+                                      <button  onClick={() => openChatbot()}   className="btn cta-callnow shr--width">
+                                          Chat Now
+                                        </button>
+                                      </div>  
+                                      
                                       <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
                                         <button
                                           onClick={() => handleShare(course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">

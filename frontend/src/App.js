@@ -35,7 +35,7 @@ import Shortlisting from './Pages/App/Candidate/CandidatesJobs/Shortlisting';
 import SocialImpact from './Pages/Front/SocialImpact/SocialImpact';
 const Layout = () => {
   const location = useLocation(); 
-
+ 
   return (
     <>
       {/* <FrontHeader /> */}
