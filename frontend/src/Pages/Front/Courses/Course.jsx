@@ -116,22 +116,6 @@ function Course() {
   };
 
 
-  useEffect(() => {
-    // Fetch courses data from API
-    const fetchData = async () => {
-      try {
-
-        const response = await axios.get(`${backendUrl}/courses`);
-        console.log("Courses data received:", response);
-        setCourses(response.data.courses);
-        setUniqueSectors(response.data.uniqueSectors);
-      } catch (error) {
-        console.error("Error fetching course data:", error);
-      }
-    };
-
-    fetchData();
-  }, []);
 
 
   // Filter courses based on selected sector and search term
