@@ -347,4 +347,11 @@ router.post("/removephoto", isAdmin, async (req, res) => {
 	res.send({ status: 200, message: "Course Updated Successfully" });
 });
 
+ router.patch("/coursesequence", async (req, res) => {
+	const { id, val } = req.body
+	const update = await Courses.findByIdAndUpdate({ _id: id }, { sequence: +(val) })
+	res.send({ status: true, sequence: val })
+	console.log(update, "updateSequence")
+  })
+
 module.exports = router;

@@ -15,6 +15,10 @@ const courseSchema = new Schema({
         required: true,
       },
     duration: String,
+    sequence:{
+        type: Number,
+        default : 50
+    },
     courseType: String,
     youtubeURL: String,
     brochure: String,

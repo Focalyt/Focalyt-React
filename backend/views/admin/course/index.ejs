@@ -78,12 +78,14 @@
 							<table class="table table-hover-animation mb-0 table-hover">
 								<thead>
 									<tr>
+										<th class="jd-sequence">Sequence</th>
 										<th>Sector</th>
 										<th>Course Level</th>
 										<th>Course Name</th>
 										<!--th>No of Students</th!-->
 										<th>Duration</th>
-										<th>Certificate Agency</th>
+										<th>Publish Date</th>
+										<!-- <th>Certificate Agency</th> -->
 										<th>Certificate Agency Website</th>
 										<th>Status</th>
 										<th>Action</th>
@@ -92,13 +94,19 @@
 								<tbody>
                                   <%courses.forEach((course,i)=>{%>
                                    <tr>
+									<td>
+										<input type="number" id="jd-seq" value="<%= course.sequence %>"
+										onblur="updateSequence(event,'<%= course._id %>')" name="sequence" maxlength="4" onkeypress="if(this.value.length==4) return false"
+										class="form-control w-50" data-id="<%= course._id %>">
+									   </td>
 									<td><%course?.sectors.forEach((sector,i)=>{%>
 										<option value="<%=sector._id %>"><%=sector.name %></option>
 										<%})%></td>
 									<td><%=course.courseLevel%></td>
 									<td><%=course.name%></td>
 									<td><%=course.duration%></td>
-									<td><%=course.certifyingAgency%></td>
+									<td><%= new Date(course.createdAt).toLocaleString() %></td> 
+									<!-- <td><%=course.certifyingAgency%></td> -->
 									<td><%=course.certifyingAgencyWebsite%></td>
 									<td>
 										<div
@@ -138,6 +146,16 @@
 
 	</div>
 	<script>
+  function updateSequence(e, id) {
+      const val = e.target.value;
+      axios.patch("/admin/courses/coursesequence", { id, val }).then((res) => {
+        if (res.data.status === true) {
+          e.target.value = res.data.sequence
+        }
+      })
+    }
+
+
 		 function myOnOffFunc(id, status) {
       let data = { id: id, status: !(status=='true') }
       let headers = { 'x-auth': localStorage.getItem('token') }
