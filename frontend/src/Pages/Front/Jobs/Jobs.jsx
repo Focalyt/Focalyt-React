@@ -2,6 +2,9 @@ import React from 'react'
 import "./Jobs.css"
 import FrontLayout from '../../../Component/Layouts/Front'
 function Jobs() {
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
   return (
 
     <>

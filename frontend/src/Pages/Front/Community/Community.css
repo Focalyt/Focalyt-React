@@ -582,7 +582,7 @@
   top: 50%;
   transform: translateY(-50%);
   /* background-color: rgba(0, 0, 0, 0.5); */
-  background-color: rgb(254, 4, 4)!important;
+  background-color: rgb(243 65 106) !important;
   color: white;
   border: none;
   width: 40px;
@@ -636,7 +636,7 @@
 .carousel-indicator.active {
   width: 12px;
   height: 12px;
-  background: rgb(254, 4, 4);
+  background: rgb(243 65 106) ;
 }
 
 /* Carousel counter */
@@ -645,7 +645,7 @@
   top: 10px;
   right: 10px;
   /* background: rgba(0, 0, 0, 0.5); */
-  background-color: rgb(254, 4, 4)!important;
+  background-color: rgb(243 65 106) !important;
   color: white;
   padding: 4px 8px;
   border-radius: 12px;
@@ -693,7 +693,7 @@
 .postsection .slick-next {
   width: 40px;
   height: 40px;
-  background-color: rgb(254, 4, 4) !important;
+  background-color: rgb(243 65 106) !important;
   border-radius: 50%;
   z-index: 10;
 }
@@ -710,7 +710,7 @@
 .postsection .slick-next:hover,
 .postsection .slick-prev:focus,
 .postsection .slick-next:focus {
-  background-color: rgb(254, 4, 4) !important;
+  background-color: rgb(243 65 106) !important;
   opacity: 1;
 }
 
@@ -721,16 +721,14 @@
   opacity: 1;
 }
 
-/* Style the Slick dots with proper spacing */
 .postsection .slick-dots {
   bottom: -28px;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px; /* Add spacing between dots */
+  gap: 8px;
 }
 
-/* Style for all dots (inactive state) */
 .postsection .slick-dots li {
   width: 12px;
   height: 12px;
@@ -740,12 +738,11 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background-color: #000; /* Black for inactive dots */
+  background-color: #000; 
   border: none;
   padding: 0;
 }
 
-/* Hide the default dot text content */
 .postsection .slick-dots li button:before {
   content: "";
   width: 12px;
@@ -758,13 +755,12 @@
   left: 0;
 }
 
-/* Style for active dot */
 .postsection .slick-dots li.slick-active button {
-  background-color: rgb(254, 4, 4);
+  background-color: rgb(243 65 106) ;
 }
 
 .postsection .slick-dots li.slick-active button:before {
-  background-color: rgb(254, 4, 4);
+  background-color: rgb(243 65 106) ;
   opacity: 1;
 }
 
@@ -773,7 +769,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background-color: rgb(254, 4, 4);
+  background-color: rgb(243 65 106) ;
   color: white;
   padding: 4px 8px;
   border-radius: 12px;

@@ -32,6 +32,7 @@ import CandidateShare from './Pages/App/Candidate/CandidateShare/CandidateShare'
 import CandidateNotification from './Pages/App/Candidate/CandidateNotification/CandidateNotification';
 import RegisterForInterview from './Pages/App/Candidate/CandidatesJobs/RegisterForInterview';
 import Shortlisting from './Pages/App/Candidate/CandidatesJobs/Shortlisting';
+import SocialImpact from './Pages/Front/SocialImpact/SocialImpact';
 const Layout = () => {
   const location = useLocation(); 
 
@@ -49,6 +50,7 @@ const Layout = () => {
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/company/login" element={<CompanyLogin />} />
         <Route exact path="/community" element={<Community />} />
+        <Route path="socialimpact" element={<SocialImpact/>}/>
 
         {/* Candidate Parent Route */}
         <Route path="/candidate" element={<CandidateLayout />}>

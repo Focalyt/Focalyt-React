@@ -149,6 +149,9 @@ const FrontHeader = () => {
                       </a>
                     </li>
                     <li class="nav-item">
+                      <a class='nav-link-item drop-trigger' href="/socialimpact">Social Impact</a>
+                    </li>
+                    <li class="nav-item">
                       <a class='nav-link-item drop-trigger' href="/joblisting">Jobs</a>
                     </li>
                     <li class="nav-item">

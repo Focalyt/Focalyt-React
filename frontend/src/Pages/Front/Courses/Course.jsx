@@ -165,6 +165,7 @@ function Course() {
       console.log("Filtering by search term:", term);
 
       filtered = filtered.filter(course => {
+        console.log("display-Courses",courses)
         // Check multiple fields
         const nameMatch = course.name && course.name.toLowerCase().includes(term);
         const qualificationMatch = course.qualification && course.qualification.toLowerCase().includes(term);
