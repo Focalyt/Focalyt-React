@@ -422,7 +422,7 @@ router.get("/courses", async (req, res) => {
 	
 	const countJobs = await Courses.find(filter).countDocuments()
 	const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
-	const perPage = 18;
+	const perPage = 50;
 	const p = parseInt(req.query.page);
 	const page = p || 1;
 	const totalPages = Math.ceil(countJobs / perPage);
