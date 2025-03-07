@@ -511,121 +511,87 @@ const downloadFilesSequentially = (files) => {
                 </div>
               </div>
 
-           <div className="mainBody community-feed">
-                <div className="community-header">
-                  <h2>Community Updates</h2>
-                  <p>Latest news and updates from Focalyt and partner institutions</p>
-                </div>
-                
+              <div className="mainBody">
                 {posts && posts.length > 0 ? (
-                  <div className="posts-container">
-                    {posts.map((post, index) => {
-                      const postId = post._id ? `post-${post._id}` : `post-${index}`;
-                      // const isLiked = likedPosts[postId];
-                      // const isSaved = savedPosts[postId];
-                      
-                      return (
-                        <div className="post-card" id={postId} key={post._id || index}>
-                          {/* Post Header */}
-                          <div className="post-header">
-                            <div className="post-author">
-                              <div className="author-avatar">
-                                <img src="/favicon.ico" alt="Focalyt" />
-                              </div>
-                              <div className="author-info">
-                                <h3 className="author-name">
-                                  <span className="primary-name">Focalyt</span>
-                                  
-                                  {post.tags && post.tags.length > 0 && (
-                                    <span className="tag-info">
-                                      with <span className="tag-name">{post.tags[0].name}</span>
-                                      
-                                      {post.tags.length > 1 && (
-                                        <span className="additional-tags">
-                                          & <span className="tag-count">{post.tags.length - 1}</span> others
-                                        </span>
-                                      )}
-                                    </span>
-                                  )}
-                                </h3>
-                                {/* <div className="post-meta">
-                                  <span className="post-date">
-                                    <FontAwesomeIcon icon={faCalendarAlt} />
-                                    {formatDate(post.createdAt)}
+                  posts.map((post, index) => {
+                    const postId = post._id ? `post-${post._id}` : `post-${index}`;
+
+                    return (
+                      <div className="blog--card" id={postId} key={post._id || index}>
+                        {/* Header Section */}
+                        <div className="card-header">
+                          <div className="inner__card">
+                            <div className="user_image text-black">
+                              <figure>
+                                <img src="/favicon.ico" alt="" />
+                              </figure>
+                            </div>
+                            <h3 className="user__name text-black">
+                              <span className="start__name"><b>Focalyt</b></span>
+
+                              {post.tags && post.tags.length > 0 && (
+                                <>
+                                  <span className="tag__user">
+                                    is with <b>{post.tags[0].name}</b>
                                   </span>
-                                </div> */}
+
+                                  {post.tags.length > 1 && (
+                                    <>
+                                      <span className="more__user strong"> & <b>{post.tags.length - 1}</b></span>
+                                      <span className="other"><b> Others</b></span>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </h3>
+                          </div>
+
+                          <h5 className="blog__title text-black">
+                            <PostText
+                              content={post.content}
+                              postId={postId}
+                            />
+                          </h5>
+                        </div>
+
+                        {/* Main Content */}
+                        <div className="card-content">
+                          {post.files && post.files.length > 0 && (
+                            <div className="card-image">
+                              <div className="happy_candidates" id="blog--images">
+                                <PostCarousel
+                                  files={post.files}
+                                  postId={postId}
+                                />
                               </div>
                             </div>
-                          </div>
+                          )}
 
-                          {/* Post Content */}
-                          <div className="post-content">
-                            <div className="post-text">
-                              <PostText
-                                content={post.content}
-                                postId={postId}
-                              />
+                          {/* Interaction Buttons */}
+                          <div className="interaction-buttons d-flex align-items-center justify-content-around">
+                            <div
+                              className="share_link"
+                              onClick={() => handleShare(postId)}
+                            >
+                              <FontAwesomeIcon icon={faShare} /> Share
                             </div>
-                            
-                            {post.files && post.files.length > 0 && (
-                              <PostCarousel
-                                files={post.files}
-                                postId={postId}
-                              />
-                            )}
-                          </div>
+                            <div
+                              className="share_link"
+                              onClick={() => handleDownloadAllImages(post.files.map(file => file.fileURL))}
+                            >
+                              <FontAwesomeIcon icon={faDownload} /> Download
+                            </div>
 
-                          {/* Post Engagement */}
-                          <div className="post-actions">
-                            <div className="action-buttons">
-                              {/* <button 
-                                className={`action-button ${isLiked ? 'active' : ''}`}
-                                onClick={() => handleLike(postId)}
-                              >
-                                <FontAwesomeIcon icon={faHeart} />
-                                <span>{isLiked ? 'Liked' : 'Like'}</span>
-                              </button> */}
-                              
-                              {/* <button className="action-button">
-                                <FontAwesomeIcon icon={faComment} />
-                                <span>Comment</span>
-                              </button> */}
-                              
-                              <button 
-                                className="action-button"
-                                onClick={() => handleShare(postId)}
-                              >
-                                <FontAwesomeIcon icon={faShare} />
-                                <span>Share</span>
-                              </button>
-                              
-                              {/* <button 
-                                className={`action-button ${isSaved ? 'active' : ''}`}
-                                onClick={() => handleSave(postId)}
-                              >
-                                <FontAwesomeIcon icon={faBookmark} />
-                                <span>{isSaved ? 'Saved' : 'Save'}</span>
-                              </button> */}
-                              
-                              <button 
-                                className="action-button"
-                                onClick={() => handleDownloadAllImages(post.files.map(file => file.fileURL))}
-                              >
-                                <FontAwesomeIcon icon={faDownload} />
-                                <span>Download</span>
-                              </button>
-                            </div>
+
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    );
+                  })
                 ) : (
-                  <div className="no-posts">
-                    <div className="no-posts-content">
-                      <h3>No posts available</h3>
-                      <p>Check back later for updates from the Focalyt community</p>
-                    </div>
+                  <div className="col-12 text-center py-5">
+                    <h3 className="text-muted">No posts available.</h3>
+                    <p>Check back later for new content</p>
                   </div>
                 )}
               </div>
