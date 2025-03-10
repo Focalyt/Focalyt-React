@@ -426,7 +426,7 @@ form #debt-amount-slider input:checked:nth-child(1) ~ #debt-amount-pos {
   /* Modal styles */
   .modal-content {
     border-radius: 8px;
-    overflow: hidden;
+    /* overflow: hidden; */
   }
   
   .modal-header {

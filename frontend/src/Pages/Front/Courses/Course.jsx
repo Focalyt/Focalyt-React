@@ -304,7 +304,7 @@ function Course() {
 
                       </div>
 
-                      <div className="filter-buttons">
+                      <div className="filter-buttonss " >
                         <button
                           id="all"
                           className={`filter-button text-uppercase ${activeFilter === "all" ? "active" : ""}`}

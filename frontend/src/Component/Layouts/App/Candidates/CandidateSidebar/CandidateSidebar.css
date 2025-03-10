@@ -94,11 +94,19 @@
     margin-left: 10px;
     color: #000;
   }
-  .nav-item svg{
-    color: #ff365b;
+  .menu-title .active {
+    margin-left: 10px;
+    color: #fff;
+}
+  .nav-item svg {
+    color: black; /* Default color for inactive items */
     font-size: 20px;
-  }
-  
+}
+
+.nav-item.active svg {
+    color: white; /* Color for active item */
+}
+
   /* Dropdown styling */
   .menu-content {
     list-style: none;
@@ -157,3 +165,23 @@
 .main-menu.menu-light .navigation>li ul .active>a {
   color: #fff;
 }
+/* .menu-title {
+  margin-left: 10px;
+  color: black;
+  transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-title.active {
+  color: white; 
+}
+
+.nav-item:hover > a .menu-title {
+  transform: translateX(5px); 
+}
+
+.nav-item:not(:hover) > a .menu-title {
+  transform: translateX(0);
+} */

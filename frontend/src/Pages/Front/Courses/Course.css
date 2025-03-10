@@ -180,20 +180,28 @@ button.close span {
     font-weight: 500;
   }
   
-  .filter-buttons {
+  .filter-buttonss {
     display: flex;
     overflow-y: hidden;
     overflow-x: auto;
     gap: 12px;
-    scrollbar-width: none;
+    /* scrollbar-width: none; */
+    /* -ms-overflow-style: none; */
+    padding-bottom: 8px;
+  } 
+  /* .filter-buttons{
+    
+    scrollbar-width: 1px;
     -ms-overflow-style: none;
     padding-bottom: 8px;
-  }
+
+    
+  } */
   
-  .filter-buttons::-webkit-scrollbar {
+ 
+  /* .filter-buttons::-webkit-scrollbar {
     display: none;
-  }
-  
+  } */
   .filter-button {
     position: relative;
     display: flex;
