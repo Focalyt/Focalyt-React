@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import "./Course.css";
+
 import moment from 'moment';
 import axios from 'axios';
 import ReCAPTCHA from "react-google-recaptcha";
@@ -7,7 +7,7 @@ import FrontLayout from '../../../Component/Layouts/Front';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 
-function Course() {
+function Event() {
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
@@ -18,10 +18,6 @@ function Course() {
     mobile: "",
     email: "",
     message: "",
-    courseName: "",
-    sectorName: "",
-    projectName:"",
-    typeOfProject:""    
   });
   const [captchaValue, setCaptchaValue] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -122,64 +118,64 @@ function Course() {
 
 
 
-  // Filter courses based on selected sector and search term
-  const getFilteredCourses = () => {
+    // Filter courses based on selected sector and search term
+    const getFilteredCourses = () => {
 
 
 
-    // Start with all courses
-    let filtered = [...courses];
+        // Start with all courses
+        let filtered = [...courses];
 
-    // Then filter by sector if not "all"
-    if (activeFilter !== "all") {
-      const sectorId = activeFilter.replace("id_", "");
-      console.log("Filtering by sector ID:", sectorId);
+        // Then filter by sector if not "all"
+        if (activeFilter !== "all") {
+        const sectorId = activeFilter.replace("id_", "");
+        console.log("Filtering by sector ID:", sectorId);
 
-      filtered = filtered.filter(course => {
-        if (!course.sectors || !Array.isArray(course.sectors)) {
-          return false;
+        filtered = filtered.filter(course => {
+            if (!course.sectors || !Array.isArray(course.sectors)) {
+            return false;
+            }
+
+            const hasMatchingSector = course.sectors.some(s => s && s.toString() === sectorId);
+            return hasMatchingSector;
+        });
+
+        console.log("After sector filter, courses count:", filtered.length);
         }
 
-        const hasMatchingSector = course.sectors.some(s => s && s.toString() === sectorId);
-        return hasMatchingSector;
-      });
+        // Then filter by search term if it exists
+        if (searchTerm && searchTerm.trim() !== "") {
+        const term = searchTerm.toLowerCase().trim();
+        console.log("Filtering by search term:", term);
 
-      console.log("After sector filter, courses count:", filtered.length);
-    }
+        filtered = filtered.filter(course => {
+            console.log("display-Courses",courses)
+            // Check multiple fields
+            const nameMatch = course.name && course.name.toLowerCase().includes(term);
+            const qualificationMatch = course.qualification && course.qualification.toLowerCase().includes(term);
+            const durationMatch = course.duration && course.duration.toLowerCase().includes(term);
+            const cityMatch = course.city && course.city.toLowerCase().includes(term);
+            const stateMatch = course.state && course.state.toLowerCase().includes(term);
+            const modeMatch = course.trainingMode && course.trainingMode.toLowerCase().includes(term);
+            const typeMatch = course.courseType && course.courseType.toLowerCase().includes(term);
+            const sectorMatch = course.sectorNames && course.sectorNames.some(name =>
+            name.toLowerCase().includes(term)
+            );
 
-    // Then filter by search term if it exists
-    if (searchTerm && searchTerm.trim() !== "") {
-      const term = searchTerm.toLowerCase().trim();
-      console.log("Filtering by search term:", term);
+            return nameMatch || qualificationMatch || durationMatch || cityMatch ||
+            stateMatch || modeMatch || typeMatch || sectorMatch;
+        });
 
-      filtered = filtered.filter(course => {
-        console.log("display-Courses",courses)
-        // Check multiple fields
-        const nameMatch = course.name && course.name.toLowerCase().includes(term);
-        const qualificationMatch = course.qualification && course.qualification.toLowerCase().includes(term);
-        const durationMatch = course.duration && course.duration.toLowerCase().includes(term);
-        const cityMatch = course.city && course.city.toLowerCase().includes(term);
-        const stateMatch = course.state && course.state.toLowerCase().includes(term);
-        const modeMatch = course.trainingMode && course.trainingMode.toLowerCase().includes(term);
-        const typeMatch = course.courseType && course.courseType.toLowerCase().includes(term);
-        const sectorMatch = course.sectorNames && course.sectorNames.some(name =>
-          name.toLowerCase().includes(term)
-        );
+        console.log("After search filter, courses count:", filtered.length);
+        }
+        // ✅ Filter by Fee Type (Paid/Free)
+        if (feeFilter !== "all") {
+        filtered = filtered.filter(course => course.courseFeeType?.toLowerCase() === feeFilter);
+        }
 
-        return nameMatch || qualificationMatch || durationMatch || cityMatch ||
-          stateMatch || modeMatch || typeMatch || sectorMatch;
-      });
-
-      console.log("After search filter, courses count:", filtered.length);
-    }
-    // ✅ Filter by Fee Type (Paid/Free)
-    if (feeFilter !== "all") {
-      filtered = filtered.filter(course => course.courseFeeType?.toLowerCase() === feeFilter);
-    }
-
-    console.log("Final filtered courses count:", filtered.length);
-    return filtered;
-  };
+        console.log("Final filtered courses count:", filtered.length);
+        return filtered;
+    };
   const handleShare = async (courseId, courseName, courseThumbnail) => {
     const courseUrl = `${window.location.origin}${window.location.pathname}#${courseId}`;
     if (navigator.share) {
@@ -213,7 +209,7 @@ function Course() {
 
 
   const filteredCourses = getFilteredCourses();
-  console.log("filteredCourses",filteredCourses)
+  console.log(courses)
 
   const chatContainerRef = useRef(null);
   const bootmBoxRef = useRef(null);
@@ -271,85 +267,11 @@ function Course() {
             <div className="row">
               <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mx-auto mt-xxl-5 mt-xl-3 mt-lg-3 mt-md-3 mt-sm-3 mt-3">
                 <div className="row my-xl-5 my-lg-5 my-md-3 my-sm-3 my-5">
-                  <h1 className="text-center text-uppercase jobs-heading pb-4">Select course for your career</h1>
-
-
-
-                  {/* Filter Container */}
-                  <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                    <div className="filter-container">
-                      <div className="filter-headerss">
-                        <div className='row align-items-center justify-content-between'>
-                          <div className='col-md-6 col-12'>
-                            <div className='filter-header'>
-                              <span>▶</span>
-                              <h2 className='fill--sec'>Filter by Sector</h2>
-                            </div>
-
-                          </div>
-
-                          {/* Search Bar */}
-
-                          <div className="col-md-3 col-12">
-                            <div className="search-container">
-                              <input
-                                type="text"
-                                className="form-control search-input"
-                                placeholder="Search courses by Name, Location, Duration, etc."
-                                value={searchTerm}
-                                onChange={handleSearchChange} style={{ background: "transparent", border: "1px solid" }}
-                              />
-                              <span className="search-icon">
-                                <FontAwesomeIcon icon={faSearch} />
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <div className="filter-buttonss " >
-                        <button
-                          id="all"
-                          className={`filter-button text-uppercase ${activeFilter === "all" ? "active" : ""}`}
-                          onClick={() => handleFilterClick("all")}
-                        >
-                          All
-                          <span className="count">{courses.length}</span>
-                          {activeFilter === "all" && <div className="active-indicator"></div>}
-                        </button>
-
-                        {uniqueSectors.map((sector) => (
-                          <button
-                            key={sector._id}
-                            id={`id_${sector._id}`}
-                            className={`filter-button text-uppercase ${activeFilter === `id_${sector._id}` ? "active" : ""}`}
-                            onClick={() => handleFilterClick(`id_${sector._id}`)}
-                          >
-                            {sector.name}
-                            <span className="count">
-                              {courses.filter(course =>
-                                course.sectors && Array.isArray(course.sectors) &&
-                                course.sectors.some(s => s && s.toString() === sector._id.toString())
-                              ).length}
-                            </span>
-                            {activeFilter === `id_${sector._id}` && <div className="active-indicator"></div>}
-                          </button>
-                        ))}
-                      </div>
-                      <div className='d-flex align-items-center d-md-none d-sm-block'>
-                        <span className="font-medium text-uppercase me-2">Selected Sector:</span>
-                        <span className="filter-button active text-uppercase">
-                          {activeFilter === "all"
-                            ? "ALL"
-                            : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <h1 className="text-center text-uppercase jobs-heading pb-4">Events</h1>
 
                   {/* Selected Sector Display */}
-                  <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
+                  
+                  {/* <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
                     <div className='sector--select'>
                       <span className="font-medium text-uppercase me-2">Selected Sector:</span>
                       <span className="filter-button active text-uppercase">
@@ -380,7 +302,7 @@ function Course() {
                       </button>
 
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* Course Cards */}
                   <div className="row">
@@ -540,7 +462,7 @@ function Course() {
                                       </div>
 
                                       {/* Last Date */}
-                                      <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-2 text-center">
+                                      {/* <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-2 text-center">
                                         <div className="row">
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 my-auto">
                                             <p className="text-white apply_date">Last Date for apply</p>
@@ -553,7 +475,7 @@ function Course() {
                                             </p>
                                           </div>
                                         </div>
-                                      </div>
+                                      </div> */}
 
 
                                       {/* Action Buttons */}
@@ -583,14 +505,14 @@ function Course() {
                                           Share
                                         </button>
                                       </div>
-                                      <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                                      {/* <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
                                         <div className="row pt-2">
                                           <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
                                             <a href="#" data-bs-toggle="modal" data-bs-target="#callbackModal">
                                               <span
                                                 className="learnn btn cta-callnow w-100"
                                                 style={{ padding: "10px 14px", cursor: "pointer" }}
-                                                onClick={() => setFormData({ ...formData, courseName: course.name,sectorName:course.sectorNames,projectName:course.projectName,typeOfProject:course.typeOfProject })}
+                                                onClick={() => alert("Callback request received!")}
                                               >
                                                 Request for Call Back
                                               </span>
@@ -598,7 +520,7 @@ function Course() {
                                             </a>
                                           </div>
                                         </div>
-                                      </div>
+                                      </div> */}
                                     </div>
                                   </div>
                                 </div>
@@ -730,4 +652,4 @@ function Course() {
   );
 }
 
-export default Course;
+export default Event;

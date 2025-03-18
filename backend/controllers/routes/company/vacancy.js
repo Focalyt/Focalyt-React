@@ -97,6 +97,7 @@ router
 	})
 	.post(auth1, async (req, res) => {
 		try {
+			
 			delete req.body._company;
 			req.body._company = req.session.company._id;
 			const comp = await Vacancy.create(req.body);

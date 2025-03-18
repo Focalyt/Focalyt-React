@@ -324,7 +324,7 @@ function Jobs() {
 
                       </div>
 
-                      <div className="filter-buttons">
+                      <div className="filter-buttonss">
                         <button
                           id="all"
                           className={`filter-button text-uppercase ${activeFilter === "all" ? "active" : ""}`}
@@ -374,7 +374,7 @@ function Jobs() {
                           : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
                       </span>
                     </div>
-                    <div className='d-flex gap-1' ><span className="font-medium text-uppercase align-content-center me-2">Select Job Type:</span>
+                    {/* <div className='d-flex gap-1' ><span className="font-medium text-uppercase align-content-center me-2">Select Job Type:</span>
                       <button
                         className={`filter-button text-uppercase ${feeFilter === "all" ? "active" : ""}`}
                         onClick={() => handleFeeFilterClick("all")}
@@ -395,7 +395,7 @@ function Jobs() {
                         Free
                       </button>
 
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* Course Cards */}
@@ -446,7 +446,7 @@ function Jobs() {
 
                               <div className="flag"></div>
                               <div className="right_obj shadow">
-                                {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'}
+                                {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Jobs'}
                               </div>
                             </div>
 

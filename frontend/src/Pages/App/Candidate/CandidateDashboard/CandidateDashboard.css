@@ -425,7 +425,30 @@ background-color: #64ccf3;
   line-height: 1.45;
   transition: padding 0.35sease 0s !important;
 }
-
+.table-hover-animation tbody tr:hover {
+  transform: translateY(-4px);
+}
+.table-hover tbody tr:hover {
+  color: #626262;
+  background-color: rgba(34, 41, 47, 0.075);
+}
+.table-hover-animation tbody tr {
+    transition: all 0.25s ease;
+    background-color: #fff;
+}
+.btn-outline-primary {
+  border: 1px solid #FC2B5A!important;
+  background-color: transparent!important;
+  color: #FC2B5A!important;
+}
+.btn-outline-primary:hover {
+  background-color: rgba(115, 103, 240, 0.08)!important;
+  color: #FC2B5A!important;
+}
+.btn[class*="btn-outline-"].btn-sm {
+  padding-top: calc(0.5rem - 1px);
+  padding-bottom: calc(0.5rem - 1px);
+}
 /* Media Queries for Mobile Responsiveness */
 @media (max-width: 991.98px) {
   .main-menu {

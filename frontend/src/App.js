@@ -33,6 +33,8 @@ import CandidateNotification from './Pages/App/Candidate/CandidateNotification/C
 import RegisterForInterview from './Pages/App/Candidate/CandidatesJobs/RegisterForInterview';
 import Shortlisting from './Pages/App/Candidate/CandidatesJobs/Shortlisting';
 import SocialImpact from './Pages/Front/SocialImpact/SocialImpact';
+import StuLabs from './Pages/Front/Labs/StuLabs';
+import Event from './Pages/Front/Event/Event';
 const Layout = () => {
   const location = useLocation(); 
  
@@ -50,7 +52,9 @@ const Layout = () => {
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/company/login" element={<CompanyLogin />} />
         <Route exact path="/community" element={<Community />} />
-        <Route path="socialimpact" element={<SocialImpact/>}/>
+        <Route path="/socialimpact" element={<SocialImpact/>}/>
+        <Route path="/stulabs" element={<StuLabs/>}/>
+        <Route path="/events" element={<Event/>}/>
 
         {/* Candidate Parent Route */}
         <Route path="/candidate" element={<CandidateLayout />}>

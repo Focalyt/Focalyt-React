@@ -44,10 +44,10 @@
                                   placeholder="Enter the job title" oninput="this.setCustomValidity('')"
                                   maxlength="25" />
                               </div>
-                              <div class="col-xl-2 mb-1">
+                              <!-- <div class="col-xl-2 mb-1">
                                 <label>Cut Price</label>
                                 <input class="form-control" id="cutprice" type="number">
-                              </div>  
+                              </div>   -->
 
                               <div class="col-xl-3 mb-1" id="jd-industry-field">
                                 <label>Industry</label><span class="mandatory"> *</span></label>
@@ -729,7 +729,7 @@
 
                               <div class="col-xl-3 mb-1">
                                 <label>Add Video JD</label>
-                                <input class="form-control" type="text" name="jobVideo"
+                                <input class="form-control" type="file" name="jobVideo"
                                         placeholder="Add Youtube url" id="jobvideo" value="<%= vacancy?.jobVideo %>">
                               </div>
                              
@@ -1217,7 +1217,7 @@
                 nameof: $('#name').val(),
                 shift:  $('[name=shift]:checked').val(),
                 salaryRange: $('#salaryRange-feild').val(),
-                jobVideo: $('#jobvideo').val(),
+                jobVideo: $('#jobvideo')[0].files[0],
                 work: $('[name=work]:checked').val(),
                 benifits: $('#additional-benifits').val(),
                 isFixed: document.getElementById('fixedCheck').checked ? true : false ,
@@ -1240,7 +1240,7 @@
               if(!lessCoins){
                 axios.post("/company/addjd", body).then((res) => {
                    if(res&&res.status){
-                    // window.location.href="/company/list/jobs"
+                    window.location.href="/company/list/jobs"
                    }
                 })
               }
