@@ -18,6 +18,10 @@ function Course() {
     mobile: "",
     email: "",
     message: "",
+    courseName: "",
+    sectorName: "",
+    projectName:"",
+    typeOfProject:""    
   });
   const [captchaValue, setCaptchaValue] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -209,7 +213,7 @@ function Course() {
 
 
   const filteredCourses = getFilteredCourses();
-  console.log(courses)
+  console.log("filteredCourses",filteredCourses)
 
   const chatContainerRef = useRef(null);
   const bootmBoxRef = useRef(null);
@@ -586,7 +590,7 @@ function Course() {
                                               <span
                                                 className="learnn btn cta-callnow w-100"
                                                 style={{ padding: "10px 14px", cursor: "pointer" }}
-                                                onClick={() => alert("Callback request received!")}
+                                                onClick={() => setFormData({ ...formData, courseName: course.name,sectorName:course.sectorNames,projectName:course.projectName,typeOfProject:course.typeOfProject })}
                                               >
                                                 Request for Call Back
                                               </span>

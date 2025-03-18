@@ -7,8 +7,8 @@ const adminRoutes = require('./admin');
 const collegeRoutes = require('./college');
 const { sendMail } = require("../../helpers");
 // const companyRoutes = require('./company');
-const candidateRoutes=require('./candidate');
-const corporateRoutes=require('./corporate');
+const candidateRoutes = require('./candidate');
+const corporateRoutes = require('./corporate');
 const { baseUrl } = require("../../config");
 const router = express.Router();
 const fetch = require("cross-fetch");
@@ -19,14 +19,14 @@ const { updateSpreadSheetCarrerValues } = require("./services/googleservice");
 const moment = require("moment");
 
 router.use('/', frontRoutes);
-router.use('/candidate',candidateRoutes);
+router.use('/candidate', candidateRoutes);
 router.use('/api', apiRoutes);
 router.use('/candidateForm', viewsRoutes);
 router.use('/admin', adminRoutes);
 router.use('/college', collegeRoutes);
-router.use('/chatapi', authChat,  chatRoutes);
+router.use('/chatapi', authChat, chatRoutes);
 // router.use('/panel/company', companyRoutes);
-router.use('/company',corporateRoutes);
+router.use('/company', corporateRoutes);
 router.get('/policy', async (req, res) => {
   try {
     return res.render(`${req.vPath}/front/policy`);
@@ -36,13 +36,13 @@ router.get('/policy', async (req, res) => {
     return res.redirect('back');
   }
 });
-router.post('/contact',async (req, res) => {
+router.post('/contact', async (req, res) => {
   try {
-   
+
     const { name, mobile, email, message } = req.body;
-    if(!name || !mobile|| !email||!message){
-        req.flash("success", "Please fill all fields");
-            return res.redirect("/contact");
+    if (!name || !mobile || !email || !message) {
+      req.flash("success", "Please fill all fields");
+      return res.redirect("/contact");
     }
     const response_key = req.body["g-recaptcha-response"];
     // Put secret key here, which we get from google console
@@ -50,17 +50,17 @@ router.post('/contact',async (req, res) => {
 
 
 
-    const url = 
-    `https://www.google.com/recaptcha/api/siteverify?secret=${secret_key}&response=${response_key}`;
-      fetch(url, {
-        method: "post",
-      })
-        .then((response) => response.json())
-        .then((google_response) => {
-            console.log('====================> ', google_response)
-          if (google_response.success == true && google_response.score >=0.5) {
-            let subject = " New message Received";
-            let msg = `<html lang="en">
+    const url =
+      `https://www.google.com/recaptcha/api/siteverify?secret=${secret_key}&response=${response_key}`;
+    fetch(url, {
+      method: "post",
+    })
+      .then((response) => response.json())
+      .then((google_response) => {
+        console.log('====================> ', google_response)
+        if (google_response.success == true && google_response.score >= 0.5) {
+          let subject = " New message Received";
+          let msg = `<html lang="en">
             <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -126,21 +126,21 @@ router.post('/contact',async (req, res) => {
           </html>
           
                 `;
-                
-            sendMail(subject, msg, 'info@focalyt.com');
-            
-        
-            req.flash("success", "Message sent successfully!");
-            return res.redirect("/contact");
-          } else {
-            req.flash("success", "Captcha  failed");
-            return res.redirect("/contact");
-          }
-        })
-        .catch((error) => {
-            // Some error while verify captcha
-          return res.json({ error });
-        });
+
+          sendMail(subject, msg, 'info@focalyt.com');
+
+
+          req.flash("success", "Message sent successfully!");
+          return res.redirect("/contact");
+        } else {
+          req.flash("success", "Captcha  failed");
+          return res.redirect("/contact");
+        }
+      })
+      .catch((error) => {
+        // Some error while verify captcha
+        return res.json({ error });
+      });
   } catch (err) {
     console.log("error is ", err);
     req.flash("error", err.message || "Something went wrong!");
@@ -149,10 +149,10 @@ router.post('/contact',async (req, res) => {
 });
 
 
-router.post('/labs',async (req, res) => {
+router.post('/labs', async (req, res) => {
   try {
-   
-    const { name, designation,organisation,state, mobile, email, message } = req.body;
+
+    const { name, designation, organisation, state, mobile, email, message } = req.body;
     console.log("Form Data:", req.body);
     // Capitalize every word's first letter
     function capitalizeWords(str) {
@@ -162,7 +162,7 @@ router.post('/labs',async (req, res) => {
     const sheetData = [
       moment(new Date()).utcOffset('+05:30').format('DD/MM/YYYY'),
       moment(new Date()).utcOffset('+05:30').format('hh:mm A'),
-      
+
       capitalizeWords(organisation), // Apply the capitalizeWords function
       capitalizeWords(name),
       capitalizeWords(designation),
@@ -174,16 +174,16 @@ router.post('/labs',async (req, res) => {
 
     ];
     console.log(sheetData)
-    await updateSpreadSheetLabLeadsValues (sheetData);
-    if(!name || !designation || !organisation|| !state || !mobile|| !email || !message){
-        req.flash("success", "Please fill all fields");
-            return res.redirect("/labs");
+    await updateSpreadSheetLabLeadsValues(sheetData);
+    if (!name || !designation || !organisation || !state || !mobile || !email || !message) {
+      req.flash("success", "Please fill all fields");
+      return res.redirect("/labs");
     }
 
 
 
-            let subject = " Future Technology Labs: New Demo Request";
-            let msg = `<html lang="en">
+    let subject = " Future Technology Labs: New Demo Request";
+    let msg = `<html lang="en">
             <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -261,38 +261,38 @@ router.post('/labs',async (req, res) => {
           </html>
           
                 `;
-            sendMail(subject, msg, 'info@focalyt.com');
-        
-            req.flash("success", "Message sent successfully!");
-            // return res.redirect("/futureTechnologyLabs");
-            res.send(`
+    sendMail(subject, msg, 'info@focalyt.com');
+
+    req.flash("success", "Message sent successfully!");
+    // return res.redirect("/futureTechnologyLabs");
+    res.send(`
               <script>
                 alert('Message sent successfully!');
                 window.location.href = '/labs';
               </script>
             `);
-        
-      
-        
+
+
+
   } catch (err) {
     console.log("error is ", err);
     req.flash("error", err.message || "Something went wrong!");
     return res.send({ status: "failure", error: "Something went wrong!" });
   }
 });
-router.post('/courses',async (req, res) => {
+router.post('/courses', async (req, res) => {
   try {
-   
+
     const { name, state, mobile, email, message } = req.body;
     console.log("Form Data:", req.body);
     // Capitalize every word's first letter
-    
-    if(!name || !state || !mobile|| !email || !message){
-        req.flash("success", "Please fill all fields");
-            return res.redirect("/courses");
+
+    if (!name || !state || !mobile || !email || !message) {
+      req.flash("success", "Please fill all fields");
+      return res.redirect("/courses");
     }
     const response_key = req.body["g-recaptcha-response"];
-    console.log(response_key )
+    console.log(response_key)
     // Put secret key here, which we get from google console
     const secret_key = "6Lej1gsqAAAAADDB6EA8QfiRcJdgESc4UBMqOXeq";
 
@@ -302,7 +302,7 @@ router.post('/courses',async (req, res) => {
     };
     const sheetData = [
       moment(new Date()).utcOffset('+05:30').format('DD/MM/YYYY'),
-      moment(new Date()).utcOffset('+05:30').format('hh:mm A'), 
+      moment(new Date()).utcOffset('+05:30').format('hh:mm A'),
       capitalizeWords(name),
 
       mobile,
@@ -316,17 +316,17 @@ router.post('/courses',async (req, res) => {
 
 
 
-    const url = 
-    `https://www.google.com/recaptcha/api/siteverify?secret=${secret_key}&response=${response_key}`;
-      fetch(url, {
-        method: "post",
-      })
-        .then((response) => response.json())
-        .then((google_response) => {
-            console.log('====================> ', google_response)
-          if (google_response.success == true && google_response.score >=0.5) {
-            let subject = "Call Back Request for Course Lead";
-            let msg = `<html lang="en">
+    const url =
+      `https://www.google.com/recaptcha/api/siteverify?secret=${secret_key}&response=${response_key}`;
+    fetch(url, {
+      method: "post",
+    })
+      .then((response) => response.json())
+      .then((google_response) => {
+        console.log('====================> ', google_response)
+        if (google_response.success == true && google_response.score >= 0.5) {
+          let subject = "Call Back Request for Course Lead";
+          let msg = `<html lang="en">
             <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -398,25 +398,25 @@ router.post('/courses',async (req, res) => {
           </html>
           
                 `;
-            sendMail(subject, msg, 'info@focalyt.com');
-        
-            req.flash("success", "Message sent successfully!");
-            // return res.redirect("/futureTechnologyLabs");
-            res.send(`
+          sendMail(subject, msg, 'info@focalyt.com');
+
+          req.flash("success", "Message sent successfully!");
+          // return res.redirect("/futureTechnologyLabs");
+          res.send(`
               <script>
                 alert('Message sent successfully!');
                 window.location.href = '/courses';
               </script>
             `);
-          } else {
-            req.flash("success", "Captcha  failed");
-            return res.redirect("/courses");
-          }
-        })
-        .catch((error) => {
-            // Some error while verify captcha
-          return res.json({ error });
-        });
+        } else {
+          req.flash("success", "Captcha  failed");
+          return res.redirect("/courses");
+        }
+      })
+      .catch((error) => {
+        // Some error while verify captcha
+        return res.json({ error });
+      });
   } catch (err) {
     console.log("error is ", err);
     req.flash("error", err.message || "Something went wrong!");
@@ -426,18 +426,28 @@ router.post('/courses',async (req, res) => {
 
 router.post('/callback', async (req, res) => {
   try {
-    const { name, state, mobile, email, message } = req.body;
+    const { name, courseName, sectorName, projectName, typeOfProject, state, mobile, email, message } = req.body;
     console.log("Form Data:", req.body);
 
-    if (!name || !state || !mobile || !email || !message) {
+    if (!name || !sectorName || !projectName || !typeOfProject || !state || !mobile || !email || !message) {
       req.flash("error", "Please fill all fields");
       return res.redirect("/courses");
     }
 
     function capitalizeWords(str) {
       if (!str) return '';
+    
+      // ✅ If str is an array, pick the first element
+      if (Array.isArray(str)) {
+        str = str[0] || '';
+      }
+    
+      // ✅ Ensure it's a string before proceeding
+      if (typeof str !== 'string') return '';
+    
       return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
     }
+    
 
     const sheetData = [
       moment(new Date()).utcOffset('+05:30').format('DD/MM/YYYY'),
@@ -445,6 +455,10 @@ router.post('/callback', async (req, res) => {
       capitalizeWords(name),
       mobile,
       email,
+      capitalizeWords(courseName),
+      capitalizeWords(sectorName),
+      capitalizeWords(projectName),
+      typeOfProject,
       state,
       message
     ];
@@ -480,10 +494,13 @@ router.post('/callback', async (req, res) => {
                               <tr>
                                 <td align="left" style="font-family:'Manrope',sans-serif!important">
                                   <p style="text-align:left;line-height:32px;font-size:18px!important;margin:10px 50px 21px">
-                                    You have received a new message with the following details:
+                                    You have received a new callback request for course courseName with the following details:
                                   </p>
                                   <ul style="list-style-type:none;padding-left:0px;margin:20px 50px">
                                     <li><span style="line-height:32px;font-size:18px!important;">User Name: ${name} (${mobile})</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Type of Project: ${typeOfProject}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Project Name: ${projectName}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Sector Name: ${sectorName}</span></li>
                                     <li><span style="line-height:32px;font-size:18px!important;">Email: ${email}</span></li>
                                     <li><span style="line-height:32px;font-size:18px!important;">State: ${state}</span></li>
                                     <li><span style="line-height:32px;font-size:18px!important;">Message: ${message}</span></li>
@@ -523,7 +540,7 @@ router.post('/callback', async (req, res) => {
 });
 router.post('/career', async (req, res) => {
   try {
-    const { name, number, location, email, position ,experience ,cv ,info , termsAccepted } = req.body;
+    const { name, number, location, email, position, experience, cv, info, termsAccepted } = req.body;
     console.log("Form Data:", req.body);
 
     if (!name || !number || !location || !email || !position || !experience || !cv || !info || !termsAccepted) {
