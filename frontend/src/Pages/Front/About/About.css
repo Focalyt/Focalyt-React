@@ -180,3 +180,12 @@ padding-top:30px;
 /* training section  */
 
 /* General Section Styling */
+@media(max-width:768px){
+    .skillTech {
+    font-size: 30px;
+    }
+}
+@media (max-width:576px){
+    .skillTech {
+font-size: 21px;}
+}

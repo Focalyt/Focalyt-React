@@ -135,7 +135,7 @@ function About() {
                 <section className="bg-white">
                     <div className="focalBanner">
                         <div className="container">
-                            <div className="row align-items-center">
+                            <div className="row align-items-center mb-3">
                                 <div className="col-4">
                                     <div className="focalytLogo">
                                         {/* <img src="/Assets/public/images/logo/logo.png" alt="focal logo" /> */}
@@ -155,7 +155,7 @@ function About() {
 
                 <section className="bg-white">
                     <div className="skill-Tech-Brand">
-                        <div className="container-fluid">
+                        <div className="container">
                             <div className="row">
                                 <div className="col-12">
                                     <h2 className="skillTech text-black">
