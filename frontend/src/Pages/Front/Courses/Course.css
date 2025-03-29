@@ -277,19 +277,7 @@ button.close span {
     height: 200px;
     object-fit: cover;
   }
-  
-  .right_obj {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: #ec4899;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: bold;
-  }
-  
+    
   .group1 {
     position: absolute;
     top: 50%;
@@ -443,6 +431,9 @@ button.close span {
 }
 .newWidth{
   width: 30%!important;
+}
+.shadow-new{
+  right: 0px!important;
 }
 @media (max-width:992px){
   .newWidth{

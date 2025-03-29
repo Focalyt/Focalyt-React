@@ -1110,6 +1110,64 @@ const HomePage = () => {
         </div>
       </section>
 
+
+    <section class="">
+        <div class="container">
+            <h2 class="section-title pt-md-0 pt-0 text-center">Our Tech Learning Journey</h2>
+            <div class="row g-4">
+              
+                <div class="col-md-5 large-images">
+                    <div class="row g-4">
+                        <div class="col-12">
+                            <div class="lab-gallery-item">
+                                <img src="/Assets/images/homepage/home1.jpg" alt="Robotics Workshop" class="img-fluid"/>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="lab-gallery-item">
+                                <img src="/Assets/images/homepage/home2.jpg" alt="Coding Session" class="img-fluid"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-7 small-images">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="lab-gallery-item">
+                                <img src="/Assets/images/homepage/home3.jpg" alt="AI Research" class="img-fluid"/>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lab-gallery-item">
+                                <img src="/Assets/images/homepage/home4.jpg" alt="Machine Learning" class="img-fluid"/>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lab-gallery-item">
+                                <img src="/Assets/images/homepage/home5.jpg" alt="Coding Challenge" class="img-fluid"/>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lab-gallery-item">
+                                <img src="/Assets/images/homepage/home6.jpg" alt="Tech Seminar" class="img-fluid"/>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lab-gallery-item">
+                                <img src="/Assets/images/homepage/home7.jpg" alt="Team Project" class="img-fluid"/>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="lab-gallery-item">
+                                <img src="/Assets/images/homepage/home8.jpg" alt="Innovation Lab" class="img-fluid"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
       {/* reach us  */}
 
       <section id="reach">

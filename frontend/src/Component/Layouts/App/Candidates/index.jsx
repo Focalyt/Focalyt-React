@@ -1,4 +1,4 @@
-import React , {useState, useEffect} from 'react'
+import React , {useState, useEffect ,useRef} from 'react'
 import { Link, Outlet } from "react-router-dom";
 import CandidateHeader from './CandidateHeader/CandidateHeader'
 import CandidateFooter from './CandidateFooter/CandidateFooter'
@@ -16,10 +16,34 @@ import {
 function CandidateLayout({ children }) {
 
   const [openDropdown, setOpenDropdown] = useState(null);
-
+   const profileMenuRef = useRef(null);
   const toggleDropdown = (menu) => {
     setOpenDropdown((prev) => (prev === menu ? null : menu));
   };
+  const toggleSubmenu = (menu) => {
+    setOpenSubmenu(prev => {
+      const newState = { ...prev, [menu]: !prev[menu] };
+  
+      const menuRef = menu === 'profile' ? profileMenuRef.current : null; 
+  
+      if (menuRef) {
+        if (!prev[menu]) {
+          menuRef.style.height = menuRef.scrollHeight + "70px";
+          setTimeout(() => {
+            menuRef.style.height = "auto";
+          }, 500);
+        } else {
+          menuRef.style.height = menuRef.scrollHeight + "70px"; 
+          setTimeout(() => {
+            menuRef.style.height = "0px";
+          }, 10);
+        }
+      }
+  
+      return newState;
+    });
+  };
+  
   const [expanded, setExpanded] = useState(true);
   const [activeItem, setActiveItem] = useState('dashboard');
   const [openSubmenu, setOpenSubmenu] = useState({
@@ -45,11 +69,17 @@ function CandidateLayout({ children }) {
     setExpanded(!expanded);
   };
 
-  const toggleSubmenu = (menu) => {
-    setOpenSubmenu({
-      ...openSubmenu,
-      [menu]: !openSubmenu[menu]
-    });
+  // const toggleSubmenu = (menu) => {
+  //   setOpenSubmenu({
+  //     ...openSubmenu,
+  //     [menu]: !openSubmenu[menu]
+  //   });
+  // };
+  const menuRefs = {
+    profile: useRef(null),
+    courses: useRef(null),
+    jobs: useRef(null),
+    wallet: useRef(null),
   };
 
   const handleItemClick = (item) => {
@@ -93,7 +123,11 @@ function CandidateLayout({ children }) {
                       <FontAwesomeIcon icon={faUser} />
                         <span className="menu-title">Profile</span>
                       </a>
-                      <ul className={`menu-content ${openSubmenu.profile ? 'show' : ''}`}>
+                      <ul ref={profileMenuRef} className={`menu-content`}  style={{
+    height: openSubmenu.profile ? 'auto' : '0px',
+    overflow: 'hidden',
+    transition: 'height 0.5s ease-in-out',
+  }}>
                         <li className={`nav-item ${activeItem === 'myProfile' ? 'active' : ''}`}>
                           <Link to="/candidate/myProfile" onClick={() => handleItemClick('myProfile')}>
                           <FontAwesomeIcon icon={faUser} />

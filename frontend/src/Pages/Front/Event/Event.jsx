@@ -494,17 +494,11 @@ function Event() {
                                       </div> */}
                                       <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
                                       <button  onClick={() => openChatbot()}   className="btn cta-callnow shr--width">
-                                          Chat Now
+                                          Download
                                         </button>
                                       </div>  
                                       
-                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                        <button
-                                          onClick={() => handleShare(course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">
-                                          {/* <Share2 size={16} className="mr-1" /> */}
-                                          Share
-                                        </button>
-                                      </div>
+                                    
                                       {/* <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
                                         <div className="row pt-2">
                                           <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">

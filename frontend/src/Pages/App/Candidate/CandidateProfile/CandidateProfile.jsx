@@ -930,7 +930,7 @@ const CandidateProfile = () => {
         </div>
         
         <div className="content-body">
-          {/* Personal Information Section */}
+         
           <section id="personal-info">
             <div className="row">
               <div className="col-xl-12 col-lg-12">
@@ -938,7 +938,7 @@ const CandidateProfile = () => {
                   <div className="card-header border border-top-0 border-left-0 border-right-0">
                     <h4 className="card-title pb-1">Personal Information</h4>
                   </div>
-                  <div className="card-content">
+                  <div className="card-content p-0">
                     <div className="card-body">
                       <div className="row">
                         <div className="col-xl-3 mb-1" id="pd-name">
@@ -1178,7 +1178,7 @@ const CandidateProfile = () => {
             </div>
           </section>
           
-          {/* Qualification Section */}
+         
           <section id="qualification">
       <div className="row">
         <div className="col-xl-12 col-lg-12">

@@ -163,11 +163,11 @@ const CandidateEarning = ({
                 <div className="row">
                   <div className="col-12 px-0">
                     <div className="table-content shadow-cashback w-100">
-                      <div className="tab_head font-weight-bolder py-1 px-1"> Documents</div>
-                      <div className="tab_body bg-white p-1">
+                      <div className="tab_head font-weight-bolder p-3"> Documents</div>
+                      <div className="tab_body bg-white p-3">
                         <div className="row">
                           <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-12 ">
-                            Aadhar Number 
+                            Aadhar Number <br/>
                             <span>
                               <form>
                                 <input 
@@ -182,7 +182,7 @@ const CandidateEarning = ({
                             </span>
                           </div>
                           <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-12 mt-xl-0 mt-lg-0 mt-md-0 mt-sm-0 mt-1 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-0 mb-1">
-                            Pan number 
+                            Pan number <br/>
                             <span>
                               <form>
                                 <input 
@@ -197,7 +197,7 @@ const CandidateEarning = ({
                             </span>
                           </div>
                           <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-12 mt-xl-0 mt-lg-0 mt-md-0 mt-sm-0 mt-0 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-0 mb-1">
-                            UPI Id 
+                            UPI Id <br/>
                             <span>
                               <form>
                                 <input 
@@ -233,7 +233,7 @@ const CandidateEarning = ({
                           </div>
                           <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-12 mt-xl-0 mt-lg-0 mt-md-0 mt-sm-0 mt-1">
                             <button
-                              className={`btn btn-block btn-orrage kyc-txt px-0 ${!documents?.kycCompleted ? 'disabled' : ''}`}
+                              className={`btn btn-block btn-orrage kyc-txt px-0 disabled waves-effect waves-light ${!documents?.kycCompleted ? 'disabled' : ''}`}
                               disabled={!documents?.kycCompleted}
                               data-toggle="modal"
                               data-target="#redeemCashback"

@@ -29,7 +29,9 @@ select {
     background-color: #FC2B5A;
 }
 .new-bg-text {
-    background-color: #FC2B5A;
+    background-color: #FC2B5A !important;
+    border-top-right-radius: 0px !important;
+    border-bottom-right-radius: 0px !important;
 }
 .float-left {
     float: left !important;

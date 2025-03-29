@@ -429,7 +429,7 @@ function Course() {
 
 
                               <div className="flag"></div>
-                              <div className="right_obj shadow">
+                              <div className="right_obj shadow shadow-new">
                                 {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'}
                               </div>
                             </div>

@@ -216,6 +216,8 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
         console.log("Fetching course details...");
         // console.log("Course ID:", courseId);
         console.log("Course ID:", id);
+        console.log("backendUrl" , backendUrl);
+        
 
         // const response = await axios.get(`${backendUrl}/candidate/course/${courseId}`, {
         

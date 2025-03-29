@@ -42,3 +42,4 @@ node_modules/
 node_modules/
 frontend/.env
 frontend/.env
+frontend/src/Page/App/Candidate/CandidateLogin

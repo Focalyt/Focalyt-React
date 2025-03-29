@@ -21,6 +21,7 @@ const CandidateWallet = () => {
     };
 
     return (
+        <div className="content-wrapper">
         <div className="content-body">
 
 <style>
@@ -211,6 +212,7 @@ Please note: You will receive cashback once the candidate has completed his prof
                 </div>
             </section>
         </div>
+        </div>
     );
 };
 
@@ -240,6 +242,7 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
                 </Link>
             </div>
         </div>
+        
     );
 };
 

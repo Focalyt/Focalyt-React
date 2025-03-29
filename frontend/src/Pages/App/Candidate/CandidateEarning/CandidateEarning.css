@@ -23,3 +23,22 @@ html body .content .content-wrapper {
     color: #fff !important;
     box-shadow: 0 8px 25px -8px #28c76f;
 }
+.tab_head {
+    background-color: #b8caf0;
+    font-size: 17px;
+    color: black;
+}
+.btn-prp {
+    background-color: darkblue;
+    color: #fff;
+}
+.kyc-txt {
+    font-size: 12px;
+}
+.btn-orrage {
+    background-color: #df4805 !important;
+    color: #fff;
+}
+.btn.disabled, .btn:disabled {
+    opacity: 0.65;
+}

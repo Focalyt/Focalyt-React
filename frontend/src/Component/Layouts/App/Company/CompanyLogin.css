@@ -22,9 +22,11 @@ html {
     transition: 300ms ease all;
     backface-visibility: hidden;
     min-height: calc(100% - 4rem);
-    margin-left: 260px;
+    margin-left: 230px;
   }
-  
+  .navbar-theme {
+    background: #FC2B5A;
+}
   html body .content.app-content {
     overflow-x: hidden;
   }

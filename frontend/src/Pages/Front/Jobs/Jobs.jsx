@@ -38,14 +38,15 @@ function Jobs() {
     } else {
       console.error("Chat container (iframe-box) not found!");
     }
-  
+
     // Trigger the bootm-box click event to initialize the chat
     const bootmBox = document.getElementById("bootm-box");
     if (bootmBox) {
       bootmBox.click();
     } else {
       console.error("Element with ID 'bootm-box' not found!");
-    }}
+    }
+  }
 
   const statesList = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
@@ -175,10 +176,10 @@ function Jobs() {
 
         const hasMatchingSector = course._industry._id.toString() === sectorId;
 
-      console.log(`Checking course ${course._id}: Industry ID = ${course._industry._id}, Matching? ${hasMatchingSector}`);
+        console.log(`Checking course ${course._id}: Industry ID = ${course._industry._id}, Matching? ${hasMatchingSector}`);
 
         // const hasMatchingSector = course._industry._id.some(s => s && s.toString() === sectorId);
-        
+
         return hasMatchingSector;
       });
 
@@ -431,7 +432,14 @@ function Jobs() {
                                 data-bs-target="#videoModal"
                                 onClick={(e) => {
                                   e.preventDefault(); // ✅ Prevents default link behavior
-                                  setVideoSrc(course.videos && course.videos[0] ? `${bucketUrl}/${course.videos[0]}` : "");
+                                  // setVideoSrc(course.videos && course.jobVideo ? `${bucketUrl}/${course.jobVideo}` : "");
+                                  if (course.jobVideo) {
+                                    console.log("Opening video:", course.jobVideo);
+                                    setVideoSrc(course.jobVideo);
+                                  } else {
+                                    console.warn("No video found for this job");
+                                    setVideoSrc(""); // fallback
+                                  }
                                 }}
                                 className="pointer img-fluid"
                               >
@@ -439,21 +447,27 @@ function Jobs() {
                                   src={course.thumbnail ? `${bucketUrl}/${course.thumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
                                   className="digi"
                                   alt={course.name}
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+                                  }}
                                 />
+
+
                                 <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="Play" className="group1" />
                               </a>
 
 
                               <div className="flag"></div>
-                              <div className="right_obj shadow">
+                              <div className="right_obj shadow shadow-new">
                                 {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Jobs'}
                               </div>
                             </div>
 
                             <div className="card-body px-0 pb-0">
-                            <h4 class=" text-center course-title text-white fw-bolder text-truncate text-capitalize ellipsis mx-auto" style={{fontSize:"25px!important", fontWeight:"700!important"}}>
-                      {course.title}
-                    </h4>
+                              <h4 class=" text-center course-title text-white fw-bolder text-truncate text-capitalize ellipsis mx-auto" style={{ fontSize: "25px!important", fontWeight: "700!important" }}>
+                                {course.title}
+                              </h4>
                               <h5
                                 className="text-center text-white companyname mb-2 mx-auto text-capitalize ellipsis"
                                 title={course.name}
@@ -461,11 +475,11 @@ function Jobs() {
                                 ({course.displayCompanyName})
                               </h5>
                               <p class="text-center digi-price mb-3 mt-3">
-                      <span class="rupee text-white">₹ &nbsp;</span>
-                      <span class="r-price text-white">
-                      {course.amount}
-                      </span>
-                    </p>
+                                <span class="rupee text-white">₹ &nbsp;</span>
+                                <span class="r-price text-white">
+                                  {course.amount}
+                                </span>
+                              </p>
 
                               <div className="row" id="course_height">
                                 <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
@@ -484,7 +498,7 @@ function Jobs() {
                                             </figure>
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            
+
                                             <p className="mb-0 text-white">
                                               {course._qualification.name}
                                             </p>
@@ -506,7 +520,7 @@ function Jobs() {
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
                                             <p className="mb-0 text-white">
-                                              {course.experience == 0 ? "Fresher" :""}
+                                              {course.experience == 0 ? "Fresher" : ""}
                                             </p>
                                           </div>
                                         </div>
@@ -525,16 +539,16 @@ function Jobs() {
                                             </figure>
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                          
+
                                             <div className="ellipsis-wrapper">
                                               <p
                                                 className="mb-0 text-white"
                                                 title={course.city ? `${course.city.name}, ${course.state.name}` : 'NA'}
                                               >
-                                                 {course.city
-                                                    ? `(${course.city.name}, ${course.state.name})`
-                                                    : 'NA'}
-                                               
+                                                {course.city
+                                                  ? `(${course.city.name}, ${course.state.name})`
+                                                  : 'NA'}
+
                                               </p>
                                             </div>
                                           </div>
@@ -553,12 +567,12 @@ function Jobs() {
                                               />
                                             </figure>
                                           </div>
-                                          
+
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                           
+
                                             <p className="mb-0 text-white">
                                               {course.work}
-                                              
+
                                             </p>
                                           </div>
                                         </div>
@@ -591,7 +605,7 @@ function Jobs() {
                                         </a>
                                       </div>
                                       <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                        <button onClick={() => openChatbot()}   className="btn cta-callnow shr--width">
+                                        <button onClick={() => openChatbot()} className="btn cta-callnow shr--width">
                                           Chat Now
                                         </button>
                                       </div>
@@ -602,7 +616,7 @@ function Jobs() {
                                           Share
                                         </button>
                                       </div>
-                                      
+
                                     </div>
                                   </div>
                                 </div>
@@ -730,7 +744,7 @@ function Jobs() {
           </div>
         </div>
       </FrontLayout>
-      
+
     </>
   );
 }
