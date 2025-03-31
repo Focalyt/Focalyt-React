@@ -29,6 +29,7 @@ function Jobs() {
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const backendAppUrl = process.env.REACT_APP_MIPIE_APP_BACKEND_URL;
   const openChatbot = () => {
     console.log("On click start")
     const chatContainer = document.getElementById("iframe-box");
@@ -627,7 +628,7 @@ function Jobs() {
                               <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
                                 <div className="row py-2">
                                   <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                    <a href={`${backendUrl}/jobdetailsmore/${course._id}`}>
+                                    <a href={`${backendAppUrl}/jobdetailsmore/${course._id}`}>
                                       <span className="learnn pt-1 text-white">Learn More</span>
                                       <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
                                     </a>
