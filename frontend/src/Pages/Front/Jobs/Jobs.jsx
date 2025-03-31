@@ -251,7 +251,7 @@ function Jobs() {
 
 
   const filteredCourses = getFilteredCourses();
-  console.log(courses)
+  console.log("filteredCourses",filteredCourses)
 
 
 
