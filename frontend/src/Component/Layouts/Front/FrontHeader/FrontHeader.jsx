@@ -5,7 +5,7 @@ import MetaPixel from '../../../../Component/MetaPixel';
 
 
 const FrontHeader = () => {
-  const logo = "/Assets/images/logo/logo.png";
+  const logo = "/Assets/images/logo/focalyt_new_logo.png";
   const menuRef = useRef(null);
   const menuMainRef = useRef(null);
   const menuOverlayRef = useRef(null);

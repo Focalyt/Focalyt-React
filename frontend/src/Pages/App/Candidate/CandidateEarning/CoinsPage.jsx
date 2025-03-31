@@ -293,8 +293,8 @@ const CoinsPage = () => {
       <div className="content-wrapper">
         <div className="content-header row">
           <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-3 mb-sm-0 mb-0 candidate-card">
-            <div className="card mb-2">
-              <div className="col-xl-12 py-1">
+            <div className="card">
+              <div className="col-xl-12 p-3">
                 <div className="row">
                   <div className="col-xl-12 my-auto">
                     <h4 className="card-title mb-0">
@@ -342,10 +342,10 @@ const CoinsPage = () => {
             <div className="row">
               <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-3 mb-sm-0 mb-0 candidate-card">
                 <div className="card mb-3">
-                  <div className="col-xl-12 py-1">
+                  <div className="col-xl-12 p-3">
                     <div className="row">
                       <div className="col-xl-12 my-auto">
-                        <h4 className="card-title mb-0">Latest Transactions / नवीनतम लेनदेन</h4>
+                        <h4 className="card-title mb-0 px-3">Latest Transactions / नवीनतम लेनदेन</h4>
                       </div>
                     </div>
                   </div>

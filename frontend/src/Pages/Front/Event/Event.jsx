@@ -118,64 +118,64 @@ function Event() {
 
 
 
-    // Filter courses based on selected sector and search term
-    const getFilteredCourses = () => {
+  // Filter courses based on selected sector and search term
+  const getFilteredCourses = () => {
 
 
 
-        // Start with all courses
-        let filtered = [...courses];
+    // Start with all courses
+    let filtered = [...courses];
 
-        // Then filter by sector if not "all"
-        if (activeFilter !== "all") {
-        const sectorId = activeFilter.replace("id_", "");
-        console.log("Filtering by sector ID:", sectorId);
+    // Then filter by sector if not "all"
+    if (activeFilter !== "all") {
+      const sectorId = activeFilter.replace("id_", "");
+      console.log("Filtering by sector ID:", sectorId);
 
-        filtered = filtered.filter(course => {
-            if (!course.sectors || !Array.isArray(course.sectors)) {
-            return false;
-            }
-
-            const hasMatchingSector = course.sectors.some(s => s && s.toString() === sectorId);
-            return hasMatchingSector;
-        });
-
-        console.log("After sector filter, courses count:", filtered.length);
+      filtered = filtered.filter(course => {
+        if (!course.sectors || !Array.isArray(course.sectors)) {
+          return false;
         }
 
-        // Then filter by search term if it exists
-        if (searchTerm && searchTerm.trim() !== "") {
-        const term = searchTerm.toLowerCase().trim();
-        console.log("Filtering by search term:", term);
+        const hasMatchingSector = course.sectors.some(s => s && s.toString() === sectorId);
+        return hasMatchingSector;
+      });
 
-        filtered = filtered.filter(course => {
-            console.log("display-Courses",courses)
-            // Check multiple fields
-            const nameMatch = course.name && course.name.toLowerCase().includes(term);
-            const qualificationMatch = course.qualification && course.qualification.toLowerCase().includes(term);
-            const durationMatch = course.duration && course.duration.toLowerCase().includes(term);
-            const cityMatch = course.city && course.city.toLowerCase().includes(term);
-            const stateMatch = course.state && course.state.toLowerCase().includes(term);
-            const modeMatch = course.trainingMode && course.trainingMode.toLowerCase().includes(term);
-            const typeMatch = course.courseType && course.courseType.toLowerCase().includes(term);
-            const sectorMatch = course.sectorNames && course.sectorNames.some(name =>
-            name.toLowerCase().includes(term)
-            );
+      console.log("After sector filter, courses count:", filtered.length);
+    }
 
-            return nameMatch || qualificationMatch || durationMatch || cityMatch ||
-            stateMatch || modeMatch || typeMatch || sectorMatch;
-        });
+    // Then filter by search term if it exists
+    if (searchTerm && searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase().trim();
+      console.log("Filtering by search term:", term);
 
-        console.log("After search filter, courses count:", filtered.length);
-        }
-        // ✅ Filter by Fee Type (Paid/Free)
-        if (feeFilter !== "all") {
-        filtered = filtered.filter(course => course.courseFeeType?.toLowerCase() === feeFilter);
-        }
+      filtered = filtered.filter(course => {
+        console.log("display-Courses", courses)
+        // Check multiple fields
+        const nameMatch = course.name && course.name.toLowerCase().includes(term);
+        const qualificationMatch = course.qualification && course.qualification.toLowerCase().includes(term);
+        const durationMatch = course.duration && course.duration.toLowerCase().includes(term);
+        const cityMatch = course.city && course.city.toLowerCase().includes(term);
+        const stateMatch = course.state && course.state.toLowerCase().includes(term);
+        const modeMatch = course.trainingMode && course.trainingMode.toLowerCase().includes(term);
+        const typeMatch = course.courseType && course.courseType.toLowerCase().includes(term);
+        const sectorMatch = course.sectorNames && course.sectorNames.some(name =>
+          name.toLowerCase().includes(term)
+        );
 
-        console.log("Final filtered courses count:", filtered.length);
-        return filtered;
-    };
+        return nameMatch || qualificationMatch || durationMatch || cityMatch ||
+          stateMatch || modeMatch || typeMatch || sectorMatch;
+      });
+
+      console.log("After search filter, courses count:", filtered.length);
+    }
+    // ✅ Filter by Fee Type (Paid/Free)
+    if (feeFilter !== "all") {
+      filtered = filtered.filter(course => course.courseFeeType?.toLowerCase() === feeFilter);
+    }
+
+    console.log("Final filtered courses count:", filtered.length);
+    return filtered;
+  };
   const handleShare = async (courseId, courseName, courseThumbnail) => {
     const courseUrl = `${window.location.origin}${window.location.pathname}#${courseId}`;
     if (navigator.share) {
@@ -224,15 +224,16 @@ function Event() {
     } else {
       console.error("Chat container (iframe-box) not found!");
     }
-  
+
     // Trigger the bootm-box click event to initialize the chat
     const bootmBox = document.getElementById("bootm-box");
     if (bootmBox) {
       bootmBox.click();
     } else {
       console.error("Element with ID 'bootm-box' not found!");
-    }}
-  
+    }
+  }
+
 
   return (
     <>
@@ -270,7 +271,7 @@ function Event() {
                   <h1 className="text-center text-uppercase jobs-heading pb-4">Events</h1>
 
                   {/* Selected Sector Display */}
-                  
+
                   {/* <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
                     <div className='sector--select'>
                       <span className="font-medium text-uppercase me-2">Selected Sector:</span>
@@ -352,7 +353,7 @@ function Event() {
 
                               <div className="flag"></div>
                               <div className="right_obj shadow">
-                                {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'}
+                                {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Events'}
                               </div>
                             </div>
 
@@ -479,9 +480,10 @@ function Event() {
 
 
                                       {/* Action Buttons */}
-                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
+                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
                                         <a
-                                          className="btn cta-callnow btn-bg-color shr--width"
+                                          className="btn cta-callnow btn-bg-color shr--width w-100"
+                                          // href={`https://app.focalyt.com/candidate/login?returnUrl=/candidate/course/${course._id}`}
                                           href={`https://app.focalyt.com/candidate/login?returnUrl=/candidate/course/${course._id}`}
                                         >
                                           Apply Now
@@ -492,53 +494,25 @@ function Event() {
                                           Chat Now
                                         </a>
                                       </div> */}
-                                      <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                      <button  onClick={() => openChatbot()}   className="btn cta-callnow shr--width">
-                                          Download
+                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
+                                        <button className="btn cta-callnow shr--width w-100">
+                                        Guidelines
                                         </button>
-                                      </div>  
-                                      
-                                    
-                                      {/* <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                        <div className="row pt-2">
-                                          <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                            <a href="#" data-bs-toggle="modal" data-bs-target="#callbackModal">
-                                              <span
-                                                className="learnn btn cta-callnow w-100"
-                                                style={{ padding: "10px 14px", cursor: "pointer" }}
-                                                onClick={() => alert("Callback request received!")}
-                                              >
-                                                Request for Call Back
-                                              </span>
+                                      </div>
 
-                                            </a>
-                                          </div>
-                                        </div>
-                                      </div> */}
                                     </div>
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Footer */}
-                              <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
-                                <div className="row py-2">
-                                  <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                    <a href={`https://app.focalyt.com/coursedetails/${course._id}`}>
-                                      <span className="learnn pt-1 text-white">Learn More</span>
-                                      <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
-                                    </a>
-                                  </div>
-                                </div>
-                              </div>
                             </div>
                           </div>
                         </div>
                       ))
                     ) : (
                       <div className="col-12 text-center py-5">
-                        <h3 className="text-muted">No courses found matching your criteria</h3>
-                        <p>Try adjusting your search or filters to find more courses</p>
+                        <h3 className="text-muted">No Events found </h3>
+                        {/* <p>Try adjusting your search or filters to find more courses</p> */}
                       </div>
                     )}
                   </div>

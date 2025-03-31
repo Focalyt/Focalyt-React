@@ -144,9 +144,9 @@ ${backendUrl}/candidate/login?refCode=${id}`;
                   <div className="row">
                     <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 px-0">
                       <div className="table-content shadow-cashback shadow-cashback">
-                        <div className="tab_head font-weight-bolder py-1 px-1"> Refer & Earn</div>
+                        <div className="tab_head font-weight-bolder p-3"> Refer & Earn</div>
 
-                        <div className="mipie-refer py-2 px-1" style={{ overflowWrap: 'break-word' }}>
+                        <div className="mipie-refer p-4" style={{ overflowWrap: 'break-word' }}>
                           {/* <h5>{backendUrl}/candidate/login?refCode={candidate._id}</h5> */}
                           <h5>{backendUrl}/candidate/login?refCode={candidate?._id || "N/A"}</h5>
 
@@ -179,7 +179,7 @@ ${backendUrl}/candidate/login?refCode=${id}`;
                   <div className="col-xl-12 col-lg-12">
                     <form method="GET">
                       <div className="row">
-                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12 mt-1">
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12 mt-4">
                           <label>From Date</label>
                           <input 
                             type="date" 
@@ -189,7 +189,7 @@ ${backendUrl}/candidate/login?refCode=${id}`;
                             onChange={handleInputChange}
                           />
                         </div>
-                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12 mt-1">
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12 mt-4">
                           <label>To Date</label>
                           <input 
                             type="date" 
@@ -199,7 +199,7 @@ ${backendUrl}/candidate/login?refCode=${id}`;
                             onChange={handleInputChange}
                           />
                         </div>
-                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12 mt-1">
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12 mt-4">
                           <label>Status</label>
                           <select 
                             className="form-control text-capitalize" 
@@ -212,7 +212,7 @@ ${backendUrl}/candidate/login?refCode=${id}`;
                             <option value="Inactive">Inactive</option>
                           </select>
                         </div>
-                        <div className="col-xl-4 col-lg-12 col-md-12 col-sm-6 col-12 mt-1" style={{ marginTop: '2.5rem !important' }}>
+                        <div className="col-xl-4 col-lg-12 col-md-12 col-sm-6 col-12 mt-4" style={{ marginTop: '2.5rem !important' }}>
                           <button 
                             className="btn btn-success waves-effect waves-light text-white d-inline px-xl-2 px-lg-2 px-md-2 px-sm-2 px-1 py-1 mx-2"
                             id="search-button" 
@@ -227,7 +227,7 @@ ${backendUrl}/candidate/login?refCode=${id}`;
                             RESET
                           </a>
                         </div>
-                        <div className="totalCount col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12">
+                        <div className="totalCount col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12 mt-4">
                           <span>Total Candidates: {count}</span>
                         </div>
                       </div>
@@ -237,7 +237,7 @@ ${backendUrl}/candidate/login?refCode=${id}`;
                   <div className="row mt-3">
                     <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 px-0 pb-1">
                       <div className="table-content shadow-cashback shadow-cashback">
-                        <div className="tab_head font-weight-bolder py-1 px-1"> My Referrals</div>
+                        <div className="tab_head font-weight-bolder p-3"> My Referrals</div>
                         <div style={{ overflowX: 'auto' }}>
                           <table className="table">
                             <thead>

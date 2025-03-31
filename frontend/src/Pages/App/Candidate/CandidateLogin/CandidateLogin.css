@@ -1,3 +1,9 @@
+.text-primary{
+  color: #FC2B5A!important;
+}
+/* .btn{
+  border: 1px solid #FC2B5A!important;
+} */
 .card-title.text-center.mb-0{
     border-top: 3px solid #f2f0f8;
     border-bottom: 3px solid #f2f0f8;

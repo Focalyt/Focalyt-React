@@ -36,6 +36,7 @@ import SocialImpact from './Pages/Front/SocialImpact/SocialImpact';
 import StuLabs from './Pages/Front/Labs/StuLabs';
 import Event from './Pages/Front/Event/Event';
 import AdminLayout from './Component/Layouts/Admin';
+import CandidateLogin from './Pages/App/Candidate/CandidateLogin/CandidateLogin'
 const Layout = () => {
   const location = useLocation();
 
@@ -58,6 +59,7 @@ const Layout = () => {
         <Route path="/events" element={<Event />} />
 
         {/* Candidate Parent Route */}
+        <Route path ="/candidate/login" element={<CandidateLogin/>}/>
         <Route path="/candidate" element={<CandidateLayout />}>
           <Route path="dashboard" element={<CandidateDashboard />} />
           <Route path="myprofile" element={<CandidateProfile />} />

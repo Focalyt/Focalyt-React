@@ -156,7 +156,7 @@ const LoanApplicationPage = () => {
           </div>
           <div className="content-body">
             <section id="requestLoan-section">
-              <form onSubmit={handleSubmit} className="col-xl-12">
+              <form onSubmit={handleSubmit} className="col-xl-12 p-3">
                 <div className="row mt-2">
                   <div className={`col-xl-3 col-lg-3 col-ms-3 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-2 mb-sm-2 mb-2 ${errors.purpose ? 'error' : ''}`} id="purpose">
                     <label>Select Purpose / उद्देश्य का चयन करें<span className="mandatory"> *</span></label>
@@ -222,7 +222,7 @@ const LoanApplicationPage = () => {
                 </div>
                 <div className="row mt-2 requestLoan-btn">
                   <div className="col-12 mb-2">
-                    <button type="button" className="btn btn-danger" onClick={handleReset}>Reset</button>
+                    <button type="button" className="btn btn-danger me-3" onClick={handleReset}>Reset</button>
                     <button 
                       type="submit" 
                       className={`btn btn-success ${isSubmitDisabled ? 'disabled' : ''}`} 
