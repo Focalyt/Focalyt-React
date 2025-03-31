@@ -446,7 +446,8 @@ function Jobs() {
                                 className="pointer img-fluid"
                               >
                                 <img
-                                  src={course.thumbnail ? `${bucketUrl}/${course.thumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
+                                  // src={course.jobVideoThumbnail ? `${bucketUrl}/${course.jobVideoThumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
+                                  src={course.jobVideoThumbnail ? course.jobVideoThumbnail : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
                                   className="digi"
                                   alt={course.name}
                                   onError={(e) => {
