@@ -1,4 +1,5 @@
 const { kStringMaxLength } = require('buffer');
+const { boolean } = require('joi');
 const { Schema, model } = require('mongoose');
 
 const { ObjectId } = Schema.Types;
@@ -7,6 +8,9 @@ const courseSchema = new Schema({
     sectors: [{
         type: ObjectId, ref: "CourseSectors"
     }],
+    center: [{
+        type: ObjectId, ref: "Center"
+    }],
     courseLevel: String,
     name: { type: String, lowercase: true, trim: true },
     courseFeeType: {
@@ -14,11 +18,15 @@ const courseSchema = new Schema({
         enum: ['Paid', 'Free'], // Allowed user types
         required: true,
       },
+
+      
+      typeOfProject: {
+        type: String, // Specifies which type of user created the post
+        enum: ['P&T', 'T&P',"General"], // Allowed user types
+        
+      },
+    projectName: String,
     duration: String,
-    sequence:{
-        type: Number,
-        default : 50
-    },
     courseType: String,
     youtubeURL: String,
     brochure: String,
@@ -46,6 +54,13 @@ const courseSchema = new Schema({
     stipendDuringTraining: String,
     lastDateForApply: String,
     requiredDocuments: String,
+    docsRequired: [
+        { 
+          Name: { type: String },
+          status: { type: Boolean, default: true } 
+        }
+      ],
+      
     testimonialvideos: [{
         type: String
     }],

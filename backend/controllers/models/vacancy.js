@@ -55,7 +55,7 @@ const vacancySchema = new Schema(
     jobDescription: String,
     payOut: String,
     jobVideo: String,
-    thumbnail: String,
+    jobVideoThumbnail:String,
     distance: Number,
     isContact: Boolean,
     nameof: String,

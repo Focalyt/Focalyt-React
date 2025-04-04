@@ -16,12 +16,12 @@ import CandidateLayout from './Component/Layouts/App/Candidates';
 import CandidateDashboard from './Pages/App/Candidate/CandidateDashboard/CandidateDashboard';
 import CandidateProfile from './Pages/App/Candidate/CandidateProfile/CandidateProfile';
 import CandidatesDocuments from "./Pages/App/Candidate/CandidateDocuments/CandidateDocumets"
-import SearchCourses from "./Pages/App/Candidate/CandidateCourses/CandidateCourses"
+import SearchCourses from "./Pages/App/Candidate/CandidateCourses/SearchCourses"
 import AppliedCourses from './Pages/App/Candidate/CandidateCourses/AppliedCourses';
 import CandidatesJobs from './Pages/App/Candidate/CandidatesJobs/CandidatesJobs';
 import NearbyJobs from './Pages/App/Candidate/CandidatesJobs/NearByJobs';
 import CandidateAppliedJobs from './Pages/App/Candidate/CandidatesJobs/CandidateAppliesJobs';
-import CourseDetail from "./Pages/App/Candidate/CandidateCourses/CourseDetails"
+import SearchCourseDetail from "./Pages/App/Candidate/CandidateCourses/SearchCourseDetail"
 import CandidateWallet from './Component/Layouts/App/Candidates/CandidateWallet/CandidateWallet';
 import CandidateEarning from './Pages/App/Candidate/CandidateEarning/CandidateEarning';
 import ReferAndEarn from './Pages/App/Candidate/CandidateEarning/ReferAndEarn';
@@ -80,7 +80,7 @@ const Layout = () => {
           <Route path="registerInterviewsList" element={<RegisterForInterview />} />
           <Route path='InterestedCompanies' element={<Shortlisting />} />
           {/* <Route path="course" element={<CourseDetail/>}/> */}
-          <Route path="course/:courseId" element={<CourseDetail />} />
+          <Route path="course/:courseId" element={<SearchCourseDetail />} />
         </Route>
         <Route path='/admin' element ={<AdminLayout/>}>
         
