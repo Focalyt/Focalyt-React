@@ -41,7 +41,7 @@ const CandidateDashboard = () => {
 
 
 
-  return (<>
+  return (<CandidateLayout>
 
    
       {/* <div className="candidate-dashboard-sidebar">
@@ -250,7 +250,7 @@ const CandidateDashboard = () => {
 
 
 
-   </>
+   </CandidateLayout>
 
   )
 }

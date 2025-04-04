@@ -6,6 +6,8 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import { Pagination, Autoplay } from 'swiper/modules';
 import 'swiper/css/pagination';
+import { useLocation } from 'react-router-dom';
+
 
 
 const CandidateLogin = () => {
@@ -29,6 +31,12 @@ const CandidateLogin = () => {
     const inputRef = useRef(null);
     const otpRef = useRef(null);
     const generateOTPRef = useRef(null);
+
+
+    const urlLocation = useLocation();
+    const queryParams = new URLSearchParams(urlLocation.search);
+    const returnUrl = queryParams.get('returnUrl');
+    console.log('returnUrl',returnUrl)
 
     useEffect(() => {
         const loadGooglePlaces = () => {
@@ -159,8 +167,13 @@ const CandidateLogin = () => {
                     // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                     if (loginRes.data.status) {
                         localStorage.setItem('candidate', loginRes.data.name);
-                        localStorage.setItem('token', loginRes.data.token);
-                        window.location.href = '/candidate/searchcourses';
+                        localStorage.setItem('token', loginRes.data.token);if(returnUrl){
+
+                            window.location.href = returnUrl
+                        }
+                        else{
+                        window.location.href = '/candidate/dashboard';
+                       }
                     } else {
                         setErrorMessage('Login failed after registration');
                     }
@@ -176,23 +189,35 @@ const CandidateLogin = () => {
                 return;
             }
             try {
+                console.log('Verifing OTP')
                 // const verifyRes = await axios.post('/api/verifyOtp', { mobile: mobileNumber, otp });
-                const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber })
+                const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
                 if (verifyRes.data.status) {
                     // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                     const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                     if (loginRes.data.status) {
+                        console.log("loginRes.data", loginRes.data)
                         localStorage.setItem('candidate', loginRes.data.name);
                         localStorage.setItem('token', loginRes.data.token);
+                        sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
+                        setSuccessMessage('OTP Verified Successfully');
+
                         const token = loginRes.data.token;
                         const verificationBody = { mobile: mobileNumber, verified: true };
                         const headers = { headers: { 'x-auth': token } };
+                        if(returnUrl){
+
+                            window.location.href = returnUrl
+                        }
+                        else{
+                        window.location.href = '/candidate/dashboard';
+                       }
+
 
                         // const verificationRes = await axios.post('/candidate/verification', verificationBody, headers);
-                        const verificationRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers)
-                        if (verificationRes.data.status) {
-                            window.location.href = '/candidate/searchcourses';
-                        }
+                        // const verificationRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers)
+                        // if (verificationRes.data.status) {
+                        // }
                     } else {
                         setErrorMessage('Login failed after OTP verification');
                     }
@@ -206,6 +231,7 @@ const CandidateLogin = () => {
     };
 
     return (
+
         <div className="app-content content">
             <div className="content-wrapper mt-4">
                 <section className="row flexbox-container">

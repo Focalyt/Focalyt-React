@@ -3,6 +3,8 @@ import { Link, Outlet } from "react-router-dom";
 import CandidateHeader from './CandidateHeader/CandidateHeader'
 import CandidateFooter from './CandidateFooter/CandidateFooter'
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useNavigate } from "react-router-dom";
+
 import {
   faChartLine, faUser, faSearch, faClipboardList, faWallet, faIndianRupeeSign, faForward, faCoins,
 } from "@fortawesome/free-solid-svg-icons";
@@ -14,6 +16,20 @@ import {
 } from "@fortawesome/free-regular-svg-icons";
 
 function CandidateLayout({ children }) {
+  const navigate = useNavigate();
+  const [user, setUser] = useState();
+
+
+  useEffect(() => {
+  const storedUser = sessionStorage.getItem('user');
+  console.log()
+  if (storedUser) {
+    setUser(JSON.parse(storedUser));
+  } else {
+    navigate("/candidate/login"); // 🔄 Redirect if user not found
+  }
+}, []);
+
 
   const [openDropdown, setOpenDropdown] = useState(null);
   const profileMenuRef = useRef(null);
