@@ -16,6 +16,7 @@ function CandidateHeader() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
+
   // useEffect(() => {
   //   setUserName(localStorage.getItem('candidate') || '');
   //   fetchUserCredit();
@@ -136,25 +137,31 @@ function CandidateHeader() {
               </div>
               <ul className="nav navbar-nav float-right">
                 <li className="dropdown dropdown-user nav-item" id="logout-block">
-                  <a className="dropdown-toggle nav-link dropdown-user-link" onClick={() => setIsLogoutOpen(!isLogoutOpen)}>
-                    <div className="user-nav d-sm-flex d-flex">
-                      <span className="user-name text-bold-600 text-white">{userName}</span>
+                  <a className="dropdown-toggle nav-link dropdown-user-link" onClick={() => setIsLogoutOpen(!isLogoutOpen)} >
+                    <div className="user-nav d-sm-flex d-flex flex-column">
+                      {/* <span className="user-name text-bold-600 text-white">{userName}</span> */}
+                      <span className="user-name text-bold-600 text-white">Akash gaurav</span>
                       <span className="text-white">Coins: <strong>{userCredit}</strong></span>
                     </div>
-                    <span className="text-center pl-1">
-                      <img id="profile-visibility-status" src={profileVisibility ? "/Assets/images/confirm.png" : "/Assets/images/notconfirm.png"} alt="profile-status" className="img-fluid"/>
+                    <span className="text-center pl-1" >
+                      <img id="profile-visibility-status" src={profileVisibility ? "/Assets/images/norconfirm.png" : "/Assets/images/confirm.png"} alt="profile-status" className="img-fluid"/>
                     </span>
                   </a>
-                  {isLogoutOpen && (
-                    <div className="dropdown-menu dropdown-menu-right">
+                 {isLogoutOpen &&(
+                    <div className="" style={{width:"100%", position:"absolute", background:"#fff",top: "70px",
+    borderRadius: "6px"}}>
                       <a className="dropdown-item" href="/candidate/myProfile">
-                        <i className="feather icon-edit"></i> Edit Profile
+                      <i class="fa-thin fa-user"></i> Edit Profile
                       </a>
+                      <a className="dropdown-item" href="/candidate/myProfile">
+                      <i class="feather icon-user"></i>  Show Profile
+                      </a>
+                      <div className="dropdown-divider"></div>
                       <a className="dropdown-item" onClick={handleLogout}>
                         <i className="feather icon-power"></i> Logout
                       </a>
                     </div>
-                  )}
+                 )}
                 </li>
               </ul>
             </div>
@@ -184,7 +191,17 @@ function CandidateHeader() {
           </div>
         </div>
       )}
-
+<style>
+  {
+    `
+    .dropdown-divider {
+    height: 0;
+    margin: 0.5rem 0;
+    overflow: hidden;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}`
+  }
+</style>
      
       <script src="https://kit.fontawesome.com/9f033fe1e6.js" crossOrigin="anonymous"></script>
     </>
