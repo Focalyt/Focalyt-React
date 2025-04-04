@@ -9,6 +9,7 @@ const moment = require("moment");
 // const OpenAI = require('openai');
 
 const {
+	Event,
 	User,
 	Company,
 	College,
@@ -518,6 +519,37 @@ router.get("/courses", async (req, res) => {
 		page
 	});
 });
+
+router.get("/event", async (req, res) => {
+	let filter = { status: true }
+
+	const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
+
+	
+
+	const countEvents = await Event.find(filter).countDocuments()
+	const events = await Event.find(filter)
+	
+	const perPage = 50;
+	const p = parseInt(req.query.page);
+	const page = p || 1;
+	const totalPages = Math.ceil(countEvents / perPage);
+
+
+	console.log("events",events)
+
+
+
+	// Use res.json() to send JSON data, not res.send.json()
+	return res.json({
+		events,
+		totalPages,
+	    page
+	});
+});
+
+
+
 router.get("/coursedetails/:id", async (req, res) => {
 	const { id } = req.params
 	let course = await Courses.findOne({ _id: id })

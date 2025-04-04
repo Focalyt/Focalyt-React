@@ -1,4 +1,5 @@
 module.exports.AppBanner = require('./appBanner');
+module.exports.Event = require('./event');
 module.exports.AppUpdate = require('./appUpdate');
 module.exports.User = require('./users');
 module.exports.CareerObjective = require('./careerObjective');
@@ -63,4 +64,6 @@ module.exports.Post=require('./post');
 module.exports.CourseSectors=require('./courseSectors');
 module.exports.AppliedCourses = require("./appliedCourses");
 module.exports.FAQ = require("./chatfaqs");
+module.exports.Center = require("./center");
+module.exports.QualificationCourse = require("./qualificationCourse");
 // module.exports.Manager = required("");

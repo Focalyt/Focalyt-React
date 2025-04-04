@@ -67,7 +67,7 @@ function Jobs() {
         );
         setUniqueSectors(response.data.uniqueSectors);
 
-        console.log("Response",response )
+        console.log("Response",response.data.recentJobs )
       } catch (error) {
         console.error("Error fetching course data:", error);
       }
@@ -446,8 +446,7 @@ function Jobs() {
                                 className="pointer img-fluid"
                               >
                                 <img
-                                  // src={course.jobVideoThumbnail ? `${bucketUrl}/${course.jobVideoThumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                                  src={course.jobVideoThumbnail ? course.jobVideoThumbnail : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
+                                  src={course.jobVideoThumbnail ? `${course.jobVideoThumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
                                   className="digi"
                                   alt={course.name}
                                   onError={(e) => {
@@ -477,12 +476,14 @@ function Jobs() {
                               >
                                 ({course.displayCompanyName})
                               </h5>
+                              {(course.amount || course.min) && (
                               <p class="text-center digi-price mb-3 mt-3">
                                 <span class="rupee text-white">₹ &nbsp;</span>
                                 <span class="r-price text-white">
-                                  {course.amount}
+                                  {course.amount?`${course.amount}`:`${course.min}-${course.max}`}
                                 </span>
                               </p>
+                              )}
 
                               <div className="row" id="course_height">
                                 <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
@@ -523,7 +524,7 @@ function Jobs() {
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
                                             <p className="mb-0 text-white">
-                                              {course.experience == 0 ? "Fresher" : ""}
+                                              {course.experience == 0 ? "Fresher" : `${course.experience}`}
                                             </p>
                                           </div>
                                         </div>

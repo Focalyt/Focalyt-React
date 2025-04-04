@@ -41,7 +41,7 @@ const vacancyTypeRoutes = require('./vacancyType');
 const universityRoutes = require('./university');
 const stateRoutes = require('./states');
 const cityRoutes = require('./city');
-const { isAdmin } = require('../../../helpers');
+// const { isAdmin } = require('../../../helpers');
 const miPieCoinsRoutes = require('./miPieCoins')
 const paymentRoutes = require('./payments')
 const smsRoutes = require('./smsUsage')
@@ -61,7 +61,9 @@ const contactRoutes=require('./contacts')
 const loanRoutes = require('./loanEnquiry');
 const courseSectorsRoutes = require('./courseSectors');
 const teamRoutes=require('./team')
-
+const eventRoutes = require('./events');
+const addCenterRoutes = require('./center');
+const addPortalAccessRoutes = require('./portalAccess');
 
 const router = express.Router();
 router.use('/appBanner', appBannerRoutes);
@@ -105,12 +107,30 @@ router.use("/contact",contactRoutes)
 router.use("/loanEnquiry",loanRoutes);
 router.use('/courseSectors', courseSectorsRoutes);
 router.use('/team', teamRoutes);
-router.use(isAdmin);
+router.use('/event', eventRoutes);
+router.use('/center', addCenterRoutes);
+router.use('/portalaccess', addPortalAccessRoutes);
+
+// router.use(isAdmin);
 router.post ('/courses',async(req,res)=>{
   
 })
 router.get('/', async (req, res) => {
   try {
+
+    const userId = req.session?.user?._id;
+    let loggedInUser = null;
+
+    if (!userId) {
+      return res.redirect('/admin/login'); // ✅ User not logged in, redirect to login
+    }
+
+    if (userId) {
+      loggedInUser = await User.findById(userId);
+      console.log("Logged In User Details:", loggedInUser);
+    }
+
+
     const totalRevenue = await PaymentDetails.aggregate([
       {$match: { paymentStatus: 'captured',
                }},
@@ -389,23 +409,26 @@ router.get('/', async (req, res) => {
          $lte : moment().subtract(2,'day').utcOffset('+05:30').endOf('day').toDate()}
       }).countDocuments()
 
-    return res.render(`${req.vPath}/admin`,{
-      totalRevenue: totalRevenue[0]?.totalRevenue,
-      monthRevenue: monthRevenue[0]?.monthRevenue,
-      weekRevenue: weekRevenue[0]?.weekRevenue,
-      dayRevenue: dayRevenue[0]?.dayRevenue,
-      yesterdayRevenue:yesterdayRevenue[0]?.yesterdayRevenue,
-      dayBeforeYesterdayRevenue:dayBeforeYesterdayRevenue[0]?.dayBeforeYesterdayRevenue,
-      monthCandidates,weekCandidates,
-      monthCompanies,weekCompanies,
-      monthColleges,weekColleges,
-      yesterdayColleges,yesterdayCompanies,yesterdayJobs,yesterdayHired,yesterdayShortlisted,yesterdayAppliedJobs,dayBeforeYesterdayAppliedJobs,dayBeforeYesterdayCompanies,dayBeforeYesterdayColleges,dayBeforeYesterdayHired,dayBeforeYesterdayJobs,dayBeforeYesterdayShortlisted,
-      dayShortlisted: dayShortlisted.length,weekShortlisted: weekShortlisted.length,
-      monthShortlisted: monthShortlisted.length,totalShortlisted: totalShortlisted.length,
-      totalCandidates, dayCandidates, totalCompanies, dayCompanies, dayColleges, totalColleges,menu:'dashboard',
-      dayJobs,weekJobs,monthJobs,jobs,dayHired,weekHired,monthHired,totalHired,
-      totalAppliedJobs, monthAppliedJobs, weekAppliedJobs, dayAppliedJobs,dayBeforeYesterdayCandidates,yesterdayCandidates,totalAppliedCourses,monthAppliedCourses,weekAppliedCourses,dayAppliedCourses,yesterdayAppliedCourses,dayBeforeYesterdayAppliedCourses
-    });
+      let rederData = {
+        totalRevenue: totalRevenue[0]?.totalRevenue,
+        monthRevenue: monthRevenue[0]?.monthRevenue,
+        weekRevenue: weekRevenue[0]?.weekRevenue,
+        dayRevenue: dayRevenue[0]?.dayRevenue,
+        yesterdayRevenue:yesterdayRevenue[0]?.yesterdayRevenue,
+        dayBeforeYesterdayRevenue:dayBeforeYesterdayRevenue[0]?.dayBeforeYesterdayRevenue,
+        monthCandidates,weekCandidates,
+        monthCompanies,weekCompanies,
+        monthColleges,weekColleges,
+        loggedInUser,
+        yesterdayColleges,yesterdayCompanies,yesterdayJobs,yesterdayHired,yesterdayShortlisted,yesterdayAppliedJobs,dayBeforeYesterdayAppliedJobs,dayBeforeYesterdayCompanies,dayBeforeYesterdayColleges,dayBeforeYesterdayHired,dayBeforeYesterdayJobs,dayBeforeYesterdayShortlisted,
+        dayShortlisted: dayShortlisted.length,weekShortlisted: weekShortlisted.length,
+        monthShortlisted: monthShortlisted.length,totalShortlisted: totalShortlisted.length,
+        totalCandidates, dayCandidates, totalCompanies, dayCompanies, dayColleges, totalColleges,menu:'dashboard',
+        dayJobs,weekJobs,monthJobs,jobs,dayHired,weekHired,monthHired,totalHired,
+        totalAppliedJobs, monthAppliedJobs, weekAppliedJobs, dayAppliedJobs,dayBeforeYesterdayCandidates,yesterdayCandidates,totalAppliedCourses,monthAppliedCourses,weekAppliedCourses,dayAppliedCourses,yesterdayAppliedCourses,dayBeforeYesterdayAppliedCourses
+      };
+
+    return res.render(`${req.vPath}/admin`,rederData);
   } catch (err) {
     req.session.formData = req.body;
     req.flash('error', err.message || 'Something went wrong!');

@@ -57,7 +57,7 @@ const CandidateDashboard = () => {
           <div className="content-body  mb-4">
             <a href="/candidate/cashback">
               <div className="height-structure bannerCan">
-                <img src="/Assets/images/candidate-dashboard.jpg" alt="" />
+                <img src="/Assets/images/candidate-dashboardnew.jpg" alt="" />
                 {/* <!-- <h5 className="mb-2">Welcome <span className="font-italic text-primary" id="user-name"></span></h5> --> */}
               </div>
             </a>

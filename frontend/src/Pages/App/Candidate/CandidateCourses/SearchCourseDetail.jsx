@@ -1,205 +1,12 @@
-
-// import React, { useState, useEffect } from "react";
-// import { useParams } from "react-router-dom";
-// import axios from "axios";
-// import moment from "moment";
-
-
-// const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-// const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-
-// const CourseDetails = () => {
-//   const { courseId } = useParams();
-//   const [course, setCourse] = useState(null);
-//   const [loading, setLoading] = useState(true);
-//   const [error, setError] = useState(null);
-//   const [isApplied, setIsApplied] = useState(false);
-//   const [mobileNumber, setMobileNumber] = useState("");
-
-//   useEffect(() => {
-//     axios
-//       .get(`${backendUrl}/courses/${courseId}`)
-//       .then((response) => {
-//         setCourse(response.data);
-//         setIsApplied(response.data.isApplied || false);
-//         setMobileNumber(response.data.mobileNumber || "");
-//         setLoading(false);
-//       })
-//       .catch((err) => {
-//         setError("Course Not Found");
-//         setLoading(false);
-//       });
-//   }, [courseId]);
-
-//   if (loading) return <div>Loading...</div>;
-//   if (error) return <div className="app-content content"><div className="error">{error}</div></div>;
-
-//   return (
-//     <div className="container mt-4">
-//       <div className="card">
-//         <div className="card-body">
-//           <h3 className="text-capitalize mb-2 font-weight-bold">{course.name}</h3>
-//           <h4 className="job_cate">{course?.sectors ? course.sectors[0]?.name : "N/A"}</h4>
-
-//           {/* Course Details */}
-//           <div className="row">
-//             <div className="col-md-4">
-//               <h5>Course Fee</h5>
-//               <p>{course.cutPrice ? (course.cutPrice.toLowerCase() === "free" ? "Free" : `₹ ${course.cutPrice}`) : "N/A"}</p>
-//             </div>
-//             <div className="col-md-4">
-//               <h5>Course Level</h5>
-//               <p>{course.courseLevel || "N/A"}</p>
-//             </div>
-//             <div className="col-md-4">
-//               <h5>Course Agency</h5>
-//               <p>{course.certifyingAgency || "N/A"}</p>
-//             </div>
-//           </div>
-
-//           {/* Course Image Slider */}
-//           <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
-//             <div className="carousel-inner">
-//               {course.photos?.length > 0 ? (
-//                 course.photos.map((photo, i) => (
-//                   <div key={i} className={`carousel-item ${i === 0 ? "active" : ""}`}>
-//                     <img src={`${bucketUrl}/${photo}`} className="d-block w-100 rounded shadow" alt="Course" />
-//                   </div>
-//                 ))
-//               ) : (
-//                 <div className="carousel-item active">
-//                   <img src="/public_assets/images/newjoblistingbanner2.jpg" className="d-block w-100 rounded shadow" alt="Default" />
-//                 </div>
-//               )}
-//             </div>
-//           </div>
-
-//           {/* Course Video */}
-//           {course.videos && course.videos.length > 0 && (
-//             <div className="mt-4">
-//               <video width="100%" controls>
-//                 <source src={`${bucketUrl}/${course.videos[0]}`} type="video/mp4" />
-//                 Your browser does not support the video tag.
-//               </video>
-//             </div>
-//           )}
-
-//           {/* Apply Now Button */}
-//           <div className="mt-4">
-//             {!isApplied ? (
-//               <button className="btn btn-primary" onClick={() => applyCourse(course._id)}>
-//                 Apply Now
-//               </button>
-//             ) : (
-//               <button className="btn btn-success" disabled>
-//                 Applied Course
-//               </button>
-//             )}
-//           </div>
-
-//           {/* Course Duration & Experience */}
-//           <div className="mt-4">
-//             <h3>Course Details</h3>
-//             <div className="row">
-//               <div className="col-md-4">
-//                 <h6>Age</h6>
-//                 <p>{course.age ? `${course.age} Years` : "N/A"}</p>
-//               </div>
-//               <div className="col-md-4">
-//                 <h6>Course Qualification</h6>
-//                 <p>{course.qualification || "N/A"}</p>
-//               </div>
-//               <div className="col-md-4">
-//                 <h6>Experience</h6>
-//                 <p>{course.experience || "N/A"}</p>
-//               </div>
-//             </div>
-//           </div>
-
-//           {/* Registration Status */}
-//           <div className="mt-4">
-//             <h5>Registration Status</h5>
-//             <p>{course.registrationStatus || "Unpaid"}</p>
-//           </div>
-
-//           {/* Apply Now Modal */}
-//           <div className="modal fade" id="applyModal" tabIndex="-1" role="dialog" aria-hidden="true">
-//             <div className="modal-dialog modal-dialog-centered" role="document">
-//               <div className="modal-content">
-//                 <div className="modal-header">
-//                   <h5 className="modal-title">REGISTRATION</h5>
-//                   <button type="button" className="close" data-dismiss="modal" aria-label="Close">
-//                     <span>&times;</span>
-//                   </button>
-//                 </div>
-//                 <div className="modal-body">
-//                   <h5>Register for this Course</h5>
-//                 </div>
-//                 <div className="modal-footer">
-//                   <button type="button" className="btn btn-primary" onClick={() => applyCourse(course._id)}>
-//                     Proceed
-//                   </button>
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-
-//           {/* Call Now Button */}
-//           <div className="mt-3">
-//             <a className="btn btn-warning" href={`tel:${mobileNumber}`}>
-//               <i className="la la-phone"></i> Call Now
-//             </a>
-//           </div>
-
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// // Apply Course Function
-// const applyCourse = (courseId) => {
-//   axios
-//     .post(`${backendUrl}/course/${courseId}/apply`, {}, { headers: { "x-auth": localStorage.getItem("token") } })
-//     .then((res) => {
-//       alert("Successfully Applied!");
-//       window.location.reload();
-//     })
-//     .catch((err) => {
-//       console.error("Error applying:", err);
-//     });
-// };
-
-// export default CourseDetails;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import moment from 'moment';
-
+import "./SearchCoursesDetail.css";
 
 const CourseDetails = () => {
-  const { id } = useParams();
-  // const { courseId } = useParams();
+ 
+  const { courseId } = useParams();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isApplied, setIsApplied] = useState(false);
@@ -207,26 +14,23 @@ const CourseDetails = () => {
   const [mobileNumber, setMobileNumber] = useState('');
   const videoRef = useRef(null);
   const navigate = useNavigate();
-// Environment variables
+
 const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   useEffect(() => {
     const fetchCourseDetails = async () => {
       try {
         console.log("Fetching course details...");
-        // console.log("Course ID:", courseId);
-        console.log("Course ID:", id);
-        console.log("backendUrl" , backendUrl);
-        
+        console.log("Course ID:", courseId);
 
         // const response = await axios.get(`${backendUrl}/candidate/course/${courseId}`, {
         
-        const response = await axios.get(`${backendUrl}/candidate/course/${id}`, {
-          withCredentials: true,
+        const response = await axios.get(`${backendUrl}/candidate/course/${courseId}`, {
           headers: {
             'x-auth': localStorage.getItem('token'),
           },
         });
+        console.log('backendUrl',backendUrl)
   
         console.log("API Response:", response.data);
   
@@ -247,7 +51,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     };
   
     fetchCourseDetails();
-  }, [id]);
+  }, [courseId]);
   // }, [courseId]);
   
   const applyCourse = async (courseId) => {
@@ -389,7 +193,12 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   if (!course) {
     return <div className="error">Course not found</div>;
   }
-
+  const stripHTML = (html) => {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    return div.textContent || div.innerText || "";
+  };
+  
   return (
     <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" 
       data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" id="inner_job_page">
@@ -397,7 +206,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
       <div className="">
         <div className="content-overlay"></div>
         <div className="header-navbar-shadow"></div>
-        <div className="content-wrapper"></div>
+        <div className="content-wrapper">
         
         <section className="ml-3">
           <div className="container-fluid px-1">
@@ -547,7 +356,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                   className="video_thum img-fluid" 
                                   alt="Video thumbnail" 
                                 />
-                                <img src="/public_assets/images/newjoblisting/play.svg" alt="Play button" className="group1" />
+                                <img src="/Assets/images/icon-play.png" alt="Play button" className="group1 d-none" />
                               </a>
                             )}
                           </div>
@@ -677,7 +486,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
                   <div className="col-lg-4 col-md-4 column mt-xl-2 mt-lg-3 mt-md-3 mt-sm-0 mt-0">
                     <a 
-                      className="apply-thisjob apply-div-field text-left px-0 d-xl-block d-lg-block d-md-block d-sm-none d-none py-4 mb-2 decoration-none"
+                      className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
                       href={`tel:${course.counslerphonenumber}`} 
                       title="call"
                       style={{ textDecoration: 'none' }}
@@ -687,7 +496,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                     
                     {!isApplied ? (
                       <a 
-                        className="apply-thisjob apply-div-field text-left px-0 d-xl-block d-lg-block d-md-block d-sm-none d-none py-4 mb-2 decoration-none"
+                        className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
                         href="#" 
                         title="apply" 
                         style={{ textDecoration: 'none' }}
@@ -878,7 +687,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/Eligibility.png" className="img-fluid" draggable="false" alt="Eligibility" />
+                                      <img src="/Assets/public_assets/images/jobicons/Eligibility.png" className="img-fluid" draggable="false" alt="Eligibility" />
                                       Eligibility
                                     </h5>
                                   </div>
@@ -892,7 +701,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/Age.png" className="img-fluid" draggable="false" alt="Age" />
+                                      <img src="/Assets/public_assets/images/jobicons/Age.png" className="img-fluid" draggable="false" alt="Age" />
                                       Age
                                     </h5>
                                   </div>
@@ -905,7 +714,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/Experience.png" className="img-fluid" draggable="false" alt="Experience" />
+                                      <img src="/Assets/public_assets/images/jobicons/Experience.png" className="img-fluid" draggable="false" alt="Experience" />
                                       Experience
                                     </h5>
                                   </div>
@@ -918,7 +727,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/Course_mode.png" className="img-fluid" draggable="false" alt="Course Mode" />
+                                      <img src="/Assets/public_assets/images/jobicons/Course_mode.png" className="img-fluid" draggable="false" alt="Course Mode" />
                                       Course Mode
                                     </h5>
                                   </div>
@@ -931,7 +740,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/Course_duration.png" className="img-fluid" draggable="false" alt="Course Duration" />
+                                      <img src="/Assets/public_assets/images/jobicons/Course_duration.png" className="img-fluid" draggable="false" alt="Course Duration" />
                                       Course Duration
                                     </h5>
                                   </div>
@@ -944,7 +753,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/Course_type.png" className="img-fluid" draggable="false" alt="Course Type" />
+                                      <img src="/Assets/public_assets/images/jobicons/Course_type.png" className="img-fluid" draggable="false" alt="Course Type" />
                                       Course Type
                                     </h5>
                                   </div>
@@ -957,7 +766,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/Timing.png" className="img-fluid" draggable="false" alt="Timings" />
+                                      <img src="/Assets/public_assets/images/jobicons/Timing.png" className="img-fluid" draggable="false" alt="Timings" />
                                       Timings
                                     </h5>
                                   </div>
@@ -970,7 +779,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto text-end">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/Institute_name.png" className="img-fluid" draggable="false" alt="Institute Name" />
+                                      <img src="/Assets/public_assets/images/jobicons/Institute_name.png" className="img-fluid" draggable="false" alt="Institute Name" />
                                       Institute Name
                                     </h5>
                                   </div>
@@ -983,7 +792,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/jobicons/job_training.png" className="img-fluid" draggable="false" alt="On Job Training" />
+                                      <img src="/Assets/public_assets/images/jobicons/job_training.png" className="img-fluid" draggable="false" alt="On Job Training" />
                                       On Job Training
                                     </h5>
                                   </div>
@@ -1012,7 +821,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Course Fee" />
+                                      <img src="/Assets/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Course Fee" />
                                       Course Fee
                                     </h5>
                                   </div>
@@ -1029,7 +838,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Exam Fee" />
+                                      <img src="/Assets/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Exam Fee" />
                                       Exam Fee
                                     </h5>
                                   </div>
@@ -1042,7 +851,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Stipend During Training" />
+                                      <img src="/Assets/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Stipend During Training" />
                                       Stipend During Training
                                     </h5>
                                   </div>
@@ -1055,7 +864,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Any Other Charges" />
+                                      <img src="/Assets/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Any Other Charges" />
                                       Any Other Charges
                                     </h5>
                                   </div>
@@ -1068,7 +877,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Installment Option" />
+                                      <img src="/Assets/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Installment Option" />
                                       Installment Option
                                     </h5>
                                   </div>
@@ -1081,7 +890,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Max. EMI Tenure" />
+                                      <img src="/Assets/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Max. EMI Tenure" />
                                       Max. EMI Tenure
                                     </h5>
                                   </div>
@@ -1094,7 +903,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 <div className="feature-widget-7 border-bottom">
                                   <div className="feature-widget-7__icon-wrapper my-auto">
                                     <h5 className="fw-normal">
-                                      <img src="/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Bank Loan Option" />
+                                      <img src="/Assets/public_assets/images/tick_icon.svg" className="img-fluid" draggable="false" alt="Bank Loan Option" />
                                       Bank Loan Option
                                     </h5>
                                   </div>
@@ -1118,11 +927,12 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                 {course.questionAnswers && course.questionAnswers.map((ele, index) => (
                                   <React.Fragment key={index}>
                                     <li id="que" className="mb-1">
-                                      <img src="/public_assets/images/ul_li_shape.svg" draggable="false" alt="List icon" /> {ele.Question}
+                                      <img src="/Assets/public_assets/images/ul_li_shape.svg" draggable="false" alt="List icon" /> {stripHTML(ele.Question)}
                                     </li>
-                                    <li id="que">{ele.Answer}</li>
+                                    <li id="que">{stripHTML(ele.Answer)}</li>
                                   </React.Fragment>
                                 ))}
+
                               </ul>
                             </div>
                           </div>
@@ -1135,7 +945,6 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
             </div>
           </div>
         </section>
-        
        
         <div className="modal fade" id="apply" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
           <div className="modal-dialog modal-dialog-centered" role="document">
@@ -1208,8 +1017,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
             )}
           </div>
         </div>
-        
- 
+   
         <div className="modal fade" id="completeRegistration" tabIndex="-1" role="dialog" aria-labelledby="completeRegistrationTitle" aria-hidden="true">
           <div className="modal-dialog modal-dialog-centered" role="document">
             <div className="modal-content">
@@ -1274,6 +1082,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

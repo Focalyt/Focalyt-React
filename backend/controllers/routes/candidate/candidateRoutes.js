@@ -1234,119 +1234,69 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
   }
 });
 /* course by id*/
-router.get("/course/:courseId", [isCandidate], async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
-  console.log(fullUrl);
+// router.get("/course/:courseId/", [isCandidate], async (req, res) => {
+  router.get("/course/:courseId/", async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      // const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 });
+      // const userMobile = req.session.user.mobile;
   
-  // Modify script to run after DOM is loaded and escape quotes properly
-  const storageScript = `
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        try {
-        const storedurl = localStorage.getItem('entryUrl');
-        if(!storedurl){
-          // Store current URL immediately
-          const data = {
-            url: '${fullUrl.replace(/'/g, "\\'")}',
-            timestamp: new Date().getTime()
-          };
-          localStorage.setItem('entryUrl', JSON.stringify(data));
-          
-          // Verify it was stored
-          console.log('URL stored:', localStorage.getItem('entryUrl'))};
-          
-          // Function to check and clean expired URL
-          function cleanExpiredUrl() {
-            const stored = localStorage.getItem('entryUrl');
-            if (stored) {
-              const data = JSON.parse(stored);
-              const now = new Date().getTime();
-              const hours24 = 24 * 60 * 60 * 1000;
-              
-              if (now - data.timestamp > hours24) {
-                localStorage.removeItem('entryUrl');
-                console.log('Expired URL removed');
-              }
-            }
-          }
-          
-          // Check for expired URLs
-          cleanExpiredUrl();
-          
-        } catch (error) {
-          console.error('Error storing URL:', error);
-        }
-      });
-    </script>
-  `;
-    const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
-    const userMobile = req.session.user.mobile;
-    let validation = { mobile: userMobile }
-    let { value, error } = CandidateValidators.userMobile(validation)
-    if (error) {
-      return res.send({ status: "failure", error: "Something went wrong!", error });
-    }
-
-
-
-    let course = await Courses.findById(courseId).populate('sectors').lean();
-    if (!course || course?.status == false /* || course.courseType !== 0 */) {
-      return res.redirect("/candidate/searchcourses");
-    }
-    const candidate = await Candidate.findOne({ mobile: userMobile }).lean();
-
-    let canApply = false;
-    if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
-      if (candidate.isExperienced == false || candidate.isExperienced == true) {
-        canApply = true;
+      // let validation = { mobile: userMobile };
+      // let { value, error } = CandidateValidators.userMobile(validation);
+      // if (error) {
+      //   return res.status(400).json({ status: false, message: "Invalid user" });
+      // }
+  
+      let course = await Courses.findById(courseId).populate('sectors').lean();
+      if (!course || course?.status === false) {
+        return res.status(404).json({ status: false, message: "Course not found" });
       }
-    }
-    let isApplied = false;
-    if (candidate.appliedCourses && candidate.appliedCourses.length > 0) {
-      const [filteredCourses] = candidate.appliedCourses.filter(course => {
-        return courseId.includes(course);
+  
+     // const candidate = await Candidate.findOne({ mobile: userMobile }).lean();
+  
+      let canApply = false;
+      // if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
+      //   if (candidate.isExperienced == false || candidate.isExperienced == true) {
+      //     canApply = true;
+      //   }
+      // }
+  
+      // let isApplied = false;
+      // if (candidate.appliedCourses && candidate.appliedCourses.length > 0) {
+      //   const [filteredCourses] = candidate.appliedCourses.filter(course => {
+      //     return courseId.includes(course);
+      //   });
+      //   if (filteredCourses) {
+      //     isApplied = true;
+      //     const assignedCourseData = await AppliedCourses.findOne({
+      //       _candidate: candidate._id,
+      //       _course: new mongoose.Types.ObjectId(courseId)
+      //     }).lean();
+  
+      //     course.registrationCharges = course.registrationCharges.replace(/,/g, '');
+      //     if (assignedCourseData) {
+      //       course.remarks = assignedCourseData.remarks;
+      //       course.assignDate = assignedCourseData.assignDate ? moment(assignedCourseData.assignDate).format('DD MMM YYYY') : "";
+      //       course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid';
+      //     }
+      //   }
+      // }
+  
+      // let mobileNumber = course.phoneNumberof ? course.phoneNumberof : contact[0]?.mobile;
+  
+      return res.json({
+        status: true,
+        course,
+        canApply,
+        
       });
-      if (filteredCourses) {
-        isApplied = true;
-        const assignedCourseData = await AppliedCourses.findOne({
-          _candidate: candidate._id,
-          _course: new mongoose.Types.ObjectId(courseId)
-        }).lean();
-
-        course.registrationCharges = course.registrationCharges.replace(/,/g, '');
-        console.log('============> assignedCourseData ', assignedCourseData, course.registrationCharges)
-        if (assignedCourseData) {
-          course.remarks = assignedCourseData.remarks;
-          course.assignDate = assignedCourseData.assignDate ? moment(assignedCourseData.assignDate).format('DD MMM YYYY') : "";
-          course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid'
-          // const assignDate = assignedCourseData.assignDate ? new Date(assignedCourseData.assignDate).toLocaleDateString('en-GB', {
-          //   day: '2-digit',
-          //   month: '2-digit',
-          //   year: 'numeric'
-          // }).split('/').reverse().join('-') : "";
-          // course.assignDate = assignDate;
-        }
-      }
+  
+    } catch (err) {
+      console.error("API Error:", err);
+      return res.status(500).json({ status: false, message: "Internal server error" });
     }
-    let mobileNumber = course.phoneNumberof ? course.phoneNumberof : contact[0]?.mobile
-    // console.log('course: ', JSON.stringify(course));
-
-
-    return res.render(`${req.vPath}/app/candidate/view-course`, {
-      course,
-      menu: 'Cources',
-      isApplied,
-      mobileNumber,
-      canApply,
-      storageScript: storageScript
-    });
-  } catch (err) {
-    req.flash("error", err.message || "Something went wrong!");
-    return res.redirect("back");
-  }
-})
+  });
+  
 /* course apply */
 // router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res) => {
 //   let courseId = req.params.courseId;

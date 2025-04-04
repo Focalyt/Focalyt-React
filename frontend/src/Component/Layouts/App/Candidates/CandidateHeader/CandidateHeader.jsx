@@ -16,47 +16,47 @@ function CandidateHeader() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
-  useEffect(() => {
-    setUserName(localStorage.getItem('candidate') || '');
-    fetchUserCredit();
-    fetchNotifications();
-    fetchProfileStatus();
-  }, []);
+  // useEffect(() => {
+  //   setUserName(localStorage.getItem('candidate') || '');
+  //   fetchUserCredit();
+  //   fetchNotifications();
+  //   fetchProfileStatus();
+  // }, []);
 
-  const fetchUserCredit = async () => {
-    try {
-      const res = await axios.get('/candidate/getCreditCount', {
-        headers: { 'x-auth': localStorage.getItem('token') },
-      });
-      setUserCredit(res.data.credit || 0);
-    } catch (error) {
-      console.error("Error fetching credit count:", error);
-    }
-  };
+  // const fetchUserCredit = async () => {
+  //   try {
+  //     const res = await axios.get('/candidate/getCreditCount', {
+  //       headers: { 'x-auth': localStorage.getItem('token') },
+  //     });
+  //     setUserCredit(res.data.credit || 0);
+  //   } catch (error) {
+  //     console.error("Error fetching credit count:", error);
+  //   }
+  // };
 
-  const fetchNotifications = async () => {
-    try {
-      const res = await axios.get('/candidate/notificationCount', {
-        headers: { 'x-auth': localStorage.getItem('token') },
-      });
-      setNotificationCount(res.data?.count || 0);
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-    }
-  };
+  // const fetchNotifications = async () => {
+  //   try {
+  //     const res = await axios.get('/candidate/notificationCount', {
+  //       headers: { 'x-auth': localStorage.getItem('token') },
+  //     });
+  //     setNotificationCount(res.data?.count || 0);
+  //   } catch (error) {
+  //     console.error("Error fetching notifications:", error);
+  //   }
+  // };
 
-  const fetchProfileStatus = async () => {
-    try {
-      const res = await axios.get('/candidate/getcandidatestatus');
-      setProfileVisibility(res.data.visibility);
-      if (!res.data.visibility && !localStorage.getItem("modalShown")) {
-        setIsProfileModalOpen(true);
-        localStorage.setItem('modalShown', 'true');
-      }
-    } catch (error) {
-      console.error("Error fetching profile status:", error);
-    }
-  };
+  // const fetchProfileStatus = async () => {
+  //   try {
+  //     const res = await axios.get('/candidate/getcandidatestatus');
+  //     setProfileVisibility(res.data.visibility);
+  //     if (!res.data.visibility && !localStorage.getItem("modalShown")) {
+  //       setIsProfileModalOpen(true);
+  //       localStorage.setItem('modalShown', 'true');
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching profile status:", error);
+  //   }
+  // };
 
   const handleLogout = async () => {
     try {
