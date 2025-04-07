@@ -131,11 +131,11 @@ function About() {
     return (
         <>
             <FrontLayout>
-                <section className="section-padding-30 mt-5"></section>
+                <section className="section-padding-30 mt-4"></section>
                 <section className="bg-white">
                     <div className="focalBanner">
                         <div className="container">
-                            <div className="row align-items-center mb-3">
+                            <div className="row align-items-center">
                                 <div className="col-4">
                                     <div className="focalytLogo">
                                         {/* <img src="/Assets/public/images/logo/logo.png" alt="focal logo" /> */}
@@ -242,10 +242,43 @@ function About() {
                     </div>
                 </section>
 
+                <section>
+                    {/* <!-- training_partners --> */}
+                    <div className="container-fluid bg-white">
+                        <div className="Partners">
+                            <h3 className="affiliated_partner bg-white">Affiliated Training Partner</h3>
+                            <div className="row">
+                                <div className="col-md-12">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/brand.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
+
+                                {/* <!-- <div className="col-md-3">
+                                <div className="partner_image">
+
+                                </div>
+                            </div>
+                            <div className="col-md-3">
+                                <div className="partner_image"></div>
+                            </div>
+                            <div className="col-md-3">
+                                <div className="partner_image"></div>
+                            </div>
+                            <div className="col-md-3">
+                                <div className="partner_image"></div>
+                            </div> --> */}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* <!-- vision --> */}
                 <section id="vision">
                     <div className="container-fluid">
-                        <div className="row justify-content-center align-items-center g-3 mt-3 py-5" id="mission">
+                        <div className="row justify-content-center align-items-center g-3 py-5" id="mission">
                             <div className="col-md-6">
                                 <div className="vision">
                                     <h3 className="v_header">Our Vision</h3>
@@ -271,7 +304,24 @@ function About() {
                     </div>
                 </section>
                 <section id="partners">
-                    
+
+                </section>
+                <section id="partners">
+                    <div className="container-fluid bg-white">
+                        <div className="main_partners">
+                            <h3 className="affiliated_partner bg-white">Our Partners</h3>
+
+                            <div className="row">
+                                <div className="col-md-12">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/brand2.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
                 {/* <!-- focalyt Team  --> */}
                 <section className="bg-black">
@@ -280,7 +330,7 @@ function About() {
                             <div className="row g-3">
                                 <div className="col-md-12">
                                     <div className="text-center pt-3 pb-5">
-                                        <h2 className="focalyt_Team text-black">Focalyt Team</h2>
+                                        <h2 className="focalyt_Team text-white">Focalyt Team</h2>
                                     </div>
                                 </div>
                                 <div class="col-md-12">
@@ -308,7 +358,7 @@ function About() {
                                                     </div>
                                                 </div>
                                             ))}
-                                        
+
 
                                     </div>
                                 </div>
@@ -316,52 +366,494 @@ function About() {
                                 <div className="col-md-12">
 
                                     <div className="row justify-content-evenly g-4 align-items-center">
-                                        {management.map ((a)=>(
-                                        <div className="col-md-4 pb-4">
-                                            <div className="elementor-widget-containers">
-                                                <div className="elementor-image-box-wrapper">
-                                                    <figure className="elementor-image-box-img">
-                                                        <img src= {a.image.fileURL} alt="" />
-                                                    </figure>
-                                                    <div className="elementor-image-box-content">
-                                                    <h3 class="elementor-image-box-title text-white text-center">
-                                                                    {a.name}<br />
-                                                                    <span class="founder"> {a.designation} </span>
-                                                                </h3>
-                                                                <p class="elementor-image-box-description text-white">
-                                                                    {a.description}
+                                        {management.map((a) => (
+                                            <div className="col-md-4 pb-4">
+                                                <div className="elementor-widget-containers">
+                                                    <div className="elementor-image-box-wrapper">
+                                                        <figure className="elementor-image-box-img">
+                                                            <img src={a.image.fileURL} alt="" />
+                                                        </figure>
+                                                        <div className="elementor-image-box-content">
+                                                            <h3 class="elementor-image-box-title text-white text-center">
+                                                                {a.name}<br />
+                                                                <span class="founder"> {a.designation} </span>
+                                                            </h3>
+                                                            <p class="elementor-image-box-description text-white">
+                                                                {a.description}
 
-                                                                </p>
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>))}
+                                            </div>))}
 
-                                       {staff.map ((a)=>(
+                                        {staff.map((a) => (
 
-                                        <div className="col-md-4">
-                                            <div className="elementor-widget-containers">
-                                                <div className="elementor-image-box-wrapper">
-                                                    <figure className="elementor-image-box-img">
-                                                        <img src={a.image.fileURL}alt="" />
-                                                    </figure>
-                                                    <div className="elementor-image-box-content">
-                                                    <h3 class="elementor-image-box-title text-white text-center">
-                                                                    {a.name}<br />
-                                                                    <span class="founder"> {a.designation} </span>
-                                                                </h3>
+                                            <div className="col-md-4">
+                                                <div className="elementor-widget-containers">
+                                                    <div className="elementor-image-box-wrapper">
+                                                        <figure className="elementor-image-box-img">
+                                                            <img src={a.image.fileURL} alt="" />
+                                                        </figure>
+                                                        <div className="elementor-image-box-content">
+                                                            <h3 class="elementor-image-box-title text-white text-center">
+                                                                {a.name}<br />
+                                                                <span class="founder"> {a.designation} </span>
+                                                            </h3>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>))}
-                                        
+                                            </div>))}
+
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </section>
+                {/* <!-- projects  --> */}
+                <section>
+                    <div className="container-fluid bg-white">
+                        <div className="Partners">
+                            <h3 className="affiliated_partner bg-white">Key Govt. Project and Clients</h3>
+                            <div className="row">
+                                <div className="col-md-12">
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/brand3.png" alt="" />
+                                        </figure>
+                                    </div>
+                                    <div className="affilated_partner_image">
+                                        <figure>
+                                            <img src="/Assets/public_assets/images/brand4.png" alt="" />
+                                        </figure>
+                                    </div>
+                                </div>
 
+
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* <!-- trainig centers  --> */}
+                <section>
+                    <div className="container-fluid training-centres">
+                        <div className="text-center">
+                            <h3 className="section-title">Training Centres</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/Ghaziabad.jpg" alt="Ghaziabad" />
+                                    </figure>
+                                    <h4 className="centre-name">Ghaziabad</h4>
+                                </div>
+                            </div>
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/Hamirpur.jpg" alt="Hamirpur" />
+                                    </figure>
+                                    <h4 className="centre-name">Hamirpur</h4>
+                                </div>
+                            </div>
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/Shahpur.jpg" alt="Shahpur" />
+                                    </figure>
+                                    <h4 className="centre-name">Shahpur</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                {/* <!-- mobilization  --> */}
+                <section>
+                    <div className="container-fluid training-centres">
+                        <div className="text-center">
+                            <h3 className="section-title">Mobilization</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-12">
+                                <div className="mobilization" id="mobilization">
+                                    <div className="slider_images">
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/MOBILIZATION-1.jpg"
+                                                className="d-block w-100"
+                                                alt="video1"
+                                            />
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/MOBILIZATION-3.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/MOBILIZATION-4.png"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/MOBILIZATION-5.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/MOBILIZATION-6.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/MOBILIZATION-7.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/MOBILIZATION-8.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* <!-- hostel --> */}
+                <section className="bg-white">
+                    <div className="container-fluid">
+                        <div className="text-center">
+                            <h3 className="section-title">Hostel Facilities</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-12">
+                                <div className="mobilization" id="hostel">
+                                    <div className="slider_images">
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/hOSTEL-FACILITIES-2.jpg"
+                                                className="d-block w-100"
+                                                alt="Hostel Facility 1"
+                                            />
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/hOSTEL-FACILITIES.jpg"
+                                                className="d-block w-100"
+                                                alt="Hostel Facility 2"
+                                            />
+                                        </div>
+                                        {/* <!-- <div>
+                                        <img
+                                            src="public_assets/images/hOSTEL-FACILITIES-2.jpg"
+                                            className="d-block w-100"
+                                            alt="Hostel Facility 3"
+                                        />
+                                    </div> --> */}
+                                        {/* <!-- <div>
+                                        <img
+                                            src="public_assets/images/hOSTEL-FACILITIES-2.jpg"
+                                            className="d-block w-100"
+                                            alt="Hostel Facility 1"
+                                        />
+                                    </div> --> */}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* <!-- Training Facilities --> */}
+                <section className="bg-white">
+                    <div className="container-fluid">
+                        <div className="text-center">
+                            <h3 className="section-title">Training Facilities</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-12">
+                                <div className="mobilization" id="trainings">
+                                    <div className="slider_images">
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/TRAINING-FACILITIES-1.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/TRAINING-FACILITIES-3.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div>
+
+                                            <img
+                                                src="/Assets/public_assets/images/TRAINING-FACILITIES-2-1.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+
+                                        </div>
+                                        <div>
+                                            <img
+                                                src="/Assets/public_assets/images/TRAINING-FACILITIES-3.jpg"
+                                                className="d-block w-100"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* <!-- Placement --> */}
+                <section>
+                    <div className="container-fluid training-centres">
+                        <div className="text-center">
+                            <h3 className="section-title">Placement and Entrepreneurship</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-10">
+                                <div className="mobilization" id="Placement">
+                                    <div className="slider_images">
+                                        <div className="place">
+                                            <img
+                                                src="/Assets/public_assets/images/placement-pic-2.jpg"
+                                                className="d-block w-75"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div className="place">
+                                            <img
+                                                src="/Assets/public_assets/images/placement-pic-3.jpg"
+                                                className="d-block w-75"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                        <div className="place">
+                                            <img
+                                                src="/Assets/public_assets/images/placement-pic-4.jpg"
+                                                className="d-block w-75"
+                                                alt="video3"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* <!-- Media Coverage  --> */}
+                <section>
+                    <div className="container-fluid training-centres">
+                        <div className="text-center">
+                            <h3 className="section-title text-white">Media Coverage</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/NEWSPAPER2.png" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/NEWSPAPER3.png" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/NEWSPAPER4.png" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/NEWSPAPER5.png" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/NEWSPAPER6.png" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-4 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/NEWSPAPER7.png" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* <!-- Extra curricular Activity  --> */}
+                <section className="bg-white">
+                    <div className="container-fluid">
+                        <div className="text-center">
+                            <h3 className="section-title">Extra Curricular Activity</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-3 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/ACTIVITIES-4.jpg" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-3 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/ACTIVITIES-2.jpg" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-3 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/ACTIVITIES-1.jpg" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-3 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/ACTIVITIES-3.jpg" alt="" />
+                                    </figure>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* <!-- Project Launches  --> */}
+                <section className="bg-white">
+                    <div className="container-fluid">
+                        <div className="text-center">
+                            <h3 className="section-title">Project Launches</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-6 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/DSC_5654.jpg" alt="" />
+                                    </figure>
+                                    <h4 className="centre-name">
+                                        Inauguration of Focal Skill Training Center at Bhagat Phool Singh
+                                        Women University
+                                    </h4>
+                                </div>
+                            </div>
+                            <div className="col-md-6 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/Untitled-design.png" alt="" />
+                                    </figure>
+                                    <h4 className="centre-name">
+                                        Inauguration of Focal Skill Training Center at Manesar, Haryana
+                                    </h4>
+                                </div>
+                            </div>
+                            <div className="col-md-6 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/Untitled-design-2.png" alt="" />
+                                    </figure>
+                                    <h4 className="centre-name">
+                                        Inauguration and Launch of 18 Skill Van RPL Project at Lucknow,
+                                        Uttar Pradesh
+                                    </h4>
+                                </div>
+                            </div>
+                            <div className="col-md-6 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/Untitled-design-3.png" alt="" />
+                                    </figure>
+                                    <h4 className="centre-name">
+                                        E-Waste Art Sculpture Inauguration Ceremony with Panasonic (Harit
+                                        Umang)
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* <!-- Awards and Recognition  --> */}
+                <section>
+                    <div className="container-fluid training-centres">
+                        <div className="text-center">
+                            <h3 className="section-title">Awards and Recognition</h3>
+                        </div>
+                        <div className="row justify-content-center">
+                            <div className="col-md-3 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/AWARD-5.png" alt="Ghaziabad" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-3 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/AWARD-2.png" alt="Hamirpur" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-3 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/AWARD-4.png" alt="Shahpur" />
+                                    </figure>
+                                </div>
+                            </div>
+                            <div className="col-md-3 col-sm-6 mb-4">
+                                <div className="centre-card">
+                                    <figure>
+                                        <img src="/Assets/public_assets/images/AWARD-3.png" alt="Shahpur" />
+                                    </figure>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <style>
+                    {
+                        `
+                        .place{
+                        display:flex!important;
+                        align-items:center;
+                        justify-content:center
+                        }
+                        `
+                    }
+                </style>
 
             </FrontLayout>
         </>

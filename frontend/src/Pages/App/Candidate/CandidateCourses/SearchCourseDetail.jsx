@@ -1041,74 +1041,56 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                   </h5>
                   <p>You need to complete your profile details to apply for this course.</p>
                 </div>
-               
-                {/* <div className="form-group">
-        <select className="form-control" value={gender} onChange={(e) => setGender(e.target.value)}>
+               <div className="row">
+
+              
+                 <div className="form-group mb-2">
+        <select className="form-control" value="" >
           <option value="">Your Gender / आपका लिंग</option>
           <option value="Male">Male</option>
           <option value="Female">Female</option>
         </select>
       </div>
-      <div className="form-group">
-        <input type="date" className="form-control" value={dob} onChange={(e) => setDob(e.target.value)} placeholder="Date of Birth / जन्म तिथि" />
+      <div className="form-group  mb-2">
+        <input type="date" className="form-control" value=""  placeholder="Date of Birth / जन्म तिथि" />
       </div>
-      <div className="form-group">
-        <select className="form-control" value={experience} onChange={(e) => setExperience(e.target.value)}>
+      <div className="form-group mb-2">
+        <select className="form-control" value="" >
           <option value="">Experience / अनुभव</option>
           <option value="0">Fresher</option>
-          {[...Array(15)].map((_, i) => (
-            <option key={i + 1} value={i + 1}>{i + 1}</option>
-          ))}
+          
         </select>
       </div>
-      <div className="form-group">
-        <select className="form-control" value={highestQualification} onChange={(e) => setHighestQualification(e.target.value)}>
+      <div className="form-group mb-2">
+        <select className="form-control" value="" >
           <option value="">Highest Qualification / उच्चतम योग्यता</option>
-          {highestQualification.map((qual) => (
-            <option key={qual._id} value={qual._id}>{qual.name}</option>
-          ))}
+          
         </select>
       </div>
-      <div className="form-group">
-        <select className="form-control" value={state} onChange={(e) => {
-          setState(e.target.value);
-          // fetchCity(e.target.value); 
-        }}>
+      <div className="form-group mb-2">
+        <select className="form-control" value="" >
           <option value="">Current State / वर्तमान राज्य</option>
-          {state.map((s) => (
-            <option key={s._id} value={s._id}>{s.name}</option>
-          ))}
+        
         </select>
       </div>
-      <div className="form-group">
-        <select className="form-control" value={city} onChange={(e) => setCity(e.target.value)}>
+      <div className="form-group mb-2">
+        <select className="form-control" value="">
           <option value="">Current City / वर्तमान शहर</option>
-          {city.map((c) => (
-            <option key={c._id} value={c._id}>{c.name}</option>
-          ))}
-        </select>
+         </select>
       </div>
-      <div className="form-group">
-        <input type="number" className="form-control" value={pincode} onChange={(e) => setPincode(e.target.value)} placeholder="Pincode / पिनकोड" />
+      <div className="form-group mb-2">
+        <input type="number" className="form-control" value="" placeholder="Pincode / पिनकोड" />
       </div>
-      <div className="form-group">
-        <input type="text" className="form-control" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Your Location / वर्तमान स्थान" />
-        <input type="hidden" value={latitude} />
-        <input type="hidden" value={longitude} />
+      <div className="form-group mb-2">
+        <input type="text" className="form-control" value="" placeholder="Your Location / वर्तमान स्थान" />
+        <input type="hidden" value="" />
+        <input type="hidden" value="" />
       </div>
-
+      </div>
       <div className="modal-footer">
-      <button className="btn btn-primary" onClick={handleProfileSubmit}>Update and Apply</button>
-    </div> */}
-                <div className="modal-footer">
-                  <button 
-                    type="button" 
-                    className="btn btn-primary" 
-                    onClick={() => navigate('/candidate/profile')}
-                  >
-                    Go to Profile
-                  </button>
-                </div>
+      <button className="btn btn-primary" onClick="">Update and Apply</button>
+    </div> 
+                
               </div>
             )}
           </div>

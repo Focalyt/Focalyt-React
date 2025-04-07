@@ -87,20 +87,46 @@ const TechnologySlider = () => {
               <div key={index} className="slide-wrapper">
                 <div className="technology-slide">
                   <div className="image-container">
+                    <a href="https://app.focalyt.com/candidate/login">
                     <img
                       src={item.image}
                       alt={item.title}
                       className="tech-icon"
                     />
+                    <h5 className="tech-title">{item.title}</h5>
+                    </a>
+                   
                   </div>
-                  <h5 className="tech-title">{item.title}</h5>
+                  
                 </div>
               </div>
             ))}
           </Slider>
         </div>
       </div>
+      <style>
+      {
+        `
+        .image-container a{
+        display: flex;
+        justify-content: center;
+        align-items:center;
+        flex-direction:column;
+        gap:10px;
+        outline:none;
+        text-decoration:none;
+        }
+        .image-container a:focus{
+        outline:none;
+        }
+        .image-container a:active{
+        outline:none;
+        }
+        `
+      }
+    </style>
     </div>
+    
   );
 };
 
