@@ -145,33 +145,39 @@ function CandidateHeader() {
                   </li>
                 </ul>
               </div>
-              <ul className="nav navbar-nav float-right">
+              <ul className="nav navbar-nav float-right" style={{ gap: "10px" }}>
+                <div class="bell my-auto">
+                  <a href="/candidate/notifications"><i class="fa-solid fa-bell " style={{ color: "#fff", fontSize: "22px" }}></i>
+                    <span class="badge text-bg-secondary" id="notification"></span></a>
+                </div>
                 <li className="dropdown dropdown-user nav-item" id="logout-block">
-                  <a className="dropdown-toggle nav-link dropdown-user-link" onClick={() => setIsLogoutOpen(!isLogoutOpen)} >
+                  <a className="dropdown-toggle nav-link dropdown-user-link" onClick={() => setIsLogoutOpen(!isLogoutOpen)} style={{ gap: "15px" }}>
                     <div className="user-nav d-sm-flex d-flex flex-column">
                       {/* <span className="user-name text-bold-600 text-white">{userName}</span> */}
                       <span className="user-name text-bold-600 text-white">{user.name}</span>
                       <span className="text-white">Coins: <strong>{userCredit}</strong></span>
                     </div>
                     <span className="text-center pl-1" >
-                      <img id="profile-visibility-status" src={profileVisibility ? "/Assets/images/norconfirm.png" : "/Assets/images/confirm.png"} alt="profile-status" className="img-fluid"/>
+                      <img id="profile-visibility-status" src={profileVisibility ? "/Assets/images/norconfirm.png" : "/Assets/images/confirm.png"} alt="profile-status" className="img-fluid" />
                     </span>
                   </a>
-                 {isLogoutOpen &&(
-                    <div className="" style={{width:"100%", position:"absolute", background:"#fff",top: "70px",
-    borderRadius: "6px"}}>
+                  {isLogoutOpen && (
+                    <div className="dropdownProfile" style={{
+                      width: "100%", position: "absolute", background: "#fff", top: "70px",
+                      borderRadius: "6px"
+                    }}>
                       <a className="dropdown-item" href="/candidate/myProfile">
-                      <i class="fa-thin fa-user"></i> Edit Profile
+                        <i class="fa-thin fa-user"></i> Edit Profile
                       </a>
                       <a className="dropdown-item" href="/candidate/myProfile">
-                      <i class="feather icon-user"></i>  Show Profile
+                        <i class="feather icon-user"></i>  Show Profile
                       </a>
                       <div className="dropdown-divider"></div>
                       <a className="dropdown-item" onClick={handleLogout}>
                         <i className="feather icon-power"></i> Logout
                       </a>
                     </div>
-                 )}
+                  )}
                 </li>
               </ul>
             </div>
@@ -179,7 +185,7 @@ function CandidateHeader() {
         </div>
       </nav>
 
-    
+
       {isProfileModalOpen && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
@@ -201,18 +207,18 @@ function CandidateHeader() {
           </div>
         </div>
       )}
-<style>
-  {
-    `
+      <style>
+        {
+          `
     .dropdown-divider {
     height: 0;
     margin: 0.5rem 0;
     overflow: hidden;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
 }`
-  }
-</style>
-     
+        }
+      </style>
+
       <script src="https://kit.fontawesome.com/9f033fe1e6.js" crossOrigin="anonymous"></script>
     </>
   );

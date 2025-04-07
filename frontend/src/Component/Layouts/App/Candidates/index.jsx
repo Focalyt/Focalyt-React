@@ -284,7 +284,7 @@ function CandidateLayout({ children }) {
           </div>
         </div>
 
-        <div className="flex-1">
+        {/* <div className="flex-1">
 
           <div className="app-content content basic-timeline">
             <CandidateHeader />
@@ -292,7 +292,23 @@ function CandidateLayout({ children }) {
             <CandidateFooter />
 
           </div>
-        </div>
+        </div> */}
+        
+            <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static"
+            data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" id="inner_job_page">
+
+            <div className="app-content content">
+              <div className="content-overlay"></div>
+              <div className="header-navbar-shadow"></div>
+              <CandidateHeader />
+              <div className="content-wrapper">
+                <div className="content-body mb-4">
+                <Outlet />
+                </div>
+            <CandidateFooter />
+              </div>
+            </div>
+          </div>
       </main>
       <style>
         {`

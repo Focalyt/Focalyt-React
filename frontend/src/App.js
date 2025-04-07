@@ -36,7 +36,8 @@ import SocialImpact from './Pages/Front/SocialImpact/SocialImpact';
 import StuLabs from './Pages/Front/Labs/StuLabs';
 import Event from './Pages/Front/Event/Event';
 import AdminLayout from './Component/Layouts/Admin';
-import CandidateLogin from './Pages/App/Candidate/CandidateLogin/CandidateLogin'
+import CandidateLogin from './Pages/App/Candidate/CandidateLogin/CandidateLogin';
+import CandidateViewJobs from './Pages/App/Candidate/CandidatesJobs/CandidateViewJobs';
 const Layout = () => {
   const location = useLocation();
 
@@ -81,6 +82,7 @@ const Layout = () => {
           <Route path='InterestedCompanies' element={<Shortlisting />} />
           {/* <Route path="course" element={<CourseDetail/>}/> */}
           <Route path="course/:courseId" element={<SearchCourseDetail />} />
+          <Route path="job/:JobId" element={<CandidateViewJobs/>}/>
         </Route>
         <Route path='/admin' element ={<AdminLayout/>}>
         

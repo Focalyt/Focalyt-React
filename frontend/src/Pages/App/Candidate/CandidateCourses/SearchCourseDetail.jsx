@@ -12,6 +12,19 @@ const CourseDetails = () => {
   const [isApplied, setIsApplied] = useState(false);
   const [canApply, setCanApply] = useState(true);
   const [mobileNumber, setMobileNumber] = useState('');
+  const [showProfileForm, setShowProfileForm] = useState(false);
+
+  // const [gender, setGender] = useState('');
+  // const [dob, setDob] = useState('');
+  // const [experience, setExperience] = useState('');
+  // const [highestQualification, setHighestQualification] = useState('');
+  // const [state, setState] = useState('');
+  // const [city, setCity] = useState('');
+  // const [pincode, setPincode] = useState('');
+  // const [location, setLocation] = useState('');
+  // const [latitude, setLatitude] = useState('');
+  // const [longitude, setLongitude] = useState('');
+
   const videoRef = useRef(null);
   const navigate = useNavigate();
 
@@ -198,16 +211,40 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     div.innerHTML = html;
     return div.textContent || div.innerText || "";
   };
+  // const handleProfileSubmit = async () => {
+  //   const profileData = {
+  //     highestQualification,
+  //     personalInfo: {
+  //       sex: gender,
+  //       state,
+  //       city,
+  //       pincode,
+  //       longitude,
+  //       latitude,
+  //       dob
+  //     },
+  //     totalExperience: experience,
+  //     isExperienced: experience == 0 ? false : true
+  //   };
+  
+  //   try {
+  //     await axios.post(`${backendUrl}/candidate/myprofile`, profileData, {
+  //       headers: { 'x-auth': localStorage.getItem('token') }
+  //     });
+  
+  //     await axios.post(`${backendUrl}/candidate/course/${course._id}/apply`, {}, {
+  //       headers: { 'x-auth': localStorage.getItem('token') }
+  //     });
+  
+  //     window.location.reload();
+  //   } catch (err) {
+  //     console.error("Profile update or apply failed:", err);
+  //   }
+  // };
   
   return (
-    <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" 
-      data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" id="inner_job_page">
-      
-      <div className="">
-        <div className="content-overlay"></div>
-        <div className="header-navbar-shadow"></div>
-        <div className="content-wrapper">
-        
+      <>
+       
         <section className="ml-3">
           <div className="container-fluid px-1">
             <div className="card">
@@ -1004,6 +1041,65 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                   </h5>
                   <p>You need to complete your profile details to apply for this course.</p>
                 </div>
+               
+                {/* <div className="form-group">
+        <select className="form-control" value={gender} onChange={(e) => setGender(e.target.value)}>
+          <option value="">Your Gender / आपका लिंग</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
+      </div>
+      <div className="form-group">
+        <input type="date" className="form-control" value={dob} onChange={(e) => setDob(e.target.value)} placeholder="Date of Birth / जन्म तिथि" />
+      </div>
+      <div className="form-group">
+        <select className="form-control" value={experience} onChange={(e) => setExperience(e.target.value)}>
+          <option value="">Experience / अनुभव</option>
+          <option value="0">Fresher</option>
+          {[...Array(15)].map((_, i) => (
+            <option key={i + 1} value={i + 1}>{i + 1}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-group">
+        <select className="form-control" value={highestQualification} onChange={(e) => setHighestQualification(e.target.value)}>
+          <option value="">Highest Qualification / उच्चतम योग्यता</option>
+          {highestQualification.map((qual) => (
+            <option key={qual._id} value={qual._id}>{qual.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-group">
+        <select className="form-control" value={state} onChange={(e) => {
+          setState(e.target.value);
+          // fetchCity(e.target.value); 
+        }}>
+          <option value="">Current State / वर्तमान राज्य</option>
+          {state.map((s) => (
+            <option key={s._id} value={s._id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-group">
+        <select className="form-control" value={city} onChange={(e) => setCity(e.target.value)}>
+          <option value="">Current City / वर्तमान शहर</option>
+          {city.map((c) => (
+            <option key={c._id} value={c._id}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-group">
+        <input type="number" className="form-control" value={pincode} onChange={(e) => setPincode(e.target.value)} placeholder="Pincode / पिनकोड" />
+      </div>
+      <div className="form-group">
+        <input type="text" className="form-control" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Your Location / वर्तमान स्थान" />
+        <input type="hidden" value={latitude} />
+        <input type="hidden" value={longitude} />
+      </div>
+
+      <div className="modal-footer">
+      <button className="btn btn-primary" onClick={handleProfileSubmit}>Update and Apply</button>
+    </div> */}
                 <div className="modal-footer">
                   <button 
                     type="button" 
@@ -1083,9 +1179,9 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
             </div>
           </div>
         </div>
-        </div>
-      </div>
-    </div>
+        
+      
+    </>
   );
 };
 

@@ -927,9 +927,6 @@ const [user, setUser] = useState({});
     <div className="">
       {preloaderVisible && <div id="preloader"></div>}
       
-      <div className="content-overlay"></div>
-      <div className="header-navbar-shadow"></div>
-      <div className="content-wrapper">
         <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
           <div className="content-header-left col-md-9 col-12 mb-2">
             <div className="row breadcrumbs-top">
@@ -1809,9 +1806,8 @@ const [user, setUser] = useState({});
             </div>
           </section>
         </div>
-      </div>
+          
       
-      {/* Cashback Modal */}
       {cashbackModal.visible && (
         <div className="modal fade show" id="cashbackmodal" tabIndex="-1" role="dialog" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered" role="document">
@@ -1871,7 +1867,7 @@ const [user, setUser] = useState({});
           </div>
         </div>
       )}
-    </div>
+     </div>
   );
 };
 

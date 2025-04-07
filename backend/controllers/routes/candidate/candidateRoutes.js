@@ -688,305 +688,477 @@ router.get("/login", async (req, res) => {
   }
   return res.render(`${req.vPath}/app/candidate/login`, { apikey: process.env.AUTH_KEY_GOOGLE, storageScript: storageScript });
 });
-router.get("/searchjob", [isCandidate], async (req, res) => {
-  const data = req.query;
-  let validation = { mobile: req.session.user.mobile }
-  let { value, error } = await CandidateValidators.userMobile(validation)
-  if (error) {
-    console.log(error)
-    return res.send({ status: "failure", error: "Something went wrong!", error });
-  }
-  const candidate = await Candidate.findOne({
-    mobile: value.mobile,
-  });
-  const candidateLat = Number(candidate.latitude);
-  const candidateLong = Number(candidate.longitude);
-  let {
-    qualification,
-    experience,
-    industry,
-    state,
-    jobType,
-    minSalary,
-    techSkills,
-    name,
-    distance
-  } = req.query;
+// router.get("/searchjob", [isCandidate], async (req, res) => {
+//   const data = req.query;
+//   let validation = { mobile: req.session.user.mobile }
+//   let { value, error } = await CandidateValidators.userMobile(validation)
+//   if (error) {
+//     console.log(error)
+//     return res.send({ status: "failure", error: "Something went wrong!", error });
+//   }
+//   const candidate = await Candidate.findOne({
+//     mobile: value.mobile,
+//   });
+//   const candidateLat = Number(candidate.latitude);
+//   const candidateLong = Number(candidate.longitude);
+//   let {
+//     qualification,
+//     experience,
+//     industry,
+//     state,
+//     jobType,
+//     minSalary,
+//     techSkills,
+//     name,
+//     distance
+//   } = req.query;
 
-  let filter = { status: true, validity: { $gte: new Date() }, verified: true };
-  if (qualification) {
-    filter['_qualification'] = new mongoose.Types.ObjectId(`${qualification}`)
-  }
-  if (industry) {
-    filter._industry = new mongoose.Types.ObjectId(`${industry}`);
-  }
-  if (state) {
-    filter['state.0._id'] = new mongoose.Types.ObjectId(`${state}`);
-  }
-  if (jobType) {
-    filter.jobType = jobType;
-  }
-  if (experience) {
-    experience = +(experience)
-    experience == "0"
-      ? (filter["$or"] = [{ experience: { $lte: experience } }])
-      : (filter["experience"] = { $lte: experience });
-  }
-  if (techSkills) {
-    filter._techSkills = new mongoose.Types.ObjectId(`${techSkills}`);
-  }
-  if (minSalary) {
-    filter["$or"] = [
-      { isFixed: true, amount: { $gte: minSalary } },
-      { isFixed: false, min: { $gte: minSalary } },
+//   let filter = { status: true, validity: { $gte: new Date() }, verified: true };
+//   if (qualification) {
+//     filter['_qualification'] = new mongoose.Types.ObjectId(`${qualification}`)
+//   }
+//   if (industry) {
+//     filter._industry = new mongoose.Types.ObjectId(`${industry}`);
+//   }
+//   if (state) {
+//     filter['state.0._id'] = new mongoose.Types.ObjectId(`${state}`);
+//   }
+//   if (jobType) {
+//     filter.jobType = jobType;
+//   }
+//   if (experience) {
+//     experience = +(experience)
+//     experience == "0"
+//       ? (filter["$or"] = [{ experience: { $lte: experience } }])
+//       : (filter["experience"] = { $lte: experience });
+//   }
+//   if (techSkills) {
+//     filter._techSkills = new mongoose.Types.ObjectId(`${techSkills}`);
+//   }
+//   if (minSalary) {
+//     filter["$or"] = [
+//       { isFixed: true, amount: { $gte: minSalary } },
+//       { isFixed: false, min: { $gte: minSalary } },
+//     ];
+//   }
+//   if (name) {
+//     filter["$or"] = [
+//       { 'displayCompanyName': { "$regex": name, "$options": "i" } },
+//       { 'company.0.name': { "$regex": name, "$options": "i" } }
+//     ]
+//   }
+
+//   const allQualification = await Qualification.find({ status: true }).sort({
+//     basic: -1,
+//   });
+//   const allIndustry = await Industry.find({ status: true });
+//   const allStates = await State.find({
+//     countryId: "101",
+//     status: { $ne: false },
+//   });
+//   const perPage = 10;
+//   const p = parseInt(req.query.page);
+//   const page = p || 1;
+
+//   let jobDistance = Infinity
+
+//   if (distance && distance != 'all' && distance != '0') {
+//     jobDistance = Number(distance) * 1000
+//   }
+
+//   const agg = [
+//     {
+//       '$geoNear': {
+//         near: { type: "Point", coordinates: [candidateLong, candidateLat] },
+//         distanceField: "distance",
+//         maxDistance: jobDistance,
+//         distanceMultiplier: 0.001
+//       }
+//     },
+//     {
+//       '$lookup': {
+//         from: 'companies',
+//         localField: '_company',
+//         foreignField: '_id',
+//         as: '_company'
+//       }
+//     },
+//     {
+//       '$match': {
+//         '_company.0.isDeleted': false,
+//         '_company.0.status': true,
+//         '_id': { "$nin": candidate.appliedJobs }
+//       }
+//     },
+//     {
+//       '$lookup': {
+//         from: 'qualifications',
+//         localField: '_qualification',
+//         foreignField: '_id',
+//         as: 'qualifications'
+//       }
+//     },
+//     {
+//       '$lookup': {
+//         from: 'industries',
+//         localField: '_industry',
+//         foreignField: '_id',
+//         as: 'industry'
+//       }
+//     },
+//     {
+//       '$lookup': {
+//         from: 'cities',
+//         localField: 'city',
+//         foreignField: '_id',
+//         as: 'city'
+//       }
+//     },
+//     {
+//       '$lookup': {
+//         from: 'states',
+//         localField: 'state',
+//         foreignField: '_id',
+//         as: 'state'
+//       }
+//     },
+//     {
+//       '$lookup': {
+//         from: 'skills',
+//         localField: '_techSkills',
+//         foreignField: '_id',
+//         as: '_techSkill'
+//       }
+//     },
+//     {
+//       '$lookup': {
+//         from: 'jobcategories',
+//         localField: '_jobCategory',
+//         foreignField: '_id',
+//         as: '_jobCategory'
+//       }
+//     },
+//     {
+//       '$lookup': {
+//         from: 'users',
+//         localField: '_company.0._concernPerson',
+//         foreignField: '_id',
+//         as: 'user'
+//       }
+//     },
+//     {
+//       '$match': filter
+//     },
+//     {
+//       '$sort': {
+//         'sequence': 1,
+//         'createdAt': -1
+//       }
+//     },
+//     {
+//       '$facet': {
+//         metadata: [{ '$count': "total" }],
+//         data: [{ $skip: perPage * page - perPage }, { $limit: perPage }]
+//       }
+//     }
+//   ]
+//   const allJobs = await Vacancy.aggregate(agg)
+//   let count = allJobs[0].metadata[0]?.total
+//   if (!count) {
+//     count = 0
+//   }
+
+//   const totalPages = Math.ceil(count / perPage);
+//   let jobs = allJobs[0].data
+//   // console.log(jobs[0])
+//   // jobs.forEach((item) => {
+//   //   if (item.latitude && item.longitude && candidateLat && candidateLong) {
+//   //     let distance = getDistanceFromLatLonInKm(
+//   //       { lat1: candidateLat, long1: candidateLong },
+//   //       { lat2: Number(item.latitude), long2: Number(item.longitude) }
+//   //     );
+//   //     item.distance = distance.toFixed(0);
+//   //   } else {
+//   //     let distance = 0;
+//   //     item.distance = distance;
+//   //   }
+//   // });
+//   let skills = await Skill.find({ status: true });
+//   res.render(`${req.vPath}/app/candidate/search-job`, {
+//     menu: "Jobs",
+//     jobs,
+//     allQualification,
+//     allIndustry,
+//     allStates,
+//     data,
+//     skills,
+//     totalPages,
+//     page
+//   });
+// });
+
+// router.get("/searchjob", [isCandidate], async (req, res) => {
+  router.get("/searchjob", async (req, res) => {
+    const data = req.query;
+    const perPage = 10;
+    const page = parseInt(req.query.page) || 1;
+  
+    let {
+      qualification,
+      experience,
+      industry,
+      state,
+      jobType,
+      minSalary,
+      techSkills,
+      name,
+    } = req.query;
+  
+    let filter = { status: true, validity: { $gte: new Date() }, verified: true };
+  
+    if (qualification) filter['_qualification'] = qualification;
+    if (industry) filter['_industry'] = industry;
+    if (state) filter['state.0._id'] = state;
+    if (jobType) filter['jobType'] = jobType;
+    if (experience) {
+      const exp = Number(experience);
+      if (exp === 0) {
+        filter['$or'] = [{ experience: { $lte: 0 } }];
+      } else {
+        filter['experience'] = { $lte: exp };
+      }
+    }
+    if (techSkills) filter['_techSkills'] = techSkills;
+    if (minSalary) {
+      filter['$or'] = [
+        { isFixed: true, amount: { $gte: minSalary } },
+        { isFixed: false, min: { $gte: minSalary } },
+      ];
+    }
+    if (name) {
+      filter['$or'] = [
+        { displayCompanyName: { $regex: name, $options: 'i' } },
+        { 'company.0.name': { $regex: name, $options: 'i' } }
+      ];
+    }
+  
+    const allQualification = await Qualification.find({ status: true }).sort({ basic: -1 });
+    const allIndustry = await Industry.find({ status: true });
+    const allStates = await State.find({ countryId: "101", status: { $ne: false } });
+    const skills = await Skill.find({ status: true });
+  
+    const jobs = await Vacancy.find(filter)
+      .populate("_company")
+      .populate("_qualification")
+      .populate("_industry")
+      .populate("city")
+      .populate("state")
+      .populate("_techSkills")
+      .populate("_jobCategory")
+      .sort({ sequence: 1, createdAt: -1 })
+      .skip(perPage * (page - 1))
+      .limit(perPage);
+  
+    const count = await Vacancy.countDocuments(filter);
+    const totalPages = Math.ceil(count / perPage);
+  
+    return res.json({
+      menu: "Jobs",
+      jobs,
+      allQualification,
+      allIndustry,
+      allStates,
+      data,
+      skills,
+      totalPages,
+      page
+    });
+  });
+
+  // router.get("/job/:jobId", [isCandidate], async (req, res) => {
+  router.get("/job/:jobId", async (req, res) => {
+    const jobId = req.params.jobId;
+    const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
+    // const userMobile = req.session.user.mobile;
+    // let validation = { mobile: userMobile }
+    // let { value, error } = await CandidateValidators.userMobile(validation)
+    // if (error) {
+    //   return res.send({ status: "failure", error: "Something went wrong!", error });
+    // }
+  
+    const perPage = 10;
+    const page = parseInt(req.query.page) || 1;
+    const populate = [
+      { path: "_qualification" },
+      { path: "_industry" },
+      { path: "city" },
+      { path: "state" },
+      { path: "_jobCategory" },
+      { path: "_company", populate: "_concernPerson" },
+      { path: "_techSkills" },
+      { path: "_nonTechSkills" },
     ];
-  }
-  if (name) {
-    filter["$or"] = [
-      { 'displayCompanyName': { "$regex": name, "$options": "i" } },
-      { 'company.0.name': { "$regex": name, "$options": "i" } }
-    ]
-  }
-
-  const allQualification = await Qualification.find({ status: true }).sort({
-    basic: -1,
-  });
-  const allIndustry = await Industry.find({ status: true });
-  const allStates = await State.find({
-    countryId: "101",
-    status: { $ne: false },
-  });
-  const perPage = 10;
-  const p = parseInt(req.query.page);
-  const page = p || 1;
-
-  let jobDistance = Infinity
-
-  if (distance && distance != 'all' && distance != '0') {
-    jobDistance = Number(distance) * 1000
-  }
-
-  const agg = [
-    {
-      '$geoNear': {
-        near: { type: "Point", coordinates: [candidateLong, candidateLat] },
-        distanceField: "distance",
-        maxDistance: jobDistance,
-        distanceMultiplier: 0.001
-      }
-    },
-    {
-      '$lookup': {
-        from: 'companies',
-        localField: '_company',
-        foreignField: '_id',
-        as: '_company'
-      }
-    },
-    {
-      '$match': {
-        '_company.0.isDeleted': false,
-        '_company.0.status': true,
-        '_id': { "$nin": candidate.appliedJobs }
-      }
-    },
-    {
-      '$lookup': {
-        from: 'qualifications',
-        localField: '_qualification',
-        foreignField: '_id',
-        as: 'qualifications'
-      }
-    },
-    {
-      '$lookup': {
-        from: 'industries',
-        localField: '_industry',
-        foreignField: '_id',
-        as: 'industry'
-      }
-    },
-    {
-      '$lookup': {
-        from: 'cities',
-        localField: 'city',
-        foreignField: '_id',
-        as: 'city'
-      }
-    },
-    {
-      '$lookup': {
-        from: 'states',
-        localField: 'state',
-        foreignField: '_id',
-        as: 'state'
-      }
-    },
-    {
-      '$lookup': {
-        from: 'skills',
-        localField: '_techSkills',
-        foreignField: '_id',
-        as: '_techSkill'
-      }
-    },
-    {
-      '$lookup': {
-        from: 'jobcategories',
-        localField: '_jobCategory',
-        foreignField: '_id',
-        as: '_jobCategory'
-      }
-    },
-    {
-      '$lookup': {
-        from: 'users',
-        localField: '_company.0._concernPerson',
-        foreignField: '_id',
-        as: 'user'
-      }
-    },
-    {
-      '$match': filter
-    },
-    {
-      '$sort': {
-        'sequence': 1,
-        'createdAt': -1
-      }
-    },
-    {
-      '$facet': {
-        metadata: [{ '$count': "total" }],
-        data: [{ $skip: perPage * page - perPage }, { $limit: perPage }]
-      }
+    const jobDetails = await Vacancy.findById(jobId).populate(populate);
+    if (jobDetails.status == false) {
+      return res.redirect("/candidate/searchJob");
     }
-  ]
-  const allJobs = await Vacancy.aggregate(agg)
-  let count = allJobs[0].metadata[0]?.total
-  if (!count) {
-    count = 0
-  }
-
-  const totalPages = Math.ceil(count / perPage);
-  let jobs = allJobs[0].data
-  // console.log(jobs[0])
-  // jobs.forEach((item) => {
-  //   if (item.latitude && item.longitude && candidateLat && candidateLong) {
-  //     let distance = getDistanceFromLatLonInKm(
-  //       { lat1: candidateLat, long1: candidateLong },
-  //       { lat2: Number(item.latitude), long2: Number(item.longitude) }
-  //     );
-  //     item.distance = distance.toFixed(0);
-  //   } else {
-  //     let distance = 0;
-  //     item.distance = distance;
-  //   }
-  // });
-  let skills = await Skill.find({ status: true });
-  res.render(`${req.vPath}/app/candidate/search-job`, {
-    menu: "Jobs",
-    jobs,
-    allQualification,
-    allIndustry,
-    allStates,
-    data,
-    skills,
-    totalPages,
-    page
-  });
-});
-router.get("/job/:jobId", [isCandidate], async (req, res) => {
-  const jobId = req.params.jobId;
-  const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
-  const userMobile = req.session.user.mobile;
-  let validation = { mobile: userMobile }
-  let { value, error } = await CandidateValidators.userMobile(validation)
-  if (error) {
-    return res.send({ status: "failure", error: "Something went wrong!", error });
-  }
-
-  const perPage = 10;
-  const page = parseInt(req.query.page) || 1;
-  const populate = [
-    { path: "_qualification" },
-    { path: "_industry" },
-    { path: "city" },
-    { path: "state" },
-    { path: "_jobCategory" },
-    { path: "_company", populate: "_concernPerson" },
-    { path: "_techSkills" },
-    { path: "_nonTechSkills" },
-  ];
-  const jobDetails = await Vacancy.findById(jobId).populate(populate);
-  if (jobDetails.status == false) {
-    return res.redirect("/candidate/searchJob");
-  }
-
-  const candidate = await Candidate.findOne({ mobile: userMobile });
-  let canApply = false;
-  if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
-    if (candidate.isExperienced == false || candidate.isExperienced == true) {
-      canApply = true;
-    }
-  }
-  let isRegisterInterview = false;
-  const checkJobRegister = await AppliedJobs.findOne({
-    _candidate: candidate._id,
-    _job: new mongoose.Types.ObjectId(jobId)
-  });
-  if (checkJobRegister && checkJobRegister?.isRegisterInterview) {
-    isRegisterInterview = true;
-  }
-  let isApplied = false;
-  if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
-    isApplied = true;
-  }
-  let hasCredit = true;
-  let coins = await CoinsAlgo.findOne({});
-  if (!candidate.creditLeft || candidate.creditLeft < coins.job) {
-    hasCredit = false;
-  }
-  let mobileNumber = jobDetails.phoneNumberof ? jobDetails.phoneNumberof : contact[0]?.mobile
-  let reviewed = await Review.findOne({ _job: jobId, _user: candidate._id });
-  let course = [];
-  const recomCo = await Vacancy.distinct('_courses.courseLevel', {
-    "_id": new mongoose.Types.ObjectId(jobId), "_courses.isRecommended": true
-  });
-  console.log(recomCo, "recomCorecomCorecomCorecomCo");
-  if (recomCo.length > 0) {
-    const fields = {
-      status: true,
-      isDeleted: false,
-      _id: {
-        $in: recomCo
-      }
-    };
-    // if (candidate?.appliedCourses.length > 0) {
-    //   fields._id = {
-    //     $nin: candidate.appliedCourses
+  
+    // const candidate = await Candidate.findOne({ mobile: userMobile });
+    // let canApply = false;
+    // if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
+    //   if (candidate.isExperienced == false || candidate.isExperienced == true) {
+    //     canApply = true;
     //   }
     // }
-    course = await Courses.find(fields).populate("sectors");
-  }
-
-  res.render(`${req.vPath}/app/candidate/view-job`, {
-    menu: "Jobs",
-    jobDetails,
-    candidate,
-    isApplied,
-    isRegisterInterview,
-    canApply,
-    hasCredit,
-    coins,
-    mobileNumber,
-    reviewed: reviewed ? true : false,
-    course,
-    // page,
-    // totalPages
+    let isRegisterInterview = false;
+    // const checkJobRegister = await AppliedJobs.findOne({
+    //   _candidate: candidate._id,
+    //   _job: new mongoose.Types.ObjectId(jobId)
+    // });
+    // if (checkJobRegister && checkJobRegister?.isRegisterInterview) {
+    //   isRegisterInterview = true;
+    // }
+    // let isApplied = false;
+    // if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
+    //   isApplied = true;
+    // }
+    // let hasCredit = true;
+    // let coins = await CoinsAlgo.findOne({});
+    // if (!candidate.creditLeft || candidate.creditLeft < coins.job) {
+    //   hasCredit = false;
+    // }
+    // let mobileNumber = jobDetails.phoneNumberof ? jobDetails.phoneNumberof : contact[0]?.mobile
+    // let reviewed = await Review.findOne({ _job: jobId, _user: candidate._id });
+    // let course = [];
+    // const recomCo = await Vacancy.distinct('_courses.courseLevel', {
+    //   "_id": new mongoose.Types.ObjectId(jobId), "_courses.isRecommended": true
+    // });
+    // console.log(recomCo, "recomCorecomCorecomCorecomCo");
+    // if (recomCo.length > 0) {
+    //   const fields = {
+    //     status: true,
+    //     isDeleted: false,
+    //     _id: {
+    //       $in: recomCo
+    //     }
+    //   };
+    //   // if (candidate?.appliedCourses.length > 0) {
+    //   //   fields._id = {
+    //   //     $nin: candidate.appliedCourses
+    //   //   }
+    //   // }
+    //   course = await Courses.find(fields).populate("sectors");
+    // }
+  
+    return res.json( {
+      menu: "Jobs",
+      jobDetails,
+      // candidate,
+      // isApplied,
+      // isRegisterInterview,
+      // canApply,
+      // hasCredit,
+      // coins,
+      // mobileNumber,
+      // reviewed: reviewed ? true : false,
+      // course,
+      // page,
+      // totalPages
+    });
+  
   });
 
-});
+// router.get("/job/:jobId", [isCandidate], async (req, res) => {
+//   const jobId = req.params.jobId;
+//   const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
+//   const userMobile = req.session.user.mobile;
+//   let validation = { mobile: userMobile }
+//   let { value, error } = await CandidateValidators.userMobile(validation)
+//   if (error) {
+//     return res.send({ status: "failure", error: "Something went wrong!", error });
+//   }
+
+//   const perPage = 10;
+//   const page = parseInt(req.query.page) || 1;
+//   const populate = [
+//     { path: "_qualification" },
+//     { path: "_industry" },
+//     { path: "city" },
+//     { path: "state" },
+//     { path: "_jobCategory" },
+//     { path: "_company", populate: "_concernPerson" },
+//     { path: "_techSkills" },
+//     { path: "_nonTechSkills" },
+//   ];
+//   const jobDetails = await Vacancy.findById(jobId).populate(populate);
+//   if (jobDetails.status == false) {
+//     return res.redirect("/candidate/searchJob");
+//   }
+
+//   const candidate = await Candidate.findOne({ mobile: userMobile });
+//   let canApply = false;
+//   if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
+//     if (candidate.isExperienced == false || candidate.isExperienced == true) {
+//       canApply = true;
+//     }
+//   }
+//   let isRegisterInterview = false;
+//   const checkJobRegister = await AppliedJobs.findOne({
+//     _candidate: candidate._id,
+//     _job: new mongoose.Types.ObjectId(jobId)
+//   });
+//   if (checkJobRegister && checkJobRegister?.isRegisterInterview) {
+//     isRegisterInterview = true;
+//   }
+//   let isApplied = false;
+//   if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
+//     isApplied = true;
+//   }
+//   let hasCredit = true;
+//   let coins = await CoinsAlgo.findOne({});
+//   if (!candidate.creditLeft || candidate.creditLeft < coins.job) {
+//     hasCredit = false;
+//   }
+//   let mobileNumber = jobDetails.phoneNumberof ? jobDetails.phoneNumberof : contact[0]?.mobile
+//   let reviewed = await Review.findOne({ _job: jobId, _user: candidate._id });
+//   let course = [];
+//   const recomCo = await Vacancy.distinct('_courses.courseLevel', {
+//     "_id": new mongoose.Types.ObjectId(jobId), "_courses.isRecommended": true
+//   });
+//   console.log(recomCo, "recomCorecomCorecomCorecomCo");
+//   if (recomCo.length > 0) {
+//     const fields = {
+//       status: true,
+//       isDeleted: false,
+//       _id: {
+//         $in: recomCo
+//       }
+//     };
+//     // if (candidate?.appliedCourses.length > 0) {
+//     //   fields._id = {
+//     //     $nin: candidate.appliedCourses
+//     //   }
+//     // }
+//     course = await Courses.find(fields).populate("sectors");
+//   }
+
+//   res.render(`${req.vPath}/app/candidate/view-job`, {
+//     menu: "Jobs",
+//     jobDetails,
+//     candidate,
+//     isApplied,
+//     isRegisterInterview,
+//     canApply,
+//     hasCredit,
+//     coins,
+//     mobileNumber,
+//     reviewed: reviewed ? true : false,
+//     course,
+//     // page,
+//     // totalPages
+//   });
+
+// });
 
 /* Document route */
 router.get("/document", [isCandidate], async (req, res) => {
@@ -2171,20 +2343,97 @@ router.get("/appliedJobs", [isCandidate], async (req, res) => {
   });
 });
 //register for interview 
-router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) => {
+// router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) => {
+//   let jobId = req.params.jobId;
+//   let validation = { mobile: req.session.user.mobile }
+//   let { value, error } = await CandidateValidators.userMobile(validation)
+//   if (error) {
+//     console.log(error)
+//     return res.send({ status: "failure", error: "Something went wrong!", error });
+//   }
+//   let candidateMobile = value.mobile;
+//   let vacancy = await Vacancy.findOne({ _id: jobId });
+//   if (!vacancy) {
+//     return res.send({ status: false, msg: "Vacancy not Found!" });
+//   }
+//   let candidate = await Candidate.findOne({ mobile: candidateMobile });
+//   let coins = await CoinsAlgo.findOne({});
+//   let coinsDeducted
+//   coinsDeducted = vacancy.applyReduction > 0 ? vacancy.applyReduction : coins.job
+//   if (!candidate.creditLeft || candidate.creditLeft < coinsDeducted) {
+//     req.flash("error", "You don't have sufficient coins to register for interview!");
+//     return res
+//       .status(200)
+//       .send({ status: false, msg: "Please Subscribe to Apply Now!" });
+//   } /* else if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
+//     req.flash("error", "Already registered for the interview");
+//     return res.send({ status: false, msg: "Already registered for the interview" });
+//   } */ else {
+//     let alreadyApplied = await AppliedJobs.findOne({
+//       _candidate: candidate._id,
+//       _job: jobId,
+//       isRegisterInterview: true
+//     });
+//     if (alreadyApplied) {
+//       req.flash("error", "Already Applied");
+//       return res.send({ status: false, msg: "Already Applied" });
+//     };
+//     await AppliedJobs.findOneAndUpdate({
+//       '_candidate': candidate._id,
+//       _job: jobId
+//     }, {
+//       $set: {
+//         isRegisterInterview: true
+//       }
+//     });
+//     let apply = await Candidate.findOneAndUpdate(
+//       { mobile: candidateMobile },
+//       {
+//         $addToSet: { appliedJobs: jobId, },
+//         $inc: { creditLeft: -coinsDeducted },
+//       },
+//       { new: true, upsert: true }
+//     );
+//     if (!apply) {
+//       req.flash("error", "Already failed");
+//       return res.status(400).send({ status: false, msg: "Applied Failed!" });
+//     }
+//     let companyDetails = await Company.findOne({ _id: vacancy._company })
+//     let notificationData = {
+//       title: 'Applied Jobs',
+//       message: `You have register for interview in ${vacancy.displayCompanyName ? vacancy.displayCompanyName : companyDetails.name} Keep register for interview to get a dream Job.__बधाई हो! आपने ${vacancy.displayCompanyName ? vacancy.displayCompanyName : companyDetails.name} में साक्षात्कार के लिए पंजीकृत किया है |`,
+//       _candidate: candidate._id,
+//       source: 'System'
+//     }
+//     await sendNotification(notificationData);
+//     let newData = {
+//       title: 'New Register',
+//       message: `${candidate.name} has recently registered for your interview for ${vacancy.title}`,
+//       _company: vacancy._company
+//       , source: 'System'
+//     }
+//     await sendNotification(newData)
+//     await checkCandidateCashBack(candidate)
+//     await candidateApplyCashBack(candidate)
+//   }
+//   res.status(200).send({ status: true, msg: "Success" });
+// });
+
+// router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) => {
+router.post("/job/:jobId/registerInterviews",  async (req, res) => {
   let jobId = req.params.jobId;
-  let validation = { mobile: req.session.user.mobile }
-  let { value, error } = await CandidateValidators.userMobile(validation)
-  if (error) {
-    console.log(error)
-    return res.send({ status: "failure", error: "Something went wrong!", error });
-  }
-  let candidateMobile = value.mobile;
-  let vacancy = await Vacancy.findOne({ _id: jobId });
-  if (!vacancy) {
-    return res.send({ status: false, msg: "Vacancy not Found!" });
-  }
-  let candidate = await Candidate.findOne({ mobile: candidateMobile });
+  // let validation = { mobile: req.session.user.mobile }
+  // let { value, error } = await CandidateValidators.userMobile(validation)
+  // if (error) {
+  //   console.log(error)
+  //   return res.send({ status: "failure", error: "Something went wrong!", error });
+  // }
+  // let candidateMobile = value.mobile;
+  // let vacancy = await Vacancy.findOne({ _id: jobId });
+  // if (!vacancy) {
+  //   return res.send({ status: false, msg: "Vacancy not Found!" });
+  // }
+  // let candidate = await Candidate.findOne({ mobile: candidateMobile });
   let coins = await CoinsAlgo.findOne({});
   let coinsDeducted
   coinsDeducted = vacancy.applyReduction > 0 ? vacancy.applyReduction : coins.job
@@ -2246,6 +2495,7 @@ router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) =>
   }
   res.status(200).send({ status: true, msg: "Success" });
 });
+
 //list of register for interview
 router.get("/registerInterviewsList", [isCandidate], async (req, res) => {
   try {

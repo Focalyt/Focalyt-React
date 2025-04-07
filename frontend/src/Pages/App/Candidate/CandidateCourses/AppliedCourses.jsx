@@ -30,15 +30,9 @@ const AppliedCourses = () => {
     fetchAppliedCourses();
   }, []);
 
-  return (
-    <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static pose-lead"
-      data-open="click" data-menu="vertical-menu-modern" data-col="2-columns">
-
-      
-      <div className="">
-        <div className="content-overlay"></div>
-        <div className="header-navbar-shadow"></div>
-        <div className="content-wrapper">
+  return ( 
+      <>
+       
           {/* Breadcrumbs header for desktop */}
           <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
             <div className="content-header-left col-md-9 col-12 mb-2">
@@ -207,8 +201,8 @@ const AppliedCourses = () => {
               </div>
               </div>
             </section>
-          </div>
-        </div>
+         
+      
 
         {/* Modal */}
         <div className="modal fade" id="popup" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-modal="true">
@@ -223,7 +217,7 @@ const AppliedCourses = () => {
             </div>
           </div>
         </div>
-      </div>
+        </>
     );
 };
 
