@@ -127,10 +127,7 @@ const LoanApplicationPage = () => {
   };
 
   return (
-    <div className="">
-      <div className="content-overlay"></div>
-      <div className="header-navbar-shadow"></div>
-      <div className="content-wrapper">
+    <>
         {/* Breadcrumb section */}
         <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
           <div className="content-header-left col-md-9 col-12 mb-2">
@@ -251,8 +248,8 @@ const LoanApplicationPage = () => {
             </section>
           </div>
         </div>
-      </div>
-    </div>
+      
+    </>
   );
 };
 

@@ -54,6 +54,7 @@
     margin-left: 0px;
     transition: 300ms;
     background: #fc2b5a;
+    border-radius: 7px;
 }
 
 .header-navbar .navbar-container .bookmark-wrapper ul.nav li > a.nav-link {
@@ -105,7 +106,9 @@
     color: #FFFFFF !important;
 }
 .navbar-collapse{
-    background-color: #FC2B5A;
+    /* background-color: #FC2B5A; */
+    height: 68px;
+    min-height: 4.5rem;
 }
 .dropdown-divider {
     height: 0;
@@ -113,7 +116,36 @@
     overflow: hidden;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
-
+span#notification {
+    position: relative;
+    right: 9px;
+    top: -10px;
+}
+.badge {
+    position: absolute;
+    top: 3px;
+    right: -10px;
+    background-color: #2d2d2d;
+    color: white;
+    font-size: 12px;
+    border-radius: 50%;
+    padding: 3px 6px;
+}
+ .dropdownProfile::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    right: 1.2rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    display: block;
+    background: #fff;
+    transform: rotate(45deg) translate(-7px);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    box-sizing: border-box;
+}
 @media (min-width: 992px) {
     .navbar-expand-lg .navbar-nav {
         flex-direction: row;

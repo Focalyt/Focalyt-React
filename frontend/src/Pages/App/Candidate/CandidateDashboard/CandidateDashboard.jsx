@@ -43,18 +43,8 @@ const CandidateDashboard = () => {
 
   return (<>
 
-   
-      {/* <div className="candidate-dashboard-sidebar">
-          <CandidateSidebar />
-        </div> */}
-
       <div className="">
-        <div className="content-overlay"></div>
-        <div className="header-navbar-shadow"></div>
-        <div className="content-wrapper">
-          <div className="content-header row">
-          </div>
-          <div className="content-body  mb-4">
+      
             <a href="/candidate/cashback">
               <div className="height-structure bannerCan">
                 <img src="/Assets/images/candidate-dashboardnew.jpg" alt="" />
@@ -240,16 +230,7 @@ const CandidateDashboard = () => {
             </section>
 
           </div>
-        </div>
-
-        {/* Send SMS Modal */}
-       
-
-      </div>
-
-
-
-
+      
    </>
 
   )

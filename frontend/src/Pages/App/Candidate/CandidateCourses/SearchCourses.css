@@ -119,6 +119,9 @@
   .course_spec .spe_icon {
     margin-right: 10px;
 }
+.video-fluid{
+    width: 100%;
+}
 
 @media screen and (max-width: 1261px) {
     .apply-thisjob {

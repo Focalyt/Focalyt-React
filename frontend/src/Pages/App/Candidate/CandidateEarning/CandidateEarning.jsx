@@ -132,13 +132,7 @@ const CandidateEarning = ({
   };
 
   return (
-    <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" 
-      data-open="click" data-menu="vertical-menu-modern" data-col="2-columns">
-      
-      <div className="">
-        <div className="content-overlay"></div>
-        <div className="header-navbar-shadow"></div>
-        <div className="content-wrapper">
+    <>
           <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
             <div className="content-header-left col-md-9 col-12 mb-2">
               <div className="row breadcrumbs-top">
@@ -322,8 +316,8 @@ const CandidateEarning = ({
               </div>
             </section>
           </div>
-        </div>
-      </div>
+        
+      
 
       {/* Cashback modal */}
       <div className="modal fade" id="redeemCashback" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle">
@@ -558,7 +552,7 @@ const CandidateEarning = ({
       </div>
 
     
-    </div>
+    </>
   );
 };
 

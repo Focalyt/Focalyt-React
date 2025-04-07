@@ -120,9 +120,7 @@ const CandidateDocumets = ({ candidate, documents }) => {
 
   return (
     <>
-      <div class="content-overlay"></div>
-      <div class="header-navbar-shadow"></div>
-      <div class="content-wrapper">
+     
         <div
           class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none"
         >
@@ -196,8 +194,7 @@ const CandidateDocumets = ({ candidate, documents }) => {
             </div>
           </section>
         </div>
-      </div>
-
+ 
 
 
     </>
