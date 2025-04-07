@@ -5,6 +5,8 @@ const { ObjectId } = Schema.Types;
 const { jwtSecret } = require("../../config");
 const { boolean } = require("joi");
 
+
+
 const candidateSchema = new Schema(
   {
     hiringStatus: [
@@ -36,7 +38,7 @@ const candidateSchema = new Schema(
         centerId: { type: ObjectId, ref: "Center" }, // Changed from type to courseId        
       }
     ],
-    
+
     docsForCourses: [
       {
         courseId: { type: ObjectId, ref: "courses" }, // Changed from type to courseId
@@ -46,8 +48,8 @@ const candidateSchema = new Schema(
             fileUrl: String,
             status: { type: String, enum: ["Pending", "Verified", "Rejected"], default: "Pending" }, // Verification Status
             reason: { type: String }, // Rejection ka reason
-            verifiedBy:{ type: ObjectId, ref: "User" },
-            verifiedDate:{ type: Date },
+            verifiedBy: { type: ObjectId, ref: "User" },
+            verifiedDate: { type: Date },
             uploadedAt: { type: Date, default: Date.now } // Upload Timestamp
           }
         ]
@@ -64,15 +66,23 @@ const candidateSchema = new Schema(
         Qualification: { type: ObjectId, ref: "Qualification" },
         College: String,
         collegePlace: String,
+
         location: {
           type: {
             type: String,
-            enum: ["Point"],
+            enum: ['Point'],
+            required: true
           },
           coordinates: {
             type: [Number],
+            required: true
           },
-        },
+          city: String,
+          state: String,
+          fullAddress: String
+
+        }
+        ,
         University: { type: ObjectId, ref: "University" },
         AssessmentType: String,
         PassingYear: String,
@@ -184,6 +194,9 @@ const candidateSchema = new Schema(
         type: [Number],
         default: [0, 0]
       },
+      city: String,
+      state: String,
+      fullAddress: String
     },
     upi: { type: String },
     referredBy: {

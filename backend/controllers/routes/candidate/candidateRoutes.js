@@ -152,7 +152,7 @@ class MetaConversionAPI {
 
   async trackCourseApplication(courseData, userData, metaParams) {
     try {
-       console.log(courseData, userData, metaParams)
+      console.log(courseData, userData, metaParams)
       const eventData = {
         data: [{
           event_name: 'Course Apply',
@@ -251,52 +251,52 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
       // If it's already an object
       entryUrl = req.body.entryUrl.url;
     }
-    
+
     console.log("Entry URL:", entryUrl);
 
     // Create URL object to parse parameters
     const urlObj = new URL(entryUrl);
     const params = urlObj.searchParams;
 
-     // Get fbclid from URL
-     const fbclid = params.get('fbclid');
-     console.log("fbclid:", fbclid);
-
-    
-     // Generate fbc from fbclid
-     let fbc = null;
-     if (fbclid) {
-       // Facebook click ID format: fb.1.{timestamp}.{fbclid}
-       fbc = `fb.1.${Date.now()}.${fbclid}`;
-     }
-
-     console.log("fbc:", fbc);
- 
-     // Get or generate fbp
-     let fbp = params.get('fbp');
-
-     if (!fbp) {
-       const timestamp = Date.now();
-       const random = Math.floor(Math.random() * 1000000000);
-       fbp = `fb.1.${timestamp}.${random}`;
-     }
-
-     console.log("fbp:", fbp);
+    // Get fbclid from URL
+    const fbclid = params.get('fbclid');
+    console.log("fbclid:", fbclid);
 
 
- 
-     const metaParams = {
-       fbc: fbc,
-       fbclid: fbclid || null, // Store original fbclid
-       fbp: fbp,
-       adId: params.get('ad_id') || null,
-       campaignId: params.get('campaign_id') || null,
-       adsetId: params.get('adset_id') || null,
-       utmSource: params.get('utm_source') || null,
-       utmMedium: params.get('utm_medium') || null,
-       utmCampaign: params.get('utm_campaign') || null
-     };
-   
+    // Generate fbc from fbclid
+    let fbc = null;
+    if (fbclid) {
+      // Facebook click ID format: fb.1.{timestamp}.{fbclid}
+      fbc = `fb.1.${Date.now()}.${fbclid}`;
+    }
+
+    console.log("fbc:", fbc);
+
+    // Get or generate fbp
+    let fbp = params.get('fbp');
+
+    if (!fbp) {
+      const timestamp = Date.now();
+      const random = Math.floor(Math.random() * 1000000000);
+      fbp = `fb.1.${timestamp}.${random}`;
+    }
+
+    console.log("fbp:", fbp);
+
+
+
+    const metaParams = {
+      fbc: fbc,
+      fbclid: fbclid || null, // Store original fbclid
+      fbp: fbp,
+      adId: params.get('ad_id') || null,
+      campaignId: params.get('campaign_id') || null,
+      adsetId: params.get('adset_id') || null,
+      utmSource: params.get('utm_source') || null,
+      utmMedium: params.get('utm_medium') || null,
+      utmCampaign: params.get('utm_campaign') || null
+    };
+
 
     // Get Meta parameters
     // const metaParams = getMetaParameters(req);
@@ -308,8 +308,8 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
     }
 
     const candidateMobile = value.mobile;
-    
-    
+
+
 
     // Fetch course and candidate
     const course = await Courses.findById(courseId);
@@ -343,7 +343,7 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
       _course: courseId
     }).save();
 
-    
+
     // Capitalize every word's first letter
     function capitalizeWords(str) {
       if (!str) return '';
@@ -535,8 +535,13 @@ router
 
         location: {
           type: "Point",
-          coordinates: [latitude, longitude]
-        }
+          coordinates: [latitude, longitude],
+          ...(formData.fullAddress && { fullAddress: formData.place }),
+          ...(formData.city && { city: formData.city }),
+          ...(formData.state && { state: formData.state })
+
+        },
+
       }
       console.log("Candidate Data", candidateBody)
       if (formData?.refCode && formData?.refCode !== '') {
@@ -627,10 +632,10 @@ router.get("/login", async (req, res) => {
   let user = req.session.user
   let { returnUrl } = req.query
 
-  
+
   const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
   console.log(fullUrl);
-  
+
   // Modify script to run after DOM is loaded and escape quotes properly
   const storageScript = `
     <script>
@@ -681,7 +686,7 @@ router.get("/login", async (req, res) => {
   else if (user && user.role == 3) {
     return res.redirect("/candidate/dashboard");
   }
-  return res.render(`${req.vPath}/app/candidate/login`, { apikey: process.env.AUTH_KEY_GOOGLE,storageScript: storageScript });
+  return res.render(`${req.vPath}/app/candidate/login`, { apikey: process.env.AUTH_KEY_GOOGLE, storageScript: storageScript });
 });
 router.get("/searchjob", [isCandidate], async (req, res) => {
   const data = req.query;
@@ -1138,10 +1143,10 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     const data = req.query;
 
     const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
-  console.log(fullUrl);
-  
-  // Modify script to run after DOM is loaded and escape quotes properly
-  const storageScript = `
+    console.log(fullUrl);
+
+    // Modify script to run after DOM is loaded and escape quotes properly
+    const storageScript = `
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         try {
@@ -1235,68 +1240,68 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
 });
 /* course by id*/
 // router.get("/course/:courseId/", [isCandidate], async (req, res) => {
-  router.get("/course/:courseId/", async (req, res) => {
-    try {
-      const { courseId } = req.params;
-      // const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 });
-      // const userMobile = req.session.user.mobile;
-  
-      // let validation = { mobile: userMobile };
-      // let { value, error } = CandidateValidators.userMobile(validation);
-      // if (error) {
-      //   return res.status(400).json({ status: false, message: "Invalid user" });
-      // }
-  
-      let course = await Courses.findById(courseId).populate('sectors').lean();
-      if (!course || course?.status === false) {
-        return res.status(404).json({ status: false, message: "Course not found" });
-      }
-  
-     // const candidate = await Candidate.findOne({ mobile: userMobile }).lean();
-  
-      let canApply = false;
-      // if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
-      //   if (candidate.isExperienced == false || candidate.isExperienced == true) {
-      //     canApply = true;
-      //   }
-      // }
-  
-      // let isApplied = false;
-      // if (candidate.appliedCourses && candidate.appliedCourses.length > 0) {
-      //   const [filteredCourses] = candidate.appliedCourses.filter(course => {
-      //     return courseId.includes(course);
-      //   });
-      //   if (filteredCourses) {
-      //     isApplied = true;
-      //     const assignedCourseData = await AppliedCourses.findOne({
-      //       _candidate: candidate._id,
-      //       _course: new mongoose.Types.ObjectId(courseId)
-      //     }).lean();
-  
-      //     course.registrationCharges = course.registrationCharges.replace(/,/g, '');
-      //     if (assignedCourseData) {
-      //       course.remarks = assignedCourseData.remarks;
-      //       course.assignDate = assignedCourseData.assignDate ? moment(assignedCourseData.assignDate).format('DD MMM YYYY') : "";
-      //       course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid';
-      //     }
-      //   }
-      // }
-  
-      // let mobileNumber = course.phoneNumberof ? course.phoneNumberof : contact[0]?.mobile;
-  
-      return res.json({
-        status: true,
-        course,
-        canApply,
-        
-      });
-  
-    } catch (err) {
-      console.error("API Error:", err);
-      return res.status(500).json({ status: false, message: "Internal server error" });
+router.get("/course/:courseId/", async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    // const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 });
+    // const userMobile = req.session.user.mobile;
+
+    // let validation = { mobile: userMobile };
+    // let { value, error } = CandidateValidators.userMobile(validation);
+    // if (error) {
+    //   return res.status(400).json({ status: false, message: "Invalid user" });
+    // }
+
+    let course = await Courses.findById(courseId).populate('sectors').lean();
+    if (!course || course?.status === false) {
+      return res.status(404).json({ status: false, message: "Course not found" });
     }
-  });
-  
+
+    // const candidate = await Candidate.findOne({ mobile: userMobile }).lean();
+
+    let canApply = false;
+    // if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
+    //   if (candidate.isExperienced == false || candidate.isExperienced == true) {
+    //     canApply = true;
+    //   }
+    // }
+
+    // let isApplied = false;
+    // if (candidate.appliedCourses && candidate.appliedCourses.length > 0) {
+    //   const [filteredCourses] = candidate.appliedCourses.filter(course => {
+    //     return courseId.includes(course);
+    //   });
+    //   if (filteredCourses) {
+    //     isApplied = true;
+    //     const assignedCourseData = await AppliedCourses.findOne({
+    //       _candidate: candidate._id,
+    //       _course: new mongoose.Types.ObjectId(courseId)
+    //     }).lean();
+
+    //     course.registrationCharges = course.registrationCharges.replace(/,/g, '');
+    //     if (assignedCourseData) {
+    //       course.remarks = assignedCourseData.remarks;
+    //       course.assignDate = assignedCourseData.assignDate ? moment(assignedCourseData.assignDate).format('DD MMM YYYY') : "";
+    //       course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid';
+    //     }
+    //   }
+    // }
+
+    // let mobileNumber = course.phoneNumberof ? course.phoneNumberof : contact[0]?.mobile;
+
+    return res.json({
+      status: true,
+      course,
+      canApply,
+
+    });
+
+  } catch (err) {
+    console.error("API Error:", err);
+    return res.status(500).json({ status: false, message: "Internal server error" });
+  }
+});
+
 /* course apply */
 // router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res) => {
 //   let courseId = req.params.courseId;
@@ -1568,8 +1573,10 @@ router
   .route("/myprofile")
   .get(isCandidate, async (req, res) => {
     try {
-      const menu = "myprofile";
-      let validation = { mobile: req.session.user.mobile }
+
+      console.log(req.user)
+
+      let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)
@@ -1631,8 +1638,8 @@ router
         type: "non technical",
         status: true,
       });
-      return res.render(`${req.vPath}/app/candidate/myProfile`, {
-        menu,
+      return res.json({
+        status: true,
         candidate,
         state,
         city,

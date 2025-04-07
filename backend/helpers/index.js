@@ -1,5 +1,7 @@
 const express = require("express");
 const axios = require("axios");
+const jwt = require('jsonwebtoken');
+
 const ObjectId = require("mongodb").ObjectID;
 const {verify}=require('jsonwebtoken')
 const {
@@ -127,7 +129,29 @@ module.exports.isCompany = async (req, res, next) => {
 module.exports.isCandidate = async (req, res, next) => {
   try {
     const error = req.ykError("You are not authorized");
-    const { user } = req.session;
+    let user = null;
+
+    // ✅ First check if user exists in session (for EJS SSR project)
+    if (req.session && req.session.user) {
+      user = req.session.user;
+    } else {
+      // ✅ Else check for token in headers (for React SPA project)
+      const token = req.header('x-auth');
+      if (!token) throw error;
+      console.log('Secret key',process.env.MIPIE_JWT_SECRET)
+
+      const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+      user = await User.findById(decoded.id);
+      console.log('user', user);
+      console.log('user', user);
+
+
+      // if (!user || user.role !== 3) throw error;
+
+      // ⚠️ Optional: attach user to req for further use
+      req.user = user;
+    }
+
     if (!user || user.role !== 3) throw error;
     return next();
   } catch (err) {
