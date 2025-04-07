@@ -15,6 +15,19 @@ function CandidateHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+   const [user, setUser] = useState({});
+    
+  
+  
+    useEffect(() => {
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        setUser(parsed);
+        console.log("user (after sessionStorage):", parsed); // ✅ Right place to log
+      }
+    }, []);
   
 
   // useEffect(() => {
@@ -61,9 +74,6 @@ function CandidateHeader() {
 
   const handleLogout = async () => {
     try {
-      await axios.get('/api/logout', {
-        headers: { 'x-auth': localStorage.getItem('token') },
-      });
       localStorage.clear();
       sessionStorage.clear();
       window.location.href = '/candidate/login';
@@ -140,7 +150,7 @@ function CandidateHeader() {
                   <a className="dropdown-toggle nav-link dropdown-user-link" onClick={() => setIsLogoutOpen(!isLogoutOpen)} >
                     <div className="user-nav d-sm-flex d-flex flex-column">
                       {/* <span className="user-name text-bold-600 text-white">{userName}</span> */}
-                      <span className="user-name text-bold-600 text-white">Akash gaurav</span>
+                      <span className="user-name text-bold-600 text-white">{user.name}</span>
                       <span className="text-white">Coins: <strong>{userCredit}</strong></span>
                     </div>
                     <span className="text-center pl-1" >

@@ -11,11 +11,28 @@ import { useLocation } from 'react-router-dom';
 
 
 const CandidateLogin = () => {
+    const urlLocation = useLocation();
+
+    const queryParams = new URLSearchParams(urlLocation.search);
+
+
+    const user = sessionStorage.getItem('user');
+    const returnUrl = queryParams.get('returnUrl');
+    const refCode = queryParams.get("refCode");
+    console.log('returnUrl', returnUrl)
+
+    
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [fullName, setFullName] = useState('');
     const [gender, setGender] = useState('');
+    const [address, setAddress] = useState('');
     const [city, setCity] = useState('');
+    const [state, setState] = useState('');
+    const [pincode, setPC] = useState('');
+    const [latitude, setLatitude] = useState('');
+    const [longitude, setLongitude] = useState('');
+
     const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
     const [isNewUser, setIsNewUser] = useState(false);
     const [showOtpField, setShowOtpField] = useState(false);
@@ -33,43 +50,87 @@ const CandidateLogin = () => {
     const generateOTPRef = useRef(null);
 
 
-    const urlLocation = useLocation();
-    const queryParams = new URLSearchParams(urlLocation.search);
-    const returnUrl = queryParams.get('returnUrl');
-    console.log('returnUrl',returnUrl)
+
+    if (user) {
+        if (returnUrl) {
+
+            window.location.href = returnUrl
+        }
+        else {
+            window.location.href = '/candidate/dashboard';
+        }
+    }
+   
 
     useEffect(() => {
-        const loadGooglePlaces = () => {
-            const options = {
-                componentRestrictions: { country: 'in' },
-                types: ['(cities)']
-            };
-            const autocomplete = new window.google.maps.places.Autocomplete(
-                document.getElementById('city-location'),
-                options
-            );
-            autocomplete.addListener('place_changed', function () {
-                const place = autocomplete.getPlace();
-                setLocation({
-                    place: place.name,
-                    lat: place.geometry.location.lat(),
-                    lng: place.geometry.location.lng()
+        if (!showExtraFields) return;
+
+        const waitForGoogle = () => {
+            if (window.google && window.google.maps && window.google.maps.places) {
+                const input = document.getElementById('address-location');
+                if (!input) {
+                    console.warn('Input not found yet');
+                    return;
+                }
+
+                const autocomplete = new window.google.maps.places.Autocomplete(input, {
+                    types: ['geocode'],
+                    componentRestrictions: { country: 'in' },
                 });
-                setCity(place.name);
-            });
+
+                autocomplete.addListener('place_changed', () => {
+                    const place = autocomplete.getPlace();
+
+                    if (!place || !place.geometry || !place.geometry.location) {
+                        console.warn('Invalid place data.');
+                        return;
+                    }
+
+                    const lat = place.geometry.location.lat();
+                    const lng = place.geometry.location.lng();
+
+                    let fullAddress = '';
+                    if (place.formatted_address) fullAddress = place.formatted_address;
+                    else if (place.name) fullAddress = place.name;
+                    else if (input.value) fullAddress = input.value;
+
+                    let city = '', state = '', pincode = '';
+
+                    if (Array.isArray(place.address_components)) {
+                        place.address_components.forEach((component) => {
+                            const types = component.types.join(',');
+                            if (types.includes("postal_code")) pincode = component.long_name;
+                            if (types.includes("locality")) city = component.long_name;
+                            if (types.includes("administrative_area_level_1")) state = component.long_name;
+                            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+                        });
+                    }
+
+                    setAddress(fullAddress);
+                    setCity(city);
+                    setState(state);
+                    setPC(pincode);
+                    setLatitude(lat);
+                    setLongitude(lng);
+                    setLocation({ place: place.name || '', lat, lng });
+                });
+            } else {
+                setTimeout(waitForGoogle, 100);
+            }
         };
 
-        if (window.google) {
-            loadGooglePlaces();
-        } else {
-            window.initMap = loadGooglePlaces;
-        }
-    }, []);
+        waitForGoogle();
+    }, [showExtraFields]); // ✅ only run when showExtraFields is true
+
+
+
+
 
     const validateMobile = () => {
         const phoneRegex = /^(\+91[\-\s]?)?[0]?(91)?[6789]\d{9}$/;
         return phoneRegex.test(mobileNumber);
     };
+    console.log('address', address)
 
     const handleGenerateOTP = async () => {
         if (!validateMobile()) {
@@ -154,26 +215,35 @@ const CandidateLogin = () => {
                 name: fullName,
                 mobile: mobileNumber,
                 sex: gender,
-                place: location.place,
-                latitude: location.lat,
-                longitude: location.lng
+                city,
+                state,
+                latitude,
+                longitude,
+                place: address
+
             };
+            if (refCode) {
+                body.refCode = refCode;
+            }
             try {
                 // const registerRes = await axios.post('/candidate/register', body);
                 const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
 
-                if (registerRes.data.status) {
+                if (registerRes.data.status === "success") {
                     const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                     // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                     if (loginRes.data.status) {
                         localStorage.setItem('candidate', loginRes.data.name);
-                        localStorage.setItem('token', loginRes.data.token);if(returnUrl){
+                        localStorage.setItem('token', loginRes.data.token);
+                        sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
+
+                        if (returnUrl) {
 
                             window.location.href = returnUrl
                         }
-                        else{
-                        window.location.href = '/candidate/dashboard';
-                       }
+                        else {
+                            window.location.href = '/candidate/dashboard';
+                        }
                     } else {
                         setErrorMessage('Login failed after registration');
                     }
@@ -191,35 +261,38 @@ const CandidateLogin = () => {
             try {
                 console.log('Verifing OTP')
                 // const verifyRes = await axios.post('/api/verifyOtp', { mobile: mobileNumber, otp });
-                const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
-                if (verifyRes.data.status) {
+                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
+                if (otpVerifyRes.data.status) {
                     // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                     const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                     if (loginRes.data.status) {
-                        console.log("loginRes.data", loginRes.data)
-                        localStorage.setItem('candidate', loginRes.data.name);
-                        localStorage.setItem('token', loginRes.data.token);
-                        sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
-                        setSuccessMessage('OTP Verified Successfully');
-
                         const token = loginRes.data.token;
-                        const verificationBody = { mobile: mobileNumber, verified: true };
+                        const verificationBody = { mobile: mobileNumber, verified: true }
                         const headers = { headers: { 'x-auth': token } };
-                        if(returnUrl){
+                        const verifyRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers);
+                        if (verifyRes.data.status) {
+                            localStorage.setItem('candidate', loginRes.data.name);
+                            localStorage.setItem('token', loginRes.data.token);
+                            sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
 
-                            window.location.href = returnUrl
+                            
+
+                            if (returnUrl) {
+
+                                window.location.href = returnUrl
+                            }
+                            else {
+                                window.location.href = '/candidate/dashboard';
+                            }
+
+
+                            // const verificationRes = await axios.post('/candidate/verification', verificationBody, headers);
+                            // const verificationRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers)
+                            // if (verificationRes.data.status) {
+                            // }
+                        } else {
+                            setErrorMessage('Login failed after OTP verification');
                         }
-                        else{
-                        window.location.href = '/candidate/dashboard';
-                       }
-
-
-                        // const verificationRes = await axios.post('/candidate/verification', verificationBody, headers);
-                        // const verificationRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers)
-                        // if (verificationRes.data.status) {
-                        // }
-                    } else {
-                        setErrorMessage('Login failed after OTP verification');
                     }
                 } else {
                     setErrorMessage('Incorrect OTP');
@@ -357,12 +430,34 @@ const CandidateLogin = () => {
                                             <input
                                                 type="text"
                                                 className="form-control"
-                                                id="city-location"
+                                                id="address-location"
                                                 placeholder="City/ शहर"
-                                                value={city}
-                                                onChange={(e) => setCity(e.target.value)}
+                                                value={address}
+                                                onChange={(e) => setAddress(e.target.value)}
+
                                             />
+                                            <input
+                                                type="hidden"
+                                                name="state"
+                                                placeholder='state'
+                                                className="form-control"
+                                                id="state-location"
+                                                value={state}
+
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name='City'
+                                                className="form-control"
+                                                id="city-location"
+                                                value={city}
+                                            />
+
+                                            <input type="hidden" className="form-control" value={latitude} placeholder="Latitude" readOnly />
+                                            <input type="hidden" className="form-control" value={longitude} placeholder="Longitude" readOnly />
+
                                         </div>
+
                                     </>
                                 )}
 
