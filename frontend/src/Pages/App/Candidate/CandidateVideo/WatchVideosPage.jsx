@@ -8,20 +8,16 @@ const WatchVideosPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch videos data when component mounts
     const fetchVideos = async () => {
       try {
         const token = localStorage.getItem('token');
-        // Use the exact same endpoint as in your router
         const response = await axios.get(`${backendUrl}/watchVideos`, {
           headers: { 'x-auth': token }
         });
         
-        // The API returns videos directly based on your router
         if (response.data && response.data.videos) {
           setVideos(response.data.videos);
         } else if (Array.isArray(response.data)) {
-          // Handle case where response might be an array directly
           setVideos(response.data);
         }
         
@@ -35,16 +31,13 @@ const WatchVideosPage = () => {
     fetchVideos();
   }, [backendUrl]);
 
-  // Function to handle video click
   const handleVideoClick = (videoUrl) => {
     window.open(videoUrl, '_blank');
   };
 
   return (
-    <div className="">
-      <div className="content-overlay"></div>
-      <div className="header-navbar-shadow"></div>
-      <div className="content-wrapper">
+    <>
+
         {/* Breadcrumb section */}
         <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
           <div className="content-header-left col-md-9 col-12 mb-2">
@@ -132,8 +125,8 @@ const WatchVideosPage = () => {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+     
+    </>
   );
 };
 

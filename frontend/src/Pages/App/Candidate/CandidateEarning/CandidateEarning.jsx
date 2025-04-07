@@ -551,6 +551,44 @@ const CandidateEarning = ({
         </div>
       </div>
 
+                  <style>
+                    {
+                      `
+
+                      .btn-danger {
+    border-color: #e42728 !important;
+    background-color: #ea5455 !important;
+    color: #fff !important;
+}
+.btn-danger:hover {
+    border-color: #e73d3e !important;
+    color: #fff !important;
+    box-shadow: 0 8px 25px -8px #ea5455;
+}
+.btn-success:hover {
+    border-color: #24b263 !important;
+    color: #fff !important;
+    box-shadow: 0 8px 25px -8px #28c76f;
+}
+.tab_head {
+    background-color: #b8caf0;
+    font-size: 17px;
+    color: black;
+}
+.btn-prp {
+    background-color: darkblue;
+    color: #fff;
+}
+.kyc-txt {
+    font-size: 12px;
+}
+    .btn-block {
+  display: block;
+  width: 100%;
+}
+                      `
+                    }
+                  </style>
     
     </>
   );

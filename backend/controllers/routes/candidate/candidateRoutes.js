@@ -3319,23 +3319,51 @@ router.post("/requestCashback", [isCandidate], async (req, res) => {
   }
 });
 
-router.route('/cashback')
-  .get([isCandidate], async (req, res) => {
-    try {
-      let validation = { mobile: req.session.user.mobile }
-      let { value, error } = await CandidateValidators.userMobile(validation)
-      if (error) {
-        console.log(error)
-        return res.send({ status: "failure", error: "Something went wrong!", error });
-      }
+// router.route('/cashback')
+//   .get([isCandidate], async (req, res) => {
+//     try {
+//       let validation = { mobile: req.session.user.mobile }
+//       let { value, error } = await CandidateValidators.userMobile(validation)
+//       if (error) {
+//         console.log(error)
+//         return res.send({ status: "failure", error: "Something went wrong!", error });
+//       }
 
-      const candidate = await Candidate.findOne({ mobile: value.mobile }).select("name")
-      if (!candidate) {
-        console.log("Candidate doesn't exists")
-        req.flash("error", "Candidate doesn't exists!");
-      }
-      let thresholdCashback = await CashBackLogic.findOne({});
-      res.render(`${req.vPath}/app/candidate/cashback`, {
+//       const candidate = await Candidate.findOne({ mobile: value.mobile }).select("name")
+//       if (!candidate) {
+//         console.log("Candidate doesn't exists")
+//         req.flash("error", "Candidate doesn't exists!");
+//       }
+//       let thresholdCashback = await CashBackLogic.findOne({});
+//       res.render(`${req.vPath}/app/candidate/cashback`, {
+//         thresholdCashback, candidate, menu: 'cashback'
+//       });
+//     }
+//     catch (err) {
+//       console.log(err);
+//       req.flash("error", err.message || "Something went wrong!");
+//       return res.status(500).send({ status: false, message: err.message })
+//     }
+//   })
+
+  router.route('/cashback')
+  // .get([isCandidate], async (req, res) => {
+  .get( async (req, res) => {
+    try {
+      // let validation = { mobile: req.session.user.mobile }
+      // let { value, error } = await CandidateValidators.userMobile(validation)
+      // if (error) {
+      //   console.log(error)
+      //   return res.send({ status: "failure", error: "Something went wrong!", error });
+      // }
+
+      // const candidate = await Candidate.findOne({ mobile: value.mobile }).select("name")
+      // if (!candidate) {
+      //   console.log("Candidate doesn't exists")
+      //   req.flash("error", "Candidate doesn't exists!");
+      // }
+      // let thresholdCashback = await CashBackLogic.findOne({});
+      res.json({
         thresholdCashback, candidate, menu: 'cashback'
       });
     }

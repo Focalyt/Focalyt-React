@@ -21,7 +21,7 @@ const CandidateLogin = () => {
     const refCode = queryParams.get("refCode");
     console.log('returnUrl', returnUrl)
 
-    
+
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [fullName, setFullName] = useState('');
@@ -60,7 +60,7 @@ const CandidateLogin = () => {
             window.location.href = '/candidate/dashboard';
         }
     }
-   
+
 
     useEffect(() => {
         if (!showExtraFields) return;
@@ -275,7 +275,7 @@ const CandidateLogin = () => {
                             localStorage.setItem('token', loginRes.data.token);
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
 
-                            
+
 
                             if (returnUrl) {
 
@@ -305,7 +305,7 @@ const CandidateLogin = () => {
 
     return (
 
-        <div className="app-content content">
+        <div className="app-content blank-page content">
             <div className="content-wrapper mt-4">
                 <section className="row flexbox-container">
                     <div className="col-xl-5 col-lg-6 col-md-8 col-sm-10 col-12 mx-auto">
@@ -318,8 +318,8 @@ const CandidateLogin = () => {
                                 />
                             </div>
 
-                            <div className="text-center mb-2">
-                                <h4>#Building Future Ready Minds</h4>
+                            <div className="card-title text-center mb-0">
+                                <h4 className='readyMinds'>#Building Future Ready Minds</h4>
                             </div>
 
                             <div className="carousel-gallery px-xl-2 px-lg-2 px-md-2 px-sm-1 px-1 mb-0">
@@ -354,7 +354,7 @@ const CandidateLogin = () => {
 
 
                             <div className="card-body">
-                                <h5 className="text-left mb-3">
+                                <h5 className="text-left mb-3 spanAfter">
                                     Candidate Login / Signup
                                     <br />
                                     <small className="text-primary" style={{ color: "#FC2B5A" }}>लॉग इन / साइन अप करें</small>
@@ -362,7 +362,7 @@ const CandidateLogin = () => {
 
                                 {/* Mobile Number Input */}
                                 <div className="row mb-3">
-                                    <div className="col-9">
+                                    <div className="col-9 userMobile">
                                         <input
                                             type="tel"
                                             className="form-control"
@@ -376,10 +376,11 @@ const CandidateLogin = () => {
                                     </div>
                                     <div className="col-3">
                                         <button
-                                            className="btn btn-primary w-100"
+                                            className="btn btn-primary sendBtnn w-100"
                                             onClick={handleGenerateOTP}
                                             ref={generateOTPRef}
                                         >
+                                            <img src="/Assets/images/login_arrow.png" alt="Focalyt logo" class="candid_arrow"/>
                                             SEND
                                         </button>
                                     </div>
@@ -405,7 +406,7 @@ const CandidateLogin = () => {
                                 {/* Gender Select */}
 
                                 {showExtraFields && (
-                                    <>
+                                    <div className='userMobile'>
                                         <div className="mb-3">
                                             <input
                                                 type="text"
@@ -458,7 +459,7 @@ const CandidateLogin = () => {
 
                                         </div>
 
-                                    </>
+                                    </div>
                                 )}
 
                                 {showLoginBtn && (
@@ -489,7 +490,7 @@ const CandidateLogin = () => {
                                 )}
 
                                 {/* Partners Slider */}
-                                <h3 className="text-center my-3">Our Partners</h3>
+                                <h3 className="my-3">Our Partners</h3>
                                 <div className="slider py-0">
                                     <div className="slide-track-1">
                                         <div className="slide">
@@ -567,7 +568,7 @@ const CandidateLogin = () => {
 
 
                                 {/* Terms Agreement */}
-                                <p className="text-center mt-3">
+                                <p className="mt-3">
                                     I agree to <a href="/employersTermsofService" target="_blank">Employer's terms</a>
                                     {' '} & {' '}
                                     <a href="/userAgreement" target="_blank">User Policy</a>.
@@ -577,6 +578,77 @@ const CandidateLogin = () => {
                     </div>
                 </section>
             </div>
+            <style>
+                {` .swiper-pagination-bullet{
+    width: 5px;
+    height: 5px;
+    background-color:#d63031;
+  }
+   .text-primary {
+    color: #FC2B5A!important;
+  }
+.spanAfter {
+  position: relative;
+  display: inline-block;
+}
+
+    .spanAfter::after {
+  content: attr(data-before);
+  height: 2px;
+  width: 100%;
+  left: 0;
+  position: absolute;
+  bottom: 0;
+  top: 100%;
+  background:
+linear-gradient(30deg, #FC2B5A, rgba(115, 103, 240, 0.5)) !important;
+  box-shadow: 0 0 8px 0 rgba(115, 103, 240, 0.5) !important;
+  transform: translateY(0px);
+  transition:
+all .2s linear;
+}  
+.btn-primary:hover {
+  border-color:
+#2e394b !important;
+  color: #fff !important;
+  box-shadow: 0 8px 25px -8px #FC2B5A;
+}
+  .btn-primary:hover {
+  color: #fff;
+  background-color: #5344ed!important;
+  border-color:#4839eb!important;
+}
+.btn-primary{
+border: 1px solid #FC2B5A;
+}
+.userMobile input.form-control:focus,
+.userMobile select.form-control:focus,
+.userMobile textarea.form-control:focus {
+  border: 1px solid #FC2B5A !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.userMobile input.form-control,
+.userMobile select.form-control,
+.userMobile textarea.form-control {
+  transition: border 0.3s ease;
+}
+
+.candid_arrow {
+  width: 17%;
+  margin-right: 5px
+}
+  .sendBtnn{
+  display: flex
+;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+  `
+
+                }
+            </style>
         </div>
     );
 };
