@@ -219,29 +219,29 @@ const CandidateViewJobs = () => {
     };
     const applyJob = async () => {
         try {
-          const token = localStorage.getItem('token');
-          const response = await axios.post(`/candidate/job/${course._id}/apply`, {}, {
-            headers: { 'x-auth': token }
-          });
-          setHasApplied(true);
-          setShowApplyModal(false);
-          setShowRegisterModal(true);
+            const token = localStorage.getItem('token');
+            const response = await axios.post(`/candidate/job/${course._id}/apply`, {}, {
+                headers: { 'x-auth': token }
+            });
+            setHasApplied(true);
+            setShowApplyModal(false);
+            setShowRegisterModal(true);
         } catch (error) {
-          console.error(error);
+            console.error(error);
         }
-      };
-      const registerForInterview = async () => {
+    };
+    const registerForInterview = async () => {
         try {
-          const token = localStorage.getItem('token');
-          const response = await axios.post(`/candidate/job/${course._id}/registerInterviews`, {}, {
-            headers: { 'x-auth': token }
-          });
-          setShowRegisterModal(false);
-          setShowAfterApply(true);
+            const token = localStorage.getItem('token');
+            const response = await axios.post(`/candidate/job/${course._id}/registerInterviews`, {}, {
+                headers: { 'x-auth': token }
+            });
+            setShowRegisterModal(false);
+            setShowAfterApply(true);
         } catch (error) {
-          console.error(error);
+            console.error(error);
         }
-      };
+    };
     //   useEffect(() => {
     //     if (document.querySelector('.swiper-container')) {
     //       new Swiper('.swiper-container', {
@@ -256,8 +256,8 @@ const CandidateViewJobs = () => {
     //       });
     //     }
     //   }, []);
-      
-    
+
+
 
     return (
         <>
@@ -276,7 +276,7 @@ const CandidateViewJobs = () => {
                                                     <h4 className="job_cate">{course?.sectors ? course.sectors[0].name : ""}</h4>
                                                     <h6>Job Overview / नौकरी का अवलोकन</h6>
                                                     <div className="row">
-                                                        <div className="col-md-4 col-lg-4 col-sm-6 col-6">
+                                                        <div className="col-md-4">
                                                             <div className="course_spec">
                                                                 <div className="spe_icon">
                                                                     <i className="la la-money"></i>
@@ -290,7 +290,7 @@ const CandidateViewJobs = () => {
                                                             </div>
                                                         </div>
 
-                                                        <div className="col-md-4 col-lg-4 col-sm-6 col-6">
+                                                        <div className="col-md-4">
                                                             <div className="course_spec">
                                                                 <div className="spe_icon">
                                                                     <i className="la la-money"></i>
@@ -302,7 +302,7 @@ const CandidateViewJobs = () => {
                                                             </div>
                                                         </div>
 
-                                                        <div className="col-md-4 col-lg-4 col-sm-6 col-6">
+                                                        <div className="col-md-4">
                                                             <div className="course_spec">
                                                                 <div className="spe_icon">
                                                                     <i className="la la-money"></i>
@@ -318,7 +318,7 @@ const CandidateViewJobs = () => {
                                             </div>
                                             <div className="col-md-5">
                                                 <div className='v_pal mt-sm-3 mt-md-0 mt-3'>
-                                                    {/* video  */}
+                                                    {/* thumbnail  */}
                                                     <a
                                                         href="#"
                                                         data-bs-toggle="modal"
@@ -352,79 +352,73 @@ const CandidateViewJobs = () => {
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                   
 
-                                        <div className="row py-4">
-                                            <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-4 mb-4">
-                                                <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
-                                                    <div className="carousel-indicators">
-                                                        {course.photos && course.photos.length > 0 ? (
-                                                            course.photos.map((photo, i) => (
-                                                                <button
-                                                                    key={i}
-                                                                    type="button"
-                                                                    data-target="#carouselExampleIndicators"
-                                                                    data-slide-to={i}
-                                                                    className={i === 0 ? "active activeclass" : "activeclass"}
-                                                                    aria-label={`Slide ${i + 1}`}>
-                                                                </button>
-                                                            ))
-                                                        ) : (
+                                    <div className="row py-4">
+                                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-4 mb-4">
+                                            <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
+                                                <div className="carousel-indicators">
+                                                    {course.photos && course.photos.length > 0 ? (
+                                                        course.photos.map((photo, i) => (
                                                             <button
+                                                                key={i}
                                                                 type="button"
                                                                 data-target="#carouselExampleIndicators"
-                                                                data-slide-to="0"
-                                                                className="activeclass"
-                                                                aria-label="Slide 1">
+                                                                data-slide-to={i}
+                                                                className={i === 0 ? "active activeclass" : "activeclass"}
+                                                                aria-label={`Slide ${i + 1}`}>
                                                             </button>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="carousel-inner">
-                                                        {course.photos && course.photos.length > 0 ? (
-                                                            course.photos.map((photo, i) => (
-                                                                <div key={i} className={`carousel-item ${i === 0 ? 'active' : ''}`}>
-                                                                    <img
-                                                                        className="d-block w-100 rounded shadow"
-                                                                        src={photo ? `${bucketUrl}/${photo}` : '/public_assets/images/newjoblisting/banner1.jpg'}
-                                                                        alt={`Course slide ${i + 1}`}
-                                                                    />
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <div className="carousel-item active">
-                                                                <img
-                                                                    src="/Assets/public_assets/images/newjoblistingbanner2.jpg"
-                                                                    className="d-block w-100 rounded shadow"
-                                                                    alt="Default course banner"
-                                                                />
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {course.photos && course.photos.length > 0 && (
-                                                        <>
-                                                            <button
-                                                                className="carousel-control-prev"
-                                                                type="button"
-                                                                data-bs-target="#carouselExampleIndicators"
-                                                                data-bs-slide="prev">
-                                                                <span className="carousel-control-prev-icon pree" aria-hidden="true"></span>
-                                                                <span className="visually-hidden">Previous</span>
-                                                            </button>
-                                                            <button
-                                                                className="carousel-control-next"
-                                                                type="button"
-                                                                data-bs-target="#carouselExampleIndicators"
-                                                                data-bs-slide="next">
-                                                                <span className="carousel-control-next-icon pree" aria-hidden="true"></span>
-                                                                <span className="visually-hidden">Next</span>
-                                                            </button>
-                                                        </>
+                                                        ))
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            data-target="#carouselExampleIndicators"
+                                                            data-slide-to="0"
+                                                            className="activeclass"
+                                                            aria-label="Slide 1">
+                                                        </button>
                                                     )}
                                                 </div>
-                                            </div>
 
-                                            {/* <div className="col-md-6 d-xl-block d-lg-block d-md-block d-sm-none d-none">
+                                                <div className="carousel-inner">
+                                                    {course.photos && course.photos.length > 0 ? (
+                                                        course.photos.map((photo, i) => (
+                                                            <div key={i} className={`carousel-item ${i === 0 ? 'active' : ''}`}>
+                                                                <img
+                                                                    className="d-block w-100 rounded shadow"
+                                                                    src={photo ? `${bucketUrl}/${photo}` : '/public_assets/images/newjoblisting/banner1.jpg'}
+                                                                    alt={`Course slide ${i + 1}`}
+                                                                />
+                                                            </div>
+                                                        ))
+                                                    ): null}
+                                                </div>
+
+                                                {course.photos && course.photos.length > 0 && (
+                                                    <>
+                                                        <button
+                                                            className="carousel-control-prev"
+                                                            type="button"
+                                                            data-bs-target="#carouselExampleIndicators"
+                                                            data-bs-slide="prev">
+                                                            <span className="carousel-control-prev-icon pree" aria-hidden="true"></span>
+                                                            <span className="visually-hidden">Previous</span>
+                                                        </button>
+                                                        <button
+                                                            className="carousel-control-next"
+                                                            type="button"
+                                                            data-bs-target="#carouselExampleIndicators"
+                                                            data-bs-slide="next">
+                                                            <span className="carousel-control-next-icon pree" aria-hidden="true"></span>
+                                                            <span className="visually-hidden">Next</span>
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* <div className="col-md-6 d-xl-block d-lg-block d-md-block d-sm-none d-none">
                                                 <div className="v_pal mt-sm-3 mt-md-0 mt-3">
                                                     <a
                                                         href="#"
@@ -458,69 +452,114 @@ const CandidateViewJobs = () => {
                                                 </div>
                                             </div> */}
 
-                                            <div className="col-md-6 d-xl-none d-lg-none d-md-none d-sm-block d-block">
-                                                <div className="v_pal">
-                                                    {course.videos && (
-                                                        <a
-                                                            href="#"
-                                                            data-bs-toggle="modal"
-                                                            data-bs-target="#videoModal"
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                handleVideoClick(course.jobVideo || "");
+                                        <div className="col-md-6 d-xl-none d-lg-none d-md-none d-sm-block d-block">
+                                            <div className="v_pal">
+                                                {course.videos && (
+                                                    <a
+                                                        href="#"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#videoModal"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            handleVideoClick(course.jobVideo || "");
+                                                        }}
+                                                        className="video-bttn position-relative d-block"
+                                                    >
+                                                        <img
+                                                            src={course.jobVideoThumbnail || "/Assets/images/pages/video_thum1.png"}
+                                                            className="video_thum img-fluid rounded shadow"
+                                                            alt="Job Thumbnail"
+                                                        />
+                                                        <img
+                                                            src="/Assets/public_assets/images/newjoblisting/play.svg"
+                                                            alt="Play"
+                                                            className="group1 position-absolute"
+                                                            style={{
+                                                                top: "50%",
+                                                                left: "50%",
+                                                                transform: "translate(-50%, -50%)",
+                                                                width: "50px",
+                                                                height: "50px",
                                                             }}
-                                                            className="video-bttn position-relative d-block"
-                                                        >
-                                                            <img
-                                                                src={course.jobVideoThumbnail || "/Assets/images/pages/video_thum1.png"}
-                                                                className="video_thum img-fluid rounded shadow"
-                                                                alt="Job Thumbnail"
-                                                            />
-                                                            <img
-                                                                src="/Assets/public_assets/images/newjoblisting/play.svg"
-                                                                alt="Play"
-                                                                className="group1 position-absolute"
-                                                                style={{
-                                                                    top: "50%",
-                                                                    left: "50%",
-                                                                    transform: "translate(-50%, -50%)",
-                                                                    width: "50px",
-                                                                    height: "50px",
-                                                                }}
-                                                            />
-                                                        </a>
+                                                        />
+                                                    </a>
 
-                                                    )}
-                                                </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="job-single-sec">
-                                        <div className="cr_detail_in cr_vw">
-                                            <h3 className="mt-xl-2 mt-lg-3 mt-md-3 mt-sm-2 mt-2 mb-xl-4 mb-lg-4 mb-sm-2 mb-2">Job Description / नौकरी का विवरण</h3>
-                                            <div className="row">
-                                                <div className="col-12">
-                                                    <p>
-                                                        {course.description || "No description available."}
-                                                    </p>
-                                                </div>
+                                    <div className="cr_detail_in cr_vw">
+                                        <h3 className="mt-xl-2 mt-lg-3 mt-md-3 mt-sm-2 mt-2 mb-xl-4 mb-lg-4 mb-sm-2 mb-2">Job Description / नौकरी का विवरण</h3>
+                                        <div className="row">
+                                            <div className="col-12">
+                                                <p>
+                                                    {course.description || "No description available."}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+                                </div>
 
-                                <div className="col-lg-4 col-md-4 column mt-xl-2 mt-lg-3 mt-md-3 mt-sm-0 mt-0">
-                                   
+                               
+                            
 
+                            <div className="col-lg-4 col-md-4 column mt-xl-2 mt-lg-3 mt-md-3 mt-sm-0 mt-0">
+
+
+                                {!isApplied ? (
+                                    <a
+                                        className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
+                                        href="#"
+                                        title="apply"
+                                        style={{ textDecoration: 'none' }}
+                                        data-toggle="modal"
+                                        data-target="#apply"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            document.getElementById('apply').classList.add('show');
+                                            document.getElementById('apply').style.display = 'block';
+                                            document.body.classList.add('modal-open');
+                                        }}
+                                    >
+                                        <i className="la la-paper-plane ml-2"></i>Apply for Job / नौकरी के लिए आवेदन
+                                    </a>
+                                ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
+                                    <a
+                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            handlePayment(course._id);
+                                        }}
+                                    >
+                                        <i className="la la-paper-plane ml-3"></i>Complete Registration
+                                    </a>
+                                ) : (
+                                    <a
+                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"
+                                        href="#"
+                                    >
+                                        <i className="la la-paper-plane ml-3"></i>Applied Course
+                                    </a>
+                                )}
+                                <a
+                                    className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
+                                    href={`tel:${course.counslerphonenumber}`}
+                                    title="call"
+                                    style={{ textDecoration: 'none' }}
+                                >
+                                    <i className="la la-phone plane-font ml-2"></i>Call To HR/ एचआर को कॉल करें
+                                </a>
+                                <div className="d-xl--none d-lg-none d-md-none d-sm-block d-block" id="floating-apply">
                                     {!isApplied ? (
                                         <a
-                                            className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
+                                            className="apply-thisjob apply-div-field text-left px-0 py-2 mb-2 decoration-none shadow text-center"
                                             href="#"
                                             title="apply"
                                             style={{ textDecoration: 'none' }}
-                                            data-toggle="modal"
-                                            data-target="#apply"
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 document.getElementById('apply').classList.add('show');
@@ -528,11 +567,11 @@ const CandidateViewJobs = () => {
                                                 document.body.classList.add('modal-open');
                                             }}
                                         >
-                                            <i className="la la-paper-plane ml-2"></i>Apply for Job / नौकरी के लिए आवेदन
+                                            APPLY NOW
                                         </a>
                                     ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
                                         <a
-                                            className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+                                            className="apply-thisjob text-left px-0 py-3"
                                             href="#"
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -543,151 +582,108 @@ const CandidateViewJobs = () => {
                                         </a>
                                     ) : (
                                         <a
-                                            className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"
+                                            className="apply-thisjob text-left px-0 py-3 disabled-button"
                                             href="#"
                                         >
                                             <i className="la la-paper-plane ml-3"></i>Applied Course
                                         </a>
                                     )}
- <a
-                                        className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
-                                        href={`tel:${course.counslerphonenumber}`}
-                                        title="call"
-                                        style={{ textDecoration: 'none' }}
+                                    <a
+                                        className="apply-thisjob text-center apply-div-field text-left px-0 py-2 mb-2 decoration-none shadow text-white"
+                                        href={`tel:${mobileNumber}`}
                                     >
-                                        <i className="la la-phone plane-font ml-2"></i>Call To HR/ एचआर को कॉल करें
+                                        CALL NOW
                                     </a>
-                                    <div className="d-xl--none d-lg-none d-md-none d-sm-block d-block" id="floating-apply">
-                                        {!isApplied ? (
-                                            <a
-                                                className="apply-thisjob apply-div-field text-left px-0 py-2 mb-2 decoration-none shadow text-center"
-                                                href="#"
-                                                title="apply"
-                                                style={{ textDecoration: 'none' }}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    document.getElementById('apply').classList.add('show');
-                                                    document.getElementById('apply').style.display = 'block';
-                                                    document.body.classList.add('modal-open');
-                                                }}
-                                            >
-                                                APPLY NOW
-                                            </a>
-                                        ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
-                                            <a
-                                                className="apply-thisjob text-left px-0 py-3"
-                                                href="#"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    handlePayment(course._id);
-                                                }}
-                                            >
-                                                <i className="la la-paper-plane ml-3"></i>Complete Registration
-                                            </a>
-                                        ) : (
-                                            <a
-                                                className="apply-thisjob text-left px-0 py-3 disabled-button"
-                                                href="#"
-                                            >
-                                                <i className="la la-paper-plane ml-3"></i>Applied Course
-                                            </a>
-                                        )}
-                                        <a
-                                            className="apply-thisjob text-center apply-div-field text-left px-0 py-2 mb-2 decoration-none shadow text-white"
-                                            href={`tel:${mobileNumber}`}
-                                        >
-                                            CALL NOW
-                                        </a>
-                                    </div>
-
-                                    {/* Course Overview */}
-                                    <div className="extra-job-info mb-1 mt-3">
-                                        <span className="text-capitalize px-0 py-1">
-                                            <i className="la la-male"></i>
-                                            <strong>Location</strong>{' '}
-                                            {course.trainingMode ? course.trainingMode : 'No Preferances'}
-                                        </span>
-
-                                        <span className="text-capitalize px-0 py-1">
-                                            <i className="la la-briefcase"></i>
-                                            <strong>Gender Preferance</strong>{' '}
-                                            {course.registrationCharges ? course.registrationCharges : 'N/A'}{' '}
-                                            <b>{isApplied ? ` ( ${course.registrationStatus || 'Unpaid'} )` : ''}</b>
-                                        </span>
-
-                                        <span className="text-capitalize px-0 py-1">
-                                            <i className="la la-money"></i>
-                                            <strong>Work Type</strong>{' '}
-                                            {course.work || 'N/A'}
-                                        </span>
-
-                                        <span className="py-2 px-0">
-                                            <i className="la la-building"></i>
-                                            <strong>Compensation</strong>{' '}
-                                            {course.compensation || 'N/A'}
-                                        </span>
-
-                                        <span className="py-2 px-0">
-                                            <i className="la la-credit-card"></i>
-                                            <strong>Working Type</strong>{' '}
-                                            {course.jobType || 'N/A'}
-                                        </span>
-
-                                        <span className="px-0">
-                                            <i className="la la-map"></i>
-                                            <strong>Pay Type</strong>{' '}
-                                            {moment(course.lastDateForApply || course.createdAt).utcOffset('+05:30').format('DD MMM YYYY')}
-                                        </span>
-
-                                        <span className="text-capitalize px-0 py-1">
-                                            <i className="la la-rupee"></i>
-                                            <strong>Pay Frequency</strong>{' '}
-                                            {course.emiOptionAvailable ? course.emiOptionAvailable : 'N/A'}
-                                        </span>
-                                    </div>
-
-                                    {/* Mobile Apply Button */}
-                                    {!isApplied ? (
-                                        <a
-                                            className="viewjob-apply apply-thisjob apply-div-field text-left px-0 d-xl-none d-lg-none d-md-none d-sm-block d-block mt-xl-2 mt-lg-2 mt-md-2 mt-sm-1 mt-1 text-center"
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                document.getElementById('apply').classList.add('show');
-                                                document.getElementById('apply').style.display = 'block';
-                                                document.body.classList.add('modal-open');
-                                            }}
-                                        >
-                                            <i className="la la-paper-plane ml-3"></i>Register for this Course
-                                        </a>
-                                    ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
-                                        <a
-                                            className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handlePayment(course._id);
-                                            }}
-                                        >
-                                            <i className="la la-paper-plane ml-3"></i>Complete Registration
-                                        </a>
-                                    ) : (
-                                        <a
-                                            className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"
-                                            href="#"
-                                        >
-                                            <i className="la la-paper-plane ml-3"></i>Applied Course
-                                        </a>
-                                    )}
                                 </div>
 
+                                {/* Course Overview */}
+                                <div className="extra-job-info mb-1 mt-3">
+                                    <span className="text-capitalize px-0 py-1">
+                                        <i className="la la-male"></i>
+                                        <strong>Location</strong>{' '}
+                                        {course.trainingMode ? course.trainingMode : 'No Preferances'}
+                                    </span>
 
+                                    <span className="text-capitalize px-0 py-1">
+                                        <i className="la la-briefcase"></i>
+                                        <strong>Gender Preferance</strong>{' '}
+                                        {course.registrationCharges ? course.registrationCharges : 'N/A'}{' '}
+                                        <b>{isApplied ? ` ( ${course.registrationStatus || 'Unpaid'} )` : ''}</b>
+                                    </span>
+
+                                    <span className="text-capitalize px-0 py-1">
+                                        <i className="la la-money"></i>
+                                        <strong>Work Type</strong>{' '}
+                                        {course.work || 'N/A'}
+                                    </span>
+
+                                    <span className="py-2 px-0">
+                                        <i className="la la-building"></i>
+                                        <strong>Compensation</strong>{' '}
+                                        {course.compensation || 'N/A'}
+                                    </span>
+
+                                    <span className="py-2 px-0">
+                                        <i className="la la-credit-card"></i>
+                                        <strong>Working Type</strong>{' '}
+                                        {course.jobType || 'N/A'}
+                                    </span>
+
+                                    <span className="px-0">
+                                        <i className="la la-map"></i>
+                                        <strong>Pay Type</strong>{' '}
+                                        {moment(course.lastDateForApply || course.createdAt).utcOffset('+05:30').format('DD MMM YYYY')}
+                                    </span>
+
+                                    <span className="text-capitalize px-0 py-1">
+                                        <i className="la la-rupee"></i>
+                                        <strong>Pay Frequency</strong>{' '}
+                                        {course.emiOptionAvailable ? course.emiOptionAvailable : 'N/A'}
+                                    </span>
+                                </div>
+
+                                {/* Mobile Apply Button */}
+                                {!isApplied ? (
+                                    <a
+                                        className="viewjob-apply apply-thisjob apply-div-field text-left px-0 d-xl-none d-lg-none d-md-none d-sm-block d-block mt-xl-2 mt-lg-2 mt-md-2 mt-sm-1 mt-1 text-center"
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            document.getElementById('apply').classList.add('show');
+                                            document.getElementById('apply').style.display = 'block';
+                                            document.body.classList.add('modal-open');
+                                        }}
+                                    >
+                                        <i className="la la-paper-plane ml-3"></i>Register for this Course
+                                    </a>
+                                ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
+                                    <a
+                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            handlePayment(course._id);
+                                        }}
+                                    >
+                                        <i className="la la-paper-plane ml-3"></i>Complete Registration
+                                    </a>
+                                ) : (
+                                    <a
+                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"
+                                        href="#"
+                                    >
+                                        <i className="la la-paper-plane ml-3"></i>Applied Course
+                                    </a>
+                                )}
                             </div>
 
+                            </div>
                         </div>
+
                     </div>
                 </div>
-            </section>
+           
+        </section >
 
             <section>
                 <div className="container-fluid">
