@@ -1578,6 +1578,8 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
 // });
 /* List of applied course */
 router.get("/appliedCourses", [isCandidate], async (req, res) => {
+  try {
+    console.log("api hitting")
   const p = parseInt(req.query.page);
   const page = p || 1;
   const perPage = 10;
@@ -1608,13 +1610,16 @@ router.get("/appliedCourses", [isCandidate], async (req, res) => {
     });
     console.log(courses, "appplid coursessss loisttt")
   }
+  console.log('courses',courses)
   const totalPages = Math.ceil(count / perPage);
-  res.render(`${req.vPath}/app/candidate/appliedCourses`, {
-    menu: 'appliedCourse',
+  return res.json({
     courses,
     totalPages,
     page
   });
+} catch (err) {
+  console.log("caught error ", err);
+}
 });
 
 router.get("/dashboard", isCandidate, async (req, res) => {

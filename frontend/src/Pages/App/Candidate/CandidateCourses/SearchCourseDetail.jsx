@@ -686,8 +686,14 @@ const CourseDetails = () => {
                       <a
                         className="apply-thisjob text-left px-0 py-3 disabled-button"
                         href="#"
+                        style={{
+                          pointerEvents: 'none',
+                          opacity: 0.6,
+                          cursor: 'not-allowed',
+                          textDecoration: 'none',
+                        }}
                       >
-                        <i className="la la-paper-plane ml-3"></i>Applied Course
+                        <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
                       </a>
                     )}
                     <a
@@ -792,11 +798,17 @@ const CourseDetails = () => {
                     </a>
                   ) : (
                     <a
-                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"
-                      href="#"
-                    >
-                      <i className="la la-paper-plane ml-3"></i>Applied Course
-                    </a>
+  href="#"
+  style={{
+    pointerEvents: 'none',
+    opacity: 0.6,
+    cursor: 'not-allowed',
+    textDecoration: 'none',
+  }}
+  className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+>
+  <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
+</a>
                   )}
                 </div>
 

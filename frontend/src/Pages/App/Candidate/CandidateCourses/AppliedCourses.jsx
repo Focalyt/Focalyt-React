@@ -1,224 +1,311 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import moment from 'moment';
 
-// Environment variables
-const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
+import moment from "moment";
+import "./SearchCourses.css";
 
 const AppliedCourses = () => {
   const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [videoSrc, setVideoSrc] = useState(""); // ✅ Store the video URL
+  const videoRef = useRef(null); // ✅ Reference to the video element
+  const location = useLocation();
   const navigate = useNavigate();
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   useEffect(() => {
-    // Fetch applied courses data
-    const fetchAppliedCourses = async () => {
-      try {
-        const response = await axios.get(`${backendUrl}/candidate/appliedCourses`, {
-          withCredentials: true
-        });
-        setCourses(response.data.courses || []);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching applied courses:', error);
-        setLoading(false);
+    fetchCourses();
+  }, [location.search]);
+
+  const fetchCourses = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${backendUrl}/candidate/appliedCourses`, {
+        headers: { "x-auth": token },
+      });
+      console.log("✅ Courses Fetched:", response.data.courses);
+      setCourses(response.data.courses || []);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+    }
+  };
+
+  // ✅ Get course thumbnail image
+  const getCourseImageUrl = (course) => {
+    return course.thumbnail
+      ? `${bucketUrl}/${course.thumbnail}`
+      : "/Assets/public_assets/images/newjoblisting/course_img.svg";
+  };
+
+  const handleVideoClick = (videoUrl) => {
+    setVideoSrc(videoUrl);
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play();
+    }
+  };
+
+  useEffect(() => {
+    const videoModal = document.getElementById("videoModal");
+    if (videoModal) {
+      videoModal.addEventListener("hidden.bs.modal", () => setVideoSrc(""));
+    }
+    return () => {
+      if (videoModal) {
+        videoModal.removeEventListener("hidden.bs.modal", () => setVideoSrc(""));
       }
     };
-
-    fetchAppliedCourses();
   }, []);
 
-  return ( 
-      <>
-       
-          {/* Breadcrumbs header for desktop */}
-          <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-            <div className="content-header-left col-md-9 col-12 mb-2">
-              <div className="row breadcrumbs-top">
-                <div className="col-12 my-auto">
-                  <h3 className="content-header-title float-left mb-0">Applied Courses</h3>
-                  <div className="breadcrumb-wrapper col-12">
-                    <ol className="breadcrumb">
-                      <li className="breadcrumb-item">
-                        <Link to="/candidate/dashboard">Home</Link>
-                      </li>
-                      <li className="breadcrumb-item"><Link to="#">Applied Courses</Link></li>
-                    </ol>
-                  </div>
+  return (
+    <div className="">
+      <div className="container mt-3">
+        {/* Breadcrumbs header for desktop */}
+        <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+          <div className="content-header-left col-md-9 col-12 mb-2">
+            <div className="row breadcrumbs-top">
+              <div className="col-12 my-auto">
+                <h3 className="content-header-title float-left mb-0">Search Courses</h3>
+                <div className="breadcrumb-wrapper col-12">
+                  <ol className="breadcrumb">
+                    <li className="breadcrumb-item">
+                      <Link to="/candidate/dashboard">Home</Link>
+                    </li>
+                    <li className="breadcrumb-item"><Link to="#">Search Courses</Link></li>
+                  </ol>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tab navigation */}
-          <section id="searchCourses" className="mb-2">
-            <div className="container">
-              <ul className="nav nav-tabs justify-content-center" id="courseTabs" role="tablist">
-                <li className="nav-item" role="presentation">
-                  <Link className="nav-link" id="search-tab" to="/candidate/searchcourses" role="tab" aria-controls="search" aria-selected="false">
-                    Search Courses
-                  </Link>
-                </li>
-                <li className="nav-item" role="presentation">
-                  <Link className="nav-link" id="pending-tab" to="/candidate/pendingFee" role="tab" aria-controls="pending" aria-selected="false">
-                    Pending for Fee
-                  </Link>
-                </li>
-                <li className="nav-item" role="presentation">
-                  <Link className="nav-link active" id="applied-tab" to="/candidate/appliedCourses" role="tab" aria-controls="applied" aria-selected="true">
-                    Applied Courses
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </section>
-
-          {/* Course listings */}
-          <section className="searchjobspage">
-            <div className="forlrgscreen">
-              <div className="pt-xl-2 pt-lg-0 pt-md-0 pt-sm-5 pt-0">
-                {loading ? (
-                  <div className="text-center">Loading...</div>
-                ) : courses && courses.length > 0 ? (
-                  courses.map((appliedcourse, index) => (
-                    <div className="card" key={index}>
-                      <div className="card-body">
-                        <div className="row pointer">
-                          <div className="col-lg-8 col-md-7 column">
-                            <div className="job-single-sec mt-xl-0">
-                              <div className="job-single-head border-0 pb-0">
-                                <div>
-                                  <h6 className="text-capitalize font-weight-bolder">
-                                    {appliedcourse._course.name ? appliedcourse._course.name : 'NA'}
-                                  </h6>
-                                  <span className="text-capitalize set-lineh">
-                                    {appliedcourse._course.sectors && appliedcourse._course.sectors[0] ? appliedcourse._course.sectors[0].name : ""}
-                                  </span>
-                                </div>
-                              </div>
-                              <Link to={`/candidate/course/${appliedcourse._course._id}`}>
-                                <div className="job-overview mt-1">
-                                  <ul className="mb-xl-2 mb-lg-2 mb-md-2 mb-sm-0 mb-0 list-unstyled">
-                                    <li>
-                                      <i className="la la-money"></i>
-                                      <h3 className="jobDetails-wrap">
-                                        {appliedcourse._course.cutPrice 
-                                          ? appliedcourse._course.cutPrice.toLowerCase() === 'free' 
-                                            ? appliedcourse._course.cutPrice 
-                                            : '₹ ' + appliedcourse._course.cutPrice 
-                                          : 'N/A'}
-                                      </h3>
-                                      <span className="text-capitalize jobDetails-wrap">
-                                        Course Fee
-                                      </span>
-                                    </li>
-                                    <li>
-                                      <i className="la la-shield"></i>
-                                      <h3 className="jobDetails-wrap">
-                                        {appliedcourse._course.courseLevel ? appliedcourse._course.courseLevel : 'N/A'}
-                                      </h3>
-                                      <span className="jobDetails-wrap">
-                                        Course Level
-                                      </span>
-                                    </li>
-                                    <li>
-                                      <i className="la la-graduation-cap"></i>
-                                      <h3 className="jobDetails-wrap">
-                                        {appliedcourse._course?.certifyingAgency ? appliedcourse._course.certifyingAgency : 'N/A'}
-                                      </h3>
-                                      <span className="jobDetails-wrap">
-                                        Course Agency
-                                      </span>
-                                    </li>
-                                    <li>
-                                      <i className="la la-money"></i>
-                                      <h3 className="jobDetails-wrap">
-                                        {appliedcourse?.registrationFee === 'Paid' ? 'Paid' : 'Unpaid'}
-                                      </h3>
-                                      <span className="jobDetails-wrap">
-                                        Registration Status
-                                      </span>
-                                    </li>
-                                  </ul>
-                                </div>
-                              </Link>
-                            </div>
-                          </div>
-                          <div className="col-lg-4 col-md-5 column mt-xl-1 mt-lg-1 mt-md-1 mt-sm-3 mt-0">
-                            <div className="extra-job-info mt-1">
-                              <span className="px-0">
-                                <i className="la la-map"></i>
-                                <strong>Last Date</strong> {' '}
-                                {moment(appliedcourse._course.lastDateForApply || 
-                                  appliedcourse._course.createdAt).utcOffset('+05:30').format('DD MMM YYYY')}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <h4 className="text-center">No Course found</h4>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* Hidden map section */}
-          <section className="map" style={{ display: 'none' }}>
-            <div className="row">
-              <div className="col-xl-12 col-lg-12">
-                <div id="collapseOne" className="collapse" aria-labelledby="headingOne" data-parent="#accordion">
-                  <div className="card-body px-1 py-0">
-                    <div className="card border border-top-1">
-                      <div id="filter">
-                        <div className="card-content">
-                          <div className="card-body p-0">
-                            <div className="row my-0 mx-0" id="allFields">
-                              <div className="cont" style={{ display: 'none' }}>
-                                <p id="companyNameMarker"></p>
-                                <p id="stateCityMarker"></p>
-                                <p id="industryMarker"></p>
-                                <p id="qualificationMarker"></p>
-                                <p id="salaryMarker"></p>
-                                <p id="locationMarker"></p>
-                                <a id="jobDetailsMarker"></a>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="col-xl-12 col-lg-12">
-                <div id="error" style={{ color: 'red' }}></div>
-                <div id="map" style={{ width: '100%', height: '400px' }} className="rounded"></div>
-              </div>
-              </div>
-            </section>
-         
-      
-
-        {/* Modal */}
-        <div className="modal fade" id="popup" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-modal="true">
-          <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">Complete Profile</h5>
-                <button type="button" className="close" data-dismiss="modal" aria-label="Close">
-                  <span aria-hidden="true">×</span>
-                </button>
               </div>
             </div>
           </div>
         </div>
-        </>
-    );
+
+        <h3 className="text-center">Search Course</h3>
+        <ul className="nav nav-tabs justify-content-center" id="courseTabs">
+          <li className="nav-item">
+            <Link className="nav-link active" to="/search-courses">
+              Search Courses
+            </Link>
+          </li>
+          <li className="nav-item">
+            <Link className="nav-link" to="/candidate/pendingFee">
+              Pending for Fee
+            </Link>
+          </li>
+          <li className="nav-item">
+            <Link className="nav-link" to="/candidate/appliedCourses">
+              Applied Courses
+            </Link>
+          </li>
+        </ul>
+
+        <section className="searchjobspage mt-3">
+          <div className="row justify-content-sm-center justify-content-md-start">
+            {courses.length > 0 ? (
+              courses.map((course) => (
+
+                <div
+                  className="col-xl-6 col-lg-6 col-md-6 col-sm-10 mx-auto"
+                  key={course._course._id}
+                >
+
+                  <div className="cr_nw_in position-relative">
+                    <div className="right_obj shadow">
+                      {course._course.courseType === "coursejob" ? "Course + Job" : "Course"}
+                    </div>
+
+                    <a
+                      href="#"
+                      data-bs-toggle="modal"
+                      data-bs-target="#videoModal"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleVideoClick(
+                          course._course.videos && course._course.videos[0]
+                            ? `${bucketUrl}/${course._course.videos[0]}`
+                            : ""
+                        );
+                      }}
+                      className="video-bttn position-relative d-block"
+                    >
+                      <img
+                        src={getCourseImageUrl(course._course)}
+                        className="video_thum img-fluid"
+                        alt="Course Thumbnail"
+                      />
+                      <img
+                        src="/Assets/public_assets/images/newjoblisting/play.svg"
+                        alt="Play"
+                        className="group1"
+                      />
+                    </a>
+
+                    <div className="course_inf pt-0">
+                      <Link to={`/candidate/course/${course._course._id}`}>
+
+                        <h5>{course._course.name || "N/A"}</h5>
+                        <span className="job_cate">{course._course.sectors?.[0].name || "N/A"}</span>
+
+                        <div className="row">
+                          <div className="col-md-6 col-sm-6 col-6">
+                            <div class="course_spec">
+                              <div class="spe_icon">
+                                <figure className="text-end">
+                                  <img src="/Assets/public_assets/images/newicons/eligibility.png" className="img-fluid p-0 width" alt="Eligibility" />
+                                </figure>
+                              </div>
+                              <div class="spe_detail">
+                                <p className="mb-0 text-black">Eligibility</p>
+                                <p className="mb-0 text-black">
+                                  <small className="sub_head">({course._course.qualification || "N/A"})</small>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-6 col-sm-6 col-6">
+                            <div class="course_spec">
+                              <div class="spe_icon">
+                                <figure className="text-end">
+                                  <img src="/Assets/public_assets/images/newicons/duration.png" className="img-fluid p-0 width" alt="Duration" />
+                                </figure>
+                              </div>
+                              <div class="spe_detail">
+                                <p className="mb-0 text-black">Duration</p>
+                                <p className="mb-0 text-black">
+                                  <small className="sub_head">({course._course.duration || "N/A"})</small>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-6 col-sm-6 col-6">
+                            <div class="course_spec">
+                              <div class="spe_icon">
+                                <figure className="text-end">
+                                  <img src="/Assets/public_assets/images/newicons/location.png" className="img-fluid p-0 width" alt="Location" />
+                                </figure>
+                              </div>
+                              <div class="spe_detail">
+                                <p className="mb-0 text-black">Location</p>
+                                <p className="mb-0 text-black">
+                                  <small className="sub_head">({course._course.city ? `${course._course.city}, ${course._course.state}` : "N/A"})</small>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-6 col-sm-6 col-6">
+                            <div class="course_spec">
+                              <div class="spe_icon">
+                                <figure className="text-end">
+                                  <img src="/Assets/public_assets/images/newicons/job-mode.png" className="img-fluid p-0 width" alt="Mode" />
+                                </figure>
+                              </div>
+                              <div class="spe_detail">
+                                <p className="mb-0 text-black">Mode</p>
+                                <p className="mb-0 text-black">
+                                  <small className="sub_head">({course._course.trainingMode || "N/A"})</small>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+
+                      <div className="row mt-1">
+                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
+                          <Link
+                            className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
+                            to={`/candidate/course/${course._course._id}`}
+                          >
+                            <i className="la la-paper-plane ml-2"></i>
+                            Apply Now
+                          </Link>
+                        </div>
+                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
+                          <a
+                            className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
+                            href="https://wa.me/918699017301?text=hi"
+                          >
+                            <i className="la la-phone plane-font ml-2"></i>
+                            Chat Now
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <h4 className="text-center w-100">No Courses Found</h4>
+            )}
+          </div>
+        </section>
+
+
+
+        {/* ✅ Video Modal */}
+        <div
+          className="modal fade"
+          id="videoModal"
+          tabIndex="-1"
+          aria-labelledby="videoModalTitle"
+          aria-hidden="true"
+          onClick={() => setVideoSrc("")}
+        >
+          <div className="modal-dialog modal-dialog-centered" role="document">
+            <div className="modal-content">
+              <button
+                type="button"
+                className="close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+              <div className="modal-body p-0 text-center embed-responsive">
+                <video key={videoSrc} id="courseVid" controls className="video-fluid text-center">
+                  <source src={videoSrc} type="video/mp4" className="img-fluid video-fluid" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            </div>
+          </div>
+        </div>
+
+       
+        <style>
+          {`
+          .course--apply {
+            background: #fff;
+            border-radius: 0.5rem;
+            box-shadow: 0px 4px 25px 0px rgba(0, 0, 0, 0.1);
+            transition: all .3s ease-in-out;
+            text-align: center;
+            padding: 8px 5px;
+          }
+
+          .course--apply a {
+            color: #000;
+          }
+
+          #courseTabs {
+            gap: 25px;
+          }
+
+          .video-bttn {
+            position: relative;
+            display: block;
+          }
+
+          .video-bttn img {
+            width: 100%;
+            height: auto;
+          }
+        `}
+        </style>
+      </div>
+    </div>
+
+  );
 };
 
 export default AppliedCourses;
