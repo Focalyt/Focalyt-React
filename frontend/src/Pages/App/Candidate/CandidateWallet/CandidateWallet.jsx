@@ -25,13 +25,13 @@ const CandidateWallet = () => {
         <>
             <section className="money-rain py-3">
                 <div className="mipie-earn px-2">
-                    <h3 className="text-center">Now you can earn with Focalyt</h3>
-                    <h4 className="text-center">अब आप Focalyt से कमा सकते हैं</h4>
+                    <h4 className="font-weight-bold now-padding">Now you can earn with Focalyt</h4>
+                    <h4 className="font-weight-bold">अब आप Focalyt से कमा सकते हैं</h4>
                 </div>
                 <div className="container-fluid mt-3">
                     <div className="row">
                         <div className="col-xl-8 col-lg-8 col-md-12 col-sm-12 col-12 ">
-                            <h4 className="font-weight-bold now-padding">Rules / नियम:</h4>
+                            <h4 className="font-weight-bolder mt-3">Rules / नियम:</h4>
                             <div className="single-footer">
                                 <ul className="contact-info list-unstyled">
                                     <li className="pt-1">
@@ -158,7 +158,7 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
                 <div className="headerr border-bottom">
                     <div className="row py-2 px-3">
                         <div className="col-7 pt-1 font-weight-bold text-left">
-                            <img src={imageSrc} className="mr-2" alt="icon" /> {title}
+                            <img src={imageSrc} className="me-2" alt="icon" /> {title}
                         </div>
                         <div className="col-5 text-right">
                             <div className={`btn btn-md ${className} bott_size text-white`}>
@@ -235,6 +235,7 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
                 }
                     .applied_card{
     height: 100%;
+    width:100%!important;
 }
                 `}
             </style>

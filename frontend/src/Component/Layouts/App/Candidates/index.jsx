@@ -58,12 +58,12 @@ function CandidateLayout({ children }) {
     jobs: false,
     wallet: false
   });
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth <= 768;
+      const mobile = window.innerWidth <= 1199;
       setIsMobile(mobile);
       setIsSidebarOpen(!mobile);
     };
@@ -168,13 +168,13 @@ function CandidateLayout({ children }) {
                 <ul className={`menu-content ${openSubmenu.profile ? 'open' : ''}`}>
 
                   <li className={`nav-item ${activeItem === 'myProfile' ? 'active' : ''}`}>
-                    <Link to="/candidate/myProfile" onClick={() => handleItemClick('myProfile')}>
+                    <Link to="/candidate/myProfile" onClick={() => {handleItemClick('myProfile');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={faUser} />
                       <span className="menu-title">Your Profile</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'document' ? 'active' : ''}`}>
-                    <Link to="/candidate/document" onClick={() => handleItemClick('document')}>
+                    <Link to="/candidate/document" onClick={() =>{ handleItemClick('document'); handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farFile} />
                       <span className="menu-title">Documents</span>
                     </Link>
@@ -190,13 +190,13 @@ function CandidateLayout({ children }) {
                 </a>
                 <ul className={`menu-content ${openSubmenu.courses ? 'open' : ''}`}>
                   <li className={`nav-item ${activeItem === 'searchcourses' ? 'active' : ''}`}>
-                    <Link to="/candidate/searchcourses" onClick={() => handleItemClick('searchcourses')}>
+                    <Link to="/candidate/searchcourses" onClick={() => {handleItemClick('searchcourses'); handleSidebarClose();}}>
                       <FontAwesomeIcon icon={faSearch} />
                       <span className="menu-title">Search Courses</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'appliedCourses' ? 'active' : ''}`}>
-                    <Link to="/candidate/appliedCourses" onClick={() => handleItemClick('appliedCourses')}>
+                    <Link to="/candidate/appliedCourses" onClick={() =>{ handleItemClick('appliedCourses');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farPaperPlane} />
                       <span className="menu-title">Applied Course</span>
                     </Link>
@@ -212,31 +212,31 @@ function CandidateLayout({ children }) {
                 </a>
                 <ul className={`menu-content ${openSubmenu.jobs ? 'open' : ''}`}>
                   <li className={`nav-item ${activeItem === 'searchjob' ? 'active' : ''}`}>
-                    <Link to="/candidate/searchjob" onClick={() => handleItemClick('searchjob')}>
+                    <Link to="/candidate/searchjob" onClick={() => {handleItemClick('searchjob'); handleSidebarClose();}}>
                       <FontAwesomeIcon icon={faSearch} />
                       <span className="menu-title">Search Job</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'nearbyJobs' ? 'active' : ''}`}>
-                    <Link to="/candidate/nearbyJobs" onClick={() => handleItemClick('nearbyJobs')}>
+                    <Link to="/candidate/nearbyJobs" onClick={() => {handleItemClick('nearbyJobs');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farMap} />
                       <span className="menu-title">Jobs Near Me</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'appliedJobs' ? 'active' : ''}`}>
-                    <Link to="/candidate/appliedJobs" onClick={() => handleItemClick('appliedJobs')}>
+                    <Link to="/candidate/appliedJobs" onClick={() => {handleItemClick('appliedJobs');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farPaperPlane} />
                       <span className="menu-title">Applied Jobs</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'registerInterviewsList' ? 'active' : ''}`}>
-                    <Link to="/candidate/registerInterviewsList" onClick={() => handleItemClick('registerInterviewsList')}>
+                    <Link to="/candidate/registerInterviewsList" onClick={() => {handleItemClick('registerInterviewsList');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farHand} />
                       <span className="menu-title">Register For Interview</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'InterestedCompanies' ? 'active' : ''}`}>
-                    <Link to="/candidate/InterestedCompanies" onClick={() => handleItemClick('InterestedCompanies')}>
+                    <Link to="/candidate/InterestedCompanies" onClick={() => {handleItemClick('InterestedCompanies');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farBookmark} />
                       <span className="menu-title">Shortlisting</span>
                     </Link>
@@ -252,25 +252,25 @@ function CandidateLayout({ children }) {
                 </a>
                 <ul className={`menu-content ${openSubmenu.wallet ? 'open' : ''}`}>
                   <li className={`nav-item ${activeItem === 'cashback' ? 'active' : ''}`}>
-                    <Link to="/candidate/cashback" onClick={() => handleItemClick('cashback')}>
-                      <FontAwesomeIcon icon={faIndianRupeeSign} />
+                    <Link to="/candidate/cashback" onClick={() => {handleItemClick('cashback');handleSidebarClose();}}>
+                      <FontAwesomeIcon icon={faIndianRupeeSign} />;
                       <span className="menu-title">Cashback Offers</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'myEarnings' ? 'active' : ''}`}>
-                    <Link to="/candidate/myEarnings" onClick={() => handleItemClick('myEarnings')}>
+                    <Link to="/candidate/myEarnings" onClick={() => {handleItemClick('myEarnings');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farMoneyBill1} />
                       <span className="menu-title">My Earnings</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'referral' ? 'active' : ''}`}>
-                    <Link to="/candidate/referral" onClick={() => handleItemClick('referral')}>
+                    <Link to="/candidate/referral" onClick={() => {handleItemClick('referral');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={faForward} />
                       <span className="menu-title">Refer & Earn</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'Coins' ? 'active' : ''}`}>
-                    <Link to="/candidate/Coins" onClick={() => handleItemClick('Coins')}>
+                    <Link to="/candidate/Coins" onClick={() => {handleItemClick('Coins');handleSidebarClose();}}>
                       <FontAwesomeIcon icon={faCoins} />
                       <span className="menu-title">Coins</span>
                     </Link>
@@ -280,7 +280,7 @@ function CandidateLayout({ children }) {
 
               {/* Request Loan */}
               <li className={`nav-item ${activeItem === 'requestLoan' ? 'active' : ''}`}>
-                <Link to="/candidate/requestLoan" onClick={() => handleItemClick('requestLoan')}>
+                <Link to="/candidate/requestLoan" onClick={() => {handleItemClick('requestLoan');handleSidebarClose();}}>
                   <FontAwesomeIcon icon={farCircle} />
                   <span className="menu-title">Request Loan</span>
                 </Link>
@@ -288,7 +288,7 @@ function CandidateLayout({ children }) {
 
               {/* Watch Videos */}
               <li className={`nav-item ${activeItem === 'watchVideos' ? 'active' : ''}`}>
-                <Link to="/candidate/watchVideos" onClick={() => handleItemClick('watchVideos')}>
+                <Link to="/candidate/watchVideos" onClick={() => {handleItemClick('watchVideos');handleSidebarClose();}}>
                   <FontAwesomeIcon icon={farCirclePlay} />
                   <span className="menu-title">Watch Videos</span>
                 </Link>
@@ -296,7 +296,7 @@ function CandidateLayout({ children }) {
 
               {/* Share Profile */}
               <li className={`nav-item ${activeItem === 'shareCV' ? 'active' : ''}`}>
-                <Link to="/candidate/shareCV" onClick={() => handleItemClick('shareCV')}>
+                <Link to="/candidate/shareCV" onClick={() => {handleItemClick('shareCV');handleSidebarClose();}}>
                   <FontAwesomeIcon icon={farShareFromSquare} />
                   <span className="menu-title">Share Profile</span>
                 </Link>
@@ -304,7 +304,7 @@ function CandidateLayout({ children }) {
 
               {/* Notifications */}
               <li className={`nav-item ${activeItem === 'notifications' ? 'active' : ''}`}>
-                <Link to="/candidate/notifications" onClick={() => handleItemClick('notifications')}>
+                <Link to="/candidate/notifications" onClick={() => {handleItemClick('notifications');handleSidebarClose();}}>
                   <FontAwesomeIcon icon={farBell} />
                   <span className="menu-title">Notifications</span>
                 </Link>
