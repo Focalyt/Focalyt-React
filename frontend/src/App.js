@@ -22,12 +22,12 @@ import CandidatesJobs from './Pages/App/Candidate/CandidatesJobs/CandidatesJobs'
 import NearbyJobs from './Pages/App/Candidate/CandidatesJobs/NearByJobs';
 import CandidateAppliedJobs from './Pages/App/Candidate/CandidatesJobs/CandidateAppliesJobs';
 import SearchCourseDetail from "./Pages/App/Candidate/CandidateCourses/SearchCourseDetail"
-import CandidateWallet from './Component/Layouts/App/Candidates/CandidateWallet/CandidateWallet';
+import CandidateWallet from './Pages/App/Candidate/CandidateWallet/CandidateWallet';
 import CandidateEarning from './Pages/App/Candidate/CandidateEarning/CandidateEarning';
 import ReferAndEarn from './Pages/App/Candidate/CandidateEarning/ReferAndEarn';
 import CoinsPage from './Pages/App/Candidate/CandidateEarning/CoinsPage';
 import LoanApplicationPage from "./Pages/App/Candidate/CandidateEarning/LoanApplicationPage";
-import WatchVideosPage from './Component/Layouts/App/Candidates/CandidateVideo/WatchVideosPage';
+import WatchVideosPage from './Pages/App/Candidate/CandidateVideo/WatchVideosPage';
 import CandidateShare from './Pages/App/Candidate/CandidateShare/CandidateShare';
 import CandidateNotification from './Pages/App/Candidate/CandidateNotification/CandidateNotification';
 import RegisterForInterview from './Pages/App/Candidate/CandidatesJobs/RegisterForInterview';
@@ -38,6 +38,7 @@ import Event from './Pages/Front/Event/Event';
 import AdminLayout from './Component/Layouts/Admin';
 import CandidateLogin from './Pages/App/Candidate/CandidateLogin/CandidateLogin';
 import CandidateViewJobs from './Pages/App/Candidate/CandidatesJobs/CandidateViewJobs';
+import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredDocuments';
 const Layout = () => {
   const location = useLocation();
 
@@ -83,6 +84,7 @@ const Layout = () => {
           {/* <Route path="course" element={<CourseDetail/>}/> */}
           <Route path="course/:courseId" element={<SearchCourseDetail />} />
           <Route path="job/:JobId" element={<CandidateViewJobs/>}/>
+          <Route path="requiredDocs" element={<RequiredDocuments/>}/>
         </Route>
         <Route path='/admin' element ={<AdminLayout/>}>
         

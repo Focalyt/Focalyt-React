@@ -59,16 +59,41 @@ function CandidateLayout({ children }) {
     wallet: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
 
-  // Resize Listener for Responsive Sidebar
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-      if (window.innerWidth > 768) setExpanded(true);
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      setIsSidebarOpen(!mobile);
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Close sidebar on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        isMobile &&
+        !e.target.closest(".main-menu") &&
+        !e.target.closest(".menu-toggle")
+      ) {
+        setIsSidebarOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [isMobile]);
+
+  const handleSidebarToggle = () => {
+    setIsSidebarOpen((prev) => !prev);
+  };
+
+  const handleSidebarClose = () => {
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }}
 
 
   const toggleSidebar = () => {
@@ -103,7 +128,8 @@ function CandidateLayout({ children }) {
     <div className="min-h-screen flex flex-col">
       <main className="flex flex-1">
 
-        <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${expanded ? 'expanded' : 'collapsed'}`}>
+        {/* <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${expanded ? 'expanded' : 'collapsed'}`}> */}
+        <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${isSidebarOpen ? 'expanded' : 'collapsed'}`}>
           <div className={`navbar-header ${expanded ? 'expanded' : ''}`}>
             <ul className="nav navbar-nav flex-row">
               <li className="nav-item mr-auto">
@@ -124,7 +150,10 @@ function CandidateLayout({ children }) {
             <ul className="navigation navigation-main" id="main-menu-navigation">
               {/* Dashboard */}
               <li className={`nav-item ${activeItem === 'dashboard' ? 'active' : ''}`}>
-                <Link to="/candidate/dashboard" onClick={() => handleItemClick('dashboard')}>
+                <Link to="/candidate/dashboard" onClick={() => {
+  handleItemClick('dashboard');
+  handleSidebarClose();
+}} >
                   <FontAwesomeIcon icon={faChartLine} />
                   <span className="menu-title">Dashboard</span>
                 </Link>
@@ -300,7 +329,7 @@ function CandidateLayout({ children }) {
             <div className="app-content content">
               <div className="content-overlay"></div>
               <div className="header-navbar-shadow"></div>
-              <CandidateHeader />
+              <CandidateHeader toggleSidebar={handleSidebarToggle} isSideBarOpen={isSidebarOpen}/>
               <div className="content-wrapper">
                 <div className="content-body mb-4">
                 <Outlet />

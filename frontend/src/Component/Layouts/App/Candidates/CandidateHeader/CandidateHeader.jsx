@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import "./CandidateHeader.css";
+import { useLocation } from 'react-router-dom';
 
-
-function CandidateHeader() {
+function CandidateHeader({toggleSidebar, isSideBarOpen}) {
   const [userName, setUserName] = useState('');
   const [userCredit, setUserCredit] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
@@ -15,11 +15,9 @@ function CandidateHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
+  const location = useLocation(); 
+  
    const [user, setUser] = useState({});
-    
-  
-  
     useEffect(() => {
       const storedUser = sessionStorage.getItem('user');
       if (storedUser) {
@@ -132,8 +130,8 @@ function CandidateHeader() {
               <div className="mr-auto float-left bookmark-wrapper d-flex align-items-center">
                 <ul className="nav navbar-nav">
                   <li className="nav-item mobile-menu d-xl-none mr-auto">
-                    <a className="nav-link nav-menu-main menu-toggle hidden-xs" href="#">
-                      <i className="ficon feather icon-menu"></i>
+                    <a className="nav-link nav-menu-main menu-toggle hidden-xs" href="#" onClick={toggleSidebar}>
+                    <i className="fas fa-bars" style={{fontSize:"30px", color: "#fff"}}></i>
                     </a>
                   </li>
                 </ul>
@@ -215,7 +213,14 @@ function CandidateHeader() {
     margin: 0.5rem 0;
     overflow: hidden;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
-}`
+}
+#navbar-mobile{
+display:flex;
+align-items:center;
+justify-content: space-between;
+width:100%;
+flex-direction: row;}    
+`
         }
       </style>
 

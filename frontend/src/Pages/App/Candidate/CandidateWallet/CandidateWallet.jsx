@@ -13,81 +13,16 @@ const CandidateWallet = () => {
 
     const fetchCashbackData = async () => {
         try {
-            const response = await axios.get(`${backendUrl}/thresholdCashback`);
+            const response = await axios.get(`${backendUrl}/cashback`);
             setThresholdCashback(response.data || {});
+            console.log("Fetched Threshold Cashback Data:", response.data);
         } catch (error) {
             console.error("Error fetching cashback data:", error);
         }
     };
 
     return (
-        <div className="content-wrapper">
-        <div className="content-body">
-
-<style>
-                {`
-                .card-bottom-one {
-                    background-color: #417ebd;
-                    font-size: 18px;
-                    border-top-right-radius: 0;
-                    border-top-left-radius: 0;
-                }
-                .icon-feature {
-                    background-color: #417ebd;
-                    font-size: 17px;
-                    border: 2px solid #35679a;
-                }
-                .icon-feature-two {
-                    background-color: #e95b37;
-                    font-size: 17px;
-                    border: 2px solid #e95b37;
-                }
-                .card-bottom-two {
-                    background-color: #e95b37;
-                    font-size: 18px;
-                    border-top-right-radius: 0;
-                    border-top-left-radius: 0;
-                }
-                .icon-feature-three {
-                    background-color: #bc405a;
-                    font-size: 17px;
-                }
-                .card-bottom-three {
-                    background-color: #bc405a;
-                    font-size: 18px;
-                    border-top-right-radius: 0;
-                    border-top-left-radius: 0;
-                }
-                .icon-feature-four {
-                    padding-top: 10px;
-                    background-color: #42a181;
-                    font-size: 17px;
-                    border: 2px solid #42a181;
-                    padding-bottom: 10px;
-                }
-                .card-bottom-four {
-                    background-color: #42a181;
-                    font-size: 18px;
-                    border-top-right-radius: 0;
-                    border-top-left-radius: 0;
-                }
-                .icon-feature-five {
-                    background-color: #640064;
-                    font-size: 17px;
-                    border: 2px solid #640064;
-                }
-                .card-bottom-five {
-                    background-color: #640064;
-                    font-size: 18px;
-                    border-top-right-radius: 0;
-                    border-top-left-radius: 0;
-                }
-                    .applied_card{
-    height: 100%;
-}
-                `}
-            </style>
-
+        <>
             <section className="money-rain py-3">
                 <div className="mipie-earn px-2">
                     <h3 className="text-center">Now you can earn with Focalyt</h3>
@@ -154,7 +89,7 @@ const CandidateWallet = () => {
                         buttonLink="/candidate/myProfile/"
                         earnAmount={thresholdCashback.profilecomplete || 50}
                         className="icon-feature"
-                         buttonClass="card-bottom-one"
+                        buttonClass="card-bottom-one"
                     />
 
                     {/* Video Profile */}
@@ -167,7 +102,7 @@ const CandidateWallet = () => {
                         buttonLink="/candidate/myProfile/"
                         earnAmount={thresholdCashback.videoprofile || 20}
                         className="icon-feature-two"
-                         buttonClass="card-bottom-two"
+                        buttonClass="card-bottom-two"
                     />
 
                     {/* Job Apply */}
@@ -180,7 +115,7 @@ const CandidateWallet = () => {
                         buttonLink="/candidate/nearbyJobs"
                         earnAmount={thresholdCashback.apply || 10}
                         className="icon-feature-three"
-                         buttonClass="card-bottom-three"
+                        buttonClass="card-bottom-three"
                     />
 
                     {/* On Shortlisting */}
@@ -193,7 +128,7 @@ const CandidateWallet = () => {
                         buttonLink="/candidate/myProfile"
                         earnAmount={thresholdCashback.shortlisted || 5}
                         className="icon-feature-four"
-                         buttonClass="card-bottom-four"
+                        buttonClass="card-bottom-four"
                     />
 
                     {/* Refer and Earn */}
@@ -211,13 +146,12 @@ Please note: You will receive cashback once the candidate has completed his prof
                     />
                 </div>
             </section>
-        </div>
-        </div>
+        </>
     );
 };
 
 // Reusable Card Component
-const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, buttonLink, earnAmount, className , buttonClass}) => {
+const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, buttonLink, earnAmount, className, buttonClass }) => {
     return (
         <div className="col-md-6 mb-4">
             <div className="card applied_card rounded card_shad">
@@ -241,8 +175,71 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
                     {buttonText}
                 </Link>
             </div>
+            <style>
+                {`
+                .card-bottom-one {
+                    background-color: #417ebd;
+                    font-size: 18px;
+                    border-top-right-radius: 0;
+                    border-top-left-radius: 0;
+                }
+                .icon-feature {
+                    background-color: #417ebd;
+                    font-size: 17px;
+                    border: 2px solid #35679a;
+                }
+                .icon-feature-two {
+                    background-color: #e95b37;
+                    font-size: 17px;
+                    border: 2px solid #e95b37;
+                }
+                .card-bottom-two {
+                    background-color: #e95b37;
+                    font-size: 18px;
+                    border-top-right-radius: 0;
+                    border-top-left-radius: 0;
+                }
+                .icon-feature-three {
+                    background-color: #bc405a;
+                    font-size: 17px;
+                }
+                .card-bottom-three {
+                    background-color: #bc405a;
+                    font-size: 18px;
+                    border-top-right-radius: 0;
+                    border-top-left-radius: 0;
+                }
+                .icon-feature-four {
+                    padding-top: 10px;
+                    background-color: #42a181;
+                    font-size: 17px;
+                    border: 2px solid #42a181;
+                    padding-bottom: 10px;
+                }
+                .card-bottom-four {
+                    background-color: #42a181;
+                    font-size: 18px;
+                    border-top-right-radius: 0;
+                    border-top-left-radius: 0;
+                }
+                .icon-feature-five {
+                    background-color: #640064;
+                    font-size: 17px;
+                    border: 2px solid #640064;
+                }
+                .card-bottom-five {
+                    background-color: #640064;
+                    font-size: 18px;
+                    border-top-right-radius: 0;
+                    border-top-left-radius: 0;
+                }
+                    .applied_card{
+    height: 100%;
+}
+                `}
+            </style>
         </div>
-        
+
     );
 };
 
