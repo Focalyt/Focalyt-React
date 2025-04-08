@@ -469,6 +469,7 @@ function Event() {
                                       >
                                         Event Time (From: {event.timing.from}To: {event.timing.to})
                                       </h6>
+                                      
                                       {/* Esligibility */}
                                       {/* <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
                                         <div className="row">
