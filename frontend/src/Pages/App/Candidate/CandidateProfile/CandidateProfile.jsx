@@ -1023,7 +1023,7 @@ const [user, setUser] = useState({});
                         </div>
                        
                         <div className="col-xl-6 mb-1">
-                          <label htmlFor="address">Current Location<span className="mandatory"> *</span></label>
+                          <label htmlFor="address">Address<span className="mandatory"> *</span></label>
                           <div className="input-group">
                             <div className="input-group-prepend bg-locat">
                               <div className="input-group-text bg-intext new-bg-text">

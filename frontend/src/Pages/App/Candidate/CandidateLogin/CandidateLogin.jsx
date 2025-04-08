@@ -233,9 +233,10 @@ const CandidateLogin = () => {
                     const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                     // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                     if (loginRes.data.status) {
-                        localStorage.setItem('candidate', loginRes.data.name);
+                        localStorage.setItem('name', loginRes.data.name);
                         localStorage.setItem('token', loginRes.data.token);
                         sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
+                        sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
 
                         if (returnUrl) {
 

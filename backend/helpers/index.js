@@ -138,12 +138,10 @@ module.exports.isCandidate = async (req, res, next) => {
       // ✅ Else check for token in headers (for React SPA project)
       const token = req.header('x-auth');
       if (!token) throw error;
-      console.log('Secret key',process.env.MIPIE_JWT_SECRET)
 
       const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
       user = await User.findById(decoded.id);
-      console.log('user', user);
-      console.log('user', user);
+      
 
 
       // if (!user || user.role !== 3) throw error;
