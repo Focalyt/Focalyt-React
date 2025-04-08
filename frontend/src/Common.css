@@ -5993,12 +5993,12 @@ div#loading img {
   }
 }
 /* ========== Component : Content Section Style ============= */
-.content {
+/* .content {
   display: flex;
   flex-direction: column;
   row-gap: 30px;
   align-items: center;
-}
+} */
 @media (min-width: 992px) {
   .content {
     align-items: initial;

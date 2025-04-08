@@ -45,9 +45,15 @@ const CandidateDashboard = () => {
 
       <div className="">
       
-            <a href="/candidate/cashback">
+            <a href="/candidate/cashback" className='d-md-block d-sm-none d-none'>
               <div className="height-structure bannerCan">
                 <img src="/Assets/images/candidate-dashboardnew.jpg" alt="" />
+                {/* <!-- <h5 className="mb-2">Welcome <span className="font-italic text-primary" id="user-name"></span></h5> --> */}
+              </div>
+            </a>
+            <a href="/candidate/cashback" className='d-md-none d-sm-block d-bock'>
+              <div className="height-structure bannerCan">
+                <img src="/Assets/images/mobile-banner-candidate.jpg" alt="" />
                 {/* <!-- <h5 className="mb-2">Welcome <span className="font-italic text-primary" id="user-name"></span></h5> --> */}
               </div>
             </a>
