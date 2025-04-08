@@ -455,16 +455,21 @@ function Event() {
                                       >
                                         {event.eventTitle}
                                       </h4>
-                                      <h5 className="op-Reg text-center">Open Registration</h5>
-                                      <p className='op-Reg-p text-center'>(From: 12:00 AMTo: 1:00 AM)</p>
+                                      <h5 className="op-Reg text-center">Registration Open</h5>
+                                      <h6
+                                        className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
+                                        title={event.eventTitle}
+                                      >
+                                        Event Date 19-04-2025
+                                      </h6>
 
                                       <h6
                                         className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
                                         title={event.eventTitle}
                                       >
-                                        Duration(From: {event.timing.from}To: {event.timing.to})
+                                        Event Time (From: {event.timing.from}To: {event.timing.to})
                                       </h6>
-                                      {/* Eligibility */}
+                                      {/* Esligibility */}
                                       {/* <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
                                         <div className="row">
                                           <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">

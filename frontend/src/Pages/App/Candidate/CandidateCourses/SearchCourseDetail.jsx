@@ -416,7 +416,6 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                                   className="video_thum img-fluid" 
                                   alt="Video thumbnail" 
                                 />
-                                <img src="/public_assets/images/newjoblisting/play.svg" alt="Play button" className="group1" />
                               </a>
                             )}
                           </div>
