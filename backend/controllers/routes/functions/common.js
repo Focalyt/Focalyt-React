@@ -394,7 +394,7 @@ module.exports.otpCandidateLogin = async (req, res) => {
     if (!user || user === null) {
       throw req.ykError('Login failed!');
     }
-    const candidate = await Candidate.findOne({ mobile }, " _id ");
+    const candidate = await Candidate.findOne({ mobile }, " _id ").populate('Qualification');
     if (!candidate || candidate === null) {
       throw req.ykError('Login failed!');
     }
@@ -407,7 +407,7 @@ module.exports.otpCandidateLogin = async (req, res) => {
     } else {
       throw req.ykError('Invalid User!');
     }
-    res.status(200).send({ status: true, name: user.name, email: user.email, token,user:userData })
+    res.status(200).send({ status: true, name: user.name, email: user.email, token,user:userData, })
   } catch (err) {
     console.log(err)
     return req.errFunc(err);

@@ -242,60 +242,60 @@ const getMetaParameters = (req) => {
 router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res) => {
   try {
     const { courseId } = req.params;
-    const validation = { mobile: req.session.user.mobile };
-    let entryUrl;
-    if (typeof req.body.entryUrl === 'string') {
-      const parsedData = JSON.parse(req.body.entryUrl);
-      entryUrl = parsedData.url;
-    } else {
-      // If it's already an object
-      entryUrl = req.body.entryUrl.url;
-    }
+    const validation = { mobile: req.user.mobile };
+    // let entryUrl;
+    // if (typeof req.body.entryUrl === 'string') {
+    //   const parsedData = JSON.parse(req.body.entryUrl);
+    //   entryUrl = parsedData.url;
+    // } else {
+    //   // If it's already an object
+    //   entryUrl = req.body.entryUrl.url;
+    // }
 
-    console.log("Entry URL:", entryUrl);
+    // console.log("Entry URL:", entryUrl);
 
-    // Create URL object to parse parameters
-    const urlObj = new URL(entryUrl);
-    const params = urlObj.searchParams;
+    // // Create URL object to parse parameters
+    // const urlObj = new URL(entryUrl);
+    // const params = urlObj.searchParams;
 
     // Get fbclid from URL
-    const fbclid = params.get('fbclid');
-    console.log("fbclid:", fbclid);
+    // const fbclid = params.get('fbclid');
+    // console.log("fbclid:", fbclid);
 
 
     // Generate fbc from fbclid
-    let fbc = null;
-    if (fbclid) {
-      // Facebook click ID format: fb.1.{timestamp}.{fbclid}
-      fbc = `fb.1.${Date.now()}.${fbclid}`;
-    }
+    // let fbc = null;
+    // if (fbclid) {
+    //   // Facebook click ID format: fb.1.{timestamp}.{fbclid}
+    //   fbc = `fb.1.${Date.now()}.${fbclid}`;
+    // }
 
-    console.log("fbc:", fbc);
+    // console.log("fbc:", fbc);
 
-    // Get or generate fbp
-    let fbp = params.get('fbp');
+    // // Get or generate fbp
+    // let fbp = params.get('fbp');
 
-    if (!fbp) {
-      const timestamp = Date.now();
-      const random = Math.floor(Math.random() * 1000000000);
-      fbp = `fb.1.${timestamp}.${random}`;
-    }
+    // if (!fbp) {
+    //   const timestamp = Date.now();
+    //   const random = Math.floor(Math.random() * 1000000000);
+    //   fbp = `fb.1.${timestamp}.${random}`;
+    // }
 
-    console.log("fbp:", fbp);
+    // console.log("fbp:", fbp);
 
 
 
-    const metaParams = {
-      fbc: fbc,
-      fbclid: fbclid || null, // Store original fbclid
-      fbp: fbp,
-      adId: params.get('ad_id') || null,
-      campaignId: params.get('campaign_id') || null,
-      adsetId: params.get('adset_id') || null,
-      utmSource: params.get('utm_source') || null,
-      utmMedium: params.get('utm_medium') || null,
-      utmCampaign: params.get('utm_campaign') || null
-    };
+    // const metaParams = {
+    //   fbc: fbc,
+    //   fbclid: fbclid || null, // Store original fbclid
+    //   fbp: fbp,
+    //   adId: params.get('ad_id') || null,
+    //   campaignId: params.get('campaign_id') || null,
+    //   adsetId: params.get('adset_id') || null,
+    //   utmSource: params.get('utm_source') || null,
+    //   utmMedium: params.get('utm_medium') || null,
+    //   utmCampaign: params.get('utm_campaign') || null
+    // };
 
 
     // Get Meta parameters
@@ -371,7 +371,7 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
     ];
     await updateSpreadSheetValues(sheetData);
 
-    let candidateMob = candidate.mobile;
+    let candidateMob = String(candidate.mobile);
 
     // Check if the mobile number already has the country code
     if (!candidateMob.startsWith("91") && candidateMob.length == 10) {
@@ -380,29 +380,29 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
     console.log(candidateMob);
 
-    // Track conversion event
-    const metaApi = new MetaConversionAPI();
-    await metaApi.trackCourseApplication(
-      {
-        courseName: course.name,
-        courseId: courseId,
-        courseValue: course.registrationCharges,
-        sourceUrl: `${process.env.BASE_URL}/coursedetails/${courseId}`
-      },
-      {
-        email: candidate.email,
-        phone: candidateMob,
-        firstName: candidate.name.split(' ')[0],
-        lastName: candidate.name.split(' ').slice(1).join(' '),
-        gender: candidate?.sex === 'Male' ? 'm' : candidate?.sex === 'Female' ? 'f' : '',
-        dob: candidate?.dob ? moment(candidate.dob).format('YYYYMMDD') : '',
-        city: candidate.city?.name,
-        state: candidate.state?.name,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
-      },
-      metaParams
-    );
+    // // Track conversion event
+    // const metaApi = new MetaConversionAPI();
+    // await metaApi.trackCourseApplication(
+    //   {
+    //     courseName: course.name,
+    //     courseId: courseId,
+    //     courseValue: course.registrationCharges,
+    //     sourceUrl: `${process.env.BASE_URL}/coursedetails/${courseId}`
+    //   },
+    //   {
+    //     email: candidate.email,
+    //     phone: candidateMob,
+    //     firstName: candidate.name.split(' ')[0],
+    //     lastName: candidate.name.split(' ').slice(1).join(' '),
+    //     gender: candidate?.sex === 'Male' ? 'm' : candidate?.sex === 'Female' ? 'f' : '',
+    //     dob: candidate?.dob ? moment(candidate.dob).format('YYYYMMDD') : '',
+    //     city: candidate.city?.name,
+    //     state: candidate.state?.name,
+    //     ipAddress: req.ip,
+    //     userAgent: req.headers['user-agent']
+    //   },
+    //   metaParams
+    // );
 
 
 
@@ -1163,7 +1163,7 @@ router.get("/login", async (req, res) => {
 /* Document route */
 router.get("/document", [isCandidate], async (req, res) => {
   try {
-    let validation = { mobile: req.session.user.mobile };
+    let validation = { mobile: req.user.mobile };
     let { value, error } = await CandidateValidators.userMobile(validation);
 
     if (error) {
@@ -1361,7 +1361,7 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     const perPage = 10;
     const p = parseInt(req.query.page);
     const page = p || 1;
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -1412,59 +1412,65 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
 });
 /* course by id*/
 // router.get("/course/:courseId/", [isCandidate], async (req, res) => {
-router.get("/course/:courseId/", async (req, res) => {
+router.get("/course/:courseId/", isCandidate,async (req, res) => {
   try {
     const { courseId } = req.params;
-    // const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 });
-    // const userMobile = req.session.user.mobile;
+    const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 });
+    const userMobile = req.user.mobile ;
 
-    // let validation = { mobile: userMobile };
-    // let { value, error } = CandidateValidators.userMobile(validation);
-    // if (error) {
-    //   return res.status(400).json({ status: false, message: "Invalid user" });
-    // }
+    let validation = { mobile: userMobile };
+    let { value, error } = CandidateValidators.userMobile(validation);
+    if (error) {
+      return res.status(400).json({ status: false, message: "Invalid user" });
+    }
 
     let course = await Courses.findById(courseId).populate('sectors').lean();
     if (!course || course?.status === false) {
       return res.status(404).json({ status: false, message: "Course not found" });
     }
 
-    // const candidate = await Candidate.findOne({ mobile: userMobile }).lean();
+    const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
+    const highestQualification = await Qualification.find({ status: true });
+
 
     let canApply = false;
-    // if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
-    //   if (candidate.isExperienced == false || candidate.isExperienced == true) {
-    //     canApply = true;
-    //   }
-    // }
+    if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.location.fullAddress && candidate.highestQualification) {
+      if (candidate.isExperienced == false || candidate.isExperienced == true) {
+        canApply = true;
+      }
+    }
 
-    // let isApplied = false;
-    // if (candidate.appliedCourses && candidate.appliedCourses.length > 0) {
-    //   const [filteredCourses] = candidate.appliedCourses.filter(course => {
-    //     return courseId.includes(course);
-    //   });
-    //   if (filteredCourses) {
-    //     isApplied = true;
-    //     const assignedCourseData = await AppliedCourses.findOne({
-    //       _candidate: candidate._id,
-    //       _course: new mongoose.Types.ObjectId(courseId)
-    //     }).lean();
+    let isApplied = false;
+    if (candidate.appliedCourses && candidate.appliedCourses.length > 0) {
+      const [filteredCourses] = candidate.appliedCourses.filter(course => {
+        return courseId.includes(course);
+      });
+      if (filteredCourses) {
+        isApplied = true;
+        const assignedCourseData = await AppliedCourses.findOne({
+          _candidate: candidate._id,
+          _course: new mongoose.Types.ObjectId(courseId)
+        }).lean();
 
-    //     course.registrationCharges = course.registrationCharges.replace(/,/g, '');
-    //     if (assignedCourseData) {
-    //       course.remarks = assignedCourseData.remarks;
-    //       course.assignDate = assignedCourseData.assignDate ? moment(assignedCourseData.assignDate).format('DD MMM YYYY') : "";
-    //       course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid';
-    //     }
-    //   }
-    // }
+        course.registrationCharges = course.registrationCharges.replace(/,/g, '');
+        if (assignedCourseData) {
+          course.remarks = assignedCourseData.remarks;
+          course.assignDate = assignedCourseData.assignDate ? moment(assignedCourseData.assignDate).format('DD MMM YYYY') : "";
+          course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid';
+        }
+      }
+    }
 
-    // let mobileNumber = course.phoneNumberof ? course.phoneNumberof : contact[0]?.mobile;
+    let mobileNumber = course.phoneNumberof ? course.phoneNumberof : contact[0]?.mobile;
+   console.log('course',course)
 
     return res.json({
       status: true,
       course,
       canApply,
+      candidate,
+      highestQualification,
+      isApplied
 
     });
 
@@ -1575,7 +1581,7 @@ router.get("/appliedCourses", [isCandidate], async (req, res) => {
   const p = parseInt(req.query.page);
   const page = p || 1;
   const perPage = 10;
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -1629,7 +1635,7 @@ router.get("/dashboard", isCandidate, async (req, res) => {
       },
     ];
 
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -1835,7 +1841,7 @@ router
     }
   })
   .post(isCandidate, async (req, res) => {
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile}
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -1853,6 +1859,7 @@ router
       highestQualification,
       yearOfPassing,
     } = req.body;
+    console.log('personalInfo',personalInfo)
     const updatedFields = { isProfileCompleted: true };
     const userInfo = {};
     Object.keys(personalInfo).forEach((key) => {
@@ -1896,8 +1903,9 @@ router
       updatedFields["yearOfPassing"] = yearOfPassing;
     }
     if (updatedFields.latitude && updatedFields.longitude) {
-      updatedFields["location"] = { type: 'Point', coordinates: [updatedFields.longitude, updatedFields.latitude] }
+      updatedFields["location"] = { type: 'Point', coordinates: [updatedFields.longitude, updatedFields.latitude],fullAddress:updatedFields.address,state:updatedFields.stateName,city:updatedFields.cityName}
     }
+  
     if (user?.referredBy && user?.referredBy && user.isProfileCompleted == false) {
       const cashback = await CashBackLogic.findOne().select("Referral")
       const referral = await Referral.findOneAndUpdate(
@@ -1966,7 +1974,7 @@ router
   });
 
 router.post("/removelogo", isCandidate, async (req, res) => {
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile  }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -1988,7 +1996,7 @@ router.post("/removelogo", isCandidate, async (req, res) => {
 });
 router.post("/removeKYCImage", isCandidate, async (req, res) => {
   const { type } = req.body
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile  }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2072,7 +2080,7 @@ async function getUploadedURL() {
 }
 router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
   let jobId = req.params.jobId;
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile  }
   let { value, error } = CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2237,7 +2245,7 @@ router.get("/appliedJobs", [isCandidate], async (req, res) => {
   const p = parseInt(req.query.page);
   const page = p || 1;
   const perPage = 10;
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile  }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2502,7 +2510,7 @@ router.get("/registerInterviewsList", [isCandidate], async (req, res) => {
     const p = parseInt(req.query.page);
     const page = p || 1;
     const perPage = 10;
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -2636,7 +2644,7 @@ router.get("/registerInterviewsList", [isCandidate], async (req, res) => {
 });
 
 router.post("/removeResume", isCandidate, async (req, res) => {
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2656,7 +2664,7 @@ router.post("/removeResume", isCandidate, async (req, res) => {
 });
 
 router.post("/removeVideo", [isCandidate, authenti], async (req, res) => {
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2673,7 +2681,7 @@ router.post("/removeVideo", [isCandidate, authenti], async (req, res) => {
 
 router.get("/getCreditCount", [isCandidate, authenti], async (req, res) => {
   try {
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -2712,7 +2720,7 @@ router.get("/getCoinOffers", [isCandidate, authenti], async (req, res) => {
 });
 router.post("/updateprofilestatus", [isCandidate], async (req, res) => {
   try {
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -2738,7 +2746,7 @@ router.post("/payment", [isCandidate, authenti], async (req, res) => {
     return res.status(400).send({ status: false, msg: 'Incorrect Data.' })
   }
 
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2779,7 +2787,7 @@ router.post("/coursepayment", [isCandidate, authenti], async (req, res) => {
     return res.status(400).send({ status: false, msg: 'Incorrect Data.' })
   }
 
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2821,7 +2829,7 @@ router.post("/paymentStatus", [isCandidate, authenti], async (req, res) => {
   let offerDetails = await coinsOffers.findOne({ _id: _offer });
   console.log(offerDetails, '<<<<<<<<<<<<<<<<< offerDetails')
 
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2895,7 +2903,7 @@ router.post("/coursepaymentStatus", [isCandidate, authenti], async (req, res) =>
   let courseDetails = await AppliedCourses.findOne({ _candidate, _course: courseId });
   console.log(courseDetails, '<<<<<<<<<<<<<<<<< courseDetails')
   let course = await Courses.findById(courseId).lean();
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2955,7 +2963,7 @@ router.get("/Coins", [isCandidate], async (req, res) => {
   const p = parseInt(req.query.page);
   const page = p || 1;
   const perPage = 10;
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -3001,7 +3009,7 @@ router.get("/completeProfile", [isCandidate, authenti], async (req, res) => {
   try {
     let highestQualification = await Qualification.find({ status: true });
     let state = await State.find({ status: true, countryId: "101" });
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3026,7 +3034,7 @@ router.get("/completeProfile", [isCandidate, authenti], async (req, res) => {
   }
 });
 router.get("/getcandidatestatus", [isCandidate], async (req, res) => {
-  let validation = { mobile: req.session.user.mobile }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -3041,7 +3049,7 @@ router.get("/nearbyJobs", [isCandidate], async (req, res) => {
     const allQualification = await Qualification.find({ status: true }).sort({
       basic: -1,
     });
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3235,7 +3243,7 @@ router.get("/myEarnings", [isCandidate], async (req, res) => {
     const page = p || 1;
     let canRedeem = false
     let limit = 3
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3278,7 +3286,7 @@ router.post("/requestCashback", [isCandidate], async (req, res) => {
   try {
     let { amount } = req.body
     amount = Number(amount)
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3322,7 +3330,7 @@ router.post("/requestCashback", [isCandidate], async (req, res) => {
 router.route('/cashback')
   .get([isCandidate], async (req, res) => {
     try {
-      let validation = { mobile: req.session.user.mobile }
+      let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)
@@ -3349,7 +3357,7 @@ router.route('/cashback')
 router.route('/kycDocument')
   .post([isCandidate], async (req, res) => {
     try {
-      let validation = { mobile: req.session.user.mobile }
+      let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)
@@ -3418,7 +3426,7 @@ router.route('/InterestedCompanies').get([isCandidate], async (req, res) => {
   try {
 
     const menu = 'InterestedCompanies'
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3471,7 +3479,7 @@ router.route('/InterestedCompanies').get([isCandidate], async (req, res) => {
 router.route('/notifications').get([isCandidate], async (req, res) => {
   try {
     const menu = 'Notifications'
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3504,7 +3512,7 @@ router.get("/watchVideos", [isCandidate], async (req, res) => {
 })
 router.get('/notificationCount', [isCandidate, authenti], async (req, res) => {
   try {
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3529,7 +3537,7 @@ router.put('/applyVoucher', [isCandidate, authenti], async (req, res) => {
   try {
     let { amount, code, offerId } = req.body;
 
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3600,7 +3608,7 @@ router.put('/applyVoucher', [isCandidate, authenti], async (req, res) => {
 
 router.get('/notificationCount', [isCandidate, authenti], async (req, res) => {
   try {
-    let validation = { mobile: req.session.user.mobile }
+    let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
@@ -3732,7 +3740,7 @@ router.get('/createResume', isCandidate, authenti, async (req, res) => {
 router.route('/verification')
   .get(isCandidate, authenti, async (req, res) => {
     try {
-      let validation = { mobile: req.session.user.mobile }
+      let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)
@@ -3773,7 +3781,7 @@ router.route('/verification')
 router.route('/requestLoan')
   .get(isCandidate, async (req, res) => {
     try {
-      let validation = { mobile: req.session.user.mobile }
+      let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)
@@ -3807,7 +3815,7 @@ router.route('/requestLoan')
   .post(isCandidate, authenti, async (req, res) => {
     try {
       const body = req.body;
-      let validation = { mobile: req.session.user.mobile }
+      let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)
@@ -3839,7 +3847,7 @@ router.route('/requestLoan')
 router.route('/review/:job')
   .post([isCandidate, authenti], async (req, res) => {
     try {
-      let validation = { mobile: req.session.user.mobile }
+      let validation = { mobile: req.user.mobile }
       let { value, error } = await CandidateValidators.userMobile(validation)
       if (error) {
         console.log(error)

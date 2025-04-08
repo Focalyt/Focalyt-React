@@ -121,10 +121,7 @@ const CandidateDocumets = ({ candidate, documents }) => {
 
   return (
     <>
-     
-        <div
-          class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none"
-        >
+        <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
           <div class="content-header-left col-md-9 col-12 mb-2">
             <div class="row breadcrumbs-top">
               <div class="col-12">
