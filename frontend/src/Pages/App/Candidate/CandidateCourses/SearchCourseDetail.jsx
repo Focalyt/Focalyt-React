@@ -443,6 +443,7 @@ const CourseDetails = () => {
                                 <span className="carousel-control-prev-icon pree" aria-hidden="true"></span>
                                 <span className="visually-hidden">Previous</span>
                               </button>
+                              
                               <button
                                 className="carousel-control-next"
                                 type="button"

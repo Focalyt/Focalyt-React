@@ -459,6 +459,12 @@ background-color: #64ccf3;
   border-radius: 15px;
 }
 /* Media Queries for Mobile Responsiveness */
+@media (max-width:1199.99px){
+  #profile_status img {
+    width: 60%;
+}
+
+}
 @media (max-width: 991.98px) {
   .main-menu {
     transform: translateX(-100%);

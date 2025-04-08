@@ -21,6 +21,11 @@ html body .content .content-wrapper {
 .extra-wallet {
     font-weight: 550;
 }
+.candid-box {
+    color: #FC2B5A;
+    font-weight: 600;
+}
+
 
 @media (max-width: 1920px) {
     .candid-box {
@@ -60,10 +65,13 @@ html body .content .content-wrapper {
 @media(max-width:768px){
     html body .content .content-wrapper {
     padding-block:30px;
-    padding-inline:20px;
+    padding-inline:0px;
     }
     .mipie-earn{
         width: 90%;
+    }
+    .candid-box {
+        font-size: 19px;
     }
     /* .card{
         width: 100%!important;

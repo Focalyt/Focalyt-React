@@ -125,3 +125,28 @@ li#que p {
     margin-bottom: 0px !important;
     line-height: normal;
 }
+div#floating-apply {
+    position: fixed;
+    bottom: 100px;
+    right: 10px;
+    z-index: 999;
+}
+
+
+@media(max-width:1024px){
+    .card{
+        width: 100%!important;
+    }
+    .extra-job-info{
+        width: 100%;
+    }
+
+}
+@media(max-width:768px){
+    .course_details_col {
+        background: rgba(217, 217, 217, 0.3);
+        border: 1px solid #9e9e9e;
+        border-radius: 25px;
+        padding: 10px 10px;
+    }
+}

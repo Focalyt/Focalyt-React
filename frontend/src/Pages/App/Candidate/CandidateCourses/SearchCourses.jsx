@@ -133,11 +133,7 @@ const SearchCourses = () => {
                         className="video_thum img-fluid"
                         alt="Course Thumbnail"
                       />
-                      <img
-                        src="/Assets/public_assets/images/newjoblisting/play.svg"
-                        alt="Play"
-                        className="group1"
-                      />
+                     
                     </a>
 
                     <div className="course_inf pt-0">
@@ -300,6 +296,9 @@ const SearchCourses = () => {
             width: 100%;
             height: auto;
           }
+            .right_obj{
+            right:0px;
+            }
         `}
         </style>
       </div>

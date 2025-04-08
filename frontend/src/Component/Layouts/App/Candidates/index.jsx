@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet , useLocation } from "react-router-dom";
 import CandidateHeader from './CandidateHeader/CandidateHeader'
 import CandidateFooter from './CandidateFooter/CandidateFooter'
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -18,7 +18,7 @@ import {
 function CandidateLayout({ children }) {
   const navigate = useNavigate();
   const [user, setUser] = useState();
-  
+  const location = useLocation();
 
 
   useEffect(() => {
@@ -149,9 +149,9 @@ function CandidateLayout({ children }) {
           <div className="main-menu-content border border-left-0 border-right-0 border-bottom-0">
             <ul className="navigation navigation-main" id="main-menu-navigation">
               {/* Dashboard */}
-              <li className={`nav-item ${activeItem === 'dashboard' ? 'active' : ''}`}>
+              <li className={`nav-item ${location.pathname === '/candidate/dashboard' ? 'active' : ''}`}>
                 <Link to="/candidate/dashboard" onClick={() => {
-  handleItemClick('dashboard');
+
   handleSidebarClose();
 }} >
                   <FontAwesomeIcon icon={faChartLine} />
@@ -160,21 +160,21 @@ function CandidateLayout({ children }) {
               </li>
 
               {/* Profile */}
-              <li className={`nav-item has-sub ${openSubmenu.profile ? 'open' : ''}`}>
+              <li className={`nav-item has-sub ${openSubmenu.profile ? 'open' : ''} ${location.pathname === '/candidate/myprofile' ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('profile')}>
                   <FontAwesomeIcon icon={faUser} />
                   <span className="menu-title">Profile</span>
                 </a>
                 <ul className={`menu-content ${openSubmenu.profile ? 'open' : ''}`}>
 
-                  <li className={`nav-item ${activeItem === 'myProfile' ? 'active' : ''}`}>
-                    <Link to="/candidate/myProfile" onClick={() => {handleItemClick('myProfile');handleSidebarClose();}}>
+                  <li className={`nav-item ${location.pathname === '/candidate/myProfile' ? 'active' : ''}`}>
+                    <Link to="/candidate/myProfile" onClick={() => {handleSidebarClose();}}>
                       <FontAwesomeIcon icon={faUser} />
                       <span className="menu-title">Your Profile</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${activeItem === 'document' ? 'active' : ''}`}>
-                    <Link to="/candidate/document" onClick={() =>{ handleItemClick('document'); handleSidebarClose();}}>
+                  <li className={`nav-item ${location.pathname === '/candidate/document' ? 'active' : ''}`}>
+                    <Link to="/candidate/document" onClick={() =>{  handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farFile} />
                       <span className="menu-title">Documents</span>
                     </Link>
@@ -189,14 +189,14 @@ function CandidateLayout({ children }) {
                   <span className="menu-title">Courses</span>
                 </a>
                 <ul className={`menu-content ${openSubmenu.courses ? 'open' : ''}`}>
-                  <li className={`nav-item ${activeItem === 'searchcourses' ? 'active' : ''}`}>
-                    <Link to="/candidate/searchcourses" onClick={() => {handleItemClick('searchcourses'); handleSidebarClose();}}>
+                  <li className={`nav-item ${location.pathname === '/candidate/searchcourses' ? 'active' : ''}`}>
+                    <Link to="/candidate/searchcourses" onClick={() => {handleSidebarClose();}}>
                       <FontAwesomeIcon icon={faSearch} />
                       <span className="menu-title">Search Courses</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${activeItem === 'appliedCourses' ? 'active' : ''}`}>
-                    <Link to="/candidate/appliedCourses" onClick={() =>{ handleItemClick('appliedCourses');handleSidebarClose();}}>
+                  <li className={`nav-item ${location.pathname === '/candidate/appliedCourses' ? 'active' : ''}`}>
+                    <Link to="/candidate/appliedCourses" onClick={() =>{handleSidebarClose();}}>
                       <FontAwesomeIcon icon={farPaperPlane} />
                       <span className="menu-title">Applied Course</span>
                     </Link>

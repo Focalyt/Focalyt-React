@@ -219,7 +219,11 @@ display:flex;
 align-items:center;
 justify-content: space-between;
 width:100%;
-flex-direction: row;}    
+flex-direction: row;}  
+
+.float-right{
+        flex-direction: row;
+      }  
 `
         }
       </style>
