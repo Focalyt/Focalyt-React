@@ -84,7 +84,7 @@ const Layout = () => {
           {/* <Route path="course" element={<CourseDetail/>}/> */}
           <Route path="course/:courseId" element={<SearchCourseDetail />} />
           <Route path="job/:JobId" element={<CandidateViewJobs/>}/>
-          <Route path="requiredDocs" element={<RequiredDocuments/>}/>
+          <Route path="reqDocs/:courseId" element={<RequiredDocuments/>}/>
         </Route>
         <Route path='/admin' element ={<AdminLayout/>}>
         
