@@ -1314,50 +1314,7 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
   try {
     const data = req.query;
 
-    const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
-    console.log(fullUrl);
-
-    // Modify script to run after DOM is loaded and escape quotes properly
-    const storageScript = `
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        try {
-        const storedurl = localStorage.getItem('entryUrl');
-        if(!storedurl){
-          // Store current URL immediately
-          const data = {
-            url: '${fullUrl.replace(/'/g, "\\'")}',
-            timestamp: new Date().getTime()
-          };
-          localStorage.setItem('entryUrl', JSON.stringify(data));
-          
-          // Verify it was stored
-          console.log('URL stored:', localStorage.getItem('entryUrl'))};
-          
-          // Function to check and clean expired URL
-          function cleanExpiredUrl() {
-            const stored = localStorage.getItem('entryUrl');
-            if (stored) {
-              const data = JSON.parse(stored);
-              const now = new Date().getTime();
-              const hours24 = 24 * 60 * 60 * 1000;
-              
-              if (now - data.timestamp > hours24) {
-                localStorage.removeItem('entryUrl');
-                console.log('Expired URL removed');
-              }
-            }
-          }
-          
-          // Check for expired URLs
-          cleanExpiredUrl();
-          
-        } catch (error) {
-          console.error('Error storing URL:', error);
-        }
-      });
-    </script>
-  `;
+   
     const perPage = 10;
     const p = parseInt(req.query.page);
     const page = p || 1;
@@ -1396,13 +1353,12 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     let courses = await Courses.find(fields).populate("sectors");
     count = await Courses.countDocuments(fields);
     const totalPages = Math.ceil(count / perPage);
-    return res.render(`${req.vPath}/app/candidate/search-cources`, {
-      menu: 'Cources',
+    console.log('courses',courses)
+    return res.json( {
       courses,
       data,
       totalPages,
       page,
-      storageScript: storageScript
     });
 
   } catch (err) {

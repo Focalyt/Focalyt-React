@@ -21,10 +21,10 @@ const SearchCourses = () => {
   const fetchCourses = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(`${backendUrl}/courses`, {
+      const response = await axios.get(`${backendUrl}/candidate/searchcourses`, {
         headers: { "x-auth": token },
       });
-      console.log("✅ Courses Fetched:", response.data.courses);
+      console.log("✅ Courses Fetched:", response);
       setCourses(response.data.courses || []);
     } catch (error) {
       console.error("Error fetching courses:", error);
@@ -80,8 +80,7 @@ const SearchCourses = () => {
           </div>
         </div>
 
-        <h3 className="text-center">Search Course</h3>
-        <ul className="nav nav-tabs justify-content-center" id="courseTabs">
+        <ul className="nav nav-tabs justify-content-center d-md-none d-sm-none" id="courseTabs">
           <li className="nav-item">
             <Link className="nav-link active" to="/search-courses">
               Search Courses
@@ -140,7 +139,12 @@ const SearchCourses = () => {
                       <Link to={`/candidate/course/${course._id}`}>
 
                         <h5>{course.name || "N/A"}</h5>
-                        <span className="job_cate">{course.sectorNames?.[0] || "N/A"}</span>
+                        <span className="job_cate">
+  {course.sectors?.length > 0 && course.sectors[0]?.name
+    ? course.sectors[0].name
+    : "N/A"}
+</span>
+
 
                         <div className="row">
                           <div className="col-md-6 col-sm-6 col-6">

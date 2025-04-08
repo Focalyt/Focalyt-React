@@ -33,6 +33,11 @@ const CourseDetails = () => {
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
+  const [selectedCenter, setSelectedCenter] = useState('');
+  
+  const handleSelectChange = (e) => {
+    setSelectedCenter(e.target.value);
+  };
   useEffect(() => {
 
 
@@ -141,8 +146,8 @@ const CourseDetails = () => {
       setAddress(candidate.location?.fullAddress || '');
     }
   }, [candidate]);
-  
-  
+
+
 
   const applyCourse = async (courseId) => {
     try {
@@ -183,10 +188,10 @@ const CourseDetails = () => {
   };
 
   const handlePayment = (courseId) => {
-   
+
     const data = {
       courseId,
-      
+
     };
 
     axios({
@@ -443,7 +448,7 @@ const CourseDetails = () => {
                                 <span className="carousel-control-prev-icon pree" aria-hidden="true"></span>
                                 <span className="visually-hidden">Previous</span>
                               </button>
-                              
+
                               <button
                                 className="carousel-control-next"
                                 type="button"
@@ -642,17 +647,17 @@ const CourseDetails = () => {
                     </a>
                   ) : (
                     <a
-  href="#"
-  style={{
-    pointerEvents: 'none',
-    opacity: 0.6,
-    cursor: 'not-allowed',
-    textDecoration: 'none',
-  }}
-  className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
->
-  <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
-</a>
+                      href="#"
+                      style={{
+                        pointerEvents: 'none',
+                        opacity: 0.6,
+                        cursor: 'not-allowed',
+                        textDecoration: 'none',
+                      }}
+                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+                    >
+                      <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
+                    </a>
 
                   )}
 
@@ -799,17 +804,17 @@ const CourseDetails = () => {
                     </a>
                   ) : (
                     <a
-  href="#"
-  style={{
-    pointerEvents: 'none',
-    opacity: 0.6,
-    cursor: 'not-allowed',
-    textDecoration: 'none',
-  }}
-  className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
->
-  <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
-</a>
+                      href="#"
+                      style={{
+                        pointerEvents: 'none',
+                        opacity: 0.6,
+                        cursor: 'not-allowed',
+                        textDecoration: 'none',
+                      }}
+                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+                    >
+                      <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
+                    </a>
                   )}
                 </div>
 
@@ -1102,6 +1107,32 @@ const CourseDetails = () => {
                   <span aria-hidden="true">&times;</span>
                 </button>
               </div>
+              
+              {course.center && (
+              <div id="chooseCenterContent" className="modal-content">
+                <div className="modal-body pt-1" id="popup-body-form">
+                  <h5 className="pb-1 mb-3 text-success">Please select a center</h5>
+
+                  <div className="form-group">
+                    <select
+                      className="form-control"
+                      id="centerSelect"
+                      name="center"
+                      value={selectedCenter}
+                      onChange={handleSelectChange}
+                    >
+                      <option value="">Select Training Center</option>
+                      {course?.center?.map((c, i) => (
+                        <option key={i} value={c._id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+
+              </div>)}
               <div className="modal-body pt-1" id="popup-body">
                 <h5 className="pb-1 mb-0">
                   Register for this Course

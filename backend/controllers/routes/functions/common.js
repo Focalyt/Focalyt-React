@@ -394,7 +394,7 @@ module.exports.otpCandidateLogin = async (req, res) => {
     if (!user || user === null) {
       throw req.ykError('Login failed!');
     }
-    const candidate = await Candidate.findOne({ mobile }, " _id ").populate('Qualification');
+    const candidate = await Candidate.findOne({ mobile }, " _id ").populate('highestQualification');
     if (!candidate || candidate === null) {
       throw req.ykError('Login failed!');
     }

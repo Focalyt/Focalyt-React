@@ -66,13 +66,14 @@ const AppliedCourses = () => {
           <div className="content-header-left col-md-9 col-12 mb-2">
             <div className="row breadcrumbs-top">
               <div className="col-12 my-auto">
-                <h3 className="content-header-title float-left mb-0">Search Courses</h3>
+              <h3 className="content-header-title float-left mb-0">Applied Courses</h3>
+
                 <div className="breadcrumb-wrapper col-12">
                   <ol className="breadcrumb">
                     <li className="breadcrumb-item">
                       <Link to="/candidate/dashboard">Home</Link>
                     </li>
-                    <li className="breadcrumb-item"><Link to="#">Search Courses</Link></li>
+                    <li className="breadcrumb-item"><Link to="/candidate/appliedCourses">Applied Courses</Link></li>
                   </ol>
                 </div>
               </div>
@@ -80,8 +81,7 @@ const AppliedCourses = () => {
           </div>
         </div>
 
-        <h3 className="text-center">Search Course</h3>
-        <ul className="nav nav-tabs justify-content-center" id="courseTabs">
+        <ul className="nav nav-tabs justify-content-center d-md-none d-sm-block" id="courseTabs">
           <li className="nav-item">
             <Link className="nav-link active" to="/search-courses">
               Search Courses

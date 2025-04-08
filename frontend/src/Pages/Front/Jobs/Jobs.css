@@ -378,7 +378,7 @@ button.close span {
    */
   /* Modal Styles */
   .modal-content {
-    border: none;
+    border: none !important;
     border-radius: 12px;
     /* overflow: hidden; */
   }
