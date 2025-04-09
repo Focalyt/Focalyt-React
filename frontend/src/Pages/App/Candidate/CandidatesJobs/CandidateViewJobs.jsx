@@ -513,7 +513,7 @@ const CandidateViewJobs = () => {
                                 <div className="col-lg-4 col-md-4 column mt-xl-2 mt-lg-3 mt-md-3 mt-sm-0 mt-0">
 
 
-                                    {!isApplied ? (
+                                    { !isRegisterInterview ? (
                                         <a
                                             className="apply-thisjob text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
                                             href="#"
@@ -524,7 +524,7 @@ const CandidateViewJobs = () => {
                                         >
                                             <i className="la la-paper-plane ml-2"></i>Apply for Job / नौकरी के लिए आवेदन
                                         </a>
-                                    ) : !isRegisterInterview ? (
+                                    ) : !isApplied ? (
                                         <a
                                             className="apply-thisjob text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
                                             href="#"
