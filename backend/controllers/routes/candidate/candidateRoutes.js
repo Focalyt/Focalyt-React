@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require("bcryptjs");
 const express = require("express");
+const uuid = require('uuid/v1');
 require('dotenv').config()
 const axios = require("axios")
 const fs = require('fs')
@@ -23,6 +24,7 @@ const ServerEvent = bizSdk.ServerEvent;
 const {
   User,
   CandidateRegister,
+  Center,
   State,
   City,
   Qualification,
@@ -57,6 +59,7 @@ const {
 } = require("../../models");
 const users = require("../../models/users");
 const AWS = require("aws-sdk");
+const multer = require('multer');
 const crypto = require("crypto");
 const {
   getTotalExperience,
@@ -66,6 +69,7 @@ const {
   isCandidate,
   getDistanceFromLatLonInKm,
   sendSms,
+  isAdmin,
 } = require("../../../helpers");
 const router = express.Router();
 const {
@@ -91,6 +95,41 @@ const { CandidateValidators } = require('../../../helpers/validators');
 // Facebook API Configuration
 const FB_API_VERSION = 'v21.0';
 const FB_GRAPH_API = `https://graph.facebook.com/${FB_API_VERSION}/${fbConversionPixelId}/events`;
+
+AWS.config.update({
+  accessKeyId,
+  secretAccessKey,
+  region,
+});
+// Define the custom error
+class InvalidParameterError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'InvalidParameterError';
+  }
+}
+
+const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
+const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
+
+const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
+
+
+const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
+if (!fs.existsSync(destination)) fs.mkdirSync(destination);
+
+const storage = multer.diskStorage({
+  destination,
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, `${basename}-${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({ storage }).single('file');
 
 // Function to hash a value using SHA-256
 // const hashValue = (value) => {
@@ -241,67 +280,29 @@ const getMetaParameters = (req) => {
 
 router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res) => {
   try {
-    const { courseId } = req.params;
+    let { courseId } = req.params;
+    // Check if courseId is a string
+    if (typeof courseId === "string") {
+      console.log("courseId is a string:", courseId);
+
+      // Validate if it's a valid ObjectId before converting
+      if (mongoose.Types.ObjectId.isValid(courseId)) {
+        courseId = new mongoose.Types.ObjectId(courseId); // Convert to ObjectId
+      } else {
+        return res.status(400).json({ error: "Invalid course ID" });
+      }
+    }
     const validation = { mobile: req.user.mobile };
-    // let entryUrl;
-    // if (typeof req.body.entryUrl === 'string') {
-    //   const parsedData = JSON.parse(req.body.entryUrl);
-    //   entryUrl = parsedData.url;
-    // } else {
-    //   // If it's already an object
-    //   entryUrl = req.body.entryUrl.url;
-    // }
+    
 
-    // console.log("Entry URL:", entryUrl);
-
-    // // Create URL object to parse parameters
-    // const urlObj = new URL(entryUrl);
-    // const params = urlObj.searchParams;
-
-    // Get fbclid from URL
-    // const fbclid = params.get('fbclid');
-    // console.log("fbclid:", fbclid);
-
-
-    // Generate fbc from fbclid
-    // let fbc = null;
-    // if (fbclid) {
-    //   // Facebook click ID format: fb.1.{timestamp}.{fbclid}
-    //   fbc = `fb.1.${Date.now()}.${fbclid}`;
-    // }
-
-    // console.log("fbc:", fbc);
-
-    // // Get or generate fbp
-    // let fbp = params.get('fbp');
-
-    // if (!fbp) {
-    //   const timestamp = Date.now();
-    //   const random = Math.floor(Math.random() * 1000000000);
-    //   fbp = `fb.1.${timestamp}.${random}`;
-    // }
-
-    // console.log("fbp:", fbp);
+    selectedCenter = req.body.selectedCenter;
 
 
 
-    // const metaParams = {
-    //   fbc: fbc,
-    //   fbclid: fbclid || null, // Store original fbclid
-    //   fbp: fbp,
-    //   adId: params.get('ad_id') || null,
-    //   campaignId: params.get('campaign_id') || null,
-    //   adsetId: params.get('adset_id') || null,
-    //   utmSource: params.get('utm_source') || null,
-    //   utmMedium: params.get('utm_medium') || null,
-    //   utmCampaign: params.get('utm_campaign') || null
-    // };
+    console.log("selectedCenter",selectedCenter)
 
+   
 
-    // Get Meta parameters
-    // const metaParams = getMetaParameters(req);
-
-    // Validate courseId and candidate's mobile number
     const { value, error } = await CandidateValidators.userMobile(validation);
     if (error) {
       return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
@@ -334,13 +335,19 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
     // If event sent successfully, apply for course
     const apply = await Candidate.findOneAndUpdate(
       { mobile: candidateMobile },
-      { $addToSet: { appliedCourses: courseId } },
+      { $addToSet: { appliedCourses: courseId,
+        selectedCenter: {
+          courseId: courseId,
+          centerId: selectedCenter
+        }
+      } },
       { new: true, upsert: true }
     );
 
     const appliedData = await new AppliedCourses({
       _candidate: candidate._id,
-      _course: courseId
+      _course: courseId,
+      _center: selectedCenter
     }).save();
 
 
@@ -366,51 +373,30 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
       `${process.env.BASE_URL}/coursedetails/${courseId}`,
       course?.registrationCharges,
       appliedData?.registrationFee,
-      'Lead From Portal'
+      'Lead From Portal',
+      course?.courseFeeType, 
+      course?.typeOfProject,
+      course?.projectName,
+      "Self" 
+
 
     ];
     await updateSpreadSheetValues(sheetData);
 
-    let candidateMob = String(candidate.mobile);
+    let candidateMob = candidate.mobile;
 
     // Check if the mobile number already has the country code
-    if (!candidateMob.startsWith("91") && candidateMob.length == 10) {
-      candidateMob = "91" + candidate.mobile; // Add country code if missing and the length is 10
+    if (typeof candidateMob !== "string") {
+      candidateMob = String(candidateMob); // Convert to string
     }
 
+    if (!candidateMob.startsWith("91") && candidateMob.length === 10) {
+      candidateMob = "91" + candidateMob; // Add country code if missing and the length is 10
+    }
+
+
     console.log(candidateMob);
-
-    // // Track conversion event
-    // const metaApi = new MetaConversionAPI();
-    // await metaApi.trackCourseApplication(
-    //   {
-    //     courseName: course.name,
-    //     courseId: courseId,
-    //     courseValue: course.registrationCharges,
-    //     sourceUrl: `${process.env.BASE_URL}/coursedetails/${courseId}`
-    //   },
-    //   {
-    //     email: candidate.email,
-    //     phone: candidateMob,
-    //     firstName: candidate.name.split(' ')[0],
-    //     lastName: candidate.name.split(' ').slice(1).join(' '),
-    //     gender: candidate?.sex === 'Male' ? 'm' : candidate?.sex === 'Female' ? 'f' : '',
-    //     dob: candidate?.dob ? moment(candidate.dob).format('YYYYMMDD') : '',
-    //     city: candidate.city?.name,
-    //     state: candidate.state?.name,
-    //     ipAddress: req.ip,
-    //     userAgent: req.headers['user-agent']
-    //   },
-    //   metaParams
-    // );
-
-
-
-
-
-
-
-    return res.status(200).json({ status: true, msg: "Course applied successfully." });
+return res.status(200).json({ status: true, msg: "Course applied successfully." });
   } catch (error) {
     console.error("Error applying for course:", error.message);
     return res.status(500).json({ status: false, msg: "Internal server error.", error: error.message });
@@ -975,16 +961,16 @@ router.get("/login", async (req, res) => {
     });
   });
 
-  // router.get("/job/:jobId", [isCandidate], async (req, res) => {
-  router.get("/job/:jobId", async (req, res) => {
+  router.get("/job/:jobId", [isCandidate], async (req, res) => {
+  // router.get("/job/:jobId", async (req, res) => {
     const jobId = req.params.jobId;
     const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
-    // const userMobile = req.session.user.mobile;
-    // let validation = { mobile: userMobile }
-    // let { value, error } = await CandidateValidators.userMobile(validation)
-    // if (error) {
-    //   return res.send({ status: "failure", error: "Something went wrong!", error });
-    // }
+    const userMobile = req.user.mobile;
+    let validation = { mobile: userMobile }
+    let { value, error } = await CandidateValidators.userMobile(validation)
+    if (error) {
+      return res.send({ status: "failure", error: "Something went wrong!", error });
+    }
   
     const perPage = 10;
     const page = parseInt(req.query.page) || 1;
@@ -1003,65 +989,64 @@ router.get("/login", async (req, res) => {
       return res.redirect("/candidate/searchJob");
     }
   
-    // const candidate = await Candidate.findOne({ mobile: userMobile });
-    // let canApply = false;
-    // if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
-    //   if (candidate.isExperienced == false || candidate.isExperienced == true) {
-    //     canApply = true;
-    //   }
-    // }
+    const candidate = await Candidate.findOne({ mobile: userMobile });
+    let canApply = false;
+    if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.city && candidate.state && candidate.highestQualification) {
+      if (candidate.isExperienced == false || candidate.isExperienced == true) {
+        canApply = true;
+      }
+    }
     let isRegisterInterview = false;
-    // const checkJobRegister = await AppliedJobs.findOne({
-    //   _candidate: candidate._id,
-    //   _job: new mongoose.Types.ObjectId(jobId)
-    // });
-    // if (checkJobRegister && checkJobRegister?.isRegisterInterview) {
-    //   isRegisterInterview = true;
-    // }
-    // let isApplied = false;
-    // if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
-    //   isApplied = true;
-    // }
-    // let hasCredit = true;
-    // let coins = await CoinsAlgo.findOne({});
-    // if (!candidate.creditLeft || candidate.creditLeft < coins.job) {
-    //   hasCredit = false;
-    // }
-    // let mobileNumber = jobDetails.phoneNumberof ? jobDetails.phoneNumberof : contact[0]?.mobile
-    // let reviewed = await Review.findOne({ _job: jobId, _user: candidate._id });
-    // let course = [];
-    // const recomCo = await Vacancy.distinct('_courses.courseLevel', {
-    //   "_id": new mongoose.Types.ObjectId(jobId), "_courses.isRecommended": true
-    // });
-    // console.log(recomCo, "recomCorecomCorecomCorecomCo");
-    // if (recomCo.length > 0) {
-    //   const fields = {
-    //     status: true,
-    //     isDeleted: false,
-    //     _id: {
-    //       $in: recomCo
-    //     }
-    //   };
-    //   // if (candidate?.appliedCourses.length > 0) {
-    //   //   fields._id = {
-    //   //     $nin: candidate.appliedCourses
-    //   //   }
-    //   // }
-    //   course = await Courses.find(fields).populate("sectors");
-    // }
+    const checkJobRegister = await AppliedJobs.findOne({
+      _candidate: candidate._id,
+      _job: new mongoose.Types.ObjectId(jobId)
+    });
+    if (checkJobRegister && checkJobRegister?.isRegisterInterview) {
+      isRegisterInterview = true;
+    }
+    let isApplied = false;
+    if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
+      isApplied = true;
+    }
+    let hasCredit = true;
+    let coins = await CoinsAlgo.findOne({});
+    if (!candidate.creditLeft || candidate.creditLeft < coins.job) {
+      hasCredit = false;
+    }
+    let mobileNumber = jobDetails.phoneNumberof ? jobDetails.phoneNumberof : contact[0]?.mobile
+    let reviewed = await Review.findOne({ _job: jobId, _user: candidate._id });
+    let course = [];
+    const recomCo = await Vacancy.distinct('_courses.courseLevel', {
+      "_id": new mongoose.Types.ObjectId(jobId), "_courses.isRecommended": true
+    });
+    console.log(recomCo, "recomCorecomCorecomCorecomCo");
+    if (recomCo.length > 0) {
+      const fields = {
+        status: true,
+        isDeleted: false,
+        _id: {
+          $in: recomCo
+        }
+      };
+      // if (candidate?.appliedCourses.length > 0) {
+      //   fields._id = {
+      //     $nin: candidate.appliedCourses
+      //   }
+      // }
+      course = await Courses.find(fields).populate("sectors");
+    }
   
     return res.json( {
-      menu: "Jobs",
       jobDetails,
-      // candidate,
-      // isApplied,
-      // isRegisterInterview,
-      // canApply,
-      // hasCredit,
-      // coins,
-      // mobileNumber,
-      // reviewed: reviewed ? true : false,
-      // course,
+      candidate,
+      isApplied,
+      isRegisterInterview,
+      canApply,
+      hasCredit,
+      coins,
+      mobileNumber,
+      reviewed: reviewed ? true : false,
+      course,
       // page,
       // totalPages
     });
@@ -1380,17 +1365,30 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
       return res.status(400).json({ status: false, message: "Invalid user" });
     }
 
-    let course = await Courses.findById(courseId).populate('sectors').lean();
+    let course = await Courses.findById(courseId).populate('sectors').populate('center').lean();
+
     if (!course || course?.status === false) {
       return res.status(404).json({ status: false, message: "Course not found" });
     }
 
     const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
     const highestQualification = await Qualification.find({ status: true });
+    const centers = await Center.find();
+
+    let docsRequired = false;
+
+    const requiredDocs = course.docsRequired ? course.docsRequired.length : 0;
+
+    if(requiredDocs>0){
+      docsRequired = true
+    };
+
+    console.log("requiredDocs",requiredDocs)
+    console.log("docsRequired",docsRequired)
 
 
     let canApply = false;
-    if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.location.fullAddress && candidate.highestQualification) {
+    if (candidate.name && candidate.mobile && candidate.sex && candidate.whatsapp && candidate.location && candidate.highestQualification) {
       if (candidate.isExperienced == false || candidate.isExperienced == true) {
         canApply = true;
       }
@@ -1423,10 +1421,11 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
     return res.json({
       status: true,
       course,
+      docsRequired,
+      isApplied,
+      mobileNumber,
       canApply,
-      candidate,
-      highestQualification,
-      isApplied
+      centers,
 
     });
 
@@ -3871,5 +3870,223 @@ router.route('/review/:job')
       console.log(err)
       return res.status(500).send({ status: false, message: err.message })
     }
+  });
+
+  router.route('/reqDocs/:courseId')
+  .get(isCandidate, async (req, res) => {    
+    try {
+
+      console.log("fetching docs")
+      const filter = { status: true };
+      const validation = { mobile: req.user.mobile };
+      const { value, error } = await CandidateValidators.userMobile(validation);
+      if (error) {
+        return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
+      };
+      const candidateMobile = value.mobile;
+      const { courseId } = req.params;
+      const candidate = await Candidate.findOne({
+        mobile: candidateMobile,
+        appliedCourses: courseId  // Check if courseId exists in appliedCourses
+      });
+
+      if (!candidate) {
+        console.log("You have not applied for this course.")
+        res.redirect("/candidate/searchcourses");
+      };
+      const course = await Courses.findById(courseId);
+      let docsRequired = null
+      if (course) {
+        docsRequired = course.docsRequired; // requireDocs array fetch ho jayega
+        
+      } else {
+        console.log("Course not found");
+      };
+
+      let uploadedDocs = [];
+      if (candidate.docsForCourses && candidate.docsForCourses.length > 0) {
+        const courseEntry = candidate.docsForCourses.find(
+          entry => entry.courseId.toString() === courseId.toString()
+        );
+        if (courseEntry && courseEntry.uploadedDocs) {
+          uploadedDocs = courseEntry.uploadedDocs;
+        }
+      }
+      let mergedDocs = [];
+      
+      if (course && course.docsRequired) {
+        docsRequired = course.docsRequired;
+      
+      // Create a merged array with both required docs and uploaded docs info
+      mergedDocs = docsRequired.map(reqDoc => {
+        // Convert Mongoose document to plain object
+        const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+        
+        // Find matching uploaded docs for this required doc
+        const matchingUploads = uploadedDocs.filter(
+          uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+        );
+        
+        return {
+          _id: docObj._id,
+          Name: docObj.Name,
+          
+          description: docObj.description || '',
+          uploads: matchingUploads || []
+        };
+      });
+      
+      // console.log("Merged docs:", JSON.stringify(mergedDocs, null, 2));
+    } else {
+      console.log("Course not found or no docs required");
+    };
+
+    console.log(mergedDocs)
+      
+      res.json({
+        docsRequired,
+        courseId,
+        uploadedDocs,
+        mergedDocs: mergedDocs || []
+      });
+    } catch (err) {
+      console.log("caught error ", err);
+    }
   })
+
+  .post(isCandidate, async (req, res) => {
+    try {
+        const { docsName, courseId, docsId } = req.body;
+        console.log("docsId:", docsId, "Type:", typeof docsId, "Valid:", mongoose.Types.ObjectId.isValid(docsId));
+
+        if (!mongoose.Types.ObjectId.isValid(docsId)) {
+            return res.status(400).json({ error: "Invalid document ID format." });
+        }
+
+        const validation = { mobile: req.user.mobile };
+        const { value, error } = await CandidateValidators.userMobile(validation);
+        if (error) {
+            return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
+        }
+        const candidateMobile = value.mobile;
+
+        const candidate = await Candidate.findOne({
+            mobile: candidateMobile,
+            appliedCourses: courseId
+        });
+
+        if (!candidate) {
+            return res.status(400).json({ error: "You have not applied for this course." });
+        }
+
+        let files = req.files?.file;
+        if (!files) {
+            return res.status(400).send({ status: false, message: "No files uploaded" });
+        }
+
+        console.log("Files", files);
+        const candidateId = candidate._id
+
+        const filesArray = Array.isArray(files) ? files : [files];
+        const uploadedFiles = [];
+        const uploadPromises = [];
+
+        filesArray.forEach((item) => {
+            const { name, mimetype } = item;
+            const ext = name?.split('.').pop().toLowerCase();
+
+            console.log(`Processing File: ${name}, Extension: ${ext}`);
+
+            if (!allowedExtensions.includes(ext)) { // ✅ Now includes PDFs
+                console.log("File type not supported")
+                throw new Error(`File type not supported: ${ext}`);
+            }
+
+            let fileType = "document"; // ✅ Default to "document"
+            if (allowedImageExtensions.includes(ext)) {
+                fileType = "image";
+            } else if (allowedVideoExtensions.includes(ext)) {
+                fileType = "video";
+            }
+
+            const key = `Documents for course/${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
+            const params = {
+                Bucket: bucketName,
+                Key: key,
+                Body: item.data,
+                ContentType: mimetype,
+            };
+
+            uploadPromises.push(
+                s3.upload(params).promise().then((uploadResult) => {
+                    uploadedFiles.push({
+                        fileURL: uploadResult.Location,
+                        fileType,
+                    });
+                })
+            );
+        });
+
+        await Promise.all(uploadPromises);
+        console.log(uploadedFiles)
+
+        const fileUrl = uploadedFiles[0].fileURL;
+
+        const existingCourseDoc = await Candidate.findOne({
+            mobile: candidateMobile,
+            "docsForCourses.courseId": courseId
+        });
+
+        if (existingCourseDoc) {
+            const updatedCandidate = await Candidate.findOneAndUpdate(
+                { mobile: candidateMobile, "docsForCourses.courseId": courseId },
+                {
+                    $push: {
+                        "docsForCourses.$.uploadedDocs": {
+                            docsId: new mongoose.Types.ObjectId(docsId),
+                            fileUrl: fileUrl,
+                            status: "Pending",
+                            uploadedAt: new Date()
+                        }
+                    }
+                },
+                { new: true }
+            );
+
+            return res.status(200).json({
+                status: true,
+                message: "Document uploaded successfully",
+                data: updatedCandidate
+            });
+        } else {
+            const updatedCandidate = await Candidate.findOneAndUpdate(
+                { mobile: candidateMobile },
+                {
+                    $push: {
+                        "docsForCourses": {
+                            courseId: new mongoose.Types.ObjectId(courseId),
+                            uploadedDocs: [{
+                                docsId: new mongoose.Types.ObjectId(docsId),
+                                fileUrl: fileUrl,
+                                status: "Pending",
+                                uploadedAt: new Date()
+                            }]
+                        }
+                    }
+                },
+                { new: true }
+            );
+
+            return res.status(200).json({
+                status: true,
+                message: "Document uploaded successfully",
+                data: updatedCandidate
+            });
+        }
+    }
+    catch (err) {
+        console.log(err)
+        return res.status(500).send({ status: false, message: err.message })
+    }
+})
 module.exports = router;

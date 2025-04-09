@@ -526,17 +526,6 @@ const CandidateViewJobs = () => {
                                     >
                                         <i className="la la-paper-plane ml-2"></i>Apply for Job / नौकरी के लिए आवेदन
                                     </a>
-                                ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
-                                    <a
-                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            handlePayment(course._id);
-                                        }}
-                                    >
-                                        <i className="la la-paper-plane ml-3"></i>Complete Registration
-                                    </a>
                                 ) : (
                                     <a
                                         className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"

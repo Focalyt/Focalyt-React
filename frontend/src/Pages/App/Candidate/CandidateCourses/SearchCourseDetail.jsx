@@ -9,6 +9,7 @@ const CourseDetails = () => {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
   const [candidate, setCandidate] = useState(null);
+  const [docsRequired, setDocsRequired] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isApplied, setIsApplied] = useState(false);
   const [canApply, setCanApply] = useState(true);
@@ -34,10 +35,13 @@ const CourseDetails = () => {
   const [longitude, setLongitude] = useState('');
   const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
   const [selectedCenter, setSelectedCenter] = useState('');
-  
+  const [selectCenterVisible, setSelectCenterVisible] = useState(false);
+  const [proceedbtnVisible, setProceedbtnVisibleVisible] = useState(false);
+
   const handleSelectChange = (e) => {
     setSelectedCenter(e.target.value);
   };
+
   useEffect(() => {
 
 
@@ -117,11 +121,22 @@ const CourseDetails = () => {
 
         if (response.data && response.data.course) {
           setCourse(response.data.course);
+          setDocsRequired(response.data.docsRequired);
           setCandidate(response.data.candidate);
           setIsApplied(response.data.isApplied);
           setCanApply(response.data.canApply);
           sethighestQualificationdata(response.data.highestQualification);
           setMobileNumber(response.data.mobileNumber || response.data.course.counslerphonenumber);
+          if (Array.isArray(response.data.course.center) && response.data.course.center.length > 0) {
+            setSelectCenterVisible(true);
+            setProceedbtnVisibleVisible(false);
+
+          }
+          else {
+            setSelectCenterVisible(false);
+            setProceedbtnVisibleVisible(true);
+
+          }
         } else {
           console.error("Course data is missing in API response:", response.data);
         }
@@ -154,7 +169,12 @@ const CourseDetails = () => {
       const entryUrlData = localStorage.getItem('entryUrl');
       const data = {
         entryUrl: entryUrlData ? entryUrlData : null,
+
       };
+
+      if (selectedCenter) {
+        data.selectedCenter = selectedCenter
+      }
 
       const response = await axios({
         method: 'post',
@@ -1107,47 +1127,75 @@ const CourseDetails = () => {
                   <span aria-hidden="true">&times;</span>
                 </button>
               </div>
-              
-              {course.center && (
-              <div id="chooseCenterContent" className="modal-content">
-                <div className="modal-body pt-1" id="popup-body-form">
-                  <h5 className="pb-1 mb-3 text-success">Please select a center</h5>
 
-                  <div className="form-group">
-                    <select
-                      className="form-control"
-                      id="centerSelect"
-                      name="center"
-                      value={selectedCenter}
-                      onChange={handleSelectChange}
+              {selectCenterVisible && (
+                <div id="chooseCenterContent" className="modal-content">
+                  <div className="modal-body pt-1" id="popup-body-form">
+                    <h5 className="pb-1 mb-3 text-success">Please select a center</h5>
+
+                    <div className="form-group">
+                      <select
+                        className="form-control"
+                        id="centerSelect"
+                        name="center"
+                        value={selectedCenter}
+                        onChange={handleSelectChange}
+                      >
+                        <option value="">Select Training Center</option>
+                        {course.center.map((c, i) => (
+                          <option key={i} value={c._id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      className="btn btn-primary"
+                      id="next-btn"
+                      onClick={() => {
+                        setSelectCenterVisible(false);
+                        setProceedbtnVisibleVisible(true)
+                      }
+                      }
                     >
-                      <option value="">Select Training Center</option>
-                      {course?.center?.map((c, i) => (
-                        <option key={i} value={c._id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                      Next
+                    </button>
+
                   </div>
+
                 </div>
+              )}
 
+              {proceedbtnVisible && (
+                <>
 
-              </div>)}
-              <div className="modal-body pt-1" id="popup-body">
-                <h5 className="pb-1 mb-0">
-                  Register for this Course
-                </h5>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  id="apply-btn"
-                  onClick={() => applyCourse(course._id)}
-                >
-                  Proceed
-                </button>
-              </div>
+                  <div className="modal-body pt-1" id="popup-body">
+                    <h5 className="pb-1 mb-0">
+                      Register for this Course
+                    </h5>
+                  </div>
+                  <div className="modal-footer">
+                    {(Array.isArray(course.center) && course.center.length > 0) && (
+                      <button
+                        className="btn btn-primary"
+                        id="back-btn"
+                        onClick={() => {
+                          setProceedbtnVisibleVisible(false);
+                          setSelectCenterVisible(true)
+                        }}
+                      >
+                        Back
+                      </button>)}
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      id="apply-btn"
+                      onClick={() => applyCourse(course._id)}
+                    >
+                      Proceed
+                    </button>
+                  </div> </>)}
             </div>
           ) : (
 
@@ -1225,7 +1273,8 @@ const CourseDetails = () => {
                     className="form-control"
                     id="address-location"
                     placeholder="City/ शहर"
-                    value={candidate.location.fullAddress}
+                    value={candidate?.location?.fullAddress || ""}
+
                     onChange={(e) => setAddress(e.target.value)}
 
                   />
@@ -1267,9 +1316,23 @@ const CourseDetails = () => {
               <h5 className="pb-1 mb-0">
                 Congratulations!
               </h5>
-              <span>You have successfully registered for this course.<br /> Our team will contact you shortly.</span>
+              {!docsRequired ? (
+                <span>
+                  You have successfully registered for this course.
+                  <br />
+                  Our team will contact you shortly for the next steps.
+                </span>
+              ) : (
+                <span>
+                  You have successfully registered for this course.
+                  <br />
+                  Please upload the required documents to proceed with your application.
+                </span>
+              )}
+
             </div>
             <div className="modal-footer">
+            {!docsRequired ? (
               <button
                 type="button"
                 className="btn btn-primary"
@@ -1283,7 +1346,15 @@ const CourseDetails = () => {
                 }}
               >
                 Close
-              </button>
+              </button>):(
+              <a
+              href={`/candidate/reqDocs/${course._id}`}
+              className="btn btn-primary"
+              id="uploadDocsbtn"
+            >
+              Upload Required Documents
+            </a>
+            )}
             </div>
           </div>
         </div>
@@ -1316,8 +1387,3 @@ const CourseDetails = () => {
 };
 
 export default CourseDetails;
-
-
-
-
-
