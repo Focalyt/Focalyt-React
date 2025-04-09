@@ -19,6 +19,7 @@ const CandidateViewJobs = () => {
     const [showApplyModal, setShowApplyModal] = useState(false);
     const [showRegisterModal, setShowRegisterModal] = useState(false);
     const [showAfterApply, setShowAfterApply] = useState(false);
+    const [isRegisterInterview, setIsRegisterInterview] = useState(false);
 
     const [videoSrc, setVideoSrc] = useState("");
     const videoRef = useRef(null);
@@ -46,6 +47,7 @@ const CandidateViewJobs = () => {
                 if (response.data && response.data.jobDetails) {
                     setCourse(response.data.jobDetails);
                     setIsApplied(response.data.isApplied);
+                    setIsRegisterInterview(response.data.isRegisterInterview);
                     setCanApply(response.data.canApply);
                     setMobileNumber(response.data.mobileNumber || response.data.course.counslerphonenumber);
                 } else {
@@ -220,7 +222,8 @@ const CandidateViewJobs = () => {
     const applyJob = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post(`/candidate/job/${course._id}/apply`, {}, {
+            // const response = await axios.post(`/candidate/job/${course._id}/apply`, {}, {
+            const response = await axios.post(`${backendUrl}/candidate/job/${course._id}/apply`, {}, {
                 headers: { 'x-auth': token }
             });
             setHasApplied(true);
@@ -233,7 +236,8 @@ const CandidateViewJobs = () => {
     const registerForInterview = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post(`/candidate/job/${course._id}/registerInterviews`, {}, {
+            // const response = await axios.post(`/candidate/job/${course._id}/registerInterviews`, {}, {
+            const response = await axios.post(`${backendUrl}/candidate/job/${course._id}/registerInterviews`, {}, {
                 headers: { 'x-auth': token }
             });
             setShowRegisterModal(false);
@@ -353,9 +357,9 @@ const CandidateViewJobs = () => {
                                             </div>
                                         </div>
                                     </div>
-                                   
 
-                                    <div className="row py-4">
+
+                                    {/* <div className="row py-4">
                                         <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-4 mb-4">
                                             <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
                                                 <div className="carousel-indicators">
@@ -392,7 +396,7 @@ const CandidateViewJobs = () => {
                                                                 />
                                                             </div>
                                                         ))
-                                                    ): null}
+                                                    ) : null}
                                                 </div>
 
                                                 {course.photos && course.photos.length > 0 && (
@@ -450,7 +454,7 @@ const CandidateViewJobs = () => {
                                                     </a>
 
                                                 </div>
-                                            </div> */}
+                                            </div> 
 
                                         <div className="col-md-6 d-xl-none d-lg-none d-md-none d-sm-block d-block">
                                             <div className="v_pal">
@@ -487,79 +491,164 @@ const CandidateViewJobs = () => {
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
+                                    </div> */}
 
                                     <div className="job-single-sec">
-                                    <div className="cr_detail_in cr_vw">
-                                        <h3 className="mt-xl-2 mt-lg-3 mt-md-3 mt-sm-2 mt-2 mb-xl-4 mb-lg-4 mb-sm-2 mb-2">Job Description / नौकरी का विवरण</h3>
-                                        <div className="row">
-                                            <div className="col-12">
-                                                <p>
-                                                    {course.description || "No description available."}
-                                                </p>
+                                        <div className="cr_detail_in cr_vw">
+                                            <h3 className="mt-xl-2 mt-lg-3 mt-md-3 mt-sm-2 mt-2 mb-xl-4 mb-lg-4 mb-sm-2 mb-2">Job Description / नौकरी का विवरण</h3>
+                                            <div className="row">
+                                                <div className="col-12">
+                                                    <p>
+                                                        {course.description || "No description available."}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                </div>
-
-                               
-                            
-
-                            <div className="col-lg-4 col-md-4 column mt-xl-2 mt-lg-3 mt-md-3 mt-sm-0 mt-0">
 
 
-                                {!isApplied ? (
-                                    <a
-                                        className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
-                                        href="#"
-                                        title="apply"
-                                        style={{ textDecoration: 'none' }}
-                                        data-toggle="modal"
-                                        data-target="#apply"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            document.getElementById('apply').classList.add('show');
-                                            document.getElementById('apply').style.display = 'block';
-                                            document.body.classList.add('modal-open');
-                                        }}
-                                    >
-                                        <i className="la la-paper-plane ml-2"></i>Apply for Job / नौकरी के लिए आवेदन
-                                    </a>
-                                ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
-                                    <a
-                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            handlePayment(course._id);
-                                        }}
-                                    >
-                                        <i className="la la-paper-plane ml-3"></i>Complete Registration
-                                    </a>
-                                ) : (
-                                    <a
-                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"
-                                        href="#"
-                                    >
-                                        <i className="la la-paper-plane ml-3"></i>Applied Course
-                                    </a>
-                                )}
-                                <a
-                                    className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
-                                    href={`tel:${course.counslerphonenumber}`}
-                                    title="call"
-                                    style={{ textDecoration: 'none' }}
-                                >
-                                    <i className="la la-phone plane-font ml-2"></i>Call To HR/ एचआर को कॉल करें
-                                </a>
-                                <div className="d-xl--none d-lg-none d-md-none d-sm-block d-block" id="floating-apply">
+
+
+                                <div className="col-lg-4 col-md-4 column mt-xl-2 mt-lg-3 mt-md-3 mt-sm-0 mt-0">
+
+
                                     {!isApplied ? (
                                         <a
-                                            className="apply-thisjob apply-div-field text-left px-0 py-2 mb-2 decoration-none shadow text-center"
+                                            className="apply-thisjob text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
                                             href="#"
-                                            title="apply"
-                                            style={{ textDecoration: 'none' }}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setShowApplyModal(true);
+                                            }}
+                                        >
+                                            <i className="la la-paper-plane ml-2"></i>Apply for Job / नौकरी के लिए आवेदन
+                                        </a>
+                                    ) : !isRegisterInterview ? (
+                                        <a
+                                            className="apply-thisjob text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
+                                            href="#"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setShowRegisterModal(true);
+                                            }}
+                                        >
+                                            <i className="fa fa-hand-o-up ml-2"></i>Register for Interview / साक्षात्कार के लिए पंजीकरण करें
+                                        </a>
+                                    ) : (
+                                        <a
+                                            className="apply-thisjob text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none disabled-button"
+                                            href="#"
+                                        >
+                                            <i className="la la-paper-plane ml-2"></i>Registered / पंजीकृत
+                                        </a>
+                                    )}
+
+                                    <a
+                                        className="apply-thisjob apply-div-field text-left d-xl-block d-lg-block d-md-block d-sm-none d-none mb-2 decoration-none"
+                                        href={`tel:${course.counslerphonenumber}`}
+                                        title="call"
+                                        style={{ textDecoration: 'none' }}
+                                    >
+                                        <i className="la la-phone plane-font ml-2"></i>Call To HR/ एचआर को कॉल करें
+                                    </a>
+
+                                    <div className="d-xl-none d-lg-none d-md-none d-sm-block d-block" id="floating-apply">
+                                        {!isApplied ? (
+                                            <a
+                                                className="apply-thisjob apply-div-field text-left px-0 py-2 mb-2 decoration-none shadow text-center"
+                                                href="#"
+                                                title="apply"
+                                                style={{ textDecoration: 'none' }}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    setShowApplyModal(true);
+                                                }}
+                                            >
+                                                APPLY NOW
+                                            </a>
+                                        ) : !isRegisterInterview ? (
+                                            <a
+                                                className="apply-thisjob text-left px-0 py-2 mb-2 shadow"
+                                                href="#"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    setShowRegisterModal(true);
+                                                }}
+                                            >
+                                                Register for Interview
+                                            </a>
+                                        ) : (
+                                            <a className="apply-thisjob text-left px-0 py-2 mb-2 disabled-button">Registered</a>
+                                        )}
+
+                                        <a
+                                            className="apply-thisjob text-center apply-div-field text-left px-0 py-2 mb-2 decoration-none shadow text-white"
+                                            href={`tel:${mobileNumber}`}
+                                        >
+                                            CALL NOW
+                                        </a>
+                                    </div>
+
+
+                                    {/* Course Overview */}
+                                    <div className="extra-job-info mb-1 mt-3">
+                                        <span className="text-capitalize px-0 py-1">
+                                            <i className="la la-male"></i>
+                                            <strong>Location</strong>{' '}
+                                            {course.trainingMode ? course.trainingMode : 'No Preferances'}
+                                        </span>
+
+                                        <span className="text-capitalize px-0 py-1">
+                                            <i className="la la-briefcase"></i>
+                                            <strong>Gender Preferance</strong>{' '}
+                                            {course.registrationCharges ? course.registrationCharges : 'N/A'}{' '}
+                                            <b>{isApplied ? ` ( ${course.registrationStatus || 'Unpaid'} )` : ''}</b>
+                                        </span>
+
+                                        <span className="text-capitalize px-0 py-1">
+                                            <i className="la la-money"></i>
+                                            <strong>Work Type</strong>{' '}
+                                            {course.work || 'N/A'}
+                                        </span>
+
+                                        <span className="py-2 px-0">
+                                            <i className="la la-building"></i>
+                                            <strong>Compensation</strong>{' '}
+                                            {course.compensation || 'N/A'}
+                                        </span>
+
+                                        <span className="py-2 px-0">
+                                            <i className="la la-credit-card"></i>
+                                            <strong>Working Type</strong>{' '}
+                                            {course.jobType || 'N/A'}
+                                        </span>
+
+                                        <span className="px-0">
+                                            <i className="la la-map"></i>
+                                            <strong>Pay Type</strong>{' '}
+                                            {moment(course.lastDateForApply || course.createdAt).utcOffset('+05:30').format('DD MMM YYYY')}
+                                        </span>
+
+                                        <span className="text-capitalize px-0 py-1">
+                                            <i className="la la-rupee"></i>
+                                            <strong>Pay Frequency</strong>{' '}
+                                            {course.emiOptionAvailable ? course.emiOptionAvailable : 'N/A'}
+                                        </span>
+                                    </div>
+                                    <a href="#"
+                                        class="apply-thisjob text-center py-2 mt-2  d-xl-block d-lg-block d-md-block d-sm-block d-block px-2 decoration-none rebase-job  mb-3 <%= reviewed ? 'disabled' : '' %> "
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#feedback"> <i
+                                            class="fa-regular fa-comments"></i>
+                                        Give your Feedback/ अपनी प्रतिक्रिया दें
+                                    </a>
+
+                                    {/* Mobile Apply Button */}
+                                    {!isApplied ? (
+                                        <a
+                                            className="viewjob-apply apply-thisjob apply-div-field text-left px-0 d-xl-none d-lg-none d-md-none d-sm-block d-block mt-xl-2 mt-lg-2 mt-md-2 mt-sm-1 mt-1 text-center"
+                                            href="#"
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 document.getElementById('apply').classList.add('show');
@@ -567,11 +656,11 @@ const CandidateViewJobs = () => {
                                                 document.body.classList.add('modal-open');
                                             }}
                                         >
-                                            APPLY NOW
+                                            <i className="la la-paper-plane ml-3"></i>Register for this Course
                                         </a>
                                     ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
                                         <a
-                                            className="apply-thisjob text-left px-0 py-3"
+                                            className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
                                             href="#"
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -582,158 +671,80 @@ const CandidateViewJobs = () => {
                                         </a>
                                     ) : (
                                         <a
-                                            className="apply-thisjob text-left px-0 py-3 disabled-button"
+                                            className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"
                                             href="#"
                                         >
-                                            <i className="la la-paper-plane ml-3"></i>Applied Course
+                                            <i className="la la-paper-plane ml-3"></i>Applied job
                                         </a>
                                     )}
-                                    <a
-                                        className="apply-thisjob text-center apply-div-field text-left px-0 py-2 mb-2 decoration-none shadow text-white"
-                                        href={`tel:${mobileNumber}`}
-                                    >
-                                        CALL NOW
-                                    </a>
                                 </div>
-
-                                {/* Course Overview */}
-                                <div className="extra-job-info mb-1 mt-3">
-                                    <span className="text-capitalize px-0 py-1">
-                                        <i className="la la-male"></i>
-                                        <strong>Location</strong>{' '}
-                                        {course.trainingMode ? course.trainingMode : 'No Preferances'}
-                                    </span>
-
-                                    <span className="text-capitalize px-0 py-1">
-                                        <i className="la la-briefcase"></i>
-                                        <strong>Gender Preferance</strong>{' '}
-                                        {course.registrationCharges ? course.registrationCharges : 'N/A'}{' '}
-                                        <b>{isApplied ? ` ( ${course.registrationStatus || 'Unpaid'} )` : ''}</b>
-                                    </span>
-
-                                    <span className="text-capitalize px-0 py-1">
-                                        <i className="la la-money"></i>
-                                        <strong>Work Type</strong>{' '}
-                                        {course.work || 'N/A'}
-                                    </span>
-
-                                    <span className="py-2 px-0">
-                                        <i className="la la-building"></i>
-                                        <strong>Compensation</strong>{' '}
-                                        {course.compensation || 'N/A'}
-                                    </span>
-
-                                    <span className="py-2 px-0">
-                                        <i className="la la-credit-card"></i>
-                                        <strong>Working Type</strong>{' '}
-                                        {course.jobType || 'N/A'}
-                                    </span>
-
-                                    <span className="px-0">
-                                        <i className="la la-map"></i>
-                                        <strong>Pay Type</strong>{' '}
-                                        {moment(course.lastDateForApply || course.createdAt).utcOffset('+05:30').format('DD MMM YYYY')}
-                                    </span>
-
-                                    <span className="text-capitalize px-0 py-1">
-                                        <i className="la la-rupee"></i>
-                                        <strong>Pay Frequency</strong>{' '}
-                                        {course.emiOptionAvailable ? course.emiOptionAvailable : 'N/A'}
-                                    </span>
-                                </div>
-
-                                {/* Mobile Apply Button */}
-                                {!isApplied ? (
-                                    <a
-                                        className="viewjob-apply apply-thisjob apply-div-field text-left px-0 d-xl-none d-lg-none d-md-none d-sm-block d-block mt-xl-2 mt-lg-2 mt-md-2 mt-sm-1 mt-1 text-center"
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            document.getElementById('apply').classList.add('show');
-                                            document.getElementById('apply').style.display = 'block';
-                                            document.body.classList.add('modal-open');
-                                        }}
-                                    >
-                                        <i className="la la-paper-plane ml-3"></i>Register for this Course
-                                    </a>
-                                ) : course.registrationStatus !== 'Paid' && Number(course.registrationCharges) > 0 ? (
-                                    <a
-                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            handlePayment(course._id);
-                                        }}
-                                    >
-                                        <i className="la la-paper-plane ml-3"></i>Complete Registration
-                                    </a>
-                                ) : (
-                                    <a
-                                        className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none disabled-button"
-                                        href="#"
-                                    >
-                                        <i className="la la-paper-plane ml-3"></i>Applied Course
-                                    </a>
-                                )}
-                            </div>
 
                             </div>
                         </div>
 
                     </div>
                 </div>
-           
-        </section >
 
-            <section>
-                <div className="container-fluid">
-                    <div className="row">
-                        <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mt-xl-0 mt-lg-0 mt-md-0 mt-sm-4 mt-4">
-                            <div className="row">
+            </section >
 
-                                <div className="col-md-6">
-                                    <div className="course_dt mb-4">
-                                        <h6>Recomended Courses</h6>
-
-                                    </div>
+            <section class="list-view">
+                <div class="row">
+                    <div class="col-xl-12 col-lg-12">
+                        <div class="card">
+                            <div class="card-header border border-top-0 border-left-0 border-right-0 pb-1 px-xl-0 px-lg-0 px-md-1 px-sm-1 px-1 pt-2">
+                                <div class="col-xl-6">
+                                    <h4 class="mt-1">Recomended Courses</h4>
                                 </div>
-
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
+            <section class="searchjobspage">
+                <div class="forlrgscreen d-xl-block d-lg-block d-md-block d-sm-none d-none">
+                    <div class="pt-xl-2 pt-lg-0 pt-md-0 pt-sm-5 pt-0">
 
-            <div className="modal fade" id="apply" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+                        <h4 class="text-center"> No Recommended Course found</h4>
+
+
+                    </div>
+                </div>
+            </section>
+
+            {showApplyModal && <div className="modal-backdrop fade show"></div>}
+
+            <div
+                className={`modal fade ${showApplyModal ? 'show d-block' : ''}`}
+                id="apply"
+                tabIndex="-1"
+                role="dialog"
+                aria-labelledby="exampleModalCenterTitle"
+                aria-hidden={!showApplyModal}
+            >
                 <div className="modal-dialog modal-dialog-centered" role="document">
                     {canApply ? (
                         <div className="modal-content">
                             <div className="modal-header">
-                                <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">REGISTRATION</h5>
+                                <h5 className="modal-title text-white text-uppercase">REGISTRATION</h5>
                                 <button
                                     type="button"
                                     className="close"
-                                    onClick={() => {
-                                        document.getElementById('apply').classList.remove('show');
-                                        document.getElementById('apply').style.display = 'none';
-                                        document.body.classList.remove('modal-open');
-                                        document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                                    }}
+                                    onClick={() => setShowApplyModal(false)}
                                 >
                                     <span aria-hidden="true">&times;</span>
                                 </button>
                             </div>
                             <div className="modal-body pt-1" id="popup-body">
-                                <h5 className="pb-1 mb-0">
-                                    Register for this Course
-                                </h5>
+                                <h5 className="pb-1 mb-0">Register for this job</h5>
                             </div>
                             <div className="modal-footer">
                                 <button
                                     type="submit"
                                     className="btn btn-primary"
-                                    id="apply-btn"
-                                    onClick={() => applyCourse(course._id)}
+                                    onClick={() => {
+                                        applyCourse(course._id);
+                                        setShowApplyModal(false);
+                                    }}
                                 >
                                     Proceed
                                 </button>
@@ -742,90 +753,27 @@ const CandidateViewJobs = () => {
                     ) : (
                         <div className="modal-content">
                             <div className="modal-header">
-                                <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">COMPLETE PROFILE</h5>
+                                <h5 className="modal-title text-white text-uppercase">COMPLETE PROFILE</h5>
                                 <button
                                     type="button"
                                     className="close"
-                                    onClick={() => {
-                                        document.getElementById('apply').classList.remove('show');
-                                        document.getElementById('apply').style.display = 'none';
-                                        document.body.classList.remove('modal-open');
-                                        document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                                    }}
+                                    onClick={() => setShowApplyModal(false)}
                                 >
                                     <span aria-hidden="true">&times;</span>
                                 </button>
                             </div>
                             <div className="modal-body pt-1" id="popup-body">
-                                <h5 className="pb-1 mb-0">
-                                    Please complete your profile before applying
-                                </h5>
+                                <h5 className="pb-1 mb-0">Please complete your profile before applying</h5>
                                 <p>You need to complete your profile details to apply for this course.</p>
                             </div>
-
-                            {/* <div className="form-group">
-        <select className="form-control" value={gender} onChange={(e) => setGender(e.target.value)}>
-          <option value="">Your Gender / आपका लिंग</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-        </select>
-      </div>
-      <div className="form-group">
-        <input type="date" className="form-control" value={dob} onChange={(e) => setDob(e.target.value)} placeholder="Date of Birth / जन्म तिथि" />
-      </div>
-      <div className="form-group">
-        <select className="form-control" value={experience} onChange={(e) => setExperience(e.target.value)}>
-          <option value="">Experience / अनुभव</option>
-          <option value="0">Fresher</option>
-          {[...Array(15)].map((_, i) => (
-            <option key={i + 1} value={i + 1}>{i + 1}</option>
-          ))}
-        </select>
-      </div>
-      <div className="form-group">
-        <select className="form-control" value={highestQualification} onChange={(e) => setHighestQualification(e.target.value)}>
-          <option value="">Highest Qualification / उच्चतम योग्यता</option>
-          {highestQualification.map((qual) => (
-            <option key={qual._id} value={qual._id}>{qual.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="form-group">
-        <select className="form-control" value={state} onChange={(e) => {
-          setState(e.target.value);
-          // fetchCity(e.target.value); 
-        }}>
-          <option value="">Current State / वर्तमान राज्य</option>
-          {state.map((s) => (
-            <option key={s._id} value={s._id}>{s.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="form-group">
-        <select className="form-control" value={city} onChange={(e) => setCity(e.target.value)}>
-          <option value="">Current City / वर्तमान शहर</option>
-          {city.map((c) => (
-            <option key={c._id} value={c._id}>{c.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="form-group">
-        <input type="number" className="form-control" value={pincode} onChange={(e) => setPincode(e.target.value)} placeholder="Pincode / पिनकोड" />
-      </div>
-      <div className="form-group">
-        <input type="text" className="form-control" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Your Location / वर्तमान स्थान" />
-        <input type="hidden" value={latitude} />
-        <input type="hidden" value={longitude} />
-      </div>
-
-      <div className="modal-footer">
-      <button className="btn btn-primary" onClick={handleProfileSubmit}>Update and Apply</button>
-    </div> */}
                             <div className="modal-footer">
                                 <button
                                     type="button"
                                     className="btn btn-primary"
-                                    onClick={() => navigate('/candidate/profile')}
+                                    onClick={() => {
+                                        setShowApplyModal(false);
+                                        navigate('/candidate/profile');
+                                    }}
                                 >
                                     Go to Profile
                                 </button>
@@ -858,7 +806,7 @@ const CandidateViewJobs = () => {
                             <h5 className="pb-1 mb-0">
                                 Congratulations!
                             </h5>
-                            <span>You have successfully registered for this course.<br /> Our team will contact you shortly.</span>
+                            <span>You have successfully registered for this job.<br /></span>
                         </div>
                         <div className="modal-footer">
                             <button
@@ -938,8 +886,74 @@ const CandidateViewJobs = () => {
                     </div>
                 </div>
             </div>
+            <div
+                className="modal fade"
+                id="feedback"
+                tabIndex="-1"
+                role="dialog"
+                aria-labelledby="feedbackModalLabel"
+                aria-hidden="true"
+            >
+                <div className="modal-dialog modal-dialog-centered" role="document">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h5 className="modal-title" id="feedbackModalLabel">Your Feedback</h5>
+                            <button
+                                type="button"
+                                className="close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"
+                            >
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <textarea
+                                className="form-control"
+                                rows="4"
+                                placeholder="Write your feedback here..."
+                            ></textarea>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" className="btn btn-primary">Submit Feedback</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-
+            <style>
+                {
+                    `
+        .course_spec {
+  display: flex;
+  margin-top: 20px;
+  color: #000;
+}
+  .jobDetails-wrap{
+  white-space: pre-wrap;
+  }
+        .spe_icon{
+        background: transparent;
+        }
+        .spe_icon i {
+  font-size: 20px;
+  color: #fc2b5a;
+  background:
+#fc2b5a12;
+  border-radius:
+50px;
+  padding:
+5px;
+  border:
+solid 1px #fc2b5a75;
+}
+.course_spec .spe_icon {
+  margin-right: 10px;
+}
+        `
+                }
+            </style>
 
         </>
     );

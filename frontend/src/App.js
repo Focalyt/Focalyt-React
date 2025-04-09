@@ -39,6 +39,8 @@ import AdminLayout from './Component/Layouts/Admin';
 import CandidateLogin from './Pages/App/Candidate/CandidateLogin/CandidateLogin';
 import CandidateViewJobs from './Pages/App/Candidate/CandidatesJobs/CandidateViewJobs';
 import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredDocuments';
+import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
+import CandidateNewProfile from './Pages/App/Candidate/CandidateProfile/CandidateNewProfile';
 const Layout = () => {
   const location = useLocation();
 
@@ -85,6 +87,8 @@ const Layout = () => {
           <Route path="course/:courseId" element={<SearchCourseDetail />} />
           <Route path="job/:JobId" element={<CandidateViewJobs/>}/>
           <Route path="reqDocs/:courseId" element={<RequiredDocuments/>}/>
+          <Route path="pendingFee" element={<PaymentDetails/>}/>
+          <Route path ='userProfile' element={<CandidateNewProfile/>}/>
         </Route>
         <Route path='/admin' element ={<AdminLayout/>}>
         

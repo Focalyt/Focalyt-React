@@ -1,0 +1,72 @@
+.job-single-sec {
+    float: left;
+    width: 100%;
+  }
+  .job-single-head {
+    float: left;
+    width: 100%;
+    display: table;
+    display: block !important;
+    width: 100% !important;
+    overflow-wrap: break-word;
+  }
+  .job-overview {
+    float: left;
+    width: 100%;
+  }
+  .job-overview ul>li {
+    position: relative;
+    margin: 15px 0!important;
+}
+  .job-overview ul>li {
+    float: left;
+    width: 100%;
+    margin: 0;
+    position: relative;
+    padding-left: 67px;
+    margin: 15px 0;
+}
+  .job-overview ul {
+    float: left;
+    width: 100%;
+    border: 2px solid #e8ecec;
+    border-radius: 8px;
+    margin: 0;
+      margin-bottom: 0px;
+    padding:15px !important;
+    transition:.3s;
+  }
+  .job-single-sec .job-overview ul li {
+    float: left;
+    width: 32.334%;
+    padding-left: 50px!important;
+  }
+  .job-single-sec .job-overview ul li i {
+    left: 0;
+  }
+  .job-overview ul > li h3 {
+    float: left;
+    width: 100%;
+    font-size: 13px;
+    font-family: Open Sans;
+    margin:
+  0;
+  }
+  .job-overview ul > li span {
+    float: left;
+    width: 100%;
+    font-size: 13px;
+    color: #888888;
+    margin-top: 7px;
+  }
+   .extra-job-info {
+    float: left;
+    width: calc(100% - 30px);
+    margin-top: 30px;
+  } 
+.job-overview ul>li i {
+  position: absolute;
+  top: 5px;
+  font-size: 30px;
+  color: #FC2B5A;
+}

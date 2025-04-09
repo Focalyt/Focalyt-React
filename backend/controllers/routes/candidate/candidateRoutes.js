@@ -1532,40 +1532,44 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
 
 //   res.status(200).send({ status: true, msg: "Success" });
 // });
+
+
 /* List of applied course */
-router.get("/appliedCourses", [isCandidate], async (req, res) => {
+
+// router.get("/appliedCourses", [isCandidate], async (req, res) => {
+router.get("/appliedCourses", async (req, res) => {
   try {
     console.log("api hitting")
   const p = parseInt(req.query.page);
   const page = p || 1;
   const perPage = 10;
-  let validation = { mobile: req.user.mobile }
-  let { value, error } = CandidateValidators.userMobile(validation)
-  if (error) {
-    console.log(error)
-    return res.send({ status: "failure", error: "Something went wrong!", error });
-  }
-  let candidate = await Candidate.findOne({
-    mobile: value.mobile,
-    isDeleted: false, status: true
-  })
+  // let validation = { mobile: req.user.mobile }
+  // let { value, error } = CandidateValidators.userMobile(validation)
+  // if (error) {
+  //   console.log(error)
+  //   return res.send({ status: "failure", error: "Something went wrong!", error });
+  // }
+  // let candidate = await Candidate.findOne({
+  //   mobile: value.mobile,
+  //   isDeleted: false, status: true
+  // })
   let courses = [];
   let count = 0;
-  if (candidate?.appliedCourses?.length > 0) {
-    courses = await AppliedCourses.find({
-      _candidate: candidate._id
-    }).populate({ path: '_course', populate: { path: 'sectors' } });
+  // if (candidate?.appliedCourses?.length > 0) {
+  //   courses = await AppliedCourses.find({
+  //     _candidate: candidate._id
+  //   }).populate({ path: '_course', populate: { path: 'sectors' } });
 
-    console.log('=================>  ', courses)
-    count = await Courses.countDocuments({
-      _id: {
-        $in: candidate.appliedCourses
-      },
-      isDeleted: false,
-      status: true
-    });
-    console.log(courses, "appplid coursessss loisttt")
-  }
+  //   console.log('=================>  ', courses)
+  //   count = await Courses.countDocuments({
+  //     _id: {
+  //       $in: candidate.appliedCourses
+  //     },
+  //     isDeleted: false,
+  //     status: true
+  //   });
+  //   console.log(courses, "appplid coursessss loisttt")
+  // }
   console.log('courses',courses)
   const totalPages = Math.ceil(count / perPage);
   return res.json({
@@ -1577,6 +1581,51 @@ router.get("/appliedCourses", [isCandidate], async (req, res) => {
   console.log("caught error ", err);
 }
 });
+
+// router.get("/appliedCourses", [isCandidate], async (req, res) => {
+//   try {
+//     console.log("api hitting")
+//   const p = parseInt(req.query.page);
+//   const page = p || 1;
+//   const perPage = 10;
+//   let validation = { mobile: req.user.mobile }
+//   let { value, error } = CandidateValidators.userMobile(validation)
+//   if (error) {
+//     console.log(error)
+//     return res.send({ status: "failure", error: "Something went wrong!", error });
+//   }
+//   let candidate = await Candidate.findOne({
+//     mobile: value.mobile,
+//     isDeleted: false, status: true
+//   })
+//   let courses = [];
+//   let count = 0;
+//   if (candidate?.appliedCourses?.length > 0) {
+//     courses = await AppliedCourses.find({
+//       _candidate: candidate._id
+//     }).populate({ path: '_course', populate: { path: 'sectors' } });
+
+//     console.log('=================>  ', courses)
+//     count = await Courses.countDocuments({
+//       _id: {
+//         $in: candidate.appliedCourses
+//       },
+//       isDeleted: false,
+//       status: true
+//     });
+//     console.log(courses, "appplid coursessss loisttt")
+//   }
+//   console.log('courses',courses)
+//   const totalPages = Math.ceil(count / perPage);
+//   return res.json({
+//     courses,
+//     totalPages,
+//     page
+//   });
+// } catch (err) {
+//   console.log("caught error ", err);
+// }
+// });
 
 router.get("/dashboard", isCandidate, async (req, res) => {
   try {
