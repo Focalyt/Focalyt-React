@@ -503,9 +503,10 @@ function Jobs() {
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
 
-                                            <p className="mb-0 text-white">
-                                              {course._qualification.name}
-                                            </p>
+                                          <p className="mb-0 text-white">
+  {course._qualification?.name || 'N/A'}
+</p>
+
                                           </div>
                                         </div>
                                       </div>
