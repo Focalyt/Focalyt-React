@@ -287,10 +287,7 @@ const CoinsPage = () => {
   }
 
   return (
-    <div className="">
-      <div className="content-overlay"></div>
-      <div className="header-navbar-shadow"></div>
-      <div className="content-wrapper">
+    <>
         <div className="content-header row">
           <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-3 mb-sm-0 mb-0 candidate-card">
             <div className="card">
@@ -385,7 +382,7 @@ const CoinsPage = () => {
             </div>
           </section>
         </div>
-      </div>
+      
 
       {/* Payment Modal - Using React Bootstrap Modal */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
@@ -450,7 +447,7 @@ const CoinsPage = () => {
       
       <div className="sidenav-overlay"></div>
       <div className="drag-target"></div>
-    </div>
+    </>
   );
 };
 

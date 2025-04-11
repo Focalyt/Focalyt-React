@@ -132,13 +132,7 @@ const CandidateEarning = ({
   };
 
   return (
-    <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" 
-      data-open="click" data-menu="vertical-menu-modern" data-col="2-columns">
-      
-      <div className="">
-        <div className="content-overlay"></div>
-        <div className="header-navbar-shadow"></div>
-        <div className="content-wrapper">
+    <>
           <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
             <div className="content-header-left col-md-9 col-12 mb-2">
               <div className="row breadcrumbs-top">
@@ -322,8 +316,8 @@ const CandidateEarning = ({
               </div>
             </section>
           </div>
-        </div>
-      </div>
+        
+      
 
       {/* Cashback modal */}
       <div className="modal fade" id="redeemCashback" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle">
@@ -557,8 +551,46 @@ const CandidateEarning = ({
         </div>
       </div>
 
+                  <style>
+                    {
+                      `
+
+                      .btn-danger {
+    border-color: #e42728 !important;
+    background-color: #ea5455 !important;
+    color: #fff !important;
+}
+.btn-danger:hover {
+    border-color: #e73d3e !important;
+    color: #fff !important;
+    box-shadow: 0 8px 25px -8px #ea5455;
+}
+.btn-success:hover {
+    border-color: #24b263 !important;
+    color: #fff !important;
+    box-shadow: 0 8px 25px -8px #28c76f;
+}
+.tab_head {
+    background-color: #b8caf0;
+    font-size: 17px;
+    color: black;
+}
+.btn-prp {
+    background-color: darkblue;
+    color: #fff;
+}
+.kyc-txt {
+    font-size: 12px;
+}
+    .btn-block {
+  display: block;
+  width: 100%;
+}
+                      `
+                    }
+                  </style>
     
-    </div>
+    </>
   );
 };
 

@@ -1,13 +1,13 @@
 .training-centres {
     background-color: #000; 
-    padding: 40px 20px;
+    padding-bottom:20px;
   }
   
   .section-title {
     font-size: 28px;
     color: #FF3366; 
     font-weight: bold;
-   padding-block: 40px;
+   padding-block: 20px;
   }
   
   /* Centre Card Styling */

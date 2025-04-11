@@ -3,9 +3,12 @@
     background-color: #fff;
     transition: .2s ease-in-out;
 }
-input[type="text"], input[type="password"], input[type="email"], textarea {
+.contact-form input[type="text"],
+.contact-form input[type="password"],
+.contact-form input[type="email"],
+.contact-form textarea {
     background: #e4e4e4 none repeat scroll 0 0;
-    border: medium none;
+    border: none;
     float: left;
     font-size: 12px;
     font-weight: 400;

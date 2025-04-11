@@ -36,16 +36,12 @@ ${url}`;
   };
 
   return (
-    <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" data-open="click" data-menu="vertical-menu-modern" data-col="2-columns">
+    <>
     
       
       {/* Preloader */}
       {preloaderVisible && <div id="preloader"></div>}
 
-      <div className="">
-        <div className="content-overlay"></div>
-        <div className="header-navbar-shadow"></div>
-        <div className="content-wrapper">
           <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
             <div className="content-header-left col-md-9 col-12 mb-2">
               <div className="row breadcrumbs-top">
@@ -88,10 +84,10 @@ ${url}`;
               </div>
             </section>
           </div>
-        </div>
-      </div>
+       
+     
 
-    </div>
+    </>
   );
 };
 

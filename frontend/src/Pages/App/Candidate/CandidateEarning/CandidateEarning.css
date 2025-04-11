@@ -8,37 +8,91 @@ html body .content .content-wrapper {
 .card-body a {
     color: #FC2B5A;
 }
-.btn-danger {
-    border-color: #e42728 !important;
-    background-color: #ea5455 !important;
-    color: #fff !important;
-}
-.btn-danger:hover {
-    border-color: #e73d3e !important;
-    color: #fff !important;
-    box-shadow: 0 8px 25px -8px #ea5455;
-}
-.btn-success:hover {
-    border-color: #24b263 !important;
-    color: #fff !important;
-    box-shadow: 0 8px 25px -8px #28c76f;
-}
-.tab_head {
-    background-color: #b8caf0;
-    font-size: 17px;
-    color: black;
-}
-.btn-prp {
-    background-color: darkblue;
-    color: #fff;
-}
-.kyc-txt {
-    font-size: 12px;
-}
 .btn-orrage {
     background-color: #df4805 !important;
     color: #fff;
 }
 .btn.disabled, .btn:disabled {
     opacity: 0.65;
+}
+.now-padding {
+    padding-top: 8px;
+}
+.extra-wallet {
+    font-weight: 550;
+}
+.candid-box {
+    color: #FC2B5A;
+    font-weight: 600;
+}
+
+
+@media (max-width: 1920px) {
+    .candid-box {
+        font-size: 21px;
+    }
+}
+@media (max-width: 1400px) {
+    .candid-box {
+        font-size: 13px;
+    }
+}
+@media (max-width: 1200px) {
+    .candid-box {
+        font-size: 13px;
+    }
+}
+@media (max-width: 992px) {
+    .candid-box {
+        font-size: 14px;
+    }
+}
+
+@media only screen and (max-width: 972px) {
+    .mipie-earn {
+        width: 38% ;
+    }
+    .font-stick {
+        font-weight: 550 !important;
+        line-height: 1.9;
+    }
+}
+@media only screen and (max-width: 847px) {
+    .mipie-earn {
+        width: 45%;
+    }
+}
+@media(max-width:768px){
+    html body .content .content-wrapper {
+    padding-block:30px;
+    padding-inline:0px;
+    }
+    .mipie-earn{
+        width: 90%;
+    }
+    .candid-box {
+        font-size: 19px;
+    }
+    /* .card{
+        width: 100%!important;
+    } */
+}
+@media only screen and (max-width: 576px) {
+    .mipie-earn {
+        width: 72% ;
+    }
+    .font-stick {
+        font-weight: 500 !important;
+        line-height: 1.9;
+        font-size: 14px;
+    }
+}
+@media only screen and (max-width: 451px) {
+    .mipie-earn {
+        width: 90% ;
+    }
+    .font-stick {
+        font-weight: 500 !important;
+        line-height: 1.9;
+    }
 }

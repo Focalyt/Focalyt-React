@@ -5,17 +5,40 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import "./Community.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShare , faDownload } from '@fortawesome/free-solid-svg-icons';  
+import { faShare, faDownload } from '@fortawesome/free-solid-svg-icons';
 import $ from 'jquery';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+
 function Community() {
   const [posts, setPosts] = useState([]);
   const [expandedPosts, setExpandedPosts] = useState({});
   const [currentSlides, setCurrentSlides] = useState({});
 
+  const [startDate, setStartDate] = useState();
+  const [endDate, setEndDate] = useState();
+  const [filterData, setFilterData] = useState();
+
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  const handleFilter = () => {
+    if (!startDate || !endDate) {
+      alert("Please select both start and end date!");
+      return;
+    }
+
+    const filtered = posts.filter((post) => {
+      const postDate = new Date(post.createdAt);
+      const from = new Date(startDate);
+      const to = new Date(endDate);
+      return postDate >= from && postDate <= to;
+    });
+
+    setFilterData(filtered);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,96 +84,96 @@ function Community() {
       alert("No files to download!");
       return;
     }
-  
-   
-      if (files.length === 1) {
-        // For single file download
-        const fileURL = files[0];
-        const fileName = fileURL.split('/').pop().split('?')[0]; // Handle query params in URL
-        
-        try {
-          // Fetch the file first to handle CORS issues
-          const response = await fetch(fileURL);
-          if (!response.ok) throw new Error(`Failed to fetch: ${fileURL}`);
-          
-          const blob = await response.blob();
-          const blobUrl = window.URL.createObjectURL(blob);
-          
-          const link = document.createElement("a");
-          link.href = blobUrl;
-          link.setAttribute("download", fileName);
-          document.body.appendChild(link);
-          link.click();
-          
-          // Clean up
-          setTimeout(() => {
-            window.URL.revokeObjectURL(blobUrl);
-            document.body.removeChild(link);
-          }, 100);
-          
-        } catch (error) {
-          console.error("Error downloading file:", error);
-          alert(`Failed to download file: ${fileName}. Please try again.`);
-        }
-        
-        return;
+
+
+    if (files.length === 1) {
+      // For single file download
+      const fileURL = files[0];
+      const fileName = fileURL.split('/').pop().split('?')[0]; // Handle query params in URL
+
+      try {
+        // Fetch the file first to handle CORS issues
+        const response = await fetch(fileURL);
+        if (!response.ok) throw new Error(`Failed to fetch: ${fileURL}`);
+
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+
+        // Clean up
+        setTimeout(() => {
+          window.URL.revokeObjectURL(blobUrl);
+          document.body.removeChild(link);
+        }, 100);
+
+      } catch (error) {
+        console.error("Error downloading file:", error);
+        alert(`Failed to download file: ${fileName}. Please try again.`);
       }
-  
+
+      return;
+    }
+
     // For multiple files, create a ZIP
     try {
       const zip = new JSZip();
       const folder = zip.folder("Downloaded_Images");
       let failedFiles = [];
       let successCount = 0;
-      
+
       // Show loading message
-      
-      
+
+
       // Fetch files one by one and add to ZIP
       for (let i = 0; i < files.length; i++) {
         const fileURL = files[i];
-        const fileName = fileURL.split('/').pop() || `image${i+1}.jpg`;
-        
+        const fileName = fileURL.split('/').pop() || `image${i + 1}.jpg`;
+
         try {
           // Explicitly fetch each file
-          const response = await fetch(fileURL, { 
+          const response = await fetch(fileURL, {
             mode: 'cors',
             cache: 'no-cache'
           });
-          
+
           if (!response.ok) {
             throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
           }
-          
+
           // Get the actual file content as blob
           const blob = await response.blob();
-          
+
           // Add the blob to the ZIP file with proper filename
           folder.file(fileName, blob);
           successCount++;
-          
-          console.log(`Added file ${i+1}/${files.length} to ZIP: ${fileName}`);
+
+          console.log(`Added file ${i + 1}/${files.length} to ZIP: ${fileName}`);
         } catch (error) {
-          console.error(`Failed to add file ${i+1}:`, error);
+          console.error(`Failed to add file ${i + 1}:`, error);
           failedFiles.push(fileURL);
         }
       }
-      
+
       if (successCount === 0) {
         alert("Failed to download any files. Please check your network connection.");
         return;
       }
-      
+
       // Generate and download the ZIP file
       console.log("Generating ZIP with", successCount, "files");
-      const content = await zip.generateAsync({ 
+      const content = await zip.generateAsync({
         type: "blob",
-        compression: "DEFLATE" 
+        compression: "DEFLATE"
       });
-      
+
       console.log("ZIP generated, size:", content.size);
       saveAs(content, "Images.zip");
-      
+
       if (failedFiles.length > 0) {
         console.warn("Failed files:", failedFiles);
         alert(`Downloaded ${successCount} of ${files.length} files. Some files couldn't be downloaded.`);
@@ -161,48 +184,48 @@ function Community() {
     }
   };
 
-// Alternative approach without using JSZip for browsers that block it
-const downloadFilesSequentially = (files) => {
-  console.log("Sequential download method for files:", files);
-  
-  if (!files || files.length === 0) {
-    alert("No files to download!");
-    return;
-  }
-  
-  // Create hidden iframe for downloads to avoid page navigation
-  const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  document.body.appendChild(iframe);
-  
-  let downloadCount = 0;
-  
-  const downloadNext = (index) => {
-    if (index >= files.length) {
-      document.body.removeChild(iframe);
-      alert(`Downloaded ${downloadCount} of ${files.length} files`);
+  // Alternative approach without using JSZip for browsers that block it
+  const downloadFilesSequentially = (files) => {
+    console.log("Sequential download method for files:", files);
+
+    if (!files || files.length === 0) {
+      alert("No files to download!");
       return;
     }
-    
-    const fileURL = files[index];
-    console.log(`Downloading file ${index+1}/${files.length}:`, fileURL);
-    
-    try {
-      iframe.src = fileURL;
-      downloadCount++;
-      
-      // Schedule next download with delay
-      setTimeout(() => downloadNext(index + 1), 1000);
-    } catch (error) {
-      console.error(`Error downloading file ${index+1}:`, error);
-      // Continue to next file even if current fails
-      setTimeout(() => downloadNext(index + 1), 500);
-    }
+
+    // Create hidden iframe for downloads to avoid page navigation
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    let downloadCount = 0;
+
+    const downloadNext = (index) => {
+      if (index >= files.length) {
+        document.body.removeChild(iframe);
+        alert(`Downloaded ${downloadCount} of ${files.length} files`);
+        return;
+      }
+
+      const fileURL = files[index];
+      console.log(`Downloading file ${index + 1}/${files.length}:`, fileURL);
+
+      try {
+        iframe.src = fileURL;
+        downloadCount++;
+
+        // Schedule next download with delay
+        setTimeout(() => downloadNext(index + 1), 1000);
+      } catch (error) {
+        console.error(`Error downloading file ${index + 1}:`, error);
+        // Continue to next file even if current fails
+        setTimeout(() => downloadNext(index + 1), 500);
+      }
+    };
+
+    // Start the download sequence
+    downloadNext(0);
   };
-  
-  // Start the download sequence
-  downloadNext(0);
-};
 
 
 
@@ -211,7 +234,7 @@ const downloadFilesSequentially = (files) => {
   const handleShare = (postId) => {
     const postUrl = `${window.location.origin}${window.location.pathname}#${postId}`;
 
-    const shareData = { 
+    const shareData = {
       title: "Check this out!",
       text: "This is an awesome post. Check it out!",
       url: postUrl,
@@ -315,18 +338,18 @@ const downloadFilesSequentially = (files) => {
     const sliderRef = useRef(null);
     const slickInitialized = useRef(false);
     const currentIndex = currentSlides[postId] || 0;
-    
+
     // Function to initialize Slick Slider
     const initSlickSlider = (selector, options) => {
       if (typeof $ !== 'undefined') {
         $(selector).slick(options);
       }
     };
-    
+
     // Initialize the slider when component mounts
     useEffect(() => {
       if (!files || files.length === 0) return;
-      
+
       // Only initialize slick if it hasn't been already
       if (sliderRef.current && !slickInitialized.current) {
         const slickOptions = {
@@ -350,12 +373,12 @@ const downloadFilesSequentially = (files) => {
           },
           initialSlide: currentIndex // Start at the current index
         };
-        
+
         // Initialize slick slider
         initSlickSlider(`#slider-${postId}`, slickOptions);
         slickInitialized.current = true;
       }
-      
+
       // Cleanup function to destroy slick when component unmounts
       return () => {
         if (slickInitialized.current && sliderRef.current) {
@@ -368,7 +391,7 @@ const downloadFilesSequentially = (files) => {
         }
       };
     }, [files, postId]);
-    
+
     // Update slick slider when currentIndex changes
     useEffect(() => {
       if (slickInitialized.current && sliderRef.current) {
@@ -379,9 +402,9 @@ const downloadFilesSequentially = (files) => {
         }
       }
     }, [currentIndex, postId]);
-    
+
     if (!files || files.length === 0) return null;
-    
+
     return (
       <div className="postsection" id={`post-${postId}`}>
         <div className="slider_images" id={`slider-${postId}`} ref={sliderRef}>
@@ -417,7 +440,7 @@ const downloadFilesSequentially = (files) => {
             </div>
           ))}
         </div>
-        
+
         {/* Custom Slide Counter */}
         {files.length > 1 && (
           <div className="carousel-counter">
@@ -470,19 +493,16 @@ const downloadFilesSequentially = (files) => {
                       📰 Latest Updates
                     </div>
                     <div className="news-item">
-                      <h4>New Government Initiative</h4>
-                      <p>Extra funding for rural schools</p>
+                      <h4>Organising Free 100% Scrollership Exam</h4>
+                      <p>One Year Free Classes</p>
                     </div>
-                    <div className="news-item">
-                      <h4>Success Story</h4>
-                      <p>100 labs established in Bihar</p>
-                    </div>
+                   
                   </div>
 
                   {/* Special Offers */}
                   <div className="section">
                     <div className="section-titles">
-                      🎁 Special Offers
+                      🎁 Special Offers For Schools
                     </div>
                     <div className="offer-card green">
                       <strong>100% OFF</strong>
@@ -512,6 +532,51 @@ const downloadFilesSequentially = (files) => {
               </div>
 
               <div className="mainBody">
+                <div className="filter-section container my-4">
+                  <div className="row align-items-center">
+                    <div className="col-md-3">
+                      <label>Start Date:</label>
+                      <DatePicker
+                        selected={startDate}
+                        onChange={(date) => setStartDate(date)}
+                        dateFormat="dd-MM-yyyy"
+                        className="form-control"
+                        placeholderText="Select Start Date"
+                      />
+                    </div>
+                    <div className="col-md-3">
+                      <label>End Date:</label>
+                      <DatePicker
+                        selected={endDate}
+                        onChange={(date) => setEndDate(date)}
+                        dateFormat="dd-MM-yyyy"
+                        className="form-control"
+                        placeholderText="Select End Date"
+                      />
+                    </div>
+                    <div className="col-md-3">
+                      <button
+                        className="btn btn-primary mt-2 w-100"
+                        onClick={() => handleFilter()}
+                      >
+                        Filter Posts
+                      </button>
+                    </div>
+                    <div className="col-md-3">
+                      <button
+                        className="btn btn-secondary mt-2 w-100"
+                        onClick={() => {
+                          setStartDate("");
+                          setEndDate("");
+                          setFilterData([]);
+                        }}
+                      >
+                        Reset Filter
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {posts && posts.length > 0 ? (
                   posts.map((post, index) => {
                     const postId = post._id ? `post-${post._id}` : `post-${index}`;

@@ -6,6 +6,8 @@ module.exports = {
             mobile: Joi.string().trim().length(10).pattern(/^[0-9]+$/).required(),
             sex: Joi.string().trim().required(),
             place: Joi.string().required(),
+            state: Joi.string().required(),
+            city: Joi.string().required(),
             latitude: Joi.number().required(),
             longitude: Joi.number().required() ,
             refCode:Joi.string().optional()

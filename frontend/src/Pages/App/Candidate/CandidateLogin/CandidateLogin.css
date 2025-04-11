@@ -1,3 +1,15 @@
+.blank-page{
+  /* background:url(/Assets/images/logo/rename.webp) repeat; */
+  background:url(../../../../../public/Assets/public/images/logo/rename.webp) repeat;
+    background-size: auto;
+  background-size: contain;
+}
+
+.blank-page {
+  margin: 0px !important;
+  height: 100vh!important;
+}   
+
 .text-primary{
   color: #FC2B5A!important;
 }
@@ -116,3 +128,11 @@
     }
   }
   /* login page slider end */
+  .card-title.text-center.mb-0 {
+    border-top: 3px solid #f2f0f8;
+    border-bottom: 3px solid #f2f0f8;
+  }
+  .readyMinds{
+    margin: 0;
+    padding-block: 5px;
+  }

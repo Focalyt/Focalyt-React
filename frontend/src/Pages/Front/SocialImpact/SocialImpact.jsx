@@ -385,24 +385,24 @@ function SocialImpact() {
                             <div className="col-md-10">
                                 <div className="mobilization" id="Placement">
                                     <div className="slider_images">
-                                        <div>
+                                        <div className='place'>
                                             <img
                                                 src="/Assets/public_assets/images/placement-pic-2.jpg"
-                                                className="d-block w-100"
+                                                className="d-block w-75"
                                                 alt="video3"
                                             />
                                         </div>
-                                        <div>
+                                        <div className='place'>
                                             <img
                                                 src="/Assets/public_assets/images/placement-pic-3.jpg"
-                                                className="d-block w-100"
+                                                className="d-block w-75"
                                                 alt="video3"
                                             />
                                         </div>
-                                        <div>
+                                        <div className='place'>
                                             <img
                                                 src="/Assets/public_assets/images/placement-pic-4.jpg"
-                                                className="d-block w-100"
+                                                className="d-block w-75"
                                                 alt="video3"
                                             />
                                         </div>
@@ -593,6 +593,17 @@ function SocialImpact() {
                         </div>
                     </div>
                 </section>
+                <style>
+                    {
+                        `
+                        .place{
+                        display:flex!important;
+                        align-items:center;
+                        justify-content:center
+                        }
+                        `
+                    }
+                </style>
             </FrontLayout>
         </>
     )

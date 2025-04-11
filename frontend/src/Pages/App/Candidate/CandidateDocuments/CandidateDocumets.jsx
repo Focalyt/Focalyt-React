@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./CandidatesDocuments.css"
+import CandidateLayout from "../../../../Component/Layouts/App/Candidates";
 const CandidateDocumets = ({ candidate, documents }) => {
 
   const [documentData, setDocumentData] = useState({
@@ -120,12 +121,7 @@ const CandidateDocumets = ({ candidate, documents }) => {
 
   return (
     <>
-      <div class="content-overlay"></div>
-      <div class="header-navbar-shadow"></div>
-      <div class="content-wrapper">
-        <div
-          class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none"
-        >
+        <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
           <div class="content-header-left col-md-9 col-12 mb-2">
             <div class="row breadcrumbs-top">
               <div class="col-12">
@@ -196,8 +192,7 @@ const CandidateDocumets = ({ candidate, documents }) => {
             </div>
           </section>
         </div>
-      </div>
-
+ 
 
 
     </>

@@ -43,3 +43,12 @@ body{
   width: 100%;
   height: auto;
 }
+
+
+.modal {
+  overflow: visible !important;
+}
+.pac-container {
+  z-index: 99999 !important;
+ 
+}

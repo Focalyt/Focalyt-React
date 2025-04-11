@@ -1,6 +1,6 @@
 .money-rain {
     /* background: url(public/Assets/images/money-rain.jpg) no-repeat; */
-    background: url(../../../../../../public/Assets/images/money-rain.jpg) no-repeat;
+    background: url(../../../../../public/Assets/images/money-rain.jpg) no-repeat;
     background-size: 100%;
     background-size: cover;
     background-position: right;
@@ -54,7 +54,8 @@
 
 @media only screen and (max-width: 900px) {
     .money-rain {
-        background-image: url(../../../../../../public/Assets/images/mobilebg.jpg) !important;
+        /* background-image: url(../../../../../../public/Assets/images/mobilebg.jpg) !important; */
+        background-image: url(../../../../../public/Assets/images/mobilebg.jpg)!important;
         background-repeat: no-repeat !important;
         background-size: cover !important;
         background-position: bottom !important;

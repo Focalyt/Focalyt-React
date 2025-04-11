@@ -6,14 +6,33 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import { Pagination, Autoplay } from 'swiper/modules';
 import 'swiper/css/pagination';
+import { useLocation } from 'react-router-dom';
+
 
 
 const CandidateLogin = () => {
+    const urlLocation = useLocation();
+
+    const queryParams = new URLSearchParams(urlLocation.search);
+
+
+    const user = sessionStorage.getItem('user');
+    const returnUrl = queryParams.get('returnUrl');
+    const refCode = queryParams.get("refCode");
+    console.log('returnUrl', returnUrl)
+
+
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [fullName, setFullName] = useState('');
     const [gender, setGender] = useState('');
+    const [address, setAddress] = useState('');
     const [city, setCity] = useState('');
+    const [state, setState] = useState('');
+    const [pincode, setPC] = useState('');
+    const [latitude, setLatitude] = useState('');
+    const [longitude, setLongitude] = useState('');
+
     const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
     const [isNewUser, setIsNewUser] = useState(false);
     const [showOtpField, setShowOtpField] = useState(false);
@@ -30,38 +49,88 @@ const CandidateLogin = () => {
     const otpRef = useRef(null);
     const generateOTPRef = useRef(null);
 
+
+
+    if (user) {
+        if (returnUrl) {
+
+            window.location.href = returnUrl
+        }
+        else {
+            window.location.href = '/candidate/dashboard';
+        }
+    }
+
+
     useEffect(() => {
-        const loadGooglePlaces = () => {
-            const options = {
-                componentRestrictions: { country: 'in' },
-                types: ['(cities)']
-            };
-            const autocomplete = new window.google.maps.places.Autocomplete(
-                document.getElementById('city-location'),
-                options
-            );
-            autocomplete.addListener('place_changed', function () {
-                const place = autocomplete.getPlace();
-                setLocation({
-                    place: place.name,
-                    lat: place.geometry.location.lat(),
-                    lng: place.geometry.location.lng()
+        if (!showExtraFields) return;
+
+        const waitForGoogle = () => {
+            if (window.google && window.google.maps && window.google.maps.places) {
+                const input = document.getElementById('address-location');
+                if (!input) {
+                    console.warn('Input not found yet');
+                    return;
+                }
+
+                const autocomplete = new window.google.maps.places.Autocomplete(input, {
+                    types: ['geocode'],
+                    componentRestrictions: { country: 'in' },
                 });
-                setCity(place.name);
-            });
+
+                autocomplete.addListener('place_changed', () => {
+                    const place = autocomplete.getPlace();
+
+                    if (!place || !place.geometry || !place.geometry.location) {
+                        console.warn('Invalid place data.');
+                        return;
+                    }
+
+                    const lat = place.geometry.location.lat();
+                    const lng = place.geometry.location.lng();
+
+                    let fullAddress = '';
+                    if (place.formatted_address) fullAddress = place.formatted_address;
+                    else if (place.name) fullAddress = place.name;
+                    else if (input.value) fullAddress = input.value;
+
+                    let city = '', state = '', pincode = '';
+
+                    if (Array.isArray(place.address_components)) {
+                        place.address_components.forEach((component) => {
+                            const types = component.types.join(',');
+                            if (types.includes("postal_code")) pincode = component.long_name;
+                            if (types.includes("locality")) city = component.long_name;
+                            if (types.includes("administrative_area_level_1")) state = component.long_name;
+                            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+                        });
+                    }
+
+                    setAddress(fullAddress);
+                    setCity(city);
+                    setState(state);
+                    setPC(pincode);
+                    setLatitude(lat);
+                    setLongitude(lng);
+                    setLocation({ place: place.name || '', lat, lng });
+                });
+            } else {
+                setTimeout(waitForGoogle, 100);
+            }
         };
 
-        if (window.google) {
-            loadGooglePlaces();
-        } else {
-            window.initMap = loadGooglePlaces;
-        }
-    }, []);
+        waitForGoogle();
+    }, [showExtraFields]); // ✅ only run when showExtraFields is true
+
+
+
+
 
     const validateMobile = () => {
         const phoneRegex = /^(\+91[\-\s]?)?[0]?(91)?[6789]\d{9}$/;
         return phoneRegex.test(mobileNumber);
     };
+    console.log('address', address)
 
     const handleGenerateOTP = async () => {
         if (!validateMobile()) {
@@ -146,21 +215,36 @@ const CandidateLogin = () => {
                 name: fullName,
                 mobile: mobileNumber,
                 sex: gender,
-                place: location.place,
-                latitude: location.lat,
-                longitude: location.lng
+                city,
+                state,
+                latitude,
+                longitude,
+                place: address
+
             };
+            if (refCode) {
+                body.refCode = refCode;
+            }
             try {
                 // const registerRes = await axios.post('/candidate/register', body);
                 const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
 
-                if (registerRes.data.status) {
+                if (registerRes.data.status === "success") {
                     const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                     // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                     if (loginRes.data.status) {
-                        localStorage.setItem('candidate', loginRes.data.name);
+                        localStorage.setItem('name', loginRes.data.name);
                         localStorage.setItem('token', loginRes.data.token);
-                        window.location.href = '/candidate/searchcourses';
+                        sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
+                        sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
+
+                        if (returnUrl) {
+
+                            window.location.href = returnUrl
+                        }
+                        else {
+                            window.location.href = '/candidate/dashboard';
+                        }
                     } else {
                         setErrorMessage('Login failed after registration');
                     }
@@ -176,25 +260,40 @@ const CandidateLogin = () => {
                 return;
             }
             try {
+                console.log('Verifing OTP')
                 // const verifyRes = await axios.post('/api/verifyOtp', { mobile: mobileNumber, otp });
-                const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber })
-                if (verifyRes.data.status) {
+                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
+                if (otpVerifyRes.data.status) {
                     // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                     const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                     if (loginRes.data.status) {
-                        localStorage.setItem('candidate', loginRes.data.name);
-                        localStorage.setItem('token', loginRes.data.token);
                         const token = loginRes.data.token;
-                        const verificationBody = { mobile: mobileNumber, verified: true };
+                        const verificationBody = { mobile: mobileNumber, verified: true }
                         const headers = { headers: { 'x-auth': token } };
+                        const verifyRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers);
+                        if (verifyRes.data.status) {
+                            localStorage.setItem('candidate', loginRes.data.name);
+                            localStorage.setItem('token', loginRes.data.token);
+                            sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
 
-                        // const verificationRes = await axios.post('/candidate/verification', verificationBody, headers);
-                        const verificationRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers)
-                        if (verificationRes.data.status) {
-                            window.location.href = '/candidate/searchcourses';
+
+
+                            if (returnUrl) {
+
+                                window.location.href = returnUrl
+                            }
+                            else {
+                                window.location.href = '/candidate/dashboard';
+                            }
+
+
+                            // const verificationRes = await axios.post('/candidate/verification', verificationBody, headers);
+                            // const verificationRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers)
+                            // if (verificationRes.data.status) {
+                            // }
+                        } else {
+                            setErrorMessage('Login failed after OTP verification');
                         }
-                    } else {
-                        setErrorMessage('Login failed after OTP verification');
                     }
                 } else {
                     setErrorMessage('Incorrect OTP');
@@ -206,7 +305,8 @@ const CandidateLogin = () => {
     };
 
     return (
-        <div className="app-content content">
+
+        <div className="app-content blank-page content">
             <div className="content-wrapper mt-4">
                 <section className="row flexbox-container">
                     <div className="col-xl-5 col-lg-6 col-md-8 col-sm-10 col-12 mx-auto">
@@ -219,8 +319,8 @@ const CandidateLogin = () => {
                                 />
                             </div>
 
-                            <div className="text-center mb-2">
-                                <h4>#Building Future Ready Minds</h4>
+                            <div className="card-title text-center mb-0">
+                                <h4 className='readyMinds'>#Building Future Ready Minds</h4>
                             </div>
 
                             <div className="carousel-gallery px-xl-2 px-lg-2 px-md-2 px-sm-1 px-1 mb-0">
@@ -255,7 +355,7 @@ const CandidateLogin = () => {
 
 
                             <div className="card-body">
-                                <h5 className="text-left mb-3">
+                                <h5 className="text-left mb-3 spanAfter">
                                     Candidate Login / Signup
                                     <br />
                                     <small className="text-primary" style={{ color: "#FC2B5A" }}>लॉग इन / साइन अप करें</small>
@@ -263,7 +363,7 @@ const CandidateLogin = () => {
 
                                 {/* Mobile Number Input */}
                                 <div className="row mb-3">
-                                    <div className="col-9">
+                                    <div className="col-9 userMobile">
                                         <input
                                             type="tel"
                                             className="form-control"
@@ -277,10 +377,11 @@ const CandidateLogin = () => {
                                     </div>
                                     <div className="col-3">
                                         <button
-                                            className="btn btn-primary w-100"
+                                            className="btn btn-primary sendBtnn w-100"
                                             onClick={handleGenerateOTP}
                                             ref={generateOTPRef}
                                         >
+                                            <img src="/Assets/images/login_arrow.png" alt="Focalyt logo" class="candid_arrow"/>
                                             SEND
                                         </button>
                                     </div>
@@ -306,7 +407,7 @@ const CandidateLogin = () => {
                                 {/* Gender Select */}
 
                                 {showExtraFields && (
-                                    <>
+                                    <div className='userMobile'>
                                         <div className="mb-3">
                                             <input
                                                 type="text"
@@ -331,13 +432,35 @@ const CandidateLogin = () => {
                                             <input
                                                 type="text"
                                                 className="form-control"
-                                                id="city-location"
+                                                id="address-location"
                                                 placeholder="City/ शहर"
-                                                value={city}
-                                                onChange={(e) => setCity(e.target.value)}
+                                                value={address}
+                                                onChange={(e) => setAddress(e.target.value)}
+
                                             />
+                                            <input
+                                                type="hidden"
+                                                name="state"
+                                                placeholder='state'
+                                                className="form-control"
+                                                id="state-location"
+                                                value={state}
+
+                                            />
+                                            <input
+                                                type="hidden"
+                                                name='City'
+                                                className="form-control"
+                                                id="city-location"
+                                                value={city}
+                                            />
+
+                                            <input type="hidden" className="form-control" value={latitude} placeholder="Latitude" readOnly />
+                                            <input type="hidden" className="form-control" value={longitude} placeholder="Longitude" readOnly />
+
                                         </div>
-                                    </>
+
+                                    </div>
                                 )}
 
                                 {showLoginBtn && (
@@ -368,7 +491,7 @@ const CandidateLogin = () => {
                                 )}
 
                                 {/* Partners Slider */}
-                                <h3 className="text-center my-3">Our Partners</h3>
+                                <h3 className="my-3">Our Partners</h3>
                                 <div className="slider py-0">
                                     <div className="slide-track-1">
                                         <div className="slide">
@@ -446,7 +569,7 @@ const CandidateLogin = () => {
 
 
                                 {/* Terms Agreement */}
-                                <p className="text-center mt-3">
+                                <p className="mt-3">
                                     I agree to <a href="/employersTermsofService" target="_blank">Employer's terms</a>
                                     {' '} & {' '}
                                     <a href="/userAgreement" target="_blank">User Policy</a>.
@@ -456,6 +579,77 @@ const CandidateLogin = () => {
                     </div>
                 </section>
             </div>
+            <style>
+                {` .swiper-pagination-bullet{
+    width: 5px;
+    height: 5px;
+    background-color:#d63031;
+  }
+   .text-primary {
+    color: #FC2B5A!important;
+  }
+.spanAfter {
+  position: relative;
+  display: inline-block;
+}
+
+    .spanAfter::after {
+  content: attr(data-before);
+  height: 2px;
+  width: 100%;
+  left: 0;
+  position: absolute;
+  bottom: 0;
+  top: 100%;
+  background:
+linear-gradient(30deg, #FC2B5A, rgba(115, 103, 240, 0.5)) !important;
+  box-shadow: 0 0 8px 0 rgba(115, 103, 240, 0.5) !important;
+  transform: translateY(0px);
+  transition:
+all .2s linear;
+}  
+.btn-primary:hover {
+  border-color:
+#2e394b !important;
+  color: #fff !important;
+  box-shadow: 0 8px 25px -8px #FC2B5A;
+}
+  .btn-primary:hover {
+  color: #fff;
+  background-color: #5344ed!important;
+  border-color:#4839eb!important;
+}
+.btn-primary{
+border: 1px solid #FC2B5A;
+}
+.userMobile input.form-control:focus,
+.userMobile select.form-control:focus,
+.userMobile textarea.form-control:focus {
+  border: 1px solid #FC2B5A !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.userMobile input.form-control,
+.userMobile select.form-control,
+.userMobile textarea.form-control {
+  transition: border 0.3s ease;
+}
+
+.candid_arrow {
+  width: 17%;
+  margin-right: 5px
+}
+  .sendBtnn{
+  display: flex
+;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+  `
+
+                }
+            </style>
         </div>
     );
 };
