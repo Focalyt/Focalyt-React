@@ -67,7 +67,7 @@ function Jobs() {
         );
         setUniqueSectors(response.data.uniqueSectors);
 
-        console.log("Response",response.data.recentJobs )
+        console.log("Response", response.data.recentJobs)
       } catch (error) {
         console.error("Error fetching course data:", error);
       }
@@ -162,7 +162,8 @@ function Jobs() {
 
 
     // Start with all courses
-    let filtered = [...courses];
+    let filtered = Array.isArray(courses) ? [...courses] : [];
+
     console.log("filter jobs", filtered)
 
     // Then filter by sector if not "all"
@@ -252,7 +253,7 @@ function Jobs() {
 
 
   const filteredCourses = getFilteredCourses();
-  console.log("filteredCourses",filteredCourses)
+  console.log("filteredCourses", filteredCourses)
 
 
 
@@ -333,11 +334,13 @@ function Jobs() {
                           onClick={() => handleFilterClick("all")}
                         >
                           All
-                          <span className="count">{courses.length}</span>
+                          <span className="count">{Array.isArray(courses) ? courses.length : 0}</span>
+
                           {activeFilter === "all" && <div className="active-indicator"></div>}
                         </button>
 
-                        {uniqueSectors.map((sector) => (
+                        {Array.isArray(uniqueSectors) && uniqueSectors.map((sector) => (
+
                           <button
                             key={sector._id}
                             id={`id_${sector._id}`}
@@ -440,7 +443,7 @@ function Jobs() {
                                     setVideoSrc(course.jobVideo);
                                   } else {
                                     console.warn("No video found for this job");
-                                    setVideoSrc(""); 
+                                    setVideoSrc("");
                                   }
                                 }}
                                 className="pointer img-fluid"
@@ -477,12 +480,12 @@ function Jobs() {
                                 ({course.displayCompanyName})
                               </h5>
                               {(course.amount || course.min) && (
-                              <p class="text-center digi-price mb-3 mt-3">
-                                <span class="rupee text-white">₹ &nbsp;</span>
-                                <span class="r-price text-white">
-                                  {course.amount?`${course.amount}`:`${course.min}-${course.max}`}
-                                </span>
-                              </p>
+                                <p class="text-center digi-price mb-3 mt-3">
+                                  <span class="rupee text-white">₹ &nbsp;</span>
+                                  <span class="r-price text-white">
+                                    {course.amount ? `${course.amount}` : `${course.min}-${course.max}`}
+                                  </span>
+                                </p>
                               )}
 
                               <div className="row" id="course_height">
@@ -503,9 +506,9 @@ function Jobs() {
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
 
-                                          <p className="mb-0 text-white">
-  {course._qualification?.name || 'N/A'}
-</p>
+                                            <p className="mb-0 text-white">
+                                              {course._qualification?.name || 'N/A'}
+                                            </p>
 
                                           </div>
                                         </div>

@@ -124,9 +124,7 @@ function Course() {
 
   // Filter courses based on selected sector and search term
   const getFilteredCourses = () => {
-
-
-
+    if (!Array.isArray(courses)) return [];
     // Start with all courses
     let filtered = [...courses];
 
@@ -315,11 +313,14 @@ function Course() {
                           onClick={() => handleFilterClick("all")}
                         >
                           All
-                          <span className="count">{courses.length}</span>
+                          <span className="count">{Array.isArray(courses) ? courses.length : 0}</span>
+
                           {activeFilter === "all" && <div className="active-indicator"></div>}
                         </button>
 
-                        {uniqueSectors.map((sector) => (
+                        {Array.isArray(uniqueSectors) && uniqueSectors.map((sector) => (
+
+
                           <button
                             key={sector._id}
                             id={`id_${sector._id}`}
