@@ -4138,4 +4138,46 @@ router.route('/review/:job')
         return res.status(500).send({ status: false, message: err.message })
     }
 })
+// Backend (Node.js with Express)
+router.post('/savecv', async (req, res) => {
+  // Destructure incoming data from request body
+  const { personalInfo, experiences, educations, skills, certificates, languages, projects, interests, declaration } = req.body;
+
+  try {
+    // Create a new profile with the data
+    const newProfile = new Profile({
+      personalInfo,
+      experiences,
+      educations,
+      skills,
+      certificates,
+      languages,
+      projects,
+      interests,
+      declaration,
+    });
+
+    // Save the profile to the database
+    await newProfile.save();
+
+    // Send a success response
+    res.status(200).json({ status: true, message: "Profile saved successfully" });
+  } catch (error) {
+    // Handle any errors during the saving process
+    console.error('Error saving profile data:', error);
+    res.status(500).json({ status: false, message: "Error saving profile data" });
+  }
+});
+
+
+
+// router.get('/savecvcv/:userId', async (req, res) => {
+//   try {
+//     const candidate = await Candidate.findOne({ userId: req.params.userId });
+//     res.status(200).json({ status: true, data: candidate });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ status: false, message: "Error fetching CV" });
+//   }
+// });
 module.exports = router;

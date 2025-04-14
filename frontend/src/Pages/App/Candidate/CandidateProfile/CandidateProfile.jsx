@@ -3,24 +3,141 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { usePlacesWidget } from 'react-google-autocomplete';
 import "./CandidateProfile.css"
-
+import CVPreviewContent from '../Partials/CVPreviewContent';
 const CandidateProfile = () => {
   const navigate = useNavigate();
   const [preloaderVisible, setPreloaderVisible] = useState(false);
-const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const createEditable = (content, placeholder) => (
+    <div
+      contentEditable
+      data-placeholder={placeholder}
+      suppressContentEditableWarning={true}
+    >
+      {content}
+    </div>
 
-const [user, setUser] = useState({});
-    
-  
-  
-    useEffect(() => {
-      const storedUser = sessionStorage.getItem('user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        setUser(parsed);
-        console.log("user (after sessionStorage):", parsed); // ✅ Right place to log
+  );
+  const [user, setUser] = useState({});
+  const [showCVBuilder, setShowCVBuilder] = useState(true);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [experiences, setExperiences] = useState([{}]);
+  const [educations, setEducations] = useState([{}]);
+  const [skills, setSkills] = useState([{ name: '', level: 0 }]);
+  const [certificates, setCertificates] = useState([{}]);
+  const [projects, setProjects] = useState([{}]);
+  const [interests, setInterests] = useState(['']);
+  const [languages, setLanguages] = useState([{ name: '', level: 0 }]);
+  const [declaration, setDeclaration] = useState();
+
+  const handleSaveCV = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user')); // assuming userId is here
+
+      const cvPayload = {
+        // userId,
+        hiringStatus: [
+          {
+            personalInfo: [
+              {
+                name: user.name,
+                title: '', 
+                summary: '', 
+                phone: '',
+                email: '',
+                location: '', 
+                image: user.image || '',
+                resume: user.resume || ''
+              }
+            ],
+            workexperience: experiences.map(e => ({
+              jobTitle: e.jobTitle || '',
+              companyName: e.companyName || '',
+              jobDescription: e.jobDescription || ''
+            })),
+            education: educations.map(e => ({
+              degree: e.degree || '',
+              university: e.university || '',
+              duration: e.duration || '',
+              addInfo: e.addInfo || ''
+            })),
+            skill: skills.map(s => ({
+              skillName: s.name,
+              skillPercent: s.level
+            })),
+            certification: certificates.map(c => ({
+              certificateName: c.name || '',
+              orgName: c.org || ''
+            })),
+            language: languages.map(l => ({
+              lname: l.name || '',
+              level: l.level
+            })),
+            projects: projects.map(p => ({
+              projectName: p.name || '',
+              proyear: p.year || '',
+              proDescription: p.description || ''
+            })),
+            interest: interests.filter(i => i !== '')
+          }
+        ]
+      };
+
+      console.log("📤 CV Payload being sent to backend:", cvPayload);
+
+      const res = await axios.post(`${backendUrl}/candidate/savecv`, cvPayload, {
+        headers: {
+          'x-auth': localStorage.getItem('token')
+        }
+      });
+
+      if (res.data.status) {
+        alert('CV Saved Successfully!');
+      } else {
+        alert('Failed to save CV!');
       }
-    }, []);
+    } catch (err) {
+      console.error("Error saving CV:", err);
+      alert("An error occurred while saving your CV");
+    }
+  };
+
+
+  const handleProfileImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = localStorage.getItem('token');
+
+      const res = await axios.post(`${backendUrl}/api/uploadSingleFile`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (res.data.status) {
+        const imageKey = res.data.data.Key;
+        setUser(prev => ({ ...prev, image: imageKey }));
+      }
+    } catch (error) {
+      console.error('Image upload failed:', error);
+    }
+  };
+
+
+  useEffect(() => {
+    const storedUser = sessionStorage.getItem('user');
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      setUser(parsed);
+      console.log("user (after sessionStorage):", parsed); // ✅ Right place to log
+    }
+  }, []);
 
   const [candidate, setCandidateData] = useState({
     name: '',
@@ -49,7 +166,7 @@ const [user, setUser] = useState({});
     nonTechSkills: [],
     locationPreferences: []
   });
-  
+
   const [formData, setFormData] = useState({
     personalInfo: {},
     qualifications: [],
@@ -62,7 +179,7 @@ const [user, setUser] = useState({});
     totalExperience: '',
     isExperienced: false
   });
-  
+
   const [formOptions, setFormOptions] = useState({
     states: [],
     cities: [],
@@ -74,12 +191,12 @@ const [user, setUser] = useState({});
     technicalSkills: [],
     nonTechnicalSkills: []
   });
-  
+
   const [errors, setErrors] = useState({
     message: '',
     visible: false
   });
-  
+
   const [cashbackModal, setCashbackModal] = useState({
     visible: false,
     isProfileCompleted: false,
@@ -123,7 +240,7 @@ const [user, setUser] = useState({});
       console.log("backendUrl =>", backendUrl);
 
       const token = localStorage.getItem('token');
-      console.log('token',token)
+      console.log('token', token)
       const response = await axios.get(`${backendUrl}/candidate/myprofile`, {
         headers: { 'x-auth': token }
       });
@@ -131,7 +248,7 @@ const [user, setUser] = useState({});
       if (response.data.status) {
         const candidateData = response.data.candidate;
         setCandidateData(candidateData);
-        
+
         // Initialize form data with candidate data
         setFormData({
           personalInfo: {
@@ -174,7 +291,7 @@ const [user, setUser] = useState({});
       const response = await axios.get(`${backendUrl}/candidate/form-options`, {
         headers: { 'x-auth': token }
       });
-      
+
       if (response.data) {
         setFormOptions({
           states: response.data.states || [],
@@ -224,18 +341,18 @@ const [user, setUser] = useState({});
   const handleQualificationChange = (index, e) => {
     const { name, value } = e.target;
     const updatedQualifications = [...formData.qualifications];
-    
+
     if (!updatedQualifications[index]) {
       updatedQualifications[index] = {};
     }
-    
+
     updatedQualifications[index][name] = value;
-    
+
     setFormData(prev => ({
       ...prev,
       qualifications: updatedQualifications
     }));
-    
+
     // If qualification ID changed, fetch sub-qualifications
     if (name === 'Qualification') {
       fetchSubQualifications(value, index);
@@ -245,13 +362,13 @@ const [user, setUser] = useState({});
   const handleExperienceDetailChange = (index, e) => {
     const { name, value } = e.target;
     const updatedExperiences = [...formData.experiences];
-    
+
     if (!updatedExperiences[index]) {
       updatedExperiences[index] = {};
     }
-    
+
     updatedExperiences[index][name] = value;
-    
+
     setFormData(prev => ({
       ...prev,
       experiences: updatedExperiences
@@ -263,7 +380,7 @@ const [user, setUser] = useState({});
       const response = await axios.get(`${backendUrl}/candidate/getcitiesbyId`, {
         params: { stateId }
       });
-      
+
       if (response.data && response.data.cityValues) {
         // Update cities in form options
         const cities = response.data.cityValues;
@@ -279,7 +396,7 @@ const [user, setUser] = useState({});
 
   const handleStateChange = (e, fieldType, index) => {
     const stateId = e.target.value;
-    
+
     if (fieldType === 'personal') {
       setFormData(prev => ({
         ...prev,
@@ -291,34 +408,34 @@ const [user, setUser] = useState({});
       }));
     } else if (fieldType === 'location') {
       const updatedLocationPreferences = [...formData.locationPreferences];
-      
+
       if (!updatedLocationPreferences[index]) {
         updatedLocationPreferences[index] = {};
       }
-      
+
       updatedLocationPreferences[index].state = stateId;
       updatedLocationPreferences[index].city = ''; // Reset city
-      
+
       setFormData(prev => ({
         ...prev,
         locationPreferences: updatedLocationPreferences
       }));
     } else if (fieldType === 'experience') {
       const updatedExperiences = [...formData.experiences];
-      
+
       if (!updatedExperiences[index]) {
         updatedExperiences[index] = {};
       }
-      
+
       updatedExperiences[index].Company_State = stateId;
       updatedExperiences[index].Company_City = ''; // Reset city
-      
+
       setFormData(prev => ({
         ...prev,
         experiences: updatedExperiences
       }));
     }
-    
+
     // Fetch cities for the selected state
     fetchCitiesByState(stateId);
   };
@@ -326,15 +443,15 @@ const [user, setUser] = useState({});
   const handleSkillChange = (type, index, e) => {
     const { value } = e.target;
     const field = type === 'technical' ? 'technicalskills' : 'nontechnicalskills';
-    
+
     const updatedSkills = [...formData[field]];
-    
+
     if (!updatedSkills[index]) {
       updatedSkills[index] = {};
     }
-    
+
     updatedSkills[index].skillId = value;
-    
+
     setFormData(prev => ({
       ...prev,
       [field]: updatedSkills
@@ -344,33 +461,33 @@ const [user, setUser] = useState({});
   const handleFileUpload = async (e, fileType) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     // Validate file based on type
     if (!validateFile(file, fileType)) {
       return;
     }
-    
+
     setPreloaderVisible(true);
-    
+
     try {
       const formData = new FormData();
       formData.append('file', file);
-      
+
       const token = localStorage.getItem('token');
       const endpoint = fileType === 'video' ? '/api/uploadVideo' : '/api/uploadSingleFile';
-      
+
       const response = await axios.post(`${backendUrl}${endpoint}`, formData, {
-        headers: { 
+        headers: {
           'x-auth': token,
           'Content-Type': 'multipart/form-data'
         }
       });
-      
+
       setPreloaderVisible(false);
-      
+
       if (response.data.status) {
         const key = response.data.data.Key;
-        
+
         // Update form data based on file type
         if (fileType === 'image') {
           setFormData(prev => ({
@@ -400,14 +517,14 @@ const [user, setUser] = useState({});
           // Extract index from id if it's a skill video
           const fieldName = fileType === 'techSkill' ? 'technicalskills' : 'nontechnicalskills';
           const index = parseInt(e.target.id.replace(fileType, ''));
-          
+
           const updatedSkills = [...formData[fieldName]];
           if (!updatedSkills[index]) {
             updatedSkills[index] = { skillId: '' };
           }
-          
+
           updatedSkills[index].upload_url = key;
-          
+
           setFormData(prev => ({
             ...prev,
             [fieldName]: updatedSkills
@@ -423,17 +540,17 @@ const [user, setUser] = useState({});
   const validateFile = (file, fileType) => {
     const fileName = file.name;
     const fileSize = file.size;
-    
+
     if (fileType === 'image') {
       // Validate image file
       const validImageTypes = /\.(jpg|jpeg|png)$/i;
       const maxSize = 2 * 1024 * 1024; // 2MB
-      
+
       if (!validImageTypes.test(fileName)) {
         alert("Please upload the image in jpg, jpeg or png format");
         return false;
       }
-      
+
       if (fileSize > maxSize) {
         alert("Uploaded image should be less than 2MB");
         return false;
@@ -442,12 +559,12 @@ const [user, setUser] = useState({});
       // Validate resume file
       const validResumeTypes = /\.(docx|doc|pdf|jpg|jpeg|png)$/i;
       const maxSize = 5 * 1024 * 1024; // 5MB
-      
+
       if (!validResumeTypes.test(fileName)) {
         alert("Please upload the resume in .docx, .doc, .jpg, .jpeg, .png or pdf format");
         return false;
       }
-      
+
       if (fileSize > maxSize) {
         alert("Uploaded resume size should be less than 5MB");
         return false;
@@ -456,18 +573,18 @@ const [user, setUser] = useState({});
       // Validate video file
       const validVideoTypes = /\.(mp4|mov|avi)$/i;
       const maxSize = 10 * 1024 * 1024; // 10MB
-      
+
       if (!validVideoTypes.test(fileName)) {
         alert("Please upload the video in mp4, mov or avi format");
         return false;
       }
-      
+
       if (fileSize > maxSize) {
         alert("Uploaded video should be less than 10MB");
         return false;
       }
     }
-    
+
     return true;
   };
 
@@ -482,7 +599,7 @@ const [user, setUser] = useState({});
   const deleteExperienceRow = (index) => {
     const updatedExperiences = [...formData.experiences];
     updatedExperiences.splice(index, 1);
-    
+
     setFormData(prev => ({
       ...prev,
       experiences: updatedExperiences
@@ -492,13 +609,13 @@ const [user, setUser] = useState({});
   const handleLocationPreferenceChange = (index, e) => {
     const { name, value } = e.target;
     const updatedLocationPreferences = [...formData.locationPreferences];
-    
+
     if (!updatedLocationPreferences[index]) {
       updatedLocationPreferences[index] = {};
     }
-    
+
     updatedLocationPreferences[index][name] = value;
-    
+
     setFormData(prev => ({
       ...prev,
       locationPreferences: updatedLocationPreferences
@@ -508,7 +625,7 @@ const [user, setUser] = useState({});
   const removeUploadedFile = async (fileType) => {
     try {
       let key = '';
-      
+
       if (fileType === 'image') {
         key = formData.personalInfo.image;
       } else if (fileType === 'resume') {
@@ -516,26 +633,26 @@ const [user, setUser] = useState({});
       } else if (fileType === 'video') {
         key = formData.personalInfo.profilevideo;
       }
-      
+
       if (!key) return;
-      
+
       const token = localStorage.getItem('token');
-      
+
       // Delete file from storage
       await axios.post(`${backendUrl}/api/deleteSingleFile`, { key }, {
         headers: { 'x-auth': token }
       });
-      
+
       // Update database record
-      const endpoint = 
-        fileType === 'image' ? '/candidate/removelogo' : 
-        fileType === 'resume' ? '/candidate/removeResume' : 
-        '/candidate/removeVideo';
-      
+      const endpoint =
+        fileType === 'image' ? '/candidate/removelogo' :
+          fileType === 'resume' ? '/candidate/removeResume' :
+            '/candidate/removeVideo';
+
       await axios.post(`${backendUrl}${endpoint}`, { key }, {
         headers: { 'x-auth': token }
       });
-      
+
       // Update form data
       if (fileType === 'image') {
         setFormData(prev => ({
@@ -570,11 +687,11 @@ const [user, setUser] = useState({});
   const removeSkillVideo = (type, index) => {
     const field = type === 'technical' ? 'technicalskills' : 'nontechnicalskills';
     const updatedSkills = [...formData[field]];
-    
+
     if (updatedSkills[index]) {
       updatedSkills[index].upload_url = '';
     }
-    
+
     setFormData(prev => ({
       ...prev,
       [field]: updatedSkills
@@ -587,15 +704,15 @@ const [user, setUser] = useState({});
       message: '',
       visible: false
     });
-    
+
     const {
       name, whatsapp, pincode, email, sex, address, state, city, place, dob
     } = formData.personalInfo;
-    
+
     const { highestQualification, isExperienced } = formData;
-    
+
     let isValid = true;
-    
+
     // Validate required fields
     if (!name || name.trim() === '') {
       setErrors({
@@ -604,7 +721,7 @@ const [user, setUser] = useState({});
       });
       return false;
     }
-    
+
     // Validate WhatsApp number
     if (!whatsapp || whatsapp.trim() === '' || whatsapp.length !== 10) {
       setErrors({
@@ -613,7 +730,7 @@ const [user, setUser] = useState({});
       });
       return false;
     }
-    
+
     // Validate pincode
     if (!pincode || pincode.trim() === '' || pincode.length !== 6) {
       setErrors({
@@ -622,7 +739,7 @@ const [user, setUser] = useState({});
       });
       return false;
     }
-    
+
     // Validate email
     const emailRegex = /^([\w-\.]+@([\w-]+\.)+[\w-]{2,4})?$/;
     if (email && email.trim() !== '' && !emailRegex.test(email)) {
@@ -632,7 +749,7 @@ const [user, setUser] = useState({});
       });
       return false;
     }
-    
+
     // Validate other required fields
     if (!sex || !address || !state || !city || !place || !dob) {
       setErrors({
@@ -641,7 +758,7 @@ const [user, setUser] = useState({});
       });
       return false;
     }
-    
+
     // Validate highest qualification
     if (!highestQualification) {
       setErrors({
@@ -650,7 +767,7 @@ const [user, setUser] = useState({});
       });
       return false;
     }
-    
+
     // Validate experience selection
     if (isExperienced === undefined) {
       setErrors({
@@ -659,7 +776,7 @@ const [user, setUser] = useState({});
       });
       return false;
     }
-    
+
     return isValid;
   };
 
@@ -667,24 +784,24 @@ const [user, setUser] = useState({});
     if (!validateForm()) {
       return;
     }
-    
+
     setPreloaderVisible(true);
-    
+
     try {
       const token = localStorage.getItem('token');
-      
+
       const response = await axios.post(`${backendUrl}/candidate/myprofile`, formData, {
         headers: { 'x-auth': token }
       });
-      
+
       setPreloaderVisible(false);
-      
+
       if (response.data.status) {
         setErrors({
           message: response.data.message,
           visible: true
         });
-        
+
         // Show cashback modal if applicable
         if (response.data.isProfileCompleted || response.data.isVideoCompleted) {
           setCashbackModal({
@@ -722,45 +839,45 @@ const [user, setUser] = useState({});
     }));
   };
   const [loading, setLoading] = useState(false);
-  
+
   // Form data state
   const [qualificationData, setQualificationData] = useState({
     highestQualification: '',
     yearOfPassing: '',
     qualifications: []
   });
-  
+
   // Options for dropdowns
   const [options, setOptions] = useState({
     qualifications: [],
     subQualifications: [],
     universities: []
   });
-  
+
   // Fetch initial data when component mounts
   useEffect(() => {
     fetchInitialData();
   }, []);
-  
+
   // Update UI when highest qualification changes
   useEffect(() => {
     handleHighestQualificationChange();
   }, [qualificationData.highestQualification]);
-  
+
   // Fetch all required data for qualification section
   const fetchInitialData = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      
+
       // Fetch candidate profile data
       const profileResponse = await axios.get(`${backendUrl}/candidate/profile`, {
         headers: { 'x-auth': token }
       });
-      
+
       if (profileResponse.data.status && profileResponse.data.candidate) {
         const candidate = profileResponse.data.candidate;
-        
+
         // Set candidate qualification data
         setQualificationData({
           highestQualification: candidate.highestQualification || '',
@@ -768,12 +885,12 @@ const [user, setUser] = useState({});
           qualifications: candidate.qualifications?.length > 0 ? candidate.qualifications : []
         });
       }
-      
+
       // Fetch qualification options
       const optionsResponse = await axios.get(`${backendUrl}/candidate/form-options`, {
         headers: { 'x-auth': token }
       });
-      
+
       if (optionsResponse.data) {
         setOptions({
           qualifications: optionsResponse.data.qualifications || [],
@@ -787,17 +904,17 @@ const [user, setUser] = useState({});
       setLoading(false);
     }
   };
-  
+
   // Handle highest qualification change
   const handleHighestQualificationChange = () => {
     const { highestQualification } = qualificationData;
-    
+
     if (!highestQualification) return;
-    
+
     const selectedQualification = options.qualifications.find(q => q._id === highestQualification);
-    
+
     if (!selectedQualification) return;
-    
+
     // For basic qualifications (Upto 5th, 10th, 12th), only show year of passing
     if (['Upto 5th', '10th', '12th'].includes(selectedQualification.name.trim())) {
       setQualificationData(prev => ({
@@ -813,11 +930,11 @@ const [user, setUser] = useState({});
           qualifications: [{}]
         }));
       }
-      
+
       document.getElementById('addmore')?.style.setProperty('display', 'block');
     }
   };
-  
+
   // Handle input change for main qualification fields
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -826,38 +943,38 @@ const [user, setUser] = useState({});
       [name]: value
     }));
   };
-  
+
   // Handle qualification row input changes
   const handleQualificationInputChange = (index, e) => {
     const { name, value } = e.target;
     const updatedQualifications = [...qualificationData.qualifications];
-    
+
     if (!updatedQualifications[index]) {
       updatedQualifications[index] = {};
     }
-    
+
     updatedQualifications[index][name] = value;
-    
+
     setQualificationData(prev => ({
       ...prev,
       qualifications: updatedQualifications
     }));
-    
+
     // If qualification ID changed, fetch sub-qualifications
     if (name === 'Qualification') {
       fetchSubQualifications(value);
     }
   };
-  
+
   // Fetch sub-qualifications based on qualification ID
   const fetchSubQualifications = async (qualificationId) => {
     if (!qualificationId) return;
-    
+
     try {
       const response = await axios.get(`${backendUrl}/candidate/getSubQualification`, {
         params: { qualificationId }
       });
-      
+
       if (response.data.status) {
         setOptions(prev => ({
           ...prev,
@@ -868,7 +985,7 @@ const [user, setUser] = useState({});
       console.error('Error fetching sub-qualifications:', error);
     }
   };
-  
+
   // Add new qualification row
   const addQualificationRow = () => {
     setQualificationData(prev => ({
@@ -876,45 +993,45 @@ const [user, setUser] = useState({});
       qualifications: [...prev.qualifications, {}]
     }));
   };
-  
+
   // Delete qualification row
   const deleteQualificationRow = (index) => {
     const updatedQualifications = [...qualificationData.qualifications];
     updatedQualifications.splice(index, 1);
-    
+
     setQualificationData(prev => ({
       ...prev,
       qualifications: updatedQualifications
     }));
   };
-  
+
   // Handle college location changes
   const initCollegeLocationAutocomplete = (element) => {
     if (!window.google || !element) return;
-    
+
     const options = {
       componentRestrictions: { country: "in" },
       types: ["establishment"]
     };
-    
+
     const autocomplete = new window.google.maps.places.Autocomplete(element, options);
-    
-    autocomplete.addListener('place_changed', function() {
+
+    autocomplete.addListener('place_changed', function () {
       const place = autocomplete.getPlace();
       const row = element.closest('.qua-row');
-      
+
       if (row) {
         const placeInput = row.querySelector('.cllgPlace');
         const latInput = row.querySelector('.cllgLatitude');
         const lngInput = row.querySelector('.cllgLongitude');
-        
+
         if (placeInput) placeInput.value = element.value;
         if (latInput) latInput.value = place.geometry?.location.lat() || '';
         if (lngInput) lngInput.value = place.geometry?.location.lng() || '';
       }
     });
   };
-  
+
   // Initialize Google Maps autocomplete for new college location fields
   useEffect(() => {
     const elements = document.querySelectorAll('.college-loc');
@@ -923,211 +1040,210 @@ const [user, setUser] = useState({});
     });
   }, [qualificationData.qualifications]);
   return (
-    
+
     <div className="">
       {preloaderVisible && <div id="preloader"></div>}
-      
-        <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-          <div className="content-header-left col-md-9 col-12 mb-2">
-            <div className="row breadcrumbs-top">
-              <div className="col-12">
-                <h3 className="content-header-title float-left mb-0">Your Profile</h3>
-                <div className="breadcrumb-wrapper col-12">
-                  <ol className="breadcrumb">
-                    <li className="breadcrumb-item"><a href="/candidate/dashboard">Home</a></li>
-                    <li className="breadcrumb-item"><a href="#">Your Profile</a></li>
-                  </ol>
-                </div>
+
+      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+        <div className="content-header-left col-md-9 col-12 mb-2">
+          <div className="row breadcrumbs-top">
+            <div className="col-12">
+              <h3 className="content-header-title float-left mb-0">Your Profile</h3>
+              <div className="breadcrumb-wrapper col-12">
+                <ol className="breadcrumb">
+                  <li className="breadcrumb-item"><a href="/candidate/dashboard">Home</a></li>
+                  <li className="breadcrumb-item"><a href="#">Your Profile</a></li>
+                </ol>
               </div>
             </div>
           </div>
         </div>
-        
-        <div className="content-body">
-         
-          <section id="personal-info">
-            <div className="row">
-              <div className="col-xl-12 col-lg-12">
-                <div className="card">
-                  <div className="card-header border border-top-0 border-left-0 border-right-0">
-                    <h4 className="card-title pb-1">Personal Information</h4>
-                  </div>
-                  <div className="card-content p-0">
-                    <div className="card-body">
-                      <div className="row">
-                        <div className="col-xl-3 mb-1" id="pd-name">
-                          <label>Name / नाम<span className="mandatory"> *</span></label>
-                          <input 
-                            type="text" 
-                            name="name" 
-                            className="form-control" 
-                            value={formData.personalInfo.name || ''} 
-                            onChange={handlePersonalInfoChange}
-                            maxLength={15}
-                          />
-                        </div>
-                        <div className="col-xl-2 mb-1">
-                          <label>Mobile / मोबाइल<span className="mandatory"> *</span></label>
-                          <input 
-                            type="number" 
-                            name="mobile" 
-                            className="form-control" 
-                            value={formData.personalInfo.mobile || ''} 
-                            readOnly
-                          />
-                        </div>
-                        <div className="col-xl-3 mb-1" id="pd-email">
-                          <label>Email / ईमेल</label>
-                          <input 
-                            type="email" 
-                            name="email" 
-                            className="form-control" 
-                            value={formData.personalInfo.email || ''} 
-                            onChange={handlePersonalInfoChange}
-                            maxLength={30}
-                          />
-                        </div>
-                        <div className="col-xl-2 mb-1" id="pd-gender">
-                          <label>Gender / लिंग<span className="mandatory"> *</span></label>
-                          <select 
-                            className="form-control" 
-                            name="sex" 
-                            value={formData.personalInfo.sex || ''} 
-                            onChange={handlePersonalInfoChange}
-                          >
-                            <option value="">Please select</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                          </select>
-                        </div>
-                        <div className="col-xl-2 mb-1" id="dob-field">
-                          <label>Date of Birth / जन्म तिथि<span className="mandatory"> *</span></label>
-                          <input 
-                            type="date" 
-                            name="dob" 
-                            className="form-control" 
-                            value={formData.personalInfo.dob || ''} 
-                            onChange={handlePersonalInfoChange}
-                          />
-                        </div>
-                        <div className="col-xl-3 mb-1" id="pd-number">
-                          <label>WhatsApp Number / व्हाट्सएप नंबर<span className="mandatory"> *</span></label>
-                          <input 
-                            type="tel" 
-                            maxLength={10} 
-                            name="whatsapp" 
-                            className="form-control" 
-                            value={formData.personalInfo.whatsapp || formData.personalInfo.mobile || ''}
-                            onChange={handlePersonalInfoChange}
-                          />
-                        </div>
-                       
-                        <div className="col-xl-6 mb-1">
-                          <label htmlFor="address">Address<span className="mandatory"> *</span></label>
-                          <div className="input-group">
-                            <div className="input-group-prepend bg-locat">
-                              <div className="input-group-text bg-intext new-bg-text">
-                                <img src="/Assets/images/isist.png" id="siteforcomp" alt="location" />
-                              </div>
+      </div>
+
+      <div className="content-body">
+
+        <section id="personal-info">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Personal Information</h4>
+                </div>
+                <div className="card-content p-0">
+                  <div className="card-body">
+                    <div className="row">
+                      <div className="col-xl-3 mb-1" id="pd-name">
+                        <label>Name / नाम<span className="mandatory"> *</span></label>
+                        <input
+                          type="text"
+                          name="name"
+                          className="form-control"
+                          value={formData.personalInfo.name || ''}
+                          onChange={handlePersonalInfoChange}
+                          maxLength={15}
+                        />
+                      </div>
+                      <div className="col-xl-2 mb-1">
+                        <label>Mobile / मोबाइल<span className="mandatory"> *</span></label>
+                        <input
+                          type="number"
+                          name="mobile"
+                          className="form-control"
+                          value={formData.personalInfo.mobile || ''}
+                          readOnly
+                        />
+                      </div>
+                      <div className="col-xl-3 mb-1" id="pd-email">
+                        <label>Email / ईमेल</label>
+                        <input
+                          type="email"
+                          name="email"
+                          className="form-control"
+                          value={formData.personalInfo.email || ''}
+                          onChange={handlePersonalInfoChange}
+                          maxLength={30}
+                        />
+                      </div>
+                      <div className="col-xl-2 mb-1" id="pd-gender">
+                        <label>Gender / लिंग<span className="mandatory"> *</span></label>
+                        <select
+                          className="form-control"
+                          name="sex"
+                          value={formData.personalInfo.sex || ''}
+                          onChange={handlePersonalInfoChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                      <div className="col-xl-2 mb-1" id="dob-field">
+                        <label>Date of Birth / जन्म तिथि<span className="mandatory"> *</span></label>
+                        <input
+                          type="date"
+                          name="dob"
+                          className="form-control"
+                          value={formData.personalInfo.dob || ''}
+                          onChange={handlePersonalInfoChange}
+                        />
+                      </div>
+                      <div className="col-xl-3 mb-1" id="pd-number">
+                        <label>WhatsApp Number / व्हाट्सएप नंबर<span className="mandatory"> *</span></label>
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          name="whatsapp"
+                          className="form-control"
+                          value={formData.personalInfo.whatsapp || formData.personalInfo.mobile || ''}
+                          onChange={handlePersonalInfoChange}
+                        />
+                      </div>
+
+                      <div className="col-xl-6 mb-1">
+                        <label htmlFor="address">Address<span className="mandatory"> *</span></label>
+                        <div className="input-group">
+                          <div className="input-group-prepend bg-locat">
+                            <div className="input-group-text bg-intext new-bg-text">
+                              <img src="/Assets/images/isist.png" id="siteforcomp" alt="location" />
                             </div>
-                            <input 
-                              type="text" 
-                              className="form-control" 
-                              id="address" 
-                              ref={workLocationRef}
-                              value={formData.personalInfo.place || ''} 
-                              onChange={(e) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  personalInfo: {
-                                    ...prev.personalInfo,
-                                    place: e.target.value
-                                  }
-                                }));
-                              }}
-                            />
-                            <input type="hidden" id="place" name="place" value={formData.personalInfo.place || ''} className="form-control" />
-                            <input type="hidden" id="latitude" name="latitude" value={formData.personalInfo.latitude || ''} className="form-control" />
-                            <input type="hidden" id="longitude" name="longitude" value={formData.personalInfo.longitude || ''} className="form-control" />
                           </div>
+                          <input
+                            type="text"
+                            className="form-control"
+                            id="address"
+                            ref={workLocationRef}
+                            value={formData.personalInfo.place || ''}
+                            onChange={(e) => {
+                              setFormData(prev => ({
+                                ...prev,
+                                personalInfo: {
+                                  ...prev.personalInfo,
+                                  place: e.target.value
+                                }
+                              }));
+                            }}
+                          />
+                          <input type="hidden" id="place" name="place" value={formData.personalInfo.place || ''} className="form-control" />
+                          <input type="hidden" id="latitude" name="latitude" value={formData.personalInfo.latitude || ''} className="form-control" />
+                          <input type="hidden" id="longitude" name="longitude" value={formData.personalInfo.longitude || ''} className="form-control" />
                         </div>
-                       
-                        <div className="col-xl-3 mb-1">
-                          <label>Upload image / तस्विर अपलोड करे</label>
-                          {formData.personalInfo.image ? (
-                            <div>
-                              <a href={`${process.env.REACT_APP_BUCKET_URL}/${formData.personalInfo.image}`} target="_blank" rel="noopener noreferrer">
-                                Uploaded image
-                              </a>
-                              <i 
-                                className="feather icon-x remove_uploaded_pic" 
-                                style={{ color: 'red', cursor: 'pointer', marginLeft: '10px' }}
-                                onClick={() => removeUploadedFile('image')}
-                              ></i>
-                            </div>
-                          ) : (
-                            <input 
-                              type="file" 
-                              className="form-control" 
-                              id="candidate-file"
-                              onChange={(e) => handleFileUpload(e, 'image')}
-                            />
-                          )}
-                        </div>
-                        <div className="col-xl-3 mb-1">
-                          <label>Upload resume / रिज्यूमे अपलोड करें</label>
-                          {formData.personalInfo.resume ? (
-                            <div>
-                              <a href={`${process.env.REACT_APP_BUCKET_URL}/${formData.personalInfo.resume}`} target="_blank" rel="noopener noreferrer">
-                                Uploaded resume
-                              </a>
-                              <i 
-                                className="feather icon-x remove_uploaded_pic" 
-                                style={{ color: 'red', cursor: 'pointer', marginLeft: '10px' }}
-                                onClick={() => removeUploadedFile('resume')}
-                              ></i>
-                            </div>
-                          ) : (
-                            <input 
-                              type="file" 
-                              className="form-control" 
-                              id="uploadresume"
-                              onChange={(e) => handleFileUpload(e, 'resume')}
-                            />
-                          )}
-                        </div>
-                        <div className="col-xl-3 mb-1">
-                          <label>Add Video Profile / वीडियो प्रोफाइल जोड़ें</label>
-                          {formData.personalInfo.profilevideo ? (
-                            <div className="profilevideo">
-                              <a 
-                                href={`${process.env.REACT_APP_BUCKET_URL}/${formData.personalInfo.profilevideo}`} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                id="uploadedvideo"
-                              >
-                                Uploaded Video
-                              </a>
-                              <i 
-                                className="feather icon-x remove_uploaded_pic" 
-                                style={{ color: 'red', cursor: 'pointer', marginLeft: '10px' }}
-                                onClick={() => removeUploadedFile('video')}
-                              ></i>
-                            </div>
-                          ) : (
-                            <input 
-                              type="file" 
-                              className="form-control" 
-                              id="uploadVideo"
-                              onChange={(e) => handleFileUpload(e, 'video')}
-                            />
-                          )}
-                        </div>
-                        <div className="col-xl-3 mb-1">
-                          <label>Sample Video Profile / वीडियो प्रोफाइल नमूना</label>
+                      </div>
+
+                      <div className="col-xl-3 mb-1">
+                        <label>Upload image / तस्विर अपलोड करे</label>
+                        {formData.personalInfo.image ? (
                           <div>
-                            <a href="/sampleVideoProfile" target="_blank" rel="noopener noreferrer">View / देखे</a>
+                            <a href={`${process.env.REACT_APP_BUCKET_URL}/${formData.personalInfo.image}`} target="_blank" rel="noopener noreferrer">
+                              Uploaded image
+                            </a>
+                            <i
+                              className="feather icon-x remove_uploaded_pic"
+                              style={{ color: 'red', cursor: 'pointer', marginLeft: '10px' }}
+                              onClick={() => removeUploadedFile('image')}
+                            ></i>
                           </div>
+                        ) : (
+                          <input
+                            type="file"
+                            className="form-control"
+                            id="candidate-file"
+                            onChange={(e) => handleFileUpload(e, 'image')}
+                          />
+                        )}
+                      </div>
+                      <div className="col-xl-3 mb-1">
+                        <label>Upload resume / रिज्यूमे अपलोड करें</label>
+                        {formData.personalInfo.resume ? (
+                          <div>
+                            <a href={`${process.env.REACT_APP_BUCKET_URL}/${formData.personalInfo.resume}`} target="_blank" rel="noopener noreferrer">
+                              Uploaded resume
+                            </a>
+                            <i
+                              className="feather icon-x remove_uploaded_pic"
+                              style={{ color: 'red', cursor: 'pointer', marginLeft: '10px' }}
+                              onClick={() => removeUploadedFile('resume')}
+                            ></i>
+                          </div>
+                        ) : (
+                          <input
+                            type="file"
+                            className="form-control"
+                            id="uploadresume"
+                            onChange={(e) => handleFileUpload(e, 'resume')}
+                          />
+                        )}
+                      </div>
+                      <div className="col-xl-3 mb-1">
+                        <label>Add Video Profile / वीडियो प्रोफाइल जोड़ें</label>
+                        {formData.personalInfo.profilevideo ? (
+                          <div className="profilevideo">
+                            <a
+                              href={`${process.env.REACT_APP_BUCKET_URL}/${formData.personalInfo.profilevideo}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              id="uploadedvideo"
+                            >
+                              Uploaded Video
+                            </a>
+                            <i
+                              className="feather icon-x remove_uploaded_pic"
+                              style={{ color: 'red', cursor: 'pointer', marginLeft: '10px' }}
+                              onClick={() => removeUploadedFile('video')}
+                            ></i>
+                          </div>
+                        ) : (
+                          <input
+                            type="file"
+                            className="form-control"
+                            id="uploadVideo"
+                            onChange={(e) => handleFileUpload(e, 'video')}
+                          />
+                        )}
+                      </div>
+                      <div className="col-xl-3 mb-1">
+                        <label>Sample Video Profile / वीडियो प्रोफाइल नमूना</label>
+                        <div>
+                          <a href="/sampleVideoProfile" target="_blank" rel="noopener noreferrer">View / देखे</a>
                         </div>
                       </div>
                     </div>
@@ -1135,275 +1251,276 @@ const [user, setUser] = useState({});
                 </div>
               </div>
             </div>
-          </section>
-          
-         
-          <section id="qualification">
-      <div className="row">
-        <div className="col-xl-12 col-lg-12">
-          <div className="card">
-            <div className="card-header border border-top-0 border-left-0 border-right-0">
-              <h4 className="card-title pb-1">Qualification</h4>
-            </div>
-            <div className="card-content">
-              <div className="card-body">
-                {loading ? (
-                  <div className="text-center">
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="sr-only">Loading...</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="row" id="qualification-section">
-                    <div className="col-xl-4 ml-1 mb-1" id="highestQuali">
-                      <label>Highest Qualification / अपनी उच्चतम योग्यता का चयन करें<span className="mandatory"> *</span></label>
-                      <select 
-                        className="form-control single-field" 
-                        name="highestQualification"
-                        id="quali"
-                        value={qualificationData.highestQualification}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Highest Qualification</option>
-                        {options.qualifications.map(qualification => (
-                          <option key={qualification._id} value={qualification._id} className="text-capitalize">
-                            {qualification.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div id="qualification-div" className="col-xl-12 mb-1">
-                      {/* For basic qualifications (Upto 5th, 10th, 12th) */}
-                      {qualificationData.highestQualification && 
-                       ['Upto 5th', '10th', '12th'].includes(
-                         options.qualifications.find(q => q._id === qualificationData.highestQualification)?.name?.trim()
-                       ) && (
-                        <div>
-                          <label>Year of Passing / उत्तीर्ण होने का वर्ष</label>
-                          <select 
-                            className="form-control single-field" 
-                            name="yearOfPassing"
-                            id="yearPassing"
-                            value={qualificationData.yearOfPassing}
+          </div>
+        </section>
+
+
+        <section id="qualification">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Qualification</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    {loading ? (
+                      <div className="text-center">
+                        <div className="spinner-border text-primary" role="status">
+                          <span className="sr-only">Loading...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="row" id="qualification-section">
+                        <div className="col-xl-4 ml-1 mb-1" id="highestQuali">
+                          <label>Highest Qualification / अपनी उच्चतम योग्यता का चयन करें<span className="mandatory"> *</span></label>
+                          <select
+                            className="form-control single-field"
+                            name="highestQualification"
+                            id="quali"
+                            value={qualificationData.highestQualification}
                             onChange={handleInputChange}
                           >
-                            <option value="">Select Year</option>
-                            {Array.from({ length: 25 }, (_, i) => 2023 - i).map(year => (
-                              <option key={year} value={year}>{year}</option>
+                            <option value="">Select Highest Qualification</option>
+                            {options.qualifications.map(qualification => (
+                              <option key={qualification._id} value={qualification._id} className="text-capitalize">
+                                {qualification.name}
+                              </option>
                             ))}
                           </select>
                         </div>
-                      )}
-                      
-                      {/* For higher qualifications */}
-                      {qualificationData.qualifications && qualificationData.qualifications.length > 0 && 
-                       !['Upto 5th', '10th', '12th'].includes(
-                         options.qualifications.find(q => q._id === qualificationData.highestQualification)?.name?.trim()
-                       ) && 
-                       qualificationData.qualifications.map((qualification, index) => (
-                        <div key={index} className="row px-1 qua-row">
-                          <div className="col-xl-4">
-                            <label>Year of Passing / उत्तीर्ण होने का वर्ष</label>
-                            <select 
-                              className="form-control" 
-                              name="PassingYear"
-                              value={qualification.PassingYear || ''}
-                              onChange={(e) => handleQualificationInputChange(index, e)}
-                            >
-                              <option value="">Select Year</option>
-                              {Array.from({ length: 25 }, (_, i) => 2023 - i).map(year => (
-                                <option key={year} value={year}>{year}</option>
-                              ))}
-                            </select>
-                          </div>
-                          
-                          <div className="col-xl-4 mb-1">
-                            <label>Qualification / योग्यता</label>
-                            <select 
-                              className="form-control" 
-                              name="Qualification"
-                              value={qualification.Qualification || ''}
-                              onChange={(e) => handleQualificationInputChange(index, e)}
-                            >
-                              <option value="">Select Qualification</option>
-                              {options.qualifications
-                                .filter(q => q.basic !== true)
-                                .map(qual => (
-                                  <option key={qual._id} value={qual._id} className="text-capitalize">
-                                    {qual.name}
-                                  </option>
-                                ))
-                              }
-                            </select>
-                          </div>
-                          
-                          <div className="col-xl-4 mb-1">
-                            <label>Stream / उप योग्यता</label>
-                            <select 
-                              className="form-control text-capitalize subqualification" 
-                              name="subQualification"
-                              value={qualification.subQualification || ''}
-                              onChange={(e) => handleQualificationInputChange(index, e)}
-                            >
-                              <option value="">Select Subqualification</option>
-                              {options.subQualifications
-                                .filter(sq => sq._qualification === qualification.Qualification)
-                                .map(subQual => (
-                                  <option key={subQual._id} value={subQual._id} className="text-capitalize">
-                                    {subQual.name}
-                                  </option>
-                                ))
-                              }
-                            </select>
-                          </div>
-                          
-                          <div className="col-xl-4 mb-1">
-                            <label>College Name / कॉलेज का नाम</label>
-                            <input 
-                              type="text" 
-                              className="form-control" 
-                              name="College"
-                              value={qualification.College || ''}
-                              onChange={(e) => handleQualificationInputChange(index, e)}
-                              maxLength={50}
-                            />
-                          </div>
-                          
-                          <div className="col-xl-4 mb-1">
-                            <label>University Name / विश्वविद्यालय का नाम</label>
-                            <select 
-                              className="form-control text-capitalize" 
-                              name="University"
-                              value={qualification.University || ''}
-                              onChange={(e) => handleQualificationInputChange(index, e)}
-                            >
-                              <option value="">Select University</option>
-                              {options.universities.map(university => (
-                                <option key={university._id} value={university._id} className="text-capitalize">
-                                  {university.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          
-                          <div className="col-xl-4 mb-1">
-                            <label>Assessment Type / मूल्यांकन प्रकार</label>
-                            <select 
-                              className="form-control" 
-                              name="AssessmentType"
-                              value={qualification.AssessmentType || ''}
-                              onChange={(e) => handleQualificationInputChange(index, e)}
-                            >
-                              <option value="">Select Option</option>
-                              <option value="CGPA">CGPA</option>
-                              <option value="Percentage">Percentage</option>
-                              <option value="Grade">Grade</option>
-                            </select>
-                          </div>
-                          
-                          <div className="col-xl-4 mb-1">
-                            <label>Enter Value / मूल्य दर्ज करें</label>
-                            <input 
-                              type="text" 
-                              className="form-control" 
-                              placeholder="Enter CGPA, Percentage or Grade" 
-                              name="Result"
-                              value={qualification.Result || ''}
-                              onChange={(e) => handleQualificationInputChange(index, e)}
-                              maxLength={4}
-                            />
-                          </div>
-                          
-                          <div className="col-xl-4 mb-1">
-                            <label htmlFor="college-loc">College Location</label>
-                            <div className="input-group mb-2">
-                              <div className="input-group-prepend bg-locat">
-                                <div className="input-group-text bg-intext">
-                                  <img src="/images/isist.png" id="siteforcomp" alt="location icon" />
-                                </div>
-                              </div>
-                              <input 
-                                type="text" 
-                                className="form-control college-loc" 
-                                id={`college-loc-${index}`}
-                                value={qualification.collegePlace || ''}
-                                onChange={(e) => handleQualificationInputChange(index, {
-                                  target: {
-                                    name: 'collegePlace',
-                                    value: e.target.value
-                                  }
-                                })}
-                              />
-                              <input 
-                                type="hidden" 
-                                className="form-control cllgPlace" 
-                                name="collegePlace" 
-                                value={qualification.collegePlace || ''} 
-                              />
-                              <input 
-                                type="hidden" 
-                                className="form-control cllgLatitude" 
-                                name="collegeLatitude" 
-                                value={qualification.collegeLatitude || ''} 
-                              />
-                              <input 
-                                type="hidden" 
-                                className="form-control cllgLongitude" 
-                                name="collegeLongitude" 
-                                value={qualification.collegeLongitude || ''} 
-                              />
-                            </div>
-                          </div>
-                          
-                          {index >= 1 && (
-                            <div className="d-flex flex-row-reverse deletequalification">
-                              <div className="col my-auto">
-                                <button 
-                                  className="btn btn-danger waves-effect waves-light"
-                                  onClick={() => deleteQualificationRow(index)}
-                                  type="button"
+
+                        <div id="qualification-div" className="col-xl-12 mb-1">
+                          {/* For basic qualifications (Upto 5th, 10th, 12th) */}
+                          {qualificationData.highestQualification &&
+                            ['Upto 5th', '10th', '12th'].includes(
+                              options.qualifications.find(q => q._id === qualificationData.highestQualification)?.name?.trim()
+                            ) && (
+                              <div>
+                                <label>Year of Passing / उत्तीर्ण होने का वर्ष</label>
+                                <select
+                                  className="form-control single-field"
+                                  name="yearOfPassing"
+                                  id="yearPassing"
+                                  value={qualificationData.yearOfPassing}
+                                  onChange={handleInputChange}
                                 >
-                                  Delete
-                                </button>
+                                  <option value="">Select Year</option>
+                                  {Array.from({ length: 25 }, (_, i) => 2023 - i).map(year => (
+                                    <option key={year} value={year}>{year}</option>
+                                  ))}
+                                </select>
                               </div>
-                            </div>
-                          )}
+                            )}
+
+                          {/* For higher qualifications */}
+                          {qualificationData.qualifications && qualificationData.qualifications.length > 0 &&
+                            !['Upto 5th', '10th', '12th'].includes(
+                              options.qualifications.find(q => q._id === qualificationData.highestQualification)?.name?.trim()
+                            ) &&
+                            qualificationData.qualifications.map((qualification, index) => (
+                              <div key={index} className="row px-1 qua-row">
+                                <div className="col-xl-4">
+                                  <label>Year of Passing / उत्तीर्ण होने का वर्ष</label>
+                                  <select
+                                    className="form-control"
+                                    name="PassingYear"
+                                    value={qualification.PassingYear || ''}
+                                    onChange={(e) => handleQualificationInputChange(index, e)}
+                                  >
+                                    <option value="">Select Year</option>
+                                    {Array.from({ length: 25 }, (_, i) => 2023 - i).map(year => (
+                                      <option key={year} value={year}>{year}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="col-xl-4 mb-1">
+                                  <label>Qualification / योग्यता</label>
+                                  <select
+                                    className="form-control"
+                                    name="Qualification"
+                                    value={qualification.Qualification || ''}
+                                    onChange={(e) => handleQualificationInputChange(index, e)}
+                                  >
+                                    <option value="">Select Qualification</option>
+                                    {options.qualifications
+                                      .filter(q => q.basic !== true)
+                                      .map(qual => (
+                                        <option key={qual._id} value={qual._id} className="text-capitalize">
+                                          {qual.name}
+                                        </option>
+                                      ))
+                                    }
+                                  </select>
+                                </div>
+
+                                <div className="col-xl-4 mb-1">
+                                  <label>Stream / उप योग्यता</label>
+                                  <select
+                                    className="form-control text-capitalize subqualification"
+                                    name="subQualification"
+                                    value={qualification.subQualification || ''}
+                                    onChange={(e) => handleQualificationInputChange(index, e)}
+                                  >
+                                    <option value="">Select Subqualification</option>
+                                    {options.subQualifications
+                                      .filter(sq => sq._qualification === qualification.Qualification)
+                                      .map(subQual => (
+                                        <option key={subQual._id} value={subQual._id} className="text-capitalize">
+                                          {subQual.name}
+                                        </option>
+                                      ))
+                                    }
+                                  </select>
+                                </div>
+
+                                <div className="col-xl-4 mb-1">
+                                  <label>College Name / कॉलेज का नाम</label>
+                                  <input
+                                    type="text"
+                                    className="form-control"
+                                    name="College"
+                                    value={qualification.College || ''}
+                                    onChange={(e) => handleQualificationInputChange(index, e)}
+                                    maxLength={50}
+                                  />
+                                </div>
+
+                                <div className="col-xl-4 mb-1">
+                                  <label>University Name / विश्वविद्यालय का नाम</label>
+                                  <select
+                                    className="form-control text-capitalize"
+                                    name="University"
+                                    value={qualification.University || ''}
+                                    onChange={(e) => handleQualificationInputChange(index, e)}
+                                  >
+                                    <option value="">Select University</option>
+                                    {options.universities.map(university => (
+                                      <option key={university._id} value={university._id} className="text-capitalize">
+                                        {university.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="col-xl-4 mb-1">
+                                  <label>Assessment Type / मूल्यांकन प्रकार</label>
+                                  <select
+                                    className="form-control"
+                                    name="AssessmentType"
+                                    value={qualification.AssessmentType || ''}
+                                    onChange={(e) => handleQualificationInputChange(index, e)}
+                                  >
+                                    <option value="">Select Option</option>
+                                    <option value="CGPA">CGPA</option>
+                                    <option value="Percentage">Percentage</option>
+                                    <option value="Grade">Grade</option>
+                                  </select>
+                                </div>
+
+                                <div className="col-xl-4 mb-1">
+                                  <label>Enter Value / मूल्य दर्ज करें</label>
+                                  <input
+                                    type="text"
+                                    className="form-control"
+                                    placeholder="Enter CGPA, Percentage or Grade"
+                                    name="Result"
+                                    value={qualification.Result || ''}
+                                    onChange={(e) => handleQualificationInputChange(index, e)}
+                                    maxLength={4}
+                                  />
+                                </div>
+
+                                <div className="col-xl-4 mb-1">
+                                  <label htmlFor="college-loc">College Location</label>
+                                  <div className="input-group mb-2">
+                                    <div className="input-group-prepend bg-locat">
+                                      <div className="input-group-text bg-intext">
+                                        <img src="/images/isist.png" id="siteforcomp" alt="location icon" />
+                                      </div>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      className="form-control college-loc"
+                                      id={`college-loc-${index}`}
+                                      value={qualification.collegePlace || ''}
+                                      onChange={(e) => handleQualificationInputChange(index, {
+                                        target: {
+                                          name: 'collegePlace',
+                                          value: e.target.value
+                                        }
+                                      })}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      className="form-control cllgPlace"
+                                      name="collegePlace"
+                                      value={qualification.collegePlace || ''}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      className="form-control cllgLatitude"
+                                      name="collegeLatitude"
+                                      value={qualification.collegeLatitude || ''}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      className="form-control cllgLongitude"
+                                      name="collegeLongitude"
+                                      value={qualification.collegeLongitude || ''}
+                                    />
+                                  </div>
+                                </div>
+
+                                {index >= 1 && (
+                                  <div className="d-flex flex-row-reverse deletequalification">
+                                    <div className="col my-auto">
+                                      <button
+                                        className="btn btn-danger waves-effect waves-light"
+                                        onClick={() => deleteQualificationRow(index)}
+                                        type="button"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                         </div>
-                      ))}
-                    </div>
-                    
-                    <div 
-                      id="addmore" 
-                      style={{ 
-                        display: 
-                          qualificationData.qualifications && 
-                          qualificationData.qualifications.length > 0 && 
-                          !['Upto 5th', '10th', '12th'].includes(
-                            options.qualifications.find(q => q._id === qualificationData.highestQualification)?.name?.trim()
-                          ) ? 'block' : 'none' 
-                      }}
-                      className="col-12"
-                    >
-                      <button 
-                        onClick={addQualificationRow}
-                        className="btn btn-success waves-effect waves-light text-white mt-2"
-                        type="button"
-                      >
-                        + Add Another
-                      </button>
-                    </div>
+
+                        <div
+                          id="addmore"
+                          style={{
+                            display:
+                              qualificationData.qualifications &&
+                                qualificationData.qualifications.length > 0 &&
+                                !['Upto 5th', '10th', '12th'].includes(
+                                  options.qualifications.find(q => q._id === qualificationData.highestQualification)?.name?.trim()
+                                ) ? 'block' : 'none'
+                          }}
+                          className="col-12"
+                        >
+                          <button
+                            onClick={addQualificationRow}
+                            className="btn btn-success waves-effect waves-light text-white mt-2"
+                            type="button"
+                          >
+                            + Add Another
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-          
-          {/* Skills Section */}
-          <section id="skills-and-profile">
+        </section>
+
+        {/* Skills Section */}
+        {/* <section id="skills-and-profile">
             <div className="row">
               <div className="col-xl-6 col-lg-6">
                 <div className="card">
@@ -1534,210 +1651,667 @@ const [user, setUser] = useState({});
                 </div>
               </div>
             </div>
-          </section>
-          
-          {/* Experience Section */}
-          <section id="Experience-section">
-            <div className="row">
-              <div className="col-xl-12 col-lg-12">
-                <div className="card">
-                  <div className="card-header border border-top-0 border-left-0 border-right-0">
-                    <h4 className="card-title pb-1">Experience / अनुभव</h4>
+          </section> */}
+        <form method='post'>
+          <section
+            id="skill"
+            style={{
+              maxHeight: showCVBuilder ? '9999px' : '0px',
+              overflow: 'hidden',
+              transition: 'max-height 0.5s ease-in-out',
+              marginTop: showCVBuilder ? '30px' : '0',
+              opacity: showCVBuilder ? 1 : 0,
+              transitionProperty: 'max-height, opacity'
+            }}
+          >
+            <div className="cv-container">
+              <div className="top-bar"></div>
+              <div className="cv-header">
+                <div className="profile-image">
+                  {/* <img src={user?.image ? `${process.env.REACT_APP_BUCKET_URL}/${user.image}` : "/api/placeholder/150/150"} alt="" /> */}
+                  <img src="" alt="" />
+
+                  <label className="upload-icon">
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleProfileImageChange(e)}
+                    />
+                  </label>
+                </div>
+                <div className="personal-info">
+                  {createEditable(user?.name || '', 'Your Name')}
+                  {createEditable('', 'Professional Title')}
+                  {createEditable('', 'Write a brief professional summary here...')}
+                  <div className="contact-info">
+                    <div className="contact-item">
+                      <span className="contact-icon">📞</span>{createEditable('', 'Phone Number')}
+                    </div>
+                    <div className="contact-item">
+                      <span className="contact-icon">✉️</span>{createEditable('', 'Email Address')}
+                    </div>
+                    {/* <div className="contact-item">
+                    <span className="contact-icon">🌐</span>{createEditable('', 'Email')}
+                  </div> */}
+                    <div className="contact-item">
+                      <span className="contact-icon">📍</span>{createEditable('', 'Location')}
+                    </div>
                   </div>
-                  <div className="card-content">
-                    <div className="card-body">
-                      <div className="row" id="exp-section">
-                        <div className="col-xl-3 mb-1" id="isExp">
-                          <label>Experience / अनुभव<span className="mandatory"> *</span></label>
-                          <select 
-                            className="form-control" 
-                            name="experience"
-                            value={formData.isExperienced ? 'Experienced' : 'Fresher'}
-                            onChange={handleExperienceChange}
+                </div>
+              </div>
+
+              <div className="main-content">
+                <div className="left-column">
+                  {/* Work Experience */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">💼</div>
+                      <div className="section-title">Work Experience</div>
+                    </div>
+                    {experiences.map((_, index) => (
+                      <div className="experience-item" key={index} style={{ position: 'relative' }}>
+                        <div className="timeline-dot"></div>
+                        <div className="timeline-line"></div>
+
+                        {createEditable('', 'Job Title')}
+                        {createEditable('', 'Company Name')}
+                        <div className="date">
+                          <span className="date-icon">📅</span>{createEditable('', 'Duration')}
+                        </div>
+                        {createEditable('', 'Job Description')}
+
+                        {/* ❌ Show only if more than 1 field */}
+                        {experiences.length > 1 && (
+                          <button
+                            className="delete-btn"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const updated = [...experiences];
+                              updated.splice(index, 1);
+                              setExperiences(updated);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: '0',
+                              right: '0',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#dc3545',
+                              fontSize: '18px',
+                              cursor: 'pointer'
+                            }}
                           >
-                            <option value="">Select Experience</option>
-                            <option value="Fresher">Fresher</option>
-                            <option value="Experienced">Experienced</option>
-                          </select>
-                        </div>
-                        
-                        {formData.isExperienced && (
-                          <div className="col-xl-3 mb-1" id="total-exp">
-                            <label>Total experience (yrs) / कुल अनुभव (वर्ष)</label>
-                            <input 
-                              type="number" 
-                              name="totalExperience" 
-                              className="form-control"
-                              value={formData.totalExperience || ''}
-                              onChange={(e) => setFormData(prev => ({ ...prev, totalExperience: e.target.value }))}
-                            />
-                          </div>
-                        )}
-                        
-                        <div id="experience-div" className="col-xl-12">
-                          {formData.isExperienced && formData.experiences && formData.experiences.map((experience, index) => (
-                            <div key={`exp-${index}`} className="row px-1 exp-row">
-                              <div className="col-xl-3 mb-1">
-                                <label>From Date / तिथि से</label>
-                                <input 
-                                  type="date" 
-                                  className="form-control" 
-                                  name="FromDate"
-                                  value={experience.FromDate || ''}
-                                  onChange={(e) => handleExperienceDetailChange(index, e)}
-                                />
-                              </div>
-                              <div className="col-xl-3 mb-1">
-                                <label>To Date / तिथि तक</label>
-                                <input 
-                                  type="date" 
-                                  className="form-control" 
-                                  name="ToDate"
-                                  value={experience.ToDate || ''}
-                                  onChange={(e) => handleExperienceDetailChange(index, e)}
-                                />
-                              </div>
-                              <div className="col-xl-3 mb-1">
-                                <label>Industry / उद्योग</label>
-                                <select 
-                                  className="form-control text-capitalize" 
-                                  name="Industry_Name"
-                                  value={experience.Industry_Name || ''}
-                                  onChange={(e) => handleExperienceDetailChange(index, e)}
-                                >
-                                  <option value="">Select Industry</option>
-                                  {formOptions.industries.map(industry => (
-                                    <option key={industry._id} value={industry._id} className="text-capitalize">
-                                      {industry.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="col-xl-3 mb-1">
-                                <label>Sub Industry / उप उद्योग</label>
-                                <select 
-                                  className="form-control text-capitalize" 
-                                  name="SubIndustry_Name"
-                                  value={experience.SubIndustry_Name || ''}
-                                  onChange={(e) => handleExperienceDetailChange(index, e)}
-                                >
-                                  <option value="">Select Sub Industry</option>
-                                  {formOptions.subIndustries.map(subIndustry => (
-                                    <option key={subIndustry._id} value={subIndustry._id} className="text-capitalize">
-                                      {subIndustry.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="col-xl-3 mb-1">
-                                <label>Company name / कंपनी का नाम</label>
-                                <input 
-                                  type="text" 
-                                  name="Company_Name" 
-                                  className="form-control"
-                                  value={experience.Company_Name || ''}
-                                  onChange={(e) => handleExperienceDetailChange(index, e)}
-                                  maxLength={50}
-                                />
-                              </div>
-                              <div className="col-xl-3 mb-1">
-                                <label>State / राज्य</label>
-                                <select 
-                                  className="form-control" 
-                                  name="Company_State"
-                                  value={experience.Company_State || ''}
-                                  onChange={(e) => handleStateChange(e, 'experience', index)}
-                                >
-                                  <option value="">Select State</option>
-                                  {formOptions.states.map(state => (
-                                    <option key={state._id} value={state._id} className="text-capitalize">
-                                      {state.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="col-xl-3 mb-1">
-                                <label>City / शहर</label>
-                                <select 
-                                  className="form-control" 
-                                  name="Company_City"
-                                  value={experience.Company_City || ''}
-                                  onChange={(e) => handleExperienceDetailChange(index, e)}
-                                >
-                                  <option value="">Select City</option>
-                                  {formOptions.cities.map(city => (
-                                    experience.Company_State === city.stateId && (
-                                      <option key={city._id} value={city._id} className="text-capitalize">
-                                        {city.name}
-                                      </option>
-                                    )
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="col-xl-3 mb-1">
-                                <label>Comments / टिप्पणियाँ</label>
-                                <input 
-                                  type="text" 
-                                  name="Comments" 
-                                  className="form-control"
-                                  value={experience.Comments || ''}
-                                  onChange={(e) => handleExperienceDetailChange(index, e)}
-                                />
-                              </div>
-                              {index >= 1 && (
-                                <div className="col-xl-12 text-right deleteexperience">
-                                  <div className="my-auto">
-                                    <button 
-                                      className="btn btn-danger waves-effect waves-light"
-                                      onClick={() => deleteExperienceRow(index)}
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {formData.isExperienced && (
-                          <div className="col-xl-12 text-right" id="addmoreexp">
-                            <button 
-                              onClick={addExperienceRow}
-                              className="btn btn-success waves-effect waves-light text-white mt-2"
-                            >
-                              + Add Another
-                            </button>
-                          </div>
+                            ✖
+                          </button>
                         )}
                       </div>
+                    ))}
+
+                    <button className="add-UserBtn" onClick={(e) =>{e.preventDefault();  setExperiences([...experiences, {}])}}>➕ Add Experience</button>
+                  </div>
+
+                  {/* Education */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🎓</div>
+                      <div className="section-title">Education</div>
+                    </div>
+                    {educations.map((_, index) => (
+  <div className="education-item" key={index} style={{ position: 'relative' }}>
+    <div className="timeline-dot"></div>
+    <div className="timeline-line"></div>
+    {createEditable('', 'Degree')}
+    {createEditable('', 'University')}
+    <div className="date">
+      <span className="date-icon">📅</span>{createEditable('', 'Passing Year')}
+    </div>
+    {createEditable('', 'Additional Information')}
+
+    {/* ❌ Delete Button */}
+    {educations.length > 1 && (
+      <button
+        className="delete-btn"
+        onClick={(e) => {
+          e.preventDefault();
+          const updated = [...educations];
+          updated.splice(index, 1);
+          setEducations(updated);
+        }}
+        style={{
+          position: 'absolute',
+          top: '0',
+          right: '0',
+          background: 'transparent',
+          border: 'none',
+          color: '#dc3545',
+          fontSize: '18px',
+          cursor: 'pointer'
+        }}
+      >
+        ✖
+      </button>
+    )}
+  </div>
+))}
+
+                    <button className="add-UserBtn" onClick={(e) =>{e.preventDefault(); setEducations([...educations, {}])}}>➕ Add Education</button>
+                  </div>
+
+                  {/* Declaration */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">📜</div>
+                      <div className="section-title">Declaration</div>
+                    </div>
+                    <div
+                      className="education-description"
+                      contentEditable
+                      suppressContentEditableWarning={true}
+                      onBlur={(e) => setDeclaration(e.target.innerText)}
+                    >
+                      {declaration}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="right-column">
+                  {/* Skills */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🔧</div>
+                      <div className="section-title">Skills</div>
+                    </div>
+                    <div className="skills-container">
+                      {skills.map((skill, index) => (
+                        <div className="skill-item" key={index} style={{ position: 'relative' }}>
+                          <div className="skill-name">
+                            <div
+                              contentEditable
+                              data-placeholder="Skill Name"
+                              suppressContentEditableWarning={true}
+                              onBlur={(e) => {
+                                const updated = [...skills];
+                                updated[index].name = e.target.innerText;
+                                setSkills(updated);
+                              }}
+                            >
+                              {skill.name}
+                            </div>
+                            <span>{skill.level}%</span>
+                          </div>
+
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={skill.level}
+                            onChange={(e) => {
+                              const updated = [...skills];
+                              updated[index].level = Number(e.target.value);
+                              setSkills(updated);
+                            }}
+                            className="slider"
+                          />
+
+                          {/* Delete button - only show if more than one skill */}
+                          {skills.length > 1 && (
+                            <button
+                              className="delete-btn"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const updated = [...skills];
+                                updated.splice(index, 1);
+                                setSkills(updated);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '-25px',
+                                right: '0',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#dc3545',
+                                fontSize: '18px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✖
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                        <button className="add-UserBtn" onClick={(e) => { e.preventDefault();setSkills([...skills, { name: '', level: 0 }])}}>
+                        ➕ Add Skill
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Certifications */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🏆</div>
+                      <div className="section-title">Certifications</div>
+                    </div>
+                    <ul className="certificates-list">
+                      {certificates.map((_, index) => (
+                        <li className="certificate-item" key={index} style={{ position: 'relative' }}>
+                          <div className="timeline-dot"></div>
+                          <div className="timeline-line"></div>
+                          {createEditable('', 'Certificate Name')}
+                          {createEditable('', 'Issuing Organization, Year')}
+
+                          {certificates.length > 1 && (
+                            <button
+                              className="delete-btn"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const updated = [...certificates];
+                                updated.splice(index, 1);
+                                setCertificates(updated);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '0',
+                                right: '0',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#dc3545',
+                                fontSize: '18px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✖
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                      <button
+                        className="add-UserBtn"
+                        onClick={(e) => { e.preventDefault(); setCertificates([...certificates, {}])}}
+                      >
+                        ➕ Add Certificate
+                      </button>
+                    </ul>
+                  </div>
+
+                  {/* Languages */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🌐</div>
+                      <div className="section-title">Languages</div>
+                    </div>
+                    <div className="languages-list">
+                      {languages.map((lang, index) => (
+                        <div className="language-item" key={index} style={{ position: 'relative' }}>
+                          {createEditable(lang.name || '', 'Language Name')}
+                          <div className="language-level">
+                            {[1, 2, 3, 4, 5].map((dot) => (
+                              <div
+                                key={dot}
+                                className={`level-dot ${dot <= lang.level ? 'filled' : ''}`}
+                                onClick={() => {
+                                  const updatedLanguages = [...languages];
+                                  updatedLanguages[index].level = dot === lang.level ? 0 : dot;
+                                  setLanguages(updatedLanguages);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              ></div>
+                            ))}
+                          </div>
+
+                          {languages.length > 1 && (
+                            <button
+                              onClick={() => {
+                                const updated = [...languages];
+                                updated.splice(index, 1);
+                                setLanguages(updated);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '0',
+                                right: '0',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#dc3545',
+                                fontSize: '18px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✖
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      <button className="add-UserBtn" onClick={(e) => {e.preventDefault(); setLanguages([...languages, {}])}}>
+                        ➕ Add Language
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Projects */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">📊</div>
+                      <div className="section-title">Projects</div>
+                    </div>
+                    <div className="projects-container">
+                      {projects.map((_, index) => (
+                        <div className="project-item" key={index} style={{ position: 'relative' }}>
+                          {createEditable(_.name || '', 'Project Name')}
+                          {createEditable(_.year || '', 'Year')}
+                          {createEditable(_.description || '', 'Project Description')}
+
+                          {projects.length > 1 && (
+                            <button
+                              onClick={() => {
+                                const updated = [...projects];
+                                updated.splice(index, 1);
+                                setProjects(updated);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '0',
+                                right: '0',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#dc3545',
+                                fontSize: '18px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✖
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      <button className="add-UserBtn" onClick={(e) => {e.preventDefault(); setProjects([...projects, {}])}}>
+                        ➕ Add Project
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Interests */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🎯</div>
+                      <div className="section-title">Interests</div>
+                    </div>
+                    <div className="interests-list">
+                      {interests.map((interest, index) => (
+                        <div
+                          className="interest-tag"
+                          key={index}
+                          contentEditable
+                          suppressContentEditableWarning={true}
+                          data-placeholder="Interest"
+                          onBlur={(e) => {
+                            const updated = [...interests];
+                            updated[index] = e.target.innerText;
+                            setInterests(updated);
+                          }}
+                          style={{ position: 'relative', paddingRight: '25px' }}
+                        >
+                          {interest}
+                          {interests.length > 1 && (
+                            <span
+                              onClick={() => {
+                                const updated = [...interests];
+                                updated.splice(index, 1);
+                                setInterests(updated);
+                              }}
+                              className='resume_closebtn'
+
+                            >
+                              ✖
+                            </span>
+                          )}
+                        </div>
+                      ))}
+
+                      <button className="add-UserBtn" onClick={(e) => { e.preventDefault(); setInterests([...interests, ''])}}>
+                        ➕ Add Interest
+                      </button>
+                    </div>
+
+                  </div>
+                  <div className="text-right mb-3 mr-2">
+                    <label className="btn btn-primary me-2">
+                      Upload Resume
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleFileUpload(e, 'resume')}
+                      />
+                    </label>
+                    <button
+                      className="btn btn-success waves-effect waves-light"
+                      onClick={handleSaveCV}
+                    >
+                      Save Resume 
+                    </button>
+
+
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => setPreviewMode(true)} style={{ fontSize: '12px' }}
+                    >
+                      Preview Resume
+                    </button>
+                  </div>
+                </div>
+
+
+              </div>
+            </div>
+          </section>
+        </form>
+        {/* Experience Section */}
+        <section id="Experience-section">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Experience / अनुभव</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div className="row" id="exp-section">
+                      <div className="col-xl-3 mb-1" id="isExp">
+                        <label>Experience / अनुभव<span className="mandatory"> *</span></label>
+                        <select
+                          className="form-control"
+                          name="experience"
+                          value={formData.isExperienced ? 'Experienced' : 'Fresher'}
+                          onChange={handleExperienceChange}
+                        >
+                          <option value="">Select Experience</option>
+                          <option value="Fresher">Fresher</option>
+                          <option value="Experienced">Experienced</option>
+                        </select>
+                      </div>
+
+                      {formData.isExperienced && (
+                        <div className="col-xl-3 mb-1" id="total-exp">
+                          <label>Total experience (yrs) / कुल अनुभव (वर्ष)</label>
+                          <input
+                            type="number"
+                            name="totalExperience"
+                            className="form-control"
+                            value={formData.totalExperience || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, totalExperience: e.target.value }))}
+                          />
+                        </div>
+                      )}
+
+                      <div id="experience-div" className="col-xl-12">
+                        {formData.isExperienced && formData.experiences && formData.experiences.map((experience, index) => (
+                          <div key={`exp-${index}`} className="row px-1 exp-row">
+                            <div className="col-xl-3 mb-1">
+                              <label>From Date / तिथि से</label>
+                              <input
+                                type="date"
+                                className="form-control"
+                                name="FromDate"
+                                value={experience.FromDate || ''}
+                                onChange={(e) => handleExperienceDetailChange(index, e)}
+                              />
+                            </div>
+                            <div className="col-xl-3 mb-1">
+                              <label>To Date / तिथि तक</label>
+                              <input
+                                type="date"
+                                className="form-control"
+                                name="ToDate"
+                                value={experience.ToDate || ''}
+                                onChange={(e) => handleExperienceDetailChange(index, e)}
+                              />
+                            </div>
+                            <div className="col-xl-3 mb-1">
+                              <label>Industry / उद्योग</label>
+                              <select
+                                className="form-control text-capitalize"
+                                name="Industry_Name"
+                                value={experience.Industry_Name || ''}
+                                onChange={(e) => handleExperienceDetailChange(index, e)}
+                              >
+                                <option value="">Select Industry</option>
+                                {formOptions.industries.map(industry => (
+                                  <option key={industry._id} value={industry._id} className="text-capitalize">
+                                    {industry.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-xl-3 mb-1">
+                              <label>Sub Industry / उप उद्योग</label>
+                              <select
+                                className="form-control text-capitalize"
+                                name="SubIndustry_Name"
+                                value={experience.SubIndustry_Name || ''}
+                                onChange={(e) => handleExperienceDetailChange(index, e)}
+                              >
+                                <option value="">Select Sub Industry</option>
+                                {formOptions.subIndustries.map(subIndustry => (
+                                  <option key={subIndustry._id} value={subIndustry._id} className="text-capitalize">
+                                    {subIndustry.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-xl-3 mb-1">
+                              <label>Company name / कंपनी का नाम</label>
+                              <input
+                                type="text"
+                                name="Company_Name"
+                                className="form-control"
+                                value={experience.Company_Name || ''}
+                                onChange={(e) => handleExperienceDetailChange(index, e)}
+                                maxLength={50}
+                              />
+                            </div>
+                            <div className="col-xl-3 mb-1">
+                              <label>State / राज्य</label>
+                              <select
+                                className="form-control"
+                                name="Company_State"
+                                value={experience.Company_State || ''}
+                                onChange={(e) => handleStateChange(e, 'experience', index)}
+                              >
+                                <option value="">Select State</option>
+                                {formOptions.states.map(state => (
+                                  <option key={state._id} value={state._id} className="text-capitalize">
+                                    {state.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-xl-3 mb-1">
+                              <label>City / शहर</label>
+                              <select
+                                className="form-control"
+                                name="Company_City"
+                                value={experience.Company_City || ''}
+                                onChange={(e) => handleExperienceDetailChange(index, e)}
+                              >
+                                <option value="">Select City</option>
+                                {formOptions.cities.map(city => (
+                                  experience.Company_State === city.stateId && (
+                                    <option key={city._id} value={city._id} className="text-capitalize">
+                                      {city.name}
+                                    </option>
+                                  )
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-xl-3 mb-1">
+                              <label>Comments / टिप्पणियाँ</label>
+                              <input
+                                type="text"
+                                name="Comments"
+                                className="form-control"
+                                value={experience.Comments || ''}
+                                onChange={(e) => handleExperienceDetailChange(index, e)}
+                              />
+                            </div>
+                            {index >= 1 && (
+                              <div className="col-xl-12 text-right deleteexperience">
+                                <div className="my-auto">
+                                  <button
+                                    className="btn btn-danger waves-effect waves-light"
+                                    onClick={() => deleteExperienceRow(index)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {formData.isExperienced && (
+                        <div className="col-xl-12 text-right" id="addmoreexp">
+                          <button
+                            onClick={addExperienceRow}
+                            className="btn btn-success waves-effect waves-light text-white mt-2"
+                          >
+                            + Add Another
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </section>
-          
-          {/* Location Preferences Section */}
-          <section id="location-preference">
-            <div className="row">
-              <div className="col-xl-12 col-lg-12">
-                <div className="card">
-                  <div className="card-header border border-top-0 border-left-0 border-right-0">
-                    <h4 className="card-title pb-1">Location Preferences / स्थान का चयन</h4>
-                  </div>
-                  <div className="card-content">
-                    <div className="card-body">
-                      {[0, 1, 2].map(index => (
-                        <div key={`loc-${index}`} className="row locationpref">
-                          <div className="d-flex align-items-center gap-5">
+          </div>
+        </section>
+
+        {/* Location Preferences Section */}
+        <section id="location-preference">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Location Preferences / स्थान का चयन</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    {[0, 1, 2].map(index => (
+                      <div key={`loc-${index}`} className="row locationpref">
+                        <div className="d-flex align-items-center gap-5">
                           <div className="my-auto">
-                            <label className="font-weight-bold">Location {index+1}</label>
+                            <label className="font-weight-bold">Location {index + 1}</label>
                           </div>
                           <div className="col-xl-3 mb-1">
                             <label>State / राज्य</label>
-                            <select 
-                              className="form-control" 
+                            <select
+                              className="form-control"
                               name="state"
                               value={formData.locationPreferences[index]?.state || ''}
                               onChange={(e) => handleStateChange(e, 'location', index)}
@@ -1752,8 +2326,8 @@ const [user, setUser] = useState({});
                           </div>
                           <div className="col-xl-3 mb-1" id={`city-div${index}`}>
                             <label>City / शहर</label>
-                            <select 
-                              className="form-control" 
+                            <select
+                              className="form-control"
                               name="city"
                               value={formData.locationPreferences[index]?.city || ''}
                               onChange={(e) => handleLocationPreferenceChange(index, e)}
@@ -1768,46 +2342,46 @@ const [user, setUser] = useState({});
                               ))}
                             </select>
                           </div>
-                          </div>
-                          
                         </div>
-                      ))}
-                      
+
+                      </div>
+                    ))}
+
+                    <div className="row">
+                      <div className="col-xl-12 text-right">
+                        <button
+                          className="btn btn-danger waves-effect waves-light"
+                          onClick={handleReset}
+                        >
+                          Reset
+                        </button>
+                        <button
+                          className="btn btn-success waves-effect waves-light text-white ml-2"
+                          onClick={handleSubmit}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+
+                    {errors.visible && (
                       <div className="row">
-                        <div className="col-xl-12 text-right">
-                          <button 
-                            className="btn btn-danger waves-effect waves-light"
-                            onClick={handleReset}
-                          >
-                            Reset
-                          </button>
-                          <button 
-                            className="btn btn-success waves-effect waves-light text-white ml-2"
-                            onClick={handleSubmit}
-                          >
-                            Save
-                          </button>
+                        <div className="col-xl-12">
+                          <div id="msg" style={{ color: 'red' }}>
+                            {errors.message}
+                          </div>
                         </div>
                       </div>
-                      
-                      {errors.visible && (
-                        <div className="row">
-                          <div className="col-xl-12">
-                            <div id="msg" style={{ color: 'red' }}>
-                              {errors.message}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
-          </section>
-        </div>
-          
-      
+          </div>
+        </section>
+      </div>
+
+
       {cashbackModal.visible && (
         <div className="modal fade show" id="cashbackmodal" tabIndex="-1" role="dialog" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered" role="document">
@@ -1823,7 +2397,7 @@ const [user, setUser] = useState({});
                   <h3 className="coupon-text">
                     You have earned <strong id="money-text">₹ {cashbackModal.totalCashback}</strong> /आपने <strong id="money-text-hindi">₹ {cashbackModal.totalCashback}</strong> कमाए हैं|
                   </h3>
-                  
+
                   {cashbackModal.isProfileCompleted === 'false' && (
                     <div id="profile-comp">
                       <p id="video-text">
@@ -1831,16 +2405,16 @@ const [user, setUser] = useState({});
                       </p>
                     </div>
                   )}
-                  
+
                   {cashbackModal.isVideoCompleted === '' && (
                     <div id="upload-video">
                       <p id="video-text" className="mx-2">
                         Upload the video and earn ₹ {cashbackModal.cashbackInfo.videoprofile} / वीडियो अपलोड करें और ₹ {cashbackModal.cashbackInfo.videoprofile} कमाएं |
                       </p>
                       <a href="/candidate/myProfile#personal-info" id="a-profile">
-                        <button 
-                          type="button" 
-                          className="voucher-btn btn btn-sm ml-1" 
+                        <button
+                          type="button"
+                          className="voucher-btn btn btn-sm ml-1"
                           aria-label="upload-video"
                         >
                           <span aria-hidden="true" className="yes-cross">Upload video / वीडियो अपलोड</span>
@@ -1848,7 +2422,7 @@ const [user, setUser] = useState({});
                       </a>
                     </div>
                   )}
-                  
+
                   {cashbackModal.isProfileCompleted !== 'false' && cashbackModal.isVideoCompleted !== '' && (
                     <div id="apply-job">
                       <h3 id="video-text">
@@ -1867,7 +2441,590 @@ const [user, setUser] = useState({});
           </div>
         </div>
       )}
-     </div>
+      <div
+        className={`modal fade ${previewMode ? 'show d-block' : ''}`}
+        id="cvPreviewModal"
+        tabIndex="-1"
+        role="dialog"
+        style={{
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          transition: 'opacity 0.3s ease-in-out',
+          opacity: previewMode ? 1 : 0,
+          pointerEvents: previewMode ? 'auto' : 'none',
+          zIndex: 1050
+        }}
+      >
+        <div className="modal-dialog modal-xl resumePreview" role="document" style={{ width: "60%", maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none' }}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Resume Preview</h5>
+              <button
+                type="button"
+                className="close"
+                onClick={() => setPreviewMode(false)}
+                style={{ top: '0px', right: '0px' }}
+              >
+                <span>&times;</span>
+              </button>
+            </div>
+            <div className="modal-body">
+              {/* Place your CV builder here */}
+              <div className="cv-container">
+                <CVPreviewContent
+                  createEditable={createEditable}
+                  experiences={experiences}
+                  educations={educations}
+                  declaration={declaration}
+                  skills={skills}
+                  certificates={certificates}
+                  languages={languages}
+                  projects={projects}
+                  interests={interests}
+                  isEditable={false}
+                />
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <style>
+        {`
+              .resume_closebtn{
+               position: absolute;
+                    right: 5px;
+                    top: 0;
+                    transform: translateY(-50%);
+                    color: red;
+                    cursor: pointer;
+                    fontWeight: bold;
+              }
+              .preview-text {
+        padding: 4px 2px;
+        min-height: 20px;
+        font-size: 15px;
+        color: #343a40;
+        white-space: pre-wrap;
+      }
+      
+               .cv-container {
+                  
+          margin: 30px auto;
+          background-color: #fff;
+          box-shadow: 0 0 30px rgba(0, 0, 0, 0.1);
+          position: relative;
+      }
+      
+      .top-bar {
+          height: 10px;
+              background: linear-gradient(90deg, #fc2b5a 0%, #fc2b5a 100%);
+      }
+      
+      .cv-header {
+          display: flex;
+          padding: 40px;
+          border-bottom: 1px solid #eaeaea;
+      }
+      
+      .profile-image {
+          width: 150px;
+          height: 150px;
+          border-radius: 50%;
+          overflow: hidden;
+          border: 3px solid #fff;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+          background-color: #e9ecef;
+          position: relative;
+      }
+      
+      .profile-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+      }
+      
+      .upload-icon {
+         position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: transparent;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s;
+      width: 100%;
+      height: 100%;
+      
+      }
+      
+      
+      
+      .personal-info {
+          margin-left: 40px;
+          flex: 1;
+      }
+      
+      .name {
+          font-size: 36px;
+          font-weight: 700;
+          color: #2e5cb8;
+          margin-bottom: 5px;
+      }
+      
+      .position {
+          font-size: 20px;
+          color: #6c757d;
+          margin-bottom: 15px;
+          font-weight: 500;
+      }
+      
+      .profile-summary {
+          margin-bottom: 20px;
+          font-size: 15px;
+          line-height: 1.7;
+          color: #495057;
+      }
+      
+      .contact-info {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 15px;
+      }
+      
+      .contact-item {
+          display: flex;
+          align-items: center;
+          font-size: 14px;
+          margin-right: 20px;
+          color: #495057;
+      }
+      
+      .contact-icon {
+          margin-right: 8px;
+          color: #4776e6;
+          font-size: 16px;
+      }
+      
+      .main-content {
+          display: flex;
+          padding: 30px;
+      }
+      
+      .left-column {
+          flex: 1;
+          padding-right: 30px;
+      }
+      
+      .right-column {
+          flex: 1;
+          padding-left: 30px;
+          border-left: 1px solid #eaeaea;
+      }
+      
+      .section {
+          margin-bottom: 35px;
+      }
+      
+      .section-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: 20px;
+      }
+      
+      .section-icon {
+          width: 35px;
+          height: 35px;
+          // background-color: #fc2b5a;
+          color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-right: 15px;
+          font-size: 16px;
+      }
+      
+      .section-title {
+          font-size: 20px;
+          font-weight: 600;
+          color: #fc2b5a;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+      }
+      
+      .experience-item, .education-item {
+          margin-bottom: 25px;
+          position: relative;
+      }
+      
+      .timeline-dot {
+          position: absolute;
+          left: -39px;
+          top: 5px;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background-color: #4776e6;
+          border: 3px solid #fff;
+          box-shadow: 0 0 0 1px #4776e6;
+      }
+      
+      .timeline-line {
+          position: absolute;
+          top: 19px;
+          left: -33px;
+          width: 2px;
+          height: calc(100% + 10px);
+          background-color: #e9ecef;
+      }
+      
+      .job-title, .degree {
+          font-size: 18px;
+          font-weight: 600;
+          color: #343a40;
+          margin-bottom: 5px;
+      }
+      
+      .company, .school {
+          font-size: 16px;
+          color: #6c757d;
+          font-weight: 500;
+          margin-bottom: 5px;
+      }
+      
+      .date {
+          font-size: 14px;
+          color: #868e96;
+          margin-bottom: 10px;
+          display: flex;
+          align-items: center;
+      }
+      
+      .date-icon {
+          margin-right: 5px;
+      }
+      
+      .job-description, .education-description {
+             background-color: #f8f9fa;
+          padding: 10px;
+          font-size:14px;
+          border-radius: 8px;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+      }
+      
+      .skills-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 15px;
+      }
+      
+      .skill-item {
+          margin-bottom: 15px;
+      }
+      
+      .skill-name {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 5px;
+          font-size: 15px;
+          font-weight: 500;
+          color: #495057;
+      }
+      
+      .skill-bar {
+          height: 8px;
+          background-color: #e9ecef;
+          border-radius: 4px;
+          overflow: hidden;
+      }
+      
+      .skill-progress {
+          height: 100%;
+          background: linear-gradient(90deg, #fc2b5a 0%, #fc2b5a 100%);
+          border-radius: 4px;
+      }
+      
+      .languages-list {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 15px;
+      }
+      
+      .language-item {
+          background-color: #f8f9fa;
+    padding-inline: 10px;
+    padding-block:5px
+    font-size: 14px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    margin-bottom: 15px;
+      }
+      
+      .language-name {
+          font-weight: 500;
+          margin-bottom: 5px;
+          color: #495057;
+      }
+      
+      .language-level {
+          display: flex;
+      }
+      
+      .level-dot {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          margin-right: 5px;
+          background-color: #e9ecef;
+      }
+      
+      .filled {
+          background: linear-gradient(90deg, #fc2b5a 0%, #fc2b5a 100%);
+      }
+      
+      .certificates-list {
+          list-style: none;
+      }
+      
+      .certificate-item {
+          margin-bottom: 15px;
+          position: relative;
+          padding-left: 25px;
+      }
+      
+      .certificate-title {
+          font-weight: 500;
+          color: #343a40;
+          font-size: 16px;
+          margin-bottom: 3px;
+      }
+      
+      .certificate-details {
+          font-size: 14px;
+          color: #6c757d;
+      }
+      
+      .interests-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+      }
+      
+      .interest-tag {
+          background-color: #e9ecef;
+          padding: 5px 15px;
+          border-radius: 20px;
+          font-size: 14px;
+          color: #495057;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+      }
+ 
+      .strength-meter {
+          padding: 25px;
+          background-color: #f8f9fa;
+          border-radius: 8px;
+          margin-top: 40px;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+      }
+      
+      .strength-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+      }
+      
+      .strength-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: #343a40;
+      }
+      
+      .strength-score {
+          font-size: 24px;
+          font-weight: 700;
+          color: #fc2b5a;
+      }
+      
+      .strength-category {
+          margin-bottom: 15px;
+      }
+      
+      .category-header {
+          display: flex;
+          justify-content: space-between;
+          font-size: 14px;
+          color: #6c757d;
+          margin-bottom: 5px;
+      }
+      
+      .progress-bar {
+          height: 8px;
+          background-color: #e9ecef;
+          border-radius: 4px;
+          overflow: hidden;
+      }
+      
+      .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #2e5cb8 0%, #4776e6 100%);
+          border-radius: 4px;
+      }
+      
+      .references-container {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 20px;
+      }
+      
+      .reference-item {
+          background-color: #f8f9fa;
+          padding: 20px;
+          border-radius: 8px;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+      }
+      
+      .reference-name {
+          font-size: 16px;
+          font-weight: 600;
+          color: #343a40;
+          margin-bottom: 5px;
+      }
+      
+      .reference-position {
+          font-size: 14px;
+          color: #6c757d;
+          margin-bottom: 10px;
+      }
+      
+      .reference-contact {
+          font-size: 14px;
+          color: #495057;
+      }
+      
+      .projects-container {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 20px;
+      }
+      
+      .project-item {
+          background-color: #f8f9fa;
+          padding: 20px;
+          border-radius: 8px;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+      }
+      
+      .project-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: #343a40;
+          margin-bottom: 5px;
+      }
+      
+      .project-date {
+          font-size: 14px;
+          color: #6c757d;
+          margin-bottom: 10px;
+      }
+      
+      .project-description {
+          font-size: 14px;
+          color: #495057;
+      }
+      
+      [contenteditable="true"]:focus {
+          outline: 2px solid #4776e6;
+          border-radius: 3px;
+      }
+      
+      [contenteditable="true"]:empty:before {
+          content: attr(data-placeholder);
+          color: #adb5bd;
+          cursor: text;
+      }
+      .name {
+        font-size: clamp(24px, 4vw, 36px);
+      }
+      .position {
+        font-size: clamp(16px, 2.5vw, 22px);
+      }
+      .add-UserBtn {
+         background: linear-gradient(to right, #fc2b5a, #ff416c);
+        color: white;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 30px;
+        cursor: pointer;
+        margin-bottom: 15px;
+        font-size: 14px;
+        font-weight: 500;
+        width: auto;
+        min-width: 130px;
+        box-shadow: 0 4px 10px rgba(252, 43, 90, 0.3);
+        transition: all 0.3s ease-in-out;
+      }
+      .add-UserBtn:hover {
+        background-color: #d92049;
+      }
+      @media(max-width:992px){
+      .cv-header{
+      padding:0}
+      }
+      @media (max-width: 768px) {
+          .cv-header {
+              flex-direction: column;
+              align-items: center;
+              text-align: center;
+          }
+          
+          .personal-info {
+              margin-left: 0;
+              margin-top: 20px;
+          }
+          
+          .contact-info {
+              justify-content: center;
+          }
+          
+          .main-content {
+              flex-direction: column;
+          }
+          
+          .left-column, .right-column {
+              padding: 0;
+          }
+          
+          .right-column {
+              border-left: none;
+              border-top: 1px solid #eaeaea;
+              margin-top: 20px;
+              padding-top: 20px;
+          }
+          
+          .skills-container, .languages-list {
+              grid-template-columns: 1fr;
+          }
+      }
+          .upload-icon input[type="file"] {
+        display: none;
+      }
+        @media(max-width:768px){
+        .resumePreview{
+        width:100%!important;
+        }}
+      
+              `}
+      </style>
+    </div>
   );
 };
 

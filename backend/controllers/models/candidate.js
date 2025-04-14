@@ -20,6 +20,50 @@ const candidateSchema = new Schema(
             eventDate: { type: String },
             concernedPerson: { type: String },
             comment: { type: String },
+            personalInfo:[{
+              name: { type: String },
+              title: { type: String },
+              summary: { type: String },
+              phone: { type: String },
+              email: { type: String },
+              location: { type: String },
+              image: { type: String },    
+              resume:{ type: String }
+            }],
+            workexperience: [{
+              jobTitle: { type: String },
+              companyName: { type: String },
+              jobDescription: { type: String }
+            }],
+            education: [{
+              degree: { type: String },
+              university: { type: String },
+              duration: { type: String },
+              addInfo: { type: String }
+            }],
+            skill: [
+              {
+                skillName: { type: String },
+                skillPercent: { type: Number }
+              }
+            ],
+            certification: [{
+              certificateName: { type: String },
+              orgName: { type: String }
+            }],
+            language: [{
+              lname: { type: String },
+              level: { type : Number}
+            }],
+            projects: [{
+              projectName: { type: String },
+              proyear: { type: Number },
+              proDescription: { type: String }
+            }],
+            interest:[ {
+              type: String
+            }]
+
           },
           { timestamps: true }
         ),

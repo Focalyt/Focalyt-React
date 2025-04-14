@@ -3,26 +3,61 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { usePlacesWidget } from 'react-google-autocomplete';
 import "./CandidateProfile.css"
+import CVPreviewContent from '../Partials/CVPreviewContent';
 
 const CandidateNewProfile = () => {
   const navigate = useNavigate();
   const [preloaderVisible, setPreloaderVisible] = useState(false);
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
+  const [showCVBuilder, setShowCVBuilder] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
   const [experiences, setExperiences] = useState([{}]);
   const [educations, setEducations] = useState([{}]);
-  const [skills, setSkills] = useState([{}]);
+  const [skills, setSkills] = useState([{ name: '', level: 0 }]);
   const [certificates, setCertificates] = useState([{}]);
-  const [languages, setLanguages] = useState([{}]);
   const [projects, setProjects] = useState([{}]);
   const [interests, setInterests] = useState(['']);
+  const [languages, setLanguages] = useState([{ name: '', level: 0 }]);
+
   const [user, setUser] = useState({});
   const [declaration, setDeclaration] = useState();
   const createEditable = (content, placeholder) => (
-    <div contentEditable={true} data-placeholder={placeholder} suppressContentEditableWarning={true}>
+    <div
+      contentEditable
+      data-placeholder={placeholder}
+      suppressContentEditableWarning={true}
+    >
       {content}
     </div>
+
   );
+  const handleProfileImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = localStorage.getItem('token');
+
+      const res = await axios.post(`${backendUrl}/api/uploadSingleFile`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (res.data.status) {
+        const imageKey = res.data.data.Key;
+        setUser(prev => ({ ...prev, image: imageKey }));
+      }
+    } catch (error) {
+      console.error('Image upload failed:', error);
+    }
+  };
+
+
 
   useEffect(() => {
     const storedUser = sessionStorage.getItem('user');
@@ -974,6 +1009,7 @@ const CandidateNewProfile = () => {
                           className="form-control"
                           value={formData.personalInfo.name || ''}
                           onChange={handlePersonalInfoChange}
+                          placeholder="Enter your name"
                           maxLength={15}
                         />
                       </div>
@@ -1547,182 +1583,463 @@ const CandidateNewProfile = () => {
           </div>
         </section>
 
-        {/* new Tech Skills  */}
+    
+        <div className="d-flex gap-2 mb-3 " style={{ background: 'white' }}>
+          <button
+            className={`btn btn-sm ${!showCVBuilder ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setShowCVBuilder(false)}
+          >
+            Upload Resume
+          </button>
+          <button
+            className={`btn btn-sm ${showCVBuilder ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setShowCVBuilder(true)}
+          >
+            Create Resume
+          </button>
+          <div className='text-right'>
+            <button
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => setPreviewMode(true)}
+              data-toggle="modal"
+              data-target="#cvPreviewModal"
+            >
+              {previewMode ? "Switch to Edit Mode" : "Preview Resume"}
+            </button>
+          </div>
 
-        <section id="skill">
-          <div className="cv-container">
-            <div className="top-bar"></div>
-            <div className="cv-header">
-              <div className="profile-image">
-                <img src="/api/placeholder/150/150" alt="Profile Picture" />
-                <div className="upload-icon">📷</div>
+        </div>
+
+        {/* SHOW FILE INPUT IF NOT IN CV BUILDER MODE */}
+        {!showCVBuilder && (
+          <div className="mb-4">
+            <label>Upload Resume / रिज्यूमे अपलोड करें</label>
+            {formData.personalInfo.resume ? (
+              <div>
+                <a href={`${process.env.REACT_APP_BUCKET_URL}/${formData.personalInfo.resume}`} target="_blank" rel="noopener noreferrer">
+                  Uploaded Resume
+                </a>
+                <i
+                  className="feather icon-x remove_uploaded_pic"
+                  style={{ color: 'red', cursor: 'pointer', marginLeft: '10px' }}
+                  onClick={() => removeUploadedFile('resume')}
+                ></i>
               </div>
-              <div className="personal-info">
-                {createEditable('Your Name', 'Your Name')}
-                {createEditable('Professional Title', 'Professional Title')}
-                {createEditable('A results-driven professional with over 8 years...', 'Write a brief professional summary here...')}
-                <div className="contact-info">
-                  <div className="contact-item"><span className="contact-icon">📞</span>{createEditable('+91 98765 43210', 'Phone Number')}</div>
-                  <div className="contact-item"><span className="contact-icon">✉️</span>{createEditable('yourname@example.com', 'Email Address')}</div>
-                  <div className="contact-item"><span className="contact-icon">🌐</span>{createEditable('linkedin.com/in/yourprofile', 'LinkedIn/Website')}</div>
-                  <div className="contact-item"><span className="contact-icon">📍</span>{createEditable('Mumbai, India', 'Location')}</div>
+            ) : (
+              <input
+                type="file"
+                className="form-control"
+                id="uploadresume"
+                onChange={(e) => handleFileUpload(e, 'resume')}
+              />
+            )}
+          </div>
+        )}
+
+
+        {showCVBuilder && (
+          <section
+            id="skill"
+            style={{
+              maxHeight: showCVBuilder ? '9999px' : '0px',
+              overflow: 'hidden',
+              transition: 'max-height 0.5s ease-in-out',
+              marginTop: showCVBuilder ? '30px' : '0',
+              opacity: showCVBuilder ? 1 : 0,
+              transitionProperty: 'max-height, opacity'
+            }}
+          >
+            <div className="cv-container">
+              <div className="top-bar"></div>
+              <div className="cv-header">
+                <div className="profile-image">
+                  {/* <img src={user?.image ? `${process.env.REACT_APP_BUCKET_URL}/${user.image}` : "/api/placeholder/150/150"} alt="" /> */}
+                  <img src="" alt="" />
+
+                  <label className="upload-icon">
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleProfileImageChange(e)}
+                    />
+                  </label>
                 </div>
-              </div>
-            </div>
-
-            <div className="main-content">
-              <div className="left-column">
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-icon">💼</div>
-                    <div className="section-title">Work Experience</div>
-                  </div>
-                  {experiences.map((_, index) => (
-                    <div className="experience-item" key={index}>
-                      <div className="timeline-dot"></div>
-                      <div className="timeline-line"></div>
-                      {createEditable('', 'Job Title')}
-                      {createEditable('', 'Company Name')}
-                      <div className="date">
-                        <span className="date-icon">📅</span>
-                        {createEditable('', 'Duration')}
-                      </div>
-                      {createEditable('', 'Job Description')}
+                <div className="personal-info">
+                  {createEditable(user?.name || '', 'Your Name')}
+                  {createEditable('', 'Professional Title')}
+                  {createEditable('', 'Write a brief professional summary here...')}
+                  <div className="contact-info">
+                    <div className="contact-item">
+                      <span className="contact-icon">📞</span>{createEditable('', 'Phone Number')}
                     </div>
-                  ))}
-                  <button className="add-UserBtn" onClick={() => setExperiences([...experiences, {}])}>➕ Add Experience</button>
-                </div>
-
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-icon">🎓</div>
-                    <div className="section-title">Education</div>
-                  </div>
-                  {educations.map((_, index) => (
-                    <div className="education-item" key={index}>
-                      <div className="timeline-dot"></div>
-                      <div className="timeline-line"></div>
-                      {createEditable('', 'Degree')}
-                      {createEditable('', 'University')}
-                      <div className="date">
-                        <span className="date-icon">📅</span>
-                        {createEditable('', 'Duration')}
-                      </div>
-                      {createEditable('', 'Additional Information')}
+                    <div className="contact-item">
+                      <span className="contact-icon">✉️</span>{createEditable('', 'Email Address')}
                     </div>
-                  ))}
-                  <button className="add-UserBtn" onClick={() => setEducations([...educations, {}])}>➕ Add Education</button>
-                </div>
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-icon">📜</div>
-                    <div className="section-title">Declaration</div>
-                  </div>
-                  <div
-                    className="education-description"
-                    contentEditable
-                    suppressContentEditableWarning={true}
-                    onBlur={(e) => setDeclaration(e.target.innerText)}
-                  >
-                    {declaration}
+                    <div className="contact-item">
+                      <span className="contact-icon">🌐</span>{createEditable('', 'LinkedIn/Website')}
+                    </div>
+                    <div className="contact-item">
+                      <span className="contact-icon">📍</span>{createEditable('', 'Location')}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="right-column">
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-icon">🔧</div>
-                    <div className="section-title">Skills</div>
-                  </div>
-                  <div className="skills-container">
-                    {skills.map((_, index) => (
-                      <div className="skill-item" key={index}>
-                        <div className="skill-name">
-                          {createEditable('', 'Skill Name')}<span>80%</span>
-                        </div>
-                        <div className="skill-bar">
-                          <div className="skill-progress" style={{ width: '80%' }}></div>
-                        </div>
-                      </div>
-                    ))}
-                    <button className="add-UserBtn" onClick={() => setSkills([...skills, {}])}>➕ Add Skill</button>
-                  </div>
-                </div>
-
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-icon">🏆</div>
-                    <div className="section-title">Certifications</div>
-                  </div>
-                  <ul className="certificates-list">
-                    {certificates.map((_, index) => (
-                      <li className="certificate-item" key={index}>
+              <div className="main-content">
+                <div className="left-column">
+                  {/* Work Experience */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">💼</div>
+                      <div className="section-title">Work Experience</div>
+                    </div>
+                    {experiences.map((_, index) => (
+                      <div className="experience-item" key={index} style={{ position: 'relative' }}>
                         <div className="timeline-dot"></div>
                         <div className="timeline-line"></div>
-                        {createEditable('', 'Certificate Name')}
-                        {createEditable('', 'Issuing Organization, Year')}
-                      </li>
-                    ))}
-                    <button className="add-UserBtn" onClick={() => setCertificates([...certificates, {}])}>➕ Add Certificate</button>
-                  </ul>
-                </div>
 
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-icon">🌐</div>
-                    <div className="section-title">Languages</div>
-                  </div>
-                  <div className="languages-list">
-                    {languages.map((_, index) => (
-                      <div className="language-item" key={index}>
-                        {createEditable('', 'Language Name')}
-                        <div className="language-level">
-                          <div className="level-dot filled"></div>
-                          <div className="level-dot filled"></div>
-                          <div className="level-dot filled"></div>
-                          <div className="level-dot"></div>
-                          <div className="level-dot"></div>
+                        {createEditable('', 'Job Title')}
+                        {createEditable('', 'Company Name')}
+                        <div className="date">
+                          <span className="date-icon">📅</span>{createEditable('', 'Duration')}
                         </div>
+                        {createEditable('', 'Job Description')}
+
+                        {/* ❌ Show only if more than 1 field */}
+                        {experiences.length > 1 && (
+                          <button
+                            className="delete-btn"
+                            onClick={() => {
+                              const updated = [...experiences];
+                              updated.splice(index, 1);
+                              setExperiences(updated);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: '0',
+                              right: '0',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#dc3545',
+                              fontSize: '18px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✖
+                          </button>
+                        )}
                       </div>
                     ))}
-                    <button className="add-UserBtn" onClick={() => setLanguages([...languages, {}])}>➕ Add Language</button>
+
+                    <button className="add-UserBtn" onClick={() => setExperiences([...experiences, {}])}>➕ Add Experience</button>
+                  </div>
+
+                  {/* Education */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🎓</div>
+                      <div className="section-title">Education</div>
+                    </div>
+                    {educations.map((_, index) => (
+                      <div className="education-item" key={index}>
+                        <div className="timeline-dot"></div>
+                        <div className="timeline-line"></div>
+                        {createEditable('', 'Degree')}
+                        {createEditable('', 'University')}
+                        <div className="date">
+                          <span className="date-icon">📅</span>{createEditable('', 'Duration')}
+                        </div>
+                        {createEditable('', 'Additional Information')}
+                      </div>
+                    ))}
+                    <button className="add-UserBtn" onClick={() => setEducations([...educations, {}])}>➕ Add Education</button>
+                  </div>
+
+                  {/* Declaration */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">📜</div>
+                      <div className="section-title">Declaration</div>
+                    </div>
+                    <div
+                      className="education-description"
+                      contentEditable
+                      suppressContentEditableWarning={true}
+                      onBlur={(e) => setDeclaration(e.target.innerText)}
+                    >
+                      {declaration}
+                    </div>
                   </div>
                 </div>
 
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-icon">📊</div>
-                    <div className="section-title">Projects</div>
-                  </div>
-                  <div className="projects-container">
-                    {projects.map((_, index) => (
-                      <div className="project-item" key={index}>
-                        {createEditable('', 'Project Name')}
-                        {createEditable('', 'Year')}
-                        {createEditable('', 'Project Description')}
-                      </div>
-                    ))}
-                    <button className="add-UserBtn" onClick={() => setProjects([...projects, {}])}>➕ Add Project</button>
-                  </div>
-                </div>
+                <div className="right-column">
+                  {/* Skills */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🔧</div>
+                      <div className="section-title">Skills</div>
+                    </div>
+                    <div className="skills-container">
+                      {skills.map((skill, index) => (
+                        <div className="skill-item" key={index} style={{ position: 'relative' }}>
+                          <div className="skill-name">
+                            <div
+                              contentEditable
+                              data-placeholder="Skill Name"
+                              suppressContentEditableWarning={true}
+                              onBlur={(e) => {
+                                const updated = [...skills];
+                                updated[index].name = e.target.innerText;
+                                setSkills(updated);
+                              }}
+                            >
+                              {skill.name}
+                            </div>
+                            <span>{skill.level}%</span>
+                          </div>
 
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-icon">🎯</div>
-                    <div className="section-title">Interests</div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={skill.level}
+                            onChange={(e) => {
+                              const updated = [...skills];
+                              updated[index].level = Number(e.target.value);
+                              setSkills(updated);
+                            }}
+                            className="slider"
+                          />
+
+                          {/* Delete button - only show if more than one skill */}
+                          {skills.length > 1 && (
+                            <button
+                              className="delete-btn"
+                              onClick={() => {
+                                const updated = [...skills];
+                                updated.splice(index, 1);
+                                setSkills(updated);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '-25px',
+                                right: '0',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#dc3545',
+                                fontSize: '18px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✖
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      <button className="add-UserBtn" onClick={() => setSkills([...skills, { name: '', level: 0 }])}>
+                        ➕ Add Skill
+                      </button>
+                    </div>
                   </div>
-                  <div className="interests-list">
-                    {interests.map((_, index) => (
-                      <div className="interest-tag" contentEditable={true} data-placeholder="Interest" suppressContentEditableWarning={true} key={index}></div>
-                    ))}
-                    <button className="add-UserBtn" onClick={() => setInterests([...interests, ''])}>➕ Add Interest</button>
+
+                  {/* Certifications */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🏆</div>
+                      <div className="section-title">Certifications</div>
+                    </div>
+                    <ul className="certificates-list">
+                      {certificates.map((_, index) => (
+                        <li className="certificate-item" key={index} style={{ position: 'relative' }}>
+                          <div className="timeline-dot"></div>
+                          <div className="timeline-line"></div>
+                          {createEditable('', 'Certificate Name')}
+                          {createEditable('', 'Issuing Organization, Year')}
+
+                          {certificates.length > 1 && (
+                            <button
+                              className="delete-btn"
+                              onClick={() => {
+                                const updated = [...certificates];
+                                updated.splice(index, 1);
+                                setCertificates(updated);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '0',
+                                right: '0',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#dc3545',
+                                fontSize: '18px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✖
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                      <button
+                        className="add-UserBtn"
+                        onClick={() => setCertificates([...certificates, {}])}
+                      >
+                        ➕ Add Certificate
+                      </button>
+                    </ul>
+                  </div>
+
+                  {/* Languages */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🌐</div>
+                      <div className="section-title">Languages</div>
+                    </div>
+                    <div className="languages-list">
+    {languages.map((lang, index) => (
+      <div className="language-item" key={index} style={{ position: 'relative' }}>
+        {createEditable(lang.name || '', 'Language Name')}
+        <div className="language-level">
+          {[1, 2, 3, 4, 5].map((dot) => (
+            <div
+              key={dot}
+              className={`level-dot ${dot <= lang.level ? 'filled' : ''}`}
+              onClick={() => {
+                const updatedLanguages = [...languages];
+                updatedLanguages[index].level = dot === lang.level ? 0 : dot;
+                setLanguages(updatedLanguages);
+              }}
+              style={{ cursor: 'pointer' }}
+            ></div>
+          ))}
+        </div>
+
+        {languages.length > 1 && (
+          <button
+            onClick={() => {
+              const updated = [...languages];
+              updated.splice(index, 1);
+              setLanguages(updated);
+            }}
+            style={{
+              position: 'absolute',
+              top: '0',
+              right: '0',
+              background: 'transparent',
+              border: 'none',
+              color: '#dc3545',
+              fontSize: '18px',
+              cursor: 'pointer',
+            }}
+          >
+            ✖
+          </button>
+        )}
+      </div>
+    ))}
+
+    <button className="add-UserBtn" onClick={() => setLanguages([...languages, {}])}>
+      ➕ Add Language
+    </button>
+  </div>
+                  </div>
+
+                  {/* Projects */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">📊</div>
+                      <div className="section-title">Projects</div>
+                    </div>
+                    <div className="projects-container">
+    {projects.map((_, index) => (
+      <div className="project-item" key={index} style={{ position: 'relative' }}>
+        {createEditable(_.name || '', 'Project Name')}
+        {createEditable(_.year || '', 'Year')}
+        {createEditable(_.description || '', 'Project Description')}
+
+        {projects.length > 1 && (
+          <button
+            onClick={() => {
+              const updated = [...projects];
+              updated.splice(index, 1);
+              setProjects(updated);
+            }}
+            style={{
+              position: 'absolute',
+              top: '0',
+              right: '0',
+              background: 'transparent',
+              border: 'none',
+              color: '#dc3545',
+              fontSize: '18px',
+              cursor: 'pointer',
+            }}
+          >
+            ✖
+          </button>
+        )}
+      </div>
+    ))}
+
+    <button className="add-UserBtn" onClick={() => setProjects([...projects, {}])}>
+      ➕ Add Project
+    </button>
+  </div>
+                  </div>
+
+                  {/* Interests */}
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-icon">🎯</div>
+                      <div className="section-title">Interests</div>
+                    </div>
+                    <div className="interests-list">
+    {interests.map((interest, index) => (
+      <div
+        className="interest-tag"
+        key={index}
+        contentEditable
+        suppressContentEditableWarning={true}
+        data-placeholder="Interest"
+        onBlur={(e) => {
+          const updated = [...interests];
+          updated[index] = e.target.innerText;
+          setInterests(updated);
+        }}
+        style={{ position: 'relative', paddingRight: '25px' }}
+      >
+        {interest}
+        {interests.length > 1 && (
+          <span
+            onClick={() => {
+              const updated = [...interests];
+              updated.splice(index, 1);
+              setInterests(updated);
+            }}
+            className='resume_closebtn'
+           
+          >
+            ✖
+          </span>
+        )}
+      </div>
+    ))}
+
+    <button className="add-UserBtn" onClick={() => setInterests([...interests, ''])}>
+      ➕ Add Interest
+    </button>
+  </div>
+
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+        )}
 
         {/* Experience Section */}
         <section id="Experience-section">
@@ -2055,10 +2372,73 @@ const CandidateNewProfile = () => {
           </div>
         </div>
       )}
+      <div
+        className={`modal fade ${previewMode ? 'show d-block' : ''}`}
+        id="cvPreviewModal"
+        tabIndex="-1"
+        role="dialog"
+        style={{
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          transition: 'opacity 0.3s ease-in-out',
+          opacity: previewMode ? 1 : 0,
+          pointerEvents: previewMode ? 'auto' : 'none',
+          zIndex: 1050
+        }}
+      >
+        <div className="modal-dialog modal-xl" role="document" style={{ width: "60%", maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Resume Preview</h5>
+              <button
+                type="button"
+                className="close"
+                onClick={() => setPreviewMode(false)}
+              >
+                <span>&times;</span>
+              </button>
+            </div>
+            <div className="modal-body">
+              {/* Place your CV builder here */}
+              <div className="cv-container">
+                <CVPreviewContent
+                  createEditable={createEditable}
+                  experiences={experiences}
+                  educations={educations}
+                  declaration={declaration}
+                  skills={skills}
+                  certificates={certificates}
+                  languages={languages}
+                  projects={projects}
+                  interests={interests}
+                  isEditable={false}
+                />
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
 
       <style>
         {`
+        .resume_closebtn{
+         position: absolute;
+              right: 5px;
+              top: 0;
+              transform: translateY(-50%);
+              color: red;
+              cursor: pointer;
+              fontWeight: bold;
+        }
+        .preview-text {
+  padding: 4px 2px;
+  min-height: 20px;
+  font-size: 15px;
+  color: #343a40;
+  white-space: pre-wrap;
+}
+
          .cv-container {
             
     margin: 30px auto;
@@ -2069,13 +2449,12 @@ const CandidateNewProfile = () => {
 
 .top-bar {
     height: 10px;
-    background: linear-gradient(90deg, #2e5cb8 0%, #4776e6 100%);
+        background: linear-gradient(90deg, #fc2b5a 0%, #fc2b5a 100%);
 }
 
 .cv-header {
     display: flex;
     padding: 40px;
-    background-color: #f8f9fa;
     border-bottom: 1px solid #eaeaea;
 }
 
@@ -2097,25 +2476,24 @@ const CandidateNewProfile = () => {
 }
 
 .upload-icon {
-    position: absolute;
-    bottom: 5px;
-    right: 5px;
-    background: rgba(255, 255, 255, 0.8);
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 16px;
-    transition: all 0.2s;
+   position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+background: transparent;
+border-radius: 50%;
+display: flex;
+align-items: center;
+justify-content: center;
+cursor: pointer;
+font-size: 16px;
+transition: all 0.2s;
+width: 100%;
+height: 100%;
+
 }
 
-.upload-icon:hover {
-    background: #fff;
-    transform: scale(1.1);
-}
+
 
 .personal-info {
     margin-left: 40px;
@@ -2192,7 +2570,7 @@ const CandidateNewProfile = () => {
 .section-icon {
     width: 35px;
     height: 35px;
-    background-color: #4776e6;
+    // background-color: #fc2b5a;
     color: white;
     border-radius: 50%;
     display: flex;
@@ -2205,7 +2583,7 @@ const CandidateNewProfile = () => {
 .section-title {
     font-size: 20px;
     font-weight: 600;
-    color: #2e5cb8;
+    color: #fc2b5a;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -2263,9 +2641,11 @@ const CandidateNewProfile = () => {
 }
 
 .job-description, .education-description {
-    font-size: 15px;
-    color: #495057;
-    line-height: 1.7;
+       background-color: #f8f9fa;
+    padding: 10px;
+    font-size:14px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
 }
 
 .skills-container {
@@ -2296,7 +2676,7 @@ const CandidateNewProfile = () => {
 
 .skill-progress {
     height: 100%;
-    background: linear-gradient(90deg, #2e5cb8 0%, #4776e6 100%);
+    background: linear-gradient(90deg, #fc2b5a 0%, #fc2b5a 100%);
     border-radius: 4px;
 }
 
@@ -2329,7 +2709,7 @@ const CandidateNewProfile = () => {
 }
 
 .filled {
-    background: linear-gradient(90deg, #2e5cb8 0%, #4776e6 100%);
+    background: linear-gradient(90deg, #fc2b5a 0%, #fc2b5a 100%);
 }
 
 .certificates-list {
@@ -2372,7 +2752,7 @@ const CandidateNewProfile = () => {
 }
 
 .interest-tag:hover {
-    background-color: #4776e6;
+    background-color: #e1d4d785;
     color: #fff;
 }
 
@@ -2400,7 +2780,7 @@ const CandidateNewProfile = () => {
 .strength-score {
     font-size: 24px;
     font-weight: 700;
-    color: #2e5cb8;
+    color: #fc2b5a;
 }
 
 .strength-category {
@@ -2500,21 +2880,34 @@ const CandidateNewProfile = () => {
     color: #adb5bd;
     cursor: text;
 }
-
+.name {
+  font-size: clamp(24px, 4vw, 36px);
+}
+.position {
+  font-size: clamp(16px, 2.5vw, 22px);
+}
 .add-UserBtn {
-  background-color: #2e5cb8;
+   background: linear-gradient(to right, #fc2b5a, #ff416c);
   color: white;
   border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 8px 14px;
+  border-radius: 30px;
   cursor: pointer;
   margin-bottom: 15px;
   font-size: 14px;
+  font-weight: 500;
+  width: auto;
+  min-width: 130px;
+  box-shadow: 0 4px 10px rgba(252, 43, 90, 0.3);
+  transition: all 0.3s ease-in-out;
 }
 .add-UserBtn:hover {
-  background-color: #1c469a;
+  background-color: #d92049;
 }
-
+@media(max-width:992px){
+.cv-header{
+padding:0}
+}
 @media (max-width: 768px) {
     .cv-header {
         flex-direction: column;
@@ -2550,6 +2943,10 @@ const CandidateNewProfile = () => {
         grid-template-columns: 1fr;
     }
 }
+    .upload-icon input[type="file"] {
+  display: none;
+}
+
         `}
       </style>
     </div>
