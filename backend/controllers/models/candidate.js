@@ -5,8 +5,6 @@ const { ObjectId } = Schema.Types;
 const { jwtSecret } = require("../../config");
 const { boolean } = require("joi");
 
-
-
 const candidateSchema = new Schema(
   {
     hiringStatus: [
@@ -20,54 +18,6 @@ const candidateSchema = new Schema(
             eventDate: { type: String },
             concernedPerson: { type: String },
             comment: { type: String },
-            personalInfo:[{
-              name: { type: String },
-              title: { type: String },
-              summary: { type: String },
-              phone: { type: String },
-              email: { type: String },
-              location: { type: String },
-              image: { type: String },    
-              resume:{ type: String }
-            }],
-            workexperience: [{
-              jobTitle: { type: String },
-              companyName: { type: String },
-              jobDescription: { type: String }
-            }],
-            education: [{
-              degree: { type: String },
-              university: { type: String },
-              duration: { type: String },
-              addInfo: { type: String }
-            }],
-            skill: [
-              {
-                skillName: { type: String },
-                skillPercent: { type: Number }
-              }
-            ],
-            certification: [{
-              certificateName: { type: String },
-              orgName: { type: String }
-            }],
-            language: [{
-              lname: { type: String },
-              level: { type : Number}
-            }],
-            projects: [{
-              projectName: { type: String },
-              proyear: { type: Number },
-              proDescription: { type: String }
-            }],
-            interest:[ {
-              type: String
-            }],
-            declaration: {
-              isChecked: { type: Boolean, default: false },
-              text: { type: String, default: "I hereby declare that all the information provided above is true to the best of my knowledge." }
-            }
-
           },
           { timestamps: true }
         ),
@@ -86,7 +36,7 @@ const candidateSchema = new Schema(
         centerId: { type: ObjectId, ref: "Center" }, // Changed from type to courseId        
       }
     ],
-
+    
     docsForCourses: [
       {
         courseId: { type: ObjectId, ref: "courses" }, // Changed from type to courseId
@@ -96,8 +46,8 @@ const candidateSchema = new Schema(
             fileUrl: String,
             status: { type: String, enum: ["Pending", "Verified", "Rejected"], default: "Pending" }, // Verification Status
             reason: { type: String }, // Rejection ka reason
-            verifiedBy: { type: ObjectId, ref: "User" },
-            verifiedDate: { type: Date },
+            verifiedBy:{ type: ObjectId, ref: "User" },
+            verifiedDate:{ type: Date },
             uploadedAt: { type: Date, default: Date.now } // Upload Timestamp
           }
         ]
@@ -114,23 +64,15 @@ const candidateSchema = new Schema(
         Qualification: { type: ObjectId, ref: "Qualification" },
         College: String,
         collegePlace: String,
-
         location: {
           type: {
             type: String,
-            enum: ['Point'],
-            required: true
+            enum: ["Point"],
           },
           coordinates: {
             type: [Number],
-            required: true
           },
-          city: String,
-          state: String,
-          fullAddress: String
-
-        }
-        ,
+        },
         University: { type: ObjectId, ref: "University" },
         AssessmentType: String,
         PassingYear: String,
@@ -164,6 +106,20 @@ const candidateSchema = new Schema(
       type: String,
       lowercase: true,
       trim: true,
+    },
+    presentAddress:{
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      latitude: { type: String, default: "" },
+      longitude: { type: String, default: "" },
+      fullAddress: { type: String, default: "" }
+    },
+    parmanentAddress:{
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      latitude: { type: String, default: "" },
+      longitude: { type: String, default: "" },
+      fullAddress: { type: String, default: "" }
     },
     place: String,
     latitude: String,
@@ -242,9 +198,6 @@ const candidateSchema = new Schema(
         type: [Number],
         default: [0, 0]
       },
-      city: String,
-      state: String,
-      fullAddress: String
     },
     upi: { type: String },
     referredBy: {
