@@ -62,7 +62,11 @@ const candidateSchema = new Schema(
             }],
             interest:[ {
               type: String
-            }]
+            }],
+            declaration: {
+              isChecked: { type: Boolean, default: false },
+              text: { type: String, default: "I hereby declare that all the information provided above is true to the best of my knowledge." }
+            }
 
           },
           { timestamps: true }

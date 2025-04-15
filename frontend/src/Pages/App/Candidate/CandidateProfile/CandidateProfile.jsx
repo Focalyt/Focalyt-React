@@ -26,9 +26,9 @@ const CandidateProfile = () => {
   const [skills, setSkills] = useState([{ name: '', level: 0 }]);
   const [certificates, setCertificates] = useState([{}]);
   const [projects, setProjects] = useState([{}]);
-  const [interests, setInterests] = useState(['']);
+  const [interest, setInterests] = useState(['']);
   const [languages, setLanguages] = useState([{ name: '', level: 0 }]);
-  const [declaration, setDeclaration] = useState();
+  const [declaration, setDeclaration] = useState(false);
 
   const handleSaveCV = async () => {
     try {
@@ -86,7 +86,7 @@ const CandidateProfile = () => {
 
       console.log("📤 CV Payload being sent to backend:", cvPayload);
 
-      const res = await axios.post(`${backendUrl}/candidate/savecv`, cvPayload, {
+      const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
         headers: {
           'x-auth': localStorage.getItem('token')
         }
@@ -1943,7 +1943,7 @@ const CandidateProfile = () => {
                       <div className="section-title">Languages</div>
                     </div>
                     <div className="languages-list">
-                      {languages.map((lang, index) => (
+                      {language.map((lang, index) => (
                         <div className="language-item" key={index} style={{ position: 'relative' }}>
                           {createEditable(lang.name || '', 'Language Name')}
                           <div className="language-level">
@@ -1952,7 +1952,7 @@ const CandidateProfile = () => {
                                 key={dot}
                                 className={`level-dot ${dot <= lang.level ? 'filled' : ''}`}
                                 onClick={() => {
-                                  const updatedLanguages = [...languages];
+                                  const updatedLanguages = [...language];
                                   updatedLanguages[index].level = dot === lang.level ? 0 : dot;
                                   setLanguages(updatedLanguages);
                                 }}
@@ -1961,10 +1961,10 @@ const CandidateProfile = () => {
                             ))}
                           </div>
 
-                          {languages.length > 1 && (
+                          {language.length > 1 && (
                             <button
                               onClick={() => {
-                                const updated = [...languages];
+                                const updated = [...language];
                                 updated.splice(index, 1);
                                 setLanguages(updated);
                               }}
@@ -1985,7 +1985,7 @@ const CandidateProfile = () => {
                         </div>
                       ))}
 
-                      <button className="add-UserBtn" onClick={(e) => {e.preventDefault(); setLanguages([...languages, {}])}}>
+                      <button className="add-UserBtn" onClick={(e) => {e.preventDefault(); setLanguages([...language, {}])}}>
                         ➕ Add Language
                       </button>
                     </div>
@@ -2049,14 +2049,14 @@ const CandidateProfile = () => {
                           suppressContentEditableWarning={true}
                           data-placeholder="Interest"
                           onBlur={(e) => {
-                            const updated = [...interests];
+                            const updated = [...interest];
                             updated[index] = e.target.innerText;
                             setInterests(updated);
                           }}
                           style={{ position: 'relative', paddingRight: '25px' }}
                         >
                           {interest}
-                          {interests.length > 1 && (
+                          {interest.length > 1 && (
                             <span
                               onClick={() => {
                                 const updated = [...interests];
@@ -2072,7 +2072,7 @@ const CandidateProfile = () => {
                         </div>
                       ))}
 
-                      <button className="add-UserBtn" onClick={(e) => { e.preventDefault(); setInterests([...interests, ''])}}>
+                      <button className="add-UserBtn" onClick={(e) => { e.preventDefault(); setInterests([...interest, ''])}}>
                         ➕ Add Interest
                       </button>
                     </div>

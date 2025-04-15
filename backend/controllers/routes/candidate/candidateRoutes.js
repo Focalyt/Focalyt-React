@@ -4139,21 +4139,21 @@ router.route('/review/:job')
     }
 })
 // Backend (Node.js with Express)
-router.post('/savecv', async (req, res) => {
-  // Destructure incoming data from request body
-  const { personalInfo, experiences, educations, skills, certificates, languages, projects, interests, declaration } = req.body;
+router.post('/saveProfile', async (req, res) => {
+
+  const { personalInfo, workexperience, education, skill, certification, language, projects, interest, declaration } = req.body;
 
   try {
     // Create a new profile with the data
-    const newProfile = new Profile({
+    const newProfile = new Candidate({
       personalInfo,
-      experiences,
-      educations,
-      skills,
-      certificates,
-      languages,
+      workexperience,
+      education,
+      skill,
+      certification,
+      language,
       projects,
-      interests,
+      interest,
       declaration,
     });
 
