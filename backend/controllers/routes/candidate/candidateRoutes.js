@@ -55,7 +55,8 @@ const {
   LoanEnquiry,
   Review,
   Courses,
-  AppliedCourses
+  AppliedCourses,
+  CandidateProfile
 } = require("../../models");
 const users = require("../../models/users");
 const AWS = require("aws-sdk");
@@ -4139,35 +4140,74 @@ router.route('/review/:job')
     }
 })
 // Backend (Node.js with Express)
-router.post('/saveProfile', async (req, res) => {
-
-  const { personalInfo, workexperience, education, skill, certification, language, projects, interest, declaration } = req.body;
+router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
+  const {
+    personalInfo,
+    workexperience,
+    education,
+    skill,
+    certification,
+    language,
+    projects,
+    interest,
+    declaration
+  } = req.body;
 
   try {
-    // Create a new profile with the data
-    const newProfile = new Candidate({
-      personalInfo,
-      workexperience,
-      education,
-      skill,
-      certification,
-      language,
-      projects,
-      interest,
-      declaration,
-    });
+    const user = req.user || {}; // Optional: If you're using token-based auth
+    console.log('user',user)
+    const profileData = {
+      hiringStatus: [{
+        personalInfo,
+        workexperience,
+        education,
+        skill,
+        certification,
+        language,
+        projects,
+        interest
+      }],
+      declaration, // if stored directly
+      name: personalInfo?.[0]?.name || '', // optional fallback
+      email: personalInfo?.[0]?.email || '',
+      mobile: personalInfo?.[0]?.phone || null,
+      image: personalInfo?.[0]?.image || '',
+      resume: personalInfo?.[0]?.resume || ''
+    };
 
-    // Save the profile to the database
-    await newProfile.save();
+    const newProfile =  Candidate.findOneAndUpdate({_id:user._id}, profileData);
+   
+    console.log("user data" , newProfile)
+    console.log("user data" , profileData)
 
-    // Send a success response
     res.status(200).json({ status: true, message: "Profile saved successfully" });
   } catch (error) {
-    // Handle any errors during the saving process
     console.error('Error saving profile data:', error);
     res.status(500).json({ status: false, message: "Error saving profile data" });
   }
 });
+
+router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
+  try {
+    const user = req.user;
+
+    const candidate = await Candidate.findOne({ _id: user._id });
+
+    if (!candidate) {
+      return res.status(404).json({ status: false, message: "Candidate not found" });
+    }
+
+    res.status(200).json({
+      status: true,
+      message: "Profile fetched successfully",
+      data: candidate
+    });
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ status: false, message: "Error fetching profile data" });
+  }
+});
+
 
 
 

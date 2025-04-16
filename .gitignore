@@ -22,6 +22,8 @@ frontend/node_modules/
 /build
 /dist
 frontend/build/
+frontend/src/Pages/App/Candidate/CandidateProfile/CandidateNewProfile copy.jsx
+
 # Misc
 .DS_Store
 .env.local
