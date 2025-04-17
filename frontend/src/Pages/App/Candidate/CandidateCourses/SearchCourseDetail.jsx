@@ -9,9 +9,14 @@ const CourseDetails = () => {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
   const [candidate, setCandidate] = useState(null);
-  const [docsRequired, setDocsRequired] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isApplied, setIsApplied] = useState(false);
+  const [docsRequired, setDocsRequired] = useState(false);
+  const [centerRequired, setCenterRequired] = useState(false);
+  const [nextbtnVisible, setNextbtnVisible] = useState(false);
+  const [backbtnVisible, setBackbtnVisible] = useState(false);
+  const [proceedbtnVisible, setProceedbtnVisible] = useState(false);
+  const [selectedCenter, setSelectedCenter] = useState('');
   const [canApply, setCanApply] = useState(true);
   const [mobileNumber, setMobileNumber] = useState('');
   const [showProfileForm, setShowProfileForm] = useState(false);
@@ -34,14 +39,6 @@ const CourseDetails = () => {
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
-  const [selectedCenter, setSelectedCenter] = useState('');
-  const [selectCenterVisible, setSelectCenterVisible] = useState(false);
-  const [proceedbtnVisible, setProceedbtnVisibleVisible] = useState(false);
-
-  const handleSelectChange = (e) => {
-    setSelectedCenter(e.target.value);
-  };
-
   useEffect(() => {
 
 
@@ -121,22 +118,14 @@ const CourseDetails = () => {
 
         if (response.data && response.data.course) {
           setCourse(response.data.course);
-          setDocsRequired(response.data.docsRequired);
           setCandidate(response.data.candidate);
           setIsApplied(response.data.isApplied);
           setCanApply(response.data.canApply);
+          setDocsRequired(response.data.docsRequired);
+          setNextbtnVisible(response.data.centerRequired);
+          setCenterRequired(response.data.centerRequired);
           sethighestQualificationdata(response.data.highestQualification);
           setMobileNumber(response.data.mobileNumber || response.data.course.counslerphonenumber);
-          if (Array.isArray(response.data.course.center) && response.data.course.center.length > 0) {
-            setSelectCenterVisible(true);
-            setProceedbtnVisibleVisible(false);
-
-          }
-          else {
-            setSelectCenterVisible(false);
-            setProceedbtnVisibleVisible(true);
-
-          }
         } else {
           console.error("Course data is missing in API response:", response.data);
         }
@@ -161,29 +150,24 @@ const CourseDetails = () => {
       setAddress(candidate.location?.fullAddress || '');
     }
   }, [candidate]);
-
-
+  
+  
 
   const applyCourse = async (courseId) => {
     try {
-      const entryUrlData = localStorage.getItem('entryUrl');
-      const data = {
-        entryUrl: entryUrlData ? entryUrlData : null,
 
+      console.log('selectedCenter',selectedCenter)
+      
+      const data = {
+        selectedCenter:selectedCenter        
       };
 
-      if (selectedCenter) {
-        data.selectedCenter = selectedCenter
-      }
-
-      const response = await axios({
-        method: 'post',
-        url: `${backendUrl}/candidate/course/${courseId}/apply`,
-        data: data,
+      const response = await axios.post(`${backendUrl}/candidate/course/${courseId}/apply`,data, {
         headers: {
           'x-auth': localStorage.getItem('token')
         }
       });
+      
 
       // Close modal
       document.getElementById('apply').classList.remove('show');
@@ -208,10 +192,10 @@ const CourseDetails = () => {
   };
 
   const handlePayment = (courseId) => {
-
+   
     const data = {
       courseId,
-
+      
     };
 
     axios({
@@ -308,6 +292,15 @@ const CourseDetails = () => {
   if (!course) {
     return <div className="error">Course not found</div>;
   }
+  const nextBtnClick = () => {
+    setNextbtnVisible(false);
+    
+  };
+  const backBtnClick = () => {
+    setNextbtnVisible(true);
+
+    
+  };
   const stripHTML = (html) => {
     const div = document.createElement("div");
     div.innerHTML = html;
@@ -361,7 +354,10 @@ const CourseDetails = () => {
                       <div className="col-md-12">
                         <div className="curs_description">
                           <h3 className="text-capitalize mb-2 font-weight-bold">{course.name}</h3>
-                          <h4 className="job_cate">{course?.sectors ? course.sectors[0].name : ""}</h4>
+                          <h4 className="job_cate">
+  {course?.sectors && course.sectors.length > 0 ? course.sectors[0].name : ""}
+</h4>
+
                           <h6>Course Overview</h6>
                           <div className="row">
                             <div className="col-md-4 col-lg-4 col-sm-6 col-6">
@@ -468,7 +464,6 @@ const CourseDetails = () => {
                                 <span className="carousel-control-prev-icon pree" aria-hidden="true"></span>
                                 <span className="visually-hidden">Previous</span>
                               </button>
-
                               <button
                                 className="carousel-control-next"
                                 type="button"
@@ -667,17 +662,17 @@ const CourseDetails = () => {
                     </a>
                   ) : (
                     <a
-                      href="#"
-                      style={{
-                        pointerEvents: 'none',
-                        opacity: 0.6,
-                        cursor: 'not-allowed',
-                        textDecoration: 'none',
-                      }}
-                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
-                    >
-                      <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
-                    </a>
+  href="#"
+  style={{
+    pointerEvents: 'none',
+    opacity: 0.6,
+    cursor: 'not-allowed',
+    textDecoration: 'none',
+  }}
+  className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+>
+  <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
+</a>
 
                   )}
 
@@ -824,17 +819,17 @@ const CourseDetails = () => {
                     </a>
                   ) : (
                     <a
-                      href="#"
-                      style={{
-                        pointerEvents: 'none',
-                        opacity: 0.6,
-                        cursor: 'not-allowed',
-                        textDecoration: 'none',
-                      }}
-                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
-                    >
-                      <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
-                    </a>
+  href="#"
+  style={{
+    pointerEvents: 'none',
+    opacity: 0.6,
+    cursor: 'not-allowed',
+    textDecoration: 'none',
+  }}
+  className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+>
+  <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
+</a>
                   )}
                 </div>
 
@@ -1127,75 +1122,52 @@ const CourseDetails = () => {
                   <span aria-hidden="true">&times;</span>
                 </button>
               </div>
+              <div className="modal-body pt-1" id="popup-body">
+              {nextbtnVisible&&  (
+              <select onChange={(e) => setSelectedCenter(e.target.value)} className="form-control" value={selectedCenter}>
+                    <option value="" disabled>Select Center</option>
 
-              {selectCenterVisible && (
-                <div id="chooseCenterContent" className="modal-content">
-                  <div className="modal-body pt-1" id="popup-body-form">
-                    <h5 className="pb-1 mb-3 text-success">Please select a center</h5>
+                   {course.center.map((q) => (
+                      <option value={q._id}>{q.name}</option>))}
+                    
+                  </select>)}
+                  {!nextbtnVisible&&  (
+                <h5 className="pb-1 mb-0">
+                  Register for this Course
+                </h5>)}
 
-                    <div className="form-group">
-                      <select
-                        className="form-control"
-                        id="centerSelect"
-                        name="center"
-                        value={selectedCenter}
-                        onChange={handleSelectChange}
-                      >
-                        <option value="">Select Training Center</option>
-                        {course.center.map((c, i) => (
-                          <option key={i} value={c._id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <button
-                      className="btn btn-primary"
-                      id="next-btn"
-                      onClick={() => {
-                        setSelectCenterVisible(false);
-                        setProceedbtnVisibleVisible(true)
-                      }
-                      }
-                    >
-                      Next
-                    </button>
-
-                  </div>
-
-                </div>
-              )}
-
-              {proceedbtnVisible && (
+              </div>
+              <div className="modal-footer">
+              {nextbtnVisible &&(
+                <button
+                  
+                  className="btn btn-primary"
+                  id="next-btn"
+                  onClick={() => nextBtnClick()}
+                >
+                  Next
+                </button>)}
+                {!nextbtnVisible && (
                 <>
-
-                  <div className="modal-body pt-1" id="popup-body">
-                    <h5 className="pb-1 mb-0">
-                      Register for this Course
-                    </h5>
-                  </div>
-                  <div className="modal-footer">
-                    {(Array.isArray(course.center) && course.center.length > 0) && (
-                      <button
-                        className="btn btn-primary"
-                        id="back-btn"
-                        onClick={() => {
-                          setProceedbtnVisibleVisible(false);
-                          setSelectCenterVisible(true)
-                        }}
-                      >
-                        Back
-                      </button>)}
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      id="apply-btn"
-                      onClick={() => applyCourse(course._id)}
-                    >
-                      Proceed
-                    </button>
-                  </div> </>)}
+                {centerRequired && (
+                <button
+                  
+                  className="btn btn-primary"
+                  id="back-btn"
+                  onClick={() => backBtnClick()}
+                >
+                  Back
+                </button>)}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  id="apply-btn"
+                  onClick={() => applyCourse(course._id)}
+                >
+                  Proceed
+                </button>
+                </>)}
+              </div>
             </div>
           ) : (
 
@@ -1273,8 +1245,7 @@ const CourseDetails = () => {
                     className="form-control"
                     id="address-location"
                     placeholder="City/ शहर"
-                    value={candidate?.location?.fullAddress || ""}
-
+                    value={candidate.location.fullAddress}
                     onChange={(e) => setAddress(e.target.value)}
 
                   />
@@ -1316,23 +1287,17 @@ const CourseDetails = () => {
               <h5 className="pb-1 mb-0">
                 Congratulations!
               </h5>
-              {!docsRequired ? (
-                <span>
-                  You have successfully registered for this course.
-                  <br />
-                  Our team will contact you shortly for the next steps.
-                </span>
-              ) : (
-                <span>
-                  You have successfully registered for this course.
-                  <br />
-                  Please upload the required documents to proceed with your application.
-                </span>
-              )}
-
+              {!docsRequired && (
+              <span>You have successfully registered for this course.<br /> Our team will contact you shortly.</span>)}
+              {docsRequired && (
+              <span>
+              You have successfully registered for this course. Please upload the required documents to proceed further.<br />
+              Our team will reach out to you shortly.
+            </span>)}
             </div>
             <div className="modal-footer">
-            {!docsRequired ? (
+            {!docsRequired && (
+
               <button
                 type="button"
                 className="btn btn-primary"
@@ -1346,15 +1311,22 @@ const CourseDetails = () => {
                 }}
               >
                 Close
-              </button>):(
-              <a
-              href={`/candidate/reqDocs/${course._id}`}
-              className="btn btn-primary"
-              id="uploadDocsbtn"
-            >
-              Upload Required Documents
-            </a>
-            )}
+              </button>)}
+              {docsRequired && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                id="addDocs"
+                onClick={() => {
+                  document.getElementById('completeRegistration').classList.remove('show');
+                  document.getElementById('completeRegistration').style.display = 'none';
+                  document.body.classList.remove('modal-open');
+                  document.getElementsByClassName('modal-backdrop')[0]?.remove();
+                  window.location.href = `/candidate/reqDocs/${courseId}`;
+                }}
+              >
+                Upload Documents
+              </button>)}
             </div>
           </div>
         </div>
@@ -1387,3 +1359,7 @@ const CourseDetails = () => {
 };
 
 export default CourseDetails;
+
+
+
+

@@ -5,6 +5,8 @@ import moment from 'moment';
 
 const RequiredDocuments = () => {
   const [mergedDocs, setMergedDocs] = useState([]);
+  const [uploadingDocId, setUploadingDocId] = useState(null);
+
   const [selectedFiles, setSelectedFiles] = useState({});
    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   
@@ -88,6 +90,7 @@ const RequiredDocuments = () => {
     formData.append("docsId", docId);
 
     try {
+      setUploadingDocId(docId);
       await axios.post(`${backendUrl}/candidate/reqDocs/${courseId}`, formData, {
         headers: {
           'x-auth': localStorage.getItem('token'),
@@ -100,6 +103,9 @@ const RequiredDocuments = () => {
     } catch (error) {
       console.error("Error uploading file:", error);
       alert("Error uploading file. Please try again.");
+    }
+    finally {
+      setUploadingDocId(null); // ✅ Hide loader after process
     }
   };
 
@@ -198,9 +204,18 @@ const RequiredDocuments = () => {
                             </div>
                           </div>
                           
-                          <button className="upload-btn mt-3" onClick={() => uploadFile(doc.Name, doc._id)}>
-                            Upload
-                          </button>
+                          <button
+  className="upload-btn mt-3"
+  onClick={() => uploadFile(doc.Name, doc._id)}
+  disabled={uploadingDocId === doc._id}
+>
+  {uploadingDocId === doc._id ? (
+    <span className="spinner-border spinner-border-sm text-light" role="status" />
+  ) : (
+    'Upload'
+  )}
+</button>
+
                         </div>
                       )}
                       
