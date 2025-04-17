@@ -282,25 +282,32 @@ const getMetaParameters = (req) => {
 router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res) => {
   try {
     let { courseId } = req.params;
+    console.log("course appling")
+  
     // Check if courseId is a string
-    if (typeof courseId === "string") {
-      console.log("courseId is a string:", courseId);
+   
 
       // Validate if it's a valid ObjectId before converting
-      if (mongoose.Types.ObjectId.isValid(courseId)) {
+      if (typeof courseId === "string" && mongoose.Types.ObjectId.isValid(courseId)) {
         courseId = new mongoose.Types.ObjectId(courseId); // Convert to ObjectId
       } else {
         return res.status(400).json({ error: "Invalid course ID" });
       }
-    }
+    
     const validation = { mobile: req.user.mobile };
+    console.log('validation')
     
 
-    selectedCenter = req.body.selectedCenter;
+    let selectedCenter = req.body.selectedCenter;
+    console.log('selectedCenter',selectedCenter)
 
-
-
-    console.log("selectedCenter",selectedCenter)
+    if (typeof selectedCenter === 'string') {
+      try {
+        selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
+      } catch (error) {
+        return res.status(400).send({ status: false, msg: 'Invalid Center ID format' });
+      }
+    }
 
    
 
@@ -964,7 +971,12 @@ router.get("/login", async (req, res) => {
 
   router.get("/job/:jobId", [isCandidate], async (req, res) => {
   // router.get("/job/:jobId", async (req, res) => {
-    const jobId = req.params.jobId;
+    let jobId = req.params.jobId;
+    console.log('jobId',jobId)
+    if (typeof jobId === 'string' && mongoose.Types.ObjectId.isValid(jobId)) {
+      console.log('converting id')
+      jobId = new mongoose.Types.ObjectId(jobId);
+    }
     const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
     const userMobile = req.user.mobile;
     let validation = { mobile: userMobile }
@@ -1339,7 +1351,7 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     let courses = await Courses.find(fields).populate("sectors");
     count = await Courses.countDocuments(fields);
     const totalPages = Math.ceil(count / perPage);
-    console.log('courses',courses)
+    
     return res.json( {
       courses,
       data,
@@ -1374,18 +1386,24 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
 
     const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
     const highestQualification = await Qualification.find({ status: true });
-    const centers = await Center.find();
+    
 
     let docsRequired = false;
+    let centerRequired = false;
+
+    const requiredCenter = course.center ? course.center.length : 0;
 
     const requiredDocs = course.docsRequired ? course.docsRequired.length : 0;
+
+    if(requiredCenter>0){
+      centerRequired = true
+    };
 
     if(requiredDocs>0){
       docsRequired = true
     };
 
-    console.log("requiredDocs",requiredDocs)
-    console.log("docsRequired",docsRequired)
+    
 
 
     let canApply = false;
@@ -1417,7 +1435,7 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
     }
 
     let mobileNumber = course.phoneNumberof ? course.phoneNumberof : contact[0]?.mobile;
-   console.log('course',course)
+   
 
     return res.json({
       status: true,
@@ -1425,8 +1443,10 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
       docsRequired,
       isApplied,
       mobileNumber,
-      canApply,
-      centers,
+      canApply,      
+      highestQualification,
+      requiredCenter,
+      centerRequired
 
     });
 
@@ -1889,7 +1909,10 @@ router
         }
       })
 
-      updatedFields['qualifications'] = qualifications;
+      if (highestQualification && highestQualification !== "") {
+        updatedFields["highestQualification"] = highestQualification;
+      }
+      
     }
     if (experiences?.length > 0) {
       updatedFields["experiences"] = experiences;
@@ -2090,6 +2113,7 @@ async function getUploadedURL() {
 }
 router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
   let jobId = req.params.jobId;
+  console.log('jobId',jobId)
   let validation = { mobile: req.user.mobile  }
   let { value, error } = CandidateValidators.userMobile(validation)
   if (error) {
@@ -2109,28 +2133,25 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     select: "name"
   }]);
 
-  // Coins are deducted on register for interview
-  // let coins = await CoinsAlgo.findOne({});
-  // let coinsDeducted
-  // coinsDeducted = vacancy.applyReduction > 0 ? vacancy.applyReduction : coins.job
-  // if (!candidate.creditLeft || candidate.creditLeft < coinsDeducted) {
-  //   req.flash("error", "You don't have sufficient coins to apply on this job!");
-  //   return res
-  //     .status(200)
-  //     .send({ status: false, msg: "Please Subscribe to Apply Now!" });
-  // } else 
+  console.log('candidate',candidate)
+
+  
   if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
+    console.log("Already Applied")
     req.flash("error", "Already Applied");
     return res.send({ status: false, msg: "Already Applied" });
   } else {
+    console.log("Checking Applied")
     let alreadyApplied = await AppliedJobs.findOne({
       _candidate: candidate._id,
-      _job: jobId,
+      _job: vacancy._id,
     });
+    console.log("alreadyApplied checking",alreadyApplied)
     if (alreadyApplied) {
       req.flash("error", "Already Applied");
       return res.send({ status: false, msg: "Already Applied" });
     };
+    console.log("Appling job")
     let apply = await Candidate.findOneAndUpdate(
       { mobile: candidateMobile },
       {
@@ -2144,6 +2165,7 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     data["_candidate"] = candidate._id;
     data["_company"] = vacancy._company;
     // data["coinsDeducted"] = coinsDeducted
+    console.log('data',data)
     const appliedData = await AppliedJobs.create(data);
 
     // let sheetData = [candidate?.name, candidate?.mobile, candidate?.email, candidate?.sex, candidate?.dob ? moment(candidate?.dob).format('DD MMM YYYY') : '', candidate?.state?.name, candidate.city?.name, 'Job', `${process.env.BASE_URL}/jobdetailsmore/${jobId}`, "", "", moment(appliedData?.createdAt).utcOffset('+05:30').format('DD MMM YYYY hh:mm')]
@@ -2159,7 +2181,7 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     const sheetData = [
       moment(appliedData.createdAt).utcOffset('+05:30').format('DD MMM YYYY'),
       moment(appliedData.createdAt).utcOffset('+05:30').format('hh:mm A'),
-      capitalizeWords(course?.name), // Apply the capitalizeWords function
+      capitalizeWords(vacancy?.title), // Apply the capitalizeWords function
       candidate?.name,
       candidate?.mobile,
       candidate?.email,
@@ -2179,54 +2201,7 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
 
     // Extract UTM Parameters
     const sanitizeInput = (value) => typeof value === 'string' ? value.replace(/[^a-zA-Z0-9-_]/g, '') : value;
-    const utm_params = {
-      utm_source: sanitizeInput(req.query.utm_source || 'unknown'),
-      utm_medium: sanitizeInput(req.query.utm_medium || 'unknown'),
-      utm_campaign: sanitizeInput(req.query.utm_campaign || 'unknown'),
-      utm_term: sanitizeInput(req.query.utm_term || ''),
-      utm_content: sanitizeInput(req.query.utm_content || '')
-    };
-
-    // Extract fbp and fbc values
-    let fbp = req.cookies?._fbp || '';
-    let fbc = req.cookies?._fbc || '';
-    if (!fbc && req.query.fbclid) {
-      fbc = `fb.${Date.now()}.${req.query.fbclid}`;
-    }
-
-    // Prepare user data for Facebook Event
-    const user_data = {
-      em: [hashValue(candidate.email)],                          // Hashed email
-      ph: [hashValue(candidate.mobile)],                        // Hashed phone number
-      fn: hashValue(candidate.name?.split(" ")[0]),             // Hashed first name
-      ln: hashValue(candidate.name?.split(" ")[1] || ""),       // Hashed last name
-      zp: hashValue(candidate.zip || ""),                       // Hashed postcode
-      db: hashValue(candidate.dob ? moment(candidate.dob).format('YYYY-MM-DD') : ""), // Hashed date of birth
-      ct: hashValue(candidate.city?.name),                      // Hashed city
-      st: hashValue(candidate.state?.name),                     // Hashed state/region
-      country: hashValue("India"),                              // Hashed country
-      ge: hashValue(candidate.sex === 'Male' ? 'm' : candidate.sex === 'Female' ? 'f' : ''), // Hashed gender
-      client_ip_address: req.ip || '',                          // IP address (no hash required)
-      client_user_agent: req.headers['user-agent'] || '',       // User agent (no hash required)
-      fbp: req.cookies?._fbp || '',                             // Browser ID
-      fbc: req.cookies?._fbc || (req.query.fbclid ? `fb.${Date.now()}.${req.query.fbclid}` : ''), // Click ID
-      external_id: hashValue(candidate._id.toString())          // Hashed External ID (user database ID)
-    };
-
-    // Prepare custom data for Facebook Event
-    const custom_data = {
-      currency: "INR",
-      value: course.registrationCharges || 0,
-      content_ids: [courseId],
-      content_type: "job",
-      num_items: 1,
-      ...utm_params
-    };
-
-    // Send Event to Facebook
-    console.log("Sending Facebook Event...");
-    const fbEventSent = await sendEventToFacebook("Job Apply", user_data, custom_data);
-
+   
     if (!apply) {
       req.flash("error", "Already failed");
       return res.status(400).send({ status: false, msg: "Applied Failed!" });
@@ -2438,20 +2413,20 @@ router.get("/appliedJobs", [isCandidate], async (req, res) => {
 // });
 
 // router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) => {
-router.post("/job/:jobId/registerInterviews",  async (req, res) => {
+router.post("/job/:jobId/registerInterviews",[isCandidate], async (req, res) => {
   let jobId = req.params.jobId;
-  // let validation = { mobile: req.session.user.mobile }
-  // let { value, error } = await CandidateValidators.userMobile(validation)
-  // if (error) {
-  //   console.log(error)
-  //   return res.send({ status: "failure", error: "Something went wrong!", error });
-  // }
-  // let candidateMobile = value.mobile;
-  // let vacancy = await Vacancy.findOne({ _id: jobId });
-  // if (!vacancy) {
-  //   return res.send({ status: false, msg: "Vacancy not Found!" });
-  // }
-  // let candidate = await Candidate.findOne({ mobile: candidateMobile });
+  let validation = { mobile: req.user.mobile }
+  let { value, error } = await CandidateValidators.userMobile(validation)
+  if (error) {
+    console.log(error)
+    return res.send({ status: "failure", error: "Something went wrong!", error });
+  }
+  let candidateMobile = value.mobile;
+  let vacancy = await Vacancy.findOne({ _id: jobId });
+  if (!vacancy) {
+    return res.send({ status: false, msg: "Vacancy not Found!" });
+  }
+  let candidate = await Candidate.findOne({ mobile: candidateMobile });
   let coins = await CoinsAlgo.findOne({});
   let coinsDeducted
   coinsDeducted = vacancy.applyReduction > 0 ? vacancy.applyReduction : coins.job
@@ -3544,7 +3519,7 @@ router.get("/watchVideos", [isCandidate], async (req, res) => {
     const videos = await VideoData.find({ status: true })
     res.render(`${req.vPath}/app/candidate/watchVideos.ejs`, { menu: 'videos', videos })
   } catch (err) {
-    console.log(err);
+    
     return res.status(500).send({ status: false, message: err.message })
   }
 })
@@ -3553,7 +3528,7 @@ router.get('/notificationCount', [isCandidate, authenti], async (req, res) => {
     let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
-      console.log(error)
+      
       return res.send({ status: "failure", error: "Something went wrong!", error });
     }
 
@@ -3567,7 +3542,7 @@ router.get('/notificationCount', [isCandidate, authenti], async (req, res) => {
     res.send({ status: true, count: notifications })
   }
   catch (err) {
-    console.log(err);
+    
     return res.status(500).send({ status: false, message: err.message })
   }
 })
@@ -3926,15 +3901,28 @@ router.route('/review/:job')
   .get(isCandidate, async (req, res) => {    
     try {
 
-      console.log("fetching docs")
+      
       const filter = { status: true };
       const validation = { mobile: req.user.mobile };
+      
+
       const { value, error } = await CandidateValidators.userMobile(validation);
       if (error) {
+     
+
         return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
       };
       const candidateMobile = value.mobile;
-      const { courseId } = req.params;
+      
+      let { courseId } = req.params;
+      if (typeof courseId === 'string' && mongoose.Types.ObjectId.isValid(courseId)) {
+       courseId = new mongoose.Types.ObjectId(courseId);
+   
+       
+      }
+      
+     
+
       const candidate = await Candidate.findOne({
         mobile: candidateMobile,
         appliedCourses: courseId  // Check if courseId exists in appliedCourses
@@ -3991,7 +3979,7 @@ router.route('/review/:job')
       console.log("Course not found or no docs required");
     };
 
-    console.log(mergedDocs)
+    console.log("mergedDocs",mergedDocs)
       
       res.json({
         docsRequired,
@@ -4006,11 +3994,10 @@ router.route('/review/:job')
 
   .post(isCandidate, async (req, res) => {
     try {
-        const { docsName, courseId, docsId } = req.body;
-        console.log("docsId:", docsId, "Type:", typeof docsId, "Valid:", mongoose.Types.ObjectId.isValid(docsId));
+        let { docsName, courseId, docsId } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(docsId)) {
-            return res.status(400).json({ error: "Invalid document ID format." });
+        if (typeof docsId  === 'String' &&!mongoose.Types.ObjectId.isValid(docsId)) {
+          docsId = new mongoose.Types.ObjectId(docsId);
         }
 
         const validation = { mobile: req.user.mobile };
