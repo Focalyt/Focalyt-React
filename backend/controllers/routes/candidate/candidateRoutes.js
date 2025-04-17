@@ -519,7 +519,7 @@ router
         place,
         latitude,
         longitude,
-
+        verified:true,
         location: {
           type: "Point",
           coordinates: [latitude, longitude],

@@ -79,6 +79,13 @@ const candidateProfileSchema = new Schema(
       interest: [{
         type: String
       }],
+      voiceIntro: [{
+        name: { type: String },
+        url: { type: String },
+        timestamp: { type: String },
+        status: { type: Boolean, default: true }
+      }],
+      
       declaration: {
         isChecked: { type: Boolean, default: false },
         text: { type: String, default: "I hereby declare that all the information provided above is true to the best of my knowledge." }
