@@ -910,11 +910,7 @@ const CandidatesJobs = () => {
                             className="video_thum img-fluid"
                             alt="Job Thumbnail"
                           />
-                          <img
-                            src="/Assets/public_assets/images/newjoblisting/play.svg"
-                            alt="Play"
-                            className="group1"
-                          />
+                         
                         </a>
                         
                         <div className="course_inf">
