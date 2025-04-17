@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './CandidateProfile.css';
+import html2pdf from 'html2pdf.js';
 
 const CandidateProfile = () => {
   // State for resume data
@@ -40,7 +41,7 @@ const CandidateProfile = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
   // For creating editable content
-  const createEditable = (content, placeholder, onChange) => (
+const createEditable = (content, placeholder, onChange) => (
     <div
       contentEditable
       data-placeholder={placeholder}
@@ -169,17 +170,29 @@ const CandidateProfile = () => {
   
       // Format the data to match what your API expects
       const cvPayload = {
-        personalInfo: [
+        personalInfo: 
           {
             name: user.name,
             title: document.querySelector('[data-placeholder="Professional Title"]')?.textContent || '',
             summary: document.querySelector('[data-placeholder="Write a brief professional summary here..."]')?.textContent || '',
             email: document.querySelector('[data-placeholder="Email Address"]')?.textContent || '',
             location: document.querySelector('[data-placeholder="Location"]')?.textContent || '',
+            experiences: document.querySelector('[data-placeholder="Summary"]')?.textContent || '',
+            skills: document.querySelector('[data-placeholder="Skills"]')?.textContent || '',
+            certifications: document.querySelector('[data-placeholder="Certifications"]')?.textContent || '',
+            interest: document.querySelector('[data-placeholder="Interest"]')?.textContent || '',
+            projects: document.querySelector('[data-placeholder="Projects"]')?.textContent || '',
+
             image: user.image || '',
-            resume: user.resume || ''
+            resume: user.resume || '',
+            voiceIntro: recordings.map(rec => ({
+              name: rec.name,
+              url: rec.url,
+              timestamp: rec.timestamp,
+              status: true
+            }))
           }
-        ],
+        ,
         workexperience: experiences.map(e => ({
           jobTitle: document.querySelectorAll('[data-placeholder="Job Title"]')[experiences.indexOf(e)]?.textContent || e.jobTitle || '',
           companyName: document.querySelectorAll('[data-placeholder="Company Name"]')[experiences.indexOf(e)]?.textContent || e.companyName || '',
@@ -251,7 +264,7 @@ const CandidateProfile = () => {
     };
   
     fetchProfile();
-  }, [backendUrl]);
+  }, );
 
   return (
     <div className="resume-builder-container">
@@ -352,12 +365,9 @@ const CandidateProfile = () => {
               Voice Intro
             </a>
           </li> */}
-          <li className='nav-item position-relative'>
-            <div className="floating-audio-btn" onClick={() => setShowRecordingModal(true)}>
-              <i className="bi bi-mic-fill"></i>
-              <span>Voice Intro</span>
-            </div>
-          </li>
+          {/* <li className='nav-item position-relative'>
+           
+          </li> */}
         </ul>
       </div>
 
@@ -387,7 +397,7 @@ const CandidateProfile = () => {
 
               <div className="profile-info">
                 <div className="profile-name">
-                {createEditable(profileData?.personalInfo?.name || "", "Your Name", (val) => {
+                {createEditable(profileData?.personalInfo?.name || '', 'Your Name', (val) => {
   setProfileData(prev => ({
     ...prev,
     personalInfo: {
@@ -397,26 +407,68 @@ const CandidateProfile = () => {
   }));
 })}
 
+
                 </div>
                 <div className="profile-title">
-                  {createEditable('', 'Professional Title')}
+                  {/* {createEditable('', 'Professional Title')} */}
+                  {createEditable(profileData?.personalInfo?.title || '', 'Professional Title...', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        title: val
+      }
+    }));
+  })}
                 </div>
                 <div className="profile-summary">
-                  {createEditable('', 'Write a brief professional summary here...')}
+                {createEditable(profileData?.personalInfo?.summary || '', 'Write a brief professional summary here...', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        summary: val
+      }
+    }));
+  })}
                 </div>
 
                 <div className="contact-info">
                   <div className="contact-item">
                     <i className="bi bi-telephone"></i>
-                    {createEditable('', 'Phone Number')}
+                    {createEditable(profileData?.personalInfo?.phone || '', 'Phone Number', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        phone: val
+      }
+    }));
+  })} 
                   </div>
                   <div className="contact-item">
                     <i className="bi bi-envelope"></i>
-                    {createEditable('', 'Email Address')}
+                    {createEditable(profileData?.personalInfo?.email || '', 'Email Address', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        email: val
+      }
+    }));
+  })}
                   </div>
                   <div className="contact-item">
                     <i className="bi bi-geo-alt"></i>
-                    {createEditable('', 'Location')}
+                    {createEditable(profileData?.personalInfo?.location || '', 'Location', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        location: val
+      }
+    }));
+  })}
                   </div>
                 </div>
               </div>
@@ -426,76 +478,99 @@ const CandidateProfile = () => {
 
         {/* Experience Section */}
         <div className={`resume-section ${activeSection === 'experience' ? 'active' : ''}`}>
-          <div className="resume-paper">
-            <div className="section-title">
-              <i className="bi bi-briefcase me-2"></i>
-              Work Experience
-            </div>
+  <div className="resume-paper">
+    <div className="section-title">
+      <i className="bi bi-briefcase me-2"></i>
+      Work Experience
+    </div>
 
-            {experiences.map((experience, index) => (
-              <div className="experience-item" key={index}>
-                <div className="item-controls">
-                  {experiences.length > 1 && (
-                    <button
-                      className="remove-button"
-                      onClick={() => {
-                        const updated = [...experiences];
-                        updated.splice(index, 1);
-                        setExperiences(updated);
-                      }}
-                    >
-                      <i className="bi bi-trash"></i>
-                    </button>
-                  )}
-                </div>
-
-                <div className="job-title">
-                  {createEditable(experience.jobTitle || '', 'Job Title')}
-                </div>
-                <div className="company-name">
-                  {createEditable(experience.companyName || '', 'Company Name')}
-                </div>
-
-                <div className="date-range">
-                  <span className="date-label">From:</span>
-                  <input
-                    type="month"
-                    value={experience.from || ''}
-                    onChange={(e) => {
-                      const updated = [...experiences];
-                      updated[index].from = e.target.value;
-                      setExperiences(updated);
-                    }}
-                    className="date-input"
-                  />
-
-                  <span className="date-label">To:</span>
-                  <input
-                    type="month"
-                    value={experience.to || ''}
-                    onChange={(e) => {
-                      const updated = [...experiences];
-                      updated[index].to = e.target.value;
-                      setExperiences(updated);
-                    }}
-                    className="date-input"
-                  />
-                </div>
-
-                <div className="job-description">
-                  {createEditable(experience.jobDescription || '', 'Job Description')}
-                </div>
-              </div>
-            ))}
-
+    {/* Map through the experiences array */}
+    {experiences.map((experience, index) => (
+      <div className="experience-item" key={index}>
+        <div className="item-controls">
+          {experiences.length > 1 && (
             <button
-              className="add-button"
-              onClick={() => setExperiences([...experiences, {}])}
+              className="remove-button"
+              onClick={() => {
+                const updated = [...experiences];
+                updated.splice(index, 1);
+                setExperiences(updated);
+              }}
             >
-              <i className="bi bi-plus"></i> Add Experience
+              <i className="bi bi-trash"></i>
             </button>
-          </div>
+          )}
         </div>
+
+        <div className="job-title">
+          {createEditable(experience.jobTitle || '', 'Job Title', (val) => {
+            const updatedExperiences = [...experiences];
+            updatedExperiences[index].jobTitle = val;
+            setExperiences(updatedExperiences);
+          })}
+        </div>
+        
+        <div className="company-name">
+          {createEditable(experience.companyName || '', 'Company Name', (val) => {
+            const updatedExperiences = [...experiences];
+            updatedExperiences[index].companyName = val;
+            setExperiences(updatedExperiences);
+          })}
+        </div>
+
+        <div className="date-range">
+          <span className="date-label">From:</span>
+          <input
+            type="month"
+            value={experience.from || ''}
+            onChange={(e) => {
+              const updatedExperiences = [...experiences];
+              updatedExperiences[index].from = e.target.value;
+              setExperiences(updatedExperiences);
+            }}
+            className="date-input"
+          />
+
+          <span className="date-label">To:</span>
+          <input
+            type="month"
+            value={experience.to || ''}
+            onChange={(e) => {
+              const updatedExperiences = [...experiences];
+              updatedExperiences[index].to = e.target.value;
+              setExperiences(updatedExperiences);
+            }}
+            className="date-input"
+          />
+        </div>
+
+        <div className="job-description">
+          {createEditable(experience.jobDescription || '', 'Job Description', (val) => {
+            const updatedExperiences = [...experiences];
+            updatedExperiences[index].jobDescription = val;
+            setExperiences(updatedExperiences);
+          })}
+        </div>
+      </div>
+    ))}
+
+    <button
+      className="add-button"
+      onClick={() => {
+        // Add a new empty experience object
+        setExperiences([...experiences, {
+          jobTitle: '',
+          companyName: '',
+          from: '',
+          to: '',
+          jobDescription: ''
+        }]);
+      }}
+    >
+      <i className="bi bi-plus"></i> Add Experience
+    </button>
+  </div>
+</div>
 
         {/* Education Section */}
         <div className={`resume-section ${activeSection === 'education' ? 'active' : ''}`}>
@@ -530,9 +605,14 @@ const CandidateProfile = () => {
                     value={edu.degree || ''}
                     onChange={(e) => {
                       const updated = [...educations];
-                      updated[index].degree = e.target.value;
+                      updated[index].degree = e.target.value; 
                       setEducations(updated);
+                      setProfileData(prev => ({
+                        ...prev,
+                        educations: updated
+                      }));
                     }}
+                    
                   >
                     <option value="">Select</option>
                     <option value="10th">10th</option>
@@ -551,12 +631,16 @@ const CandidateProfile = () => {
                       <input
                         type="text"
                         className="form-control"
-                        value={edu.board || ''}
-                        onChange={(e) => {
-                          const updated = [...educations];
-                          updated[index].board = e.target.value;
-                          setEducations(updated);
-                        }}
+                        value={profileData?.education?.degree || ''}
+                        onChange={(e) =>
+                          setProfileData(prev => ({
+                            ...prev,
+                            education: {
+                              ...(prev.education || {}),
+                              degree: e.target.value
+                            }
+                          }))
+                        }
                       />
                     </div>
 
@@ -697,13 +781,17 @@ const CandidateProfile = () => {
                         className="skill-name"
                         onBlur={(e) => {
                           const updated = [...skills];
-                          updated[index].name = e.target.innerText;
+                          updated[index].skillName = e.target.innerText;
                           setSkills(updated);
+                          setProfileData(prev => ({
+                            ...prev,
+                            skills: updated
+                          }));
                         }}
-                      >
-                        {skill.name}
+   >
+                     {skill.skillName}
                       </div>
-                      <span className="skill-level">{skill.level}%</span>
+                      <span className="skill-level">{skill.skillPercent || 0}%</span>
                     </div>
 
                     {/* {skills.length > 1 && (
@@ -745,12 +833,17 @@ const CandidateProfile = () => {
                       type="range"
                       min="0"
                       max="100"
-                      value={skill.level}
+                      value={skills[index].skillPercent || 0}
                       onChange={(e) => {
                         const updated = [...skills];
-                        updated[index].level = Number(e.target.value);
+                        updated[index].skillPercent = Number(e.target.value);
                         setSkills(updated);
+                        setProfileData(prev => ({
+                          ...prev,
+                          skills: updated
+                        }));
                       }}
+                      
                       className="form-range"
                     />
                   </div>
@@ -785,34 +878,30 @@ const CandidateProfile = () => {
                     {languages.map((language, index) => (
                       <div className="language-item" key={index}>
                         <div className="language-details">
-                          {createEditable(language.name || '', 'Language Name')}
+                        {createEditable(language.lname || '', 'Language Name', (val) => {
+            const updated = [...languages];
+            updated[index].lname = val;
+            setLanguages(updated);
+          })}
                           <div className="language-proficiency">
-                            {[1, 2, 3, 4, 5].map((dot) => (
-                              <span
-                                key={dot}
-                                className={`proficiency-dot ${dot <= language.level ? 'filled' : ''}`}
-                                onClick={() => {
-                                  const updated = [...languages];
-                                  updated[index].level = dot === language.level ? 0 : dot;
-                                  setLanguages(updated);
-                                }}
-                              ></span>
-                            ))}
+                         {[1, 2, 3, 4, 5].map((dot) => (
+  <span
+    key={dot}
+    className={`proficiency-dot ${dot <= (language.level || 0) ? 'filled' : ''}`}
+    onClick={() => {
+      const updated = [...languages];
+      updated[index].level = dot;
+      setLanguages(updated);
+      setProfileData(prev => ({
+        ...prev,
+        language: updated
+      }));
+    }}
+  ></span>
+))}
+
                           </div>
                         </div>
-
-                        {/* {languages.length > 1 && (
-                        <button
-                          className="remove-language"
-                          onClick={() => {
-                            const updated = [...languages];
-                            updated.splice(index, 1);
-                            setLanguages(updated);
-                          }}
-                        >
-                          <i className="bi bi-x"></i>
-                        </button>
-                      )} */}
                         <button
                           className="remove-language"
                           onClick={() => {
@@ -851,25 +940,21 @@ const CandidateProfile = () => {
                       <div className="certificate-item" key={index}>
                         <div className="certificate-details">
                           <div className="certificate-name">
-                            {createEditable(certificate.name || '', 'Certificate Name')}
+                          {createEditable(certificate.certificateName || '', 'Certificate Name', (val) => {
+              const updated = [...certificates];
+              updated[index].certificateName = val;
+              setCertificates(updated);
+            })}
                           </div>
                           <div className="certificate-issuer">
-                            {createEditable(certificate.org || '', 'Issuing Organization, Year')}
+                          {createEditable(certificate.orgName || '', 'Issuing Organization, Year', (val) => {
+              const updated = [...certificates];
+              updated[index].orgName = val;
+              setCertificates(updated);
+            })}
+
                           </div>
                         </div>
-
-                        {/* {certificates.length > 1 && (
-                        <button
-                          className="remove-certificate"
-                          onClick={() => {
-                            const updated = [...certificates];
-                            updated.splice(index, 1);
-                            setCertificates(updated);
-                          }}
-                        >
-                          <i className="bi bi-x"></i>
-                        </button>
-                      )} */}
                         <button
                           className="remove-certificate"
                           onClick={() => {
@@ -905,14 +990,29 @@ const CandidateProfile = () => {
                         <div className="project-details">
                           <div className="project-header">
                             <div className="project-name">
-                              {createEditable(project.name || '', 'Project Name')}
+
+        {createEditable(project.projectName || '', 'Project Name', (val) => {
+                const updated = [...projects];
+                updated[index].projectName = val;
+                setProjects(updated);
+              })}
                             </div>
                             <div className="project-year">
-                              {createEditable(project.year || '', 'Year')}
+
+         {createEditable(project.proyear || '', 'Year', (val) => {
+                const updated = [...projects];
+                updated[index].proyear = val;
+                setProjects(updated);
+              })}
                             </div>
                           </div>
                           <div className="project-description">
-                            {createEditable(project.description || '', 'Project Description')}
+                                 {createEditable(project.proDescription || '', 'Project Description', (val) => {
+              const updated = [...projects];
+              updated[index].proDescription = val;
+              setProjects(updated);
+            })}
+
                           </div>
                         </div>
 
@@ -959,7 +1059,12 @@ const CandidateProfile = () => {
                               const updated = [...interests];
                               updated[index] = e.target.innerText;
                               setInterests(updated);
+                              setProfileData(prev => ({
+                                ...prev,
+                                interests: updated
+                              }));
                             }}
+                            
                           >
                             {interest}
                           </div>
@@ -1071,6 +1176,10 @@ const CandidateProfile = () => {
 
       {/* Action Buttons */}
       <div className="resume-actions">
+      <div className="audio-btn upload-resume" onClick={() => setShowRecordingModal(true)}>
+              <i className="bi bi-mic-fill"></i>
+              <span>Add Voice Introduction</span>
+            </div>
         <label className="upload-resume">
           <i className="bi bi-upload me-2"></i> Upload Resume
           <input
@@ -1167,7 +1276,7 @@ const CandidateProfile = () => {
       </div>
 
       <div className="resume-preview-body">
-        <div className="resume-document">
+        <div id="resume-download" className="resume-document">
           {/* Header Section */}
           <div className="resume-document-header">
             <div className="resume-profile-section">
@@ -1188,35 +1297,21 @@ const CandidateProfile = () => {
                   {profileData?.personalInfo?.name || user?.name || 'Your Name'}
                 </h1>
                 <p className="resume-title">
-                  {profileData?.hiringStatus?.[0]?.personalInfo?.[0]?.title || 
-                   document.querySelector('[data-placeholder="Professional Title"]')?.textContent || 
-                   'Professional Title'}
+                  {profileData?.personalInfo?.title || 'Professional Title'}
                 </p>
                 
                 <div className="resume-contact-details">
                   <div className="resume-contact-item">
                     <i className="bi bi-telephone-fill"></i>
-                    <span>
-                      {profileData?.hiringStatus?.[0]?.personalInfo?.[0]?.phone || 
-                       document.querySelector('[data-placeholder="Phone Number"]')?.textContent || 
-                       'Phone Number'}
-                    </span>
+                    <span>{profileData?.personalInfo?.phone || 'Phone Number'}</span>
                   </div>
                   <div className="resume-contact-item">
                     <i className="bi bi-envelope-fill"></i>
-                    <span>
-                      {profileData?.hiringStatus?.[0]?.personalInfo?.[0]?.email || 
-                       document.querySelector('[data-placeholder="Email Address"]')?.textContent || 
-                       'Email Address'}
-                    </span>
+                    <span>{profileData?.personalInfo?.email || 'Email Address'}</span>
                   </div>
                   <div className="resume-contact-item">
                     <i className="bi bi-geo-alt-fill"></i>
-                    <span>
-                      {profileData?.hiringStatus?.[0]?.personalInfo?.[0]?.location || 
-                       document.querySelector('[data-placeholder="Location"]')?.textContent || 
-                       'Location'}
-                    </span>
+                    <span>{profileData?.personalInfo?.location || 'Location'}</span>
                   </div>
                 </div>
               </div>
@@ -1224,85 +1319,82 @@ const CandidateProfile = () => {
             
             <div className="resume-summary">
               <h2 className="resume-section-title">Professional Summary</h2>
-              <p>
-                {profileData?.hiringStatus?.[0]?.personalInfo?.[0]?.summary || 
-                 document.querySelector('[data-placeholder="Write a brief professional summary here..."]')?.textContent || 
-                 'No summary provided'}
-              </p>
+              <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
             </div>
           </div>
           
+          
           {/* Two Column Layout */}
           <div className="resume-document-body">
+
             {/* Left Column */}
             <div className="resume-column resume-left-column">
+
               {/* Experience Section */}
-              {(profileData?.hiringStatus?.[0]?.workexperience?.length > 0 || 
-                experiences.some(exp => exp.jobTitle || document.querySelector('[data-placeholder="Job Title"]')?.textContent)) && (
-                <div className="resume-section">
+            { (profileData.experience?.jobTitle || profileData.experience?.companyName || profileData.experience?.jobDescription) && (
+                 <div className="resume-section">
                   <h2 className="resume-section-title">Work Experience</h2>
                   
-                  {(profileData?.hiringStatus?.[0]?.workexperience || experiences).map((exp, index) => (
-                    <div className="resume-experience-item" key={index}>
-                      <div className="resume-item-header">
-                        <h3 className="resume-item-title">
-                          {exp.jobTitle || 
-                           document.querySelectorAll('[data-placeholder="Job Title"]')[index]?.textContent || 
-                           'Job Title'}
-                        </h3>
-                        <p className="resume-item-subtitle">
-                          {exp.companyName || 
-                           document.querySelectorAll('[data-placeholder="Company Name"]')[index]?.textContent || 
-                           'Company Name'}
-                        </p>
-                        <p className="resume-item-period">
-                          {exp.from || 'Start Date'} - {exp.to || 'Present'}
-                        </p>
-                      </div>
-                      <div className="resume-item-content">
-                        <p>
-                          {exp.jobDescription || 
-                           document.querySelectorAll('[data-placeholder="Job Description"]')[index]?.textContent || 
-                           'No job description provided'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  
+                      <div className="resume-experience-item">
+                        <div className="resume-item-header">
+              { (profileData.experience?.jobTitle ) && (
+
+                          <h3 className="resume-item-title">{profileData?.experience?.jobTitle|| 'Job Title'}</h3>)}
+              { (profileData.experience?.companyName ) && (
+
+                          <p className="resume-item-subtitle">{profileData?.experience?.companyName|| 'Company Name'}</p>)}
+              { (profileData.experience?.companyName ) && (
+                        
+                          <p className="resume-item-period">
+                            {profileData.experience.from || 'Start Date'} - {profileData.experience.to || 'Present'}
+                          </p>
               )}
+                        </div>
+                        <div className="resume-item-content">
+              { (profileData.experience?.jobDescription ) && (                        
+                         <p>{profileData?.experience?.jobDescription|| 'No Job description'}</p>
+              )}
+                        </div>
+                      </div>
+                   
+                </div>
+                )}
+
+
               
               {/* Education Section */}
-              {(profileData?.hiringStatus?.[0]?.education?.length > 0 || 
-                educations.some(edu => edu.degree || document.querySelector('[data-placeholder="University"]')?.textContent)) && (
+              {(profileData.education?.degree || profileData.education?.school || profileData.education?.passingYear) && (
+
                 <div className="resume-section">
                   <h2 className="resume-section-title">Education</h2>
                   
-                  {(profileData?.hiringStatus?.[0]?.education || educations).map((edu, index) => (
-                    <div className="resume-education-item" key={index}>
-                      <div className="resume-item-header">
-                        <h3 className="resume-item-title">
-                          {edu.degree || 'Degree'}
-                        </h3>
-                        <p className="resume-item-subtitle">
-                          {edu.university || 
-                           document.querySelectorAll('[data-placeholder="University"]')[index]?.textContent || 
-                           'University/Institution'}
-                        </p>
-                        <p className="resume-item-period">
-                          {edu.passingYear || edu.duration || 
-                           document.querySelectorAll('[data-placeholder="Passing Year"]')[index]?.textContent || 
-                           'Graduation Year'}
-                        </p>
+                      <div className="resume-education-item">
+                        <div className="resume-item-header">
+                        {profileData.education?.degree && (
+                          <h3 className="resume-item-title">{profileData.education.degree}</h3>)}
+                         {profileData.education?.school && (
+                          <p className="resume-item-subtitle">{profileData.education.school}</p>
+                        )}
+                        {profileData.education?.passingYear && (
+                          <p className="resume-item-period">{profileData.education.passingYear}</p>
+                        )}
+                        </div>
+                        <div className="resume-item-content">
+                        {profileData.education?.medium && (
+                          <p>Medium: {profileData.education.medium}</p>)}
+                          {profileData.education?.marks && (
+          <p>Marks: {profileData.education.marks}%</p>
+        )}
+        {profileData.education?.specialization && (
+          <p>Specialization: {profileData.education.specialization}</p>
+        )}
+        {profileData.education?.duration && (
+          <p>Duration: {profileData.education.duration}</p>
+        )}
+                        </div>
                       </div>
-                      <div className="resume-item-content">
-                        <p>
-                          {edu.addInfo || 
-                           document.querySelectorAll('[data-placeholder="Additional Information"]')[index]?.textContent || 
-                           ''}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                 
                 </div>
               )}
             </div>
@@ -1310,121 +1402,136 @@ const CandidateProfile = () => {
             {/* Right Column */}
             <div className="resume-column resume-right-column">
               {/* Skills Section */}
-              {(profileData?.hiringStatus?.[0]?.skill?.length > 0 || 
-                skills.some(skill => skill.name)) && (
+              {profileData.skills && profileData.skills.length > 0 && (
                 <div className="resume-section">
                   <h2 className="resume-section-title">Skills</h2>
                   
                   <div className="resume-skills-list">
-                    {(profileData?.hiringStatus?.[0]?.skill || skills).map((skill, index) => (
-                      <div className="resume-skill-item" key={index}>
-                        <div className="resume-skill-name">
-                          {skill.skillName || skill.name || 'Skill'}
+                  {profileData.skills.map((skill, index) => (
+        skill.skillName && (
+                        <div className="resume-skill-item" >
+                        { (profileData.skills.skillName ) && (
+                          <div className="resume-skill-name">
+                           {skill.skillName}
+                          </div>)}
+                          <div className="resume-skill-bar-container">
+                            <div 
+                              className="resume-skill-bar" 
+                              style={{width: `${skill.skillPercent || 0}%`}}
+                            ></div>
+                          </div>
                         </div>
-                        <div className="resume-skill-bar-container">
-                          <div 
-                            className="resume-skill-bar" 
-                            style={{width: `${skill.skillPercent || skill.level || 0}%`}}
-                          ></div>
-                        </div>
-                      </div>
-                    ))}
+                  )
+                ))}
                   </div>
                 </div>
               )}
               
               {/* Languages Section */}
-              {(profileData?.hiringStatus?.[0]?.language?.length > 0 || 
-                languages.some(lang => lang.name || document.querySelector('[data-placeholder="Language Name"]')?.textContent)) && (
-                <div className="resume-section">
+              {/* {profileData?.language?.lname && ( */}
+
+              {/* {languages.some(lang => lang.lname) && (                <div className="resume-section">
                   <h2 className="resume-section-title">Languages</h2>
                   
                   <div className="resume-languages-list">
-                    {(profileData?.hiringStatus?.[0]?.language || languages).map((lang, index) => (
-                      <div className="resume-language-item" key={index}>
-                        <div className="resume-language-name">
-                          {lang.lname || lang.name || 
-                           document.querySelectorAll('[data-placeholder="Language Name"]')[index]?.textContent || 
-                           'Language'}
+                   
+                      
+                        <div className="resume-language-item">
+                          <div className="resume-language-name">{profileData.language.lname}</div>
+                          <div className="resume-language-level">
+                            {[1, 2, 3, 4, 5].map(dot => (
+                              <span 
+                                key={dot} 
+                                className={`resume-level-dot ${dot <= (profileData.language.level || 0) ? 'filled' : ''}`}
+                              ></span>
+                            ))}
+                          </div>
                         </div>
-                        <div className="resume-language-level">
-                          {[1, 2, 3, 4, 5].map(dot => (
-                            <span 
-                              key={dot} 
-                              className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                            ></span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                   
                   </div>
                 </div>
-              )}
+              )} */}
+             {languages.some(lang => lang.lname) && (
+  <div className="resume-section">
+    <h2 className="resume-section-title">Languages</h2>
+    
+    <div className="resume-languages-list">
+      {languages.map((lang, index) => (
+        lang.lname && (
+          <div className="resume-language-item" key={index}>
+            <div className="resume-language-name">{lang.lname}</div>
+            <div className="resume-language-level">
+              {[1, 2, 3, 4, 5].map(dot => (
+                <span
+                  key={dot}
+                  className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                ></span>
+              ))}
+            </div>
+          </div>
+        )
+      ))}
+    </div>
+  </div>
+)}
+
               
               {/* Certifications Section */}
-              {(profileData?.hiringStatus?.[0]?.certification?.length > 0 || 
-                certificates.some(cert => cert.name || document.querySelector('[data-placeholder="Certificate Name"]')?.textContent)) && (
+              {/* {(profileData?.certificate?.certificateName || profileData?.certificate?.orgName) && ( */}
+              {certificates.some(cert => cert.certificateName || cert.orgName) && (
                 <div className="resume-section">
                   <h2 className="resume-section-title">Certifications</h2>
                   
                   <ul className="resume-certifications-list">
-                    {(profileData?.hiringStatus?.[0]?.certification || certificates).map((cert, index) => (
-                      <li key={index}>
-                        <strong>
-                          {cert.certificateName || cert.name || 
-                           document.querySelectorAll('[data-placeholder="Certificate Name"]')[index]?.textContent || 
-                           'Certificate'}
-                        </strong>
-                        {(cert.orgName || document.querySelectorAll('[data-placeholder="Issuing Organization, Year"]')[index]?.textContent) && (
-                          <span> - {cert.orgName || document.querySelectorAll('[data-placeholder="Issuing Organization, Year"]')[index]?.textContent}</span>
-                        )}
-                      </li>
-                    ))}
+                  {certificates.map((cert, index) => (
+        (cert.certificateName || cert.orgName) && (
+                        <li key={index}>
+                        <strong>{cert.certificateName || 'Certificate'}</strong>
+                        {cert.orgName && <span> - {cert.orgName}</span>}
+                        </li>
+                       )
+                      ))}
                   </ul>
                 </div>
               )}
               
               {/* Projects Section */}
-              {(profileData?.hiringStatus?.[0]?.projects?.length > 0 || 
-                projects.some(proj => proj.name || document.querySelector('[data-placeholder="Project Name"]')?.textContent)) && (
+              {/* {(profileData?.project?.projectName || profileData?.project?.proDescription) && ( */}
+              {projects.some(p => p.projectName || p.proDescription) && (
                 <div className="resume-section">
                   <h2 className="resume-section-title">Projects</h2>
-                  
-                  {(profileData?.hiringStatus?.[0]?.projects || projects).map((proj, index) => (
-                    <div className="resume-project-item" key={index}>
-                      <div className="resume-item-header">
-                        <h3 className="resume-project-title">
-                          {proj.projectName || proj.name || 
-                           document.querySelectorAll('[data-placeholder="Project Name"]')[index]?.textContent || 
-                           'Project'}
-                          {(proj.proyear || proj.year || document.querySelectorAll('[data-placeholder="Year"]')[index]?.textContent) && (
-                            <span className="resume-project-year"> ({proj.proyear || proj.year || document.querySelectorAll('[data-placeholder="Year"]')[index]?.textContent})</span>
-                          )}
-                        </h3>
+                  {projects.map((proj, index) => (
+      (proj.projectName || proj.proDescription) && (
+                      <div className="resume-project-item" key={index}>
+                        <div className="resume-item-header">
+                          <h3 className="resume-project-title">
+                          {proj.projectName || 'Project'}
+                          {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
+                          {/* {profileData.project.projectName || 'Project'}
+                          {profileData.project.proyear &&  <span className="resume-project-year"> ({profileData.project.proyear})</span>} */}
+                          </h3>
+                        </div>
+                        <div className="resume-item-content">
+                          {/* <p>{profileData.project.proDescription || 'No project description provided'}</p> */}
+                          <p>{proj.proDescription || 'No project description provided'}</p>
+                        </div>
                       </div>
-                      <div className="resume-item-content">
-                        <p>
-                          {proj.proDescription || proj.description || 
-                           document.querySelectorAll('[data-placeholder="Project Description"]')[index]?.textContent || 
-                           'No project description provided'}
-                        </p>
-                      </div>
-                    </div>
+                    )
                   ))}
+                  
                 </div>
               )}
               
               {/* Interests Section */}
-              {(profileData?.hiringStatus?.[0]?.interest?.length > 0 || 
-                interests.some(interest => interest)) && (
+              {profileData?.interests?.length > 0 && (
                 <div className="resume-section">
                   <h2 className="resume-section-title">Interests</h2>
                   
                   <div className="resume-interests-tags">
-                    {(profileData?.hiringStatus?.[0]?.interest || interests).map((interest, index) => (
+                    {interests.map((interest, index) => (
                       interest && (
                         <span className="resume-interest-tag" key={index}>
-                          {interest}
+                        {profileData.interests.filter(i => i.trim() !== '').join(', ')}
                         </span>
                       )
                     ))}
@@ -1448,8 +1555,16 @@ const CandidateProfile = () => {
         <button 
           className="download-resume-btn"
           onClick={() => {
-            // Here you would implement PDF download functionality
-            alert('Download functionality would be implemented here');
+            const element = document.getElementById('resume-download');
+            const opt = {
+              margin: 0.5,
+              filename: 'resume.pdf',
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2 },
+              jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+          
+            html2pdf().set(opt).from(element).save();
           }}
         >
           <i className="bi bi-download"></i> Download PDF
@@ -1464,7 +1579,6 @@ const CandidateProfile = () => {
     </div>
   </div>
 )}
-      {/* CSS Styles */}
     
     </div>
   );

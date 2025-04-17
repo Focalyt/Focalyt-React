@@ -299,9 +299,9 @@ background: none;
 }
 
 /* Resume Content */
-.resume-section {
+/* .resume-section {
 display: none;
-}
+} */
 
 .resume-section.active {
 display: block;

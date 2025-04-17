@@ -36,6 +36,7 @@ const CandidateLogin = () => {
     const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
     const [isNewUser, setIsNewUser] = useState(false);
     const [showOtpField, setShowOtpField] = useState(false);
+    const [showSendBtn, setShowSetBtn] = useState(true);
     const [showExtraFields, setShowExtraFields] = useState(false);
     const [showLoginBtn, setShowLoginBtn] = useState(false);
     const [resendBtnText, setResendBtnText] = useState('OTP on call');
@@ -138,6 +139,7 @@ const CandidateLogin = () => {
             setSuccessMessage('');
             return;
         }
+        setShowSetBtn(false);
 
         try {
             // const response = await axios.post('/api/sendCandidateOtp', { mobile: mobileNumber });
@@ -167,8 +169,8 @@ const CandidateLogin = () => {
     const handleResendOTP = async () => {
         if (isResendDisabled || !validateMobile()) return;
         try {
-            // const res = await axios.get('/api/resendOTP', { params: { mobile: mobileNumber } });
-            const res = await axios.post(`${backendUrl}/api/sendCandidateOtp`, { mobile: mobileNumber });
+            const res = await axios.post(`${backendUrl}/api/resendOTP`,  { mobile: mobileNumber } );
+            // const res = await axios.get(`${backendUrl}/api/api/resendOTP`, { mobile: mobileNumber });
             if (res.data.status) {
                 setSuccessMessage('OTP resent successfully');
                 startResendTimer();
@@ -227,6 +229,8 @@ const CandidateLogin = () => {
             }
             try {
                 // const registerRes = await axios.post('/candidate/register', body);
+                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
+                if (otpVerifyRes.data.status) {
                 const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
 
                 if (registerRes.data.status === "success") {
@@ -250,7 +254,7 @@ const CandidateLogin = () => {
                     }
                 } else {
                     setErrorMessage(registerRes.data.error);
-                }
+                }}
             } catch (err) {
                 setErrorMessage('Something went wrong during registration');
             }
@@ -363,7 +367,7 @@ const CandidateLogin = () => {
 
                                 {/* Mobile Number Input */}
                                 <div className="row mb-3">
-                                    <div className="col-9 userMobile">
+                                    <div className={`${showSendBtn?'col-9':'col-12'} userMobile`}>
                                         <input
                                             type="tel"
                                             className="form-control"
@@ -375,6 +379,7 @@ const CandidateLogin = () => {
                                             ref={inputRef}
                                         />
                                     </div>
+                                    {showSendBtn &&(
                                     <div className="col-3">
                                         <button
                                             className="btn btn-primary sendBtnn w-100"
@@ -385,6 +390,7 @@ const CandidateLogin = () => {
                                             SEND
                                         </button>
                                     </div>
+                                    )}
                                 </div>
 
                                 {/* OTP Input */}
@@ -459,7 +465,16 @@ const CandidateLogin = () => {
                                             <input type="hidden" className="form-control" value={longitude} placeholder="Longitude" readOnly />
 
                                         </div>
-
+                                        <div className="mb-3">
+                                        <input
+                                            type="number"
+                                            className="form-control"
+                                            placeholder="Enter OTP / अपना ओटीपी दर्ज करें"
+                                            value={otp}
+                                            onChange={(e) => setOtp(e.target.value)}
+                                            ref={otpRef}
+                                        />
+                                        </div>
                                     </div>
                                 )}
 

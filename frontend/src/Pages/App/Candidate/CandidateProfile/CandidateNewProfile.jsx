@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './CandidateProfile.css';
 
@@ -15,9 +15,9 @@ const CandidateNewProfile = () => {
   const [declaration, setDeclaration] = useState('');
 
   // State for UI control
+  const [profileData, setProfileData] = useState({});
   const [showPreview, setShowPreview] = useState(false);
   const [activeSection, setActiveSection] = useState('personal');
-  const [showRecordingModal, setShowRecordingModal] = useState(false);
   const [profileStrength, setProfileStrength] = useState(0);
 
   // Audio recording state
@@ -42,19 +42,16 @@ const CandidateNewProfile = () => {
       data-placeholder={placeholder}
       suppressContentEditableWarning={true}
       onBlur={(e) => {
-        if (onChange) onChange(e.target.innerText);
+        const updatedValue = e.target.innerText.trim();
+        if (onChange) onChange(updatedValue);
       }}
     >
       {content}
     </div>
   );
 
-  // Calculate profile strength
-  useEffect(() => {
-    CandidateNewProfile();
-  }, [user, experiences, educations, skills, languages, projects, interests]);
-
-  const CandidateNewProfile = () => {
+  // Calculate profile strength using a useCallback
+  const CandidateProfile = useCallback(() => {
     let strength = 0;
 
     // Check basic info
@@ -71,7 +68,31 @@ const CandidateNewProfile = () => {
     if (declaration) strength += 5;
 
     setProfileStrength(Math.min(strength, 100));
-  };
+  }, [user, experiences, educations, skills, languages, projects, interests, certificates, declaration]);
+
+  useEffect(() => {
+    CandidateProfile();  // Call only when dependencies change
+  }, [CandidateProfile]);
+
+  // Fetch profile data when the component mounts
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${backendUrl}/candidate/getProfile`, {
+          headers: { 'x-auth': token }
+        });
+        
+        if (response.data.status) {
+          setProfileData(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    fetchProfile();
+  }, []);  // This ensures it runs only once
 
   // Recording functions
   const updateTimer = () => {
@@ -114,12 +135,7 @@ const CandidateNewProfile = () => {
         const timestamp = new Date().toLocaleString();
 
         setRecordings(prevRecordings => [
-          {
-            id: Date.now(),
-            url: audioUrl,
-            timestamp,
-            name: `Recording ${prevRecordings.length + 1}`
-          },
+          { id: Date.now(), url: audioUrl, timestamp, name: `Recording ${prevRecordings.length + 1}` },
           ...prevRecordings
         ]);
 
@@ -134,7 +150,6 @@ const CandidateNewProfile = () => {
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingStatus('Recording in progress...');
-
       resetTimer();
       timerIntervalRef.current = setInterval(updateTimer, 1000);
 
@@ -149,6 +164,7 @@ const CandidateNewProfile = () => {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setRecordingStatus('Recording stopped...');
+      clearInterval(timerIntervalRef.current);  // Clear interval when stopping the recording
     }
   };
 
@@ -162,58 +178,57 @@ const CandidateNewProfile = () => {
       const token = localStorage.getItem('token');
       const user = JSON.parse(sessionStorage.getItem('user'));
 
+      // Format the data to match what your API expects
       const cvPayload = {
-        hiringStatus: [
-          {
-            personalInfo: [
-              {
-                name: user.name,
-                title: '',
-                summary: '',
-                phone: '',
-                email: '',
-                location: '',
-                image: user.image || '',
-                resume: user.resume || ''
-              }
-            ],
-            workexperience: experiences.map(e => ({
-              jobTitle: e.jobTitle || '',
-              companyName: e.companyName || '',
-              jobDescription: e.jobDescription || ''
-            })),
-            education: educations.map(e => ({
-              degree: e.degree || '',
-              university: e.university || '',
-              duration: e.duration || '',
-              addInfo: e.addInfo || ''
-            })),
-            skill: skills.map(s => ({
-              skillName: s.name,
-              skillPercent: s.level
-            })),
-            certification: certificates.map(c => ({
-              certificateName: c.name || '',
-              orgName: c.org || ''
-            })),
-            language: languages.map(l => ({
-              lname: l.name || '',
-              level: l.level
-            })),
-            projects: projects.map(p => ({
-              projectName: p.name || '',
-              proyear: p.year || '',
-              proDescription: p.description || ''
-            })),
-            interest: interests.filter(i => i !== '')
-          }
-        ]
+        personalInfo: {
+          name: user.name,
+          title: document.querySelector('[data-placeholder="Professional Title"]')?.textContent || '',
+          summary: document.querySelector('[data-placeholder="Write a brief professional summary here..."]')?.textContent || '',
+          email: document.querySelector('[data-placeholder="Email Address"]')?.textContent || '',
+          location: document.querySelector('[data-placeholder="Location"]')?.textContent || '',
+          image: user.image || '',
+          resume: user.resume || '',
+          voiceIntro: recordings.map(rec => ({
+            name: rec.name,
+            url: rec.url,
+            timestamp: rec.timestamp,
+            status: true
+          }))
+        },
+        workexperience: experiences.map(e => ({
+          jobTitle: e.jobTitle || '',
+          companyName: e.companyName || '',
+          jobDescription: e.jobDescription || ''
+        })),
+        education: educations.map(e => ({
+          degree: e.degree || '',
+          university: e.university || '',
+          duration: e.duration || '',
+          addInfo: e.additionalInfo || ''
+        })),
+        skill: skills.map(s => ({
+          skillName: s.name,
+          skillPercent: s.level
+        })),
+        certification: certificates.map(c => ({
+          certificateName: c.name || '',
+          orgName: c.org || ''
+        })),
+        language: languages.map(l => ({
+          lname: l.name || '',
+          level: l.level
+        })),
+        projects: projects.map(p => ({
+          projectName: p.name || '',
+          proyear: p.year || '',
+          proDescription: p.description || ''
+        })),
+        interest: interests.filter(i => i !== ''),
+        declaration: declaration
       };
 
       const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
-        headers: {
-          'x-auth': localStorage.getItem('token')
-        }
+        headers: { 'x-auth': token }
       });
 
       if (res.data.status) {
@@ -222,8 +237,8 @@ const CandidateNewProfile = () => {
         alert('Failed to save CV!');
       }
     } catch (err) {
-      console.error("Error saving CV:", err);
-      alert("An error occurred while saving your CV");
+      console.error('Error saving CV:', err);
+      alert('An error occurred while saving your CV');
     }
   };
 
@@ -231,8 +246,6 @@ const CandidateNewProfile = () => {
     <div className="resume-builder-container">
       <div className="resume-builder-header mb-4">
         <h2 className="resume-builder-title">Professional Resume Builder</h2>
-
-        {/* Profile Strength Meter */}
         <div className="profile-strength-meter">
           <div className="strength-header">
             <div className="d-flex align-items-center">
@@ -242,7 +255,7 @@ const CandidateNewProfile = () => {
             <div className="strength-level">
               {profileStrength < 30 ? 'Needs Improvement' :
                 profileStrength < 60 ? 'Satisfactory' :
-                  profileStrength < 85 ? 'Good' : 'Excellent'}
+                profileStrength < 85 ? 'Good' : 'Excellent'}
             </div>
           </div>
           <div className="progress">
@@ -253,7 +266,7 @@ const CandidateNewProfile = () => {
                 width: `${profileStrength}%`,
                 backgroundColor: profileStrength < 30 ? '#dc3545' :
                   profileStrength < 60 ? '#ffc107' :
-                    profileStrength < 85 ? '#6f42c1' : '#28a745'
+                  profileStrength < 85 ? '#6f42c1' : '#28a745'
               }}
               aria-valuenow={profileStrength}
               aria-valuemin="0"
@@ -263,9 +276,9 @@ const CandidateNewProfile = () => {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Profile Sections */}
       <div className="resume-tabs">
-        <ul className="nav nav-tabs nav-fill">
+      <ul className="nav nav-tabs nav-fill">
           <li className="nav-item">
             <a
               className={`nav-link ${activeSection === 'personal' ? 'active' : ''}`}
@@ -326,16 +339,257 @@ const CandidateNewProfile = () => {
               Voice Intro
             </a>
           </li> */}
-          <li className='nav-item position-relative'>
-            <div className="floating-audio-btn" onClick={() => setShowRecordingModal(true)}>
-              <i className="bi bi-mic-fill"></i>
-              <span>Voice Intro</span>
-            </div>
-          </li>
+          {/* <li className='nav-item position-relative'>
+           
+          </li> */}
         </ul>
       </div>
 
-      {/* Content Area */}
+      {/* Preview Modal */}
+      {showPreview && (
+  <div className="resume-preview-modal">
+    <div className="resume-preview-content">
+      <div className="resume-preview-header">
+        <h2>Resume Preview</h2>
+        <button className="close-preview" onClick={() => setShowPreview(false)}>
+          <i className="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div className="resume-preview-body">
+        <div className="resume-document">
+          {/* Header Section */}
+          <div className="resume-document-header">
+            <div className="resume-profile-section">
+              {user?.image ? (
+                <img 
+                  src={`${process.env.REACT_APP_BUCKET_URL}/${user.image}`} 
+                  alt="Profile" 
+                  className="resume-profile-image"
+                />
+              ) : (
+                <div className="resume-profile-placeholder">
+                  <i className="bi bi-person-circle"></i>
+                </div>
+              )}
+              
+              <div className="resume-header-content">
+                <h1 className="resume-name">
+                  {profileData?.personalInfo?.name || user?.name || 'Your Name'}
+                </h1>
+                <p className="resume-title">
+                  {profileData?.personalInfo?.title || 'Professional Title'}
+                </p>
+                
+                <div className="resume-contact-details">
+                  <div className="resume-contact-item">
+                    <i className="bi bi-telephone-fill"></i>
+                    <span>{profileData?.personalInfo?.phone || 'Phone Number'}</span>
+                  </div>
+                  <div className="resume-contact-item">
+                    <i className="bi bi-envelope-fill"></i>
+                    <span>{profileData?.personalInfo?.email || 'Email Address'}</span>
+                  </div>
+                  <div className="resume-contact-item">
+                    <i className="bi bi-geo-alt-fill"></i>
+                    <span>{profileData?.personalInfo?.location || 'Location'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="resume-summary">
+              <h2 className="resume-section-title">Professional Summary</h2>
+              <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
+            </div>
+          </div>
+          
+          {/* Two Column Layout */}
+          <div className="resume-document-body">
+            {/* Left Column */}
+            <div className="resume-column resume-left-column">
+              {/* Experience Section */}
+              {experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                <div className="resume-section">
+                  <h2 className="resume-section-title">Work Experience</h2>
+                   {experiences.map((exp, index) => (
+                    (exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                      <div className="resume-experience-item" key={index}>
+                        <div className="resume-item-header">
+                          <h3 className="resume-item-title">{exp.jobTitle || 'Job Title'}</h3>
+                          <p className="resume-item-subtitle">{exp.companyName || 'Company Name'}</p>
+                          <p className="resume-item-period">
+                            {exp.from || 'Start Date'} - {exp.to || 'Present'}
+                          </p>
+                        </div>
+                        <div className="resume-item-content">
+                          <p>{exp.jobDescription || 'No job description provided'}</p>
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+              )}
+              
+              {/* Education Section */}
+              {educations.some(edu => edu.degree || edu.university || edu.additionalInfo) && (
+                <div className="resume-section">
+                  <h2 className="resume-section-title">Education</h2>
+                  {educations.map((edu, index) => (
+                    (edu.degree || edu.university || edu.additionalInfo) && (
+                      <div className="resume-education-item" key={index}>
+                        <div className="resume-item-header">
+                          <h3 className="resume-item-title">{edu.degree || 'Degree'}</h3>
+                          <p className="resume-item-subtitle">{edu.university || edu.school || 'University/Institution'}</p>
+                          <p className="resume-item-period">{edu.passingYear || edu.duration || 'Graduation Year'}</p>
+                        </div>
+                        <div className="resume-item-content">
+                          <p>{edu.additionalInfo || ''}</p>
+                          {edu.marks && <p>Marks: {edu.marks}%</p>}
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Right Column */}
+            <div className="resume-column resume-right-column">
+              {/* Skills Section */}
+              {skills.some(skill => skill.name) && (
+                <div className="resume-section">
+                  <h2 className="resume-section-title">Skills</h2>
+                  <div className="resume-skills-list">
+                    {skills.map((skill, index) => (
+                      skill.name && (
+                        <div className="resume-skill-item" key={index}>
+                          <div className="resume-skill-name">{skill.name}</div>
+                          <div className="resume-skill-bar-container">
+                            <div 
+                              className="resume-skill-bar" 
+                              style={{width: `${skill.level || 0}%`}}
+                            ></div>
+                          </div>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Languages Section */}
+              {languages.some(lang => lang.name) && (
+                <div className="resume-section">
+                  <h2 className="resume-section-title">Languages</h2>
+                  <div className="resume-languages-list">
+                    {languages.map((lang, index) => (
+                      lang.name && (
+                        <div className="resume-language-item" key={index}>
+                          <div className="resume-language-name">{lang.name}</div>
+                          <div className="resume-language-level">
+                            {[1, 2, 3, 4, 5].map(dot => (
+                              <span 
+                                key={dot} 
+                                className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                              ></span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Certifications Section */}
+              {certificates.some(cert => cert.name || cert.org) && (
+                <div className="resume-section">
+                  <h2 className="resume-section-title">Certifications</h2>
+                  <ul className="resume-certifications-list">
+                    {certificates.map((cert, index) => (
+                      (cert.name || cert.org) && (
+                        <li key={index}>
+                          <strong>{cert.name || 'Certificate'}</strong>
+                          {cert.org && <span> - {cert.org}</span>}
+                        </li>
+                      )
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* Projects Section */}
+              {projects.some(proj => proj.name || proj.description) && (
+                <div className="resume-section">
+                  <h2 className="resume-section-title">Projects</h2>
+                  {projects.map((proj, index) => (
+                    (proj.name || proj.description) && (
+                      <div className="resume-project-item" key={index}>
+                        <div className="resume-item-header">
+                          <h3 className="resume-project-title">
+                            {proj.name || 'Project'}
+                            {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                          </h3>
+                        </div>
+                        <div className="resume-item-content">
+                          <p>{proj.description || 'No project description provided'}</p>
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+              )}
+              
+              {/* Interests Section */}
+              {interests.some(interest => interest) && (
+                <div className="resume-section">
+                  <h2 className="resume-section-title">Interests</h2>
+                  <div className="resume-interests-tags">
+                    {interests.map((interest, index) => (
+                      interest && (
+                        <span className="resume-interest-tag" key={index}>
+                          {interest}
+                        </span>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Declaration */}
+          {declaration && (
+            <div className="resume-declaration">
+              <h2 className="resume-section-title">Declaration</h2>
+              <p>{declaration}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div className="resume-preview-actions">
+        <button 
+          className="download-resume-btn"
+          onClick={() => {
+            alert('Download functionality would be implemented here');
+          }}
+        >
+          <i className="bi bi-download"></i> Download PDF
+        </button>
+        <button 
+          className="close-preview-btn"
+          onClick={() => setShowPreview(false)}
+        >
+          Close Preview
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* Actions */}
       <div className="resume-content">
         {/* Personal Info Section */}
         <div className={`resume-section ${activeSection === 'personal' ? 'active' : ''}`}>
@@ -361,27 +615,69 @@ const CandidateNewProfile = () => {
 
               <div className="profile-info">
                 <div className="profile-name">
-                  {createEditable(user?.name || '', 'Your Name')}
+                {createEditable(profileData?.personalInfo?.name || '', 'Your Name', (val) => {
+  setProfileData(prev => ({
+    ...prev,
+    personalInfo: {
+      ...(prev.personalInfo || {}),
+      name: val
+    }
+  }));
+})}
+
+
                 </div>
                 <div className="profile-title">
                   {createEditable('', 'Professional Title')}
                 </div>
                 <div className="profile-summary">
-                  {createEditable('', 'Write a brief professional summary here...')}
+                {createEditable(profileData?.personalInfo?.summary || '', 'Write a brief professional summary here...', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        summary: val
+      }
+    }));
+  })}
                 </div>
 
                 <div className="contact-info">
                   <div className="contact-item">
                     <i className="bi bi-telephone"></i>
-                    {createEditable('', 'Phone Number')}
+                    {createEditable(profileData?.personalInfo?.phone || '', 'Phone Number', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        phone: val
+      }
+    }));
+  })} 
                   </div>
                   <div className="contact-item">
                     <i className="bi bi-envelope"></i>
-                    {createEditable('', 'Email Address')}
+                    {createEditable(profileData?.personalInfo?.email || '', 'Email Address', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        email: val
+      }
+    }));
+  })}
                   </div>
                   <div className="contact-item">
                     <i className="bi bi-geo-alt"></i>
-                    {createEditable('', 'Location')}
+                    {createEditable(profileData?.personalInfo?.location || '', 'Location', (val) => {
+    setProfileData(prev => ({
+      ...prev,
+      personalInfo: {
+        ...(prev.personalInfo || {}),
+        location: val
+      }
+    }));
+  })}
                   </div>
                 </div>
               </div>
@@ -415,10 +711,25 @@ const CandidateNewProfile = () => {
                 </div>
 
                 <div className="job-title">
-                  {createEditable(experience.jobTitle || '', 'Job Title')}
+                {createEditable(experience.jobTitle || '', 'Job Title', (val) => {
+  const updated = [...experiences];
+  updated[index].jobTitle = val;
+  setExperiences(updated);
+})}
+
                 </div>
                 <div className="company-name">
-                  {createEditable(experience.companyName || '', 'Company Name')}
+                  {/* {createEditable(experience.companyName || '', 'Company Name')} */}
+                  {createEditable(experience.companyName || '', 'Company Name', (val) => {
+  const updated = [...experiences];
+  updated[index].companyName = val;
+  setExperiences(updated);
+  setProfileData(prev => ({
+    ...prev,
+    experiences: updated
+  }));
+})}
+
                 </div>
 
                 <div className="date-range">
@@ -448,7 +759,16 @@ const CandidateNewProfile = () => {
                 </div>
 
                 <div className="job-description">
-                  {createEditable(experience.jobDescription || '', 'Job Description')}
+                {createEditable(experience.jobDescription || '', 'Job Description', (val) => {
+  const updated = [...experiences];
+  updated[index].jobDescription = val;
+  setExperiences(updated);
+  setProfileData(prev => ({
+    ...prev,
+    experiences: updated
+  }));
+})}
+
                 </div>
               </div>
             ))}
@@ -493,11 +813,21 @@ const CandidateNewProfile = () => {
                   <select
                     className="form-select"
                     value={edu.degree || ''}
+                    // onChange={(e) => {
+                    //   const updated = [...educations];
+                    //   updated[index].degree = e.target.value;
+                    //   setEducations(updated);
+                    // }}
                     onChange={(e) => {
                       const updated = [...educations];
-                      updated[index].degree = e.target.value;
+                      updated[index].school = e.target.value; 
                       setEducations(updated);
+                      setProfileData(prev => ({
+                        ...prev,
+                        educations: updated
+                      }));
                     }}
+                    
                   >
                     <option value="">Select</option>
                     <option value="10th">10th</option>
@@ -660,12 +990,21 @@ const CandidateNewProfile = () => {
                         suppressContentEditableWarning={true}
                         data-placeholder="Skill Name"
                         className="skill-name"
+                        // onBlur={(e) => {
+                        //   const updated = [...skills];
+                        //   updated[index].name = e.target.innerText;
+                        //   setSkills(updated);
+                        // }}
                         onBlur={(e) => {
-                          const updated = [...skills];
-                          updated[index].name = e.target.innerText;
-                          setSkills(updated);
-                        }}
-                      >
+  const updated = [...skills];
+  updated[index].name = e.target.innerText;
+  setSkills(updated);
+  setProfileData(prev => ({
+    ...prev,
+    skills: updated
+  }));
+}}
+   >
                         {skill.name}
                       </div>
                       <span className="skill-level">{skill.level}%</span>
@@ -711,11 +1050,21 @@ const CandidateNewProfile = () => {
                       min="0"
                       max="100"
                       value={skill.level}
+                      // onChange={(e) => {
+                      //   const updated = [...skills];
+                      //   updated[index].level = Number(e.target.value);
+                      //   setSkills(updated);
+                      // }}
                       onChange={(e) => {
                         const updated = [...skills];
                         updated[index].level = Number(e.target.value);
                         setSkills(updated);
+                        setProfileData(prev => ({
+                          ...prev,
+                          skills: updated
+                        }));
                       }}
+                      
                       className="form-range"
                     />
                   </div>
@@ -816,10 +1165,28 @@ const CandidateNewProfile = () => {
                       <div className="certificate-item" key={index}>
                         <div className="certificate-details">
                           <div className="certificate-name">
-                            {createEditable(certificate.name || '', 'Certificate Name')}
+                            {/* {createEditable(certificate.name || '', 'Certificate Name')} */}
+                            {createEditable(certificate.name || '', 'Certificate Name', (val) => {
+  const updated = [...certificates];
+  updated[index].name = val;
+  setCertificates(updated);
+  setProfileData(prev => ({
+    ...prev,
+    certificates: updated
+  }));
+})}
                           </div>
                           <div className="certificate-issuer">
-                            {createEditable(certificate.org || '', 'Issuing Organization, Year')}
+                            {/* {createEditable(certificate.org || '', 'Issuing Organization, Year')} */}
+                            {createEditable(certificate.org || '', 'Issuing Organization, Year', (val) => {
+  const updated = [...certificates];
+  updated[index].org = val;
+  setCertificates(updated);
+  setProfileData(prev => ({
+    ...prev,
+    certificates: updated
+  }));
+})}
                           </div>
                         </div>
 
@@ -870,14 +1237,44 @@ const CandidateNewProfile = () => {
                         <div className="project-details">
                           <div className="project-header">
                             <div className="project-name">
-                              {createEditable(project.name || '', 'Project Name')}
+                              {/* {createEditable(project.name || '', 'Project Name')} */}
+                              {createEditable(project.name || '', 'Project Name', (val) => {
+  const updated = [...projects];
+  updated[index].name = val;
+  setProjects(updated);
+  setProfileData(prev => ({
+    ...prev,
+    projects: updated
+  }));
+})}
+
                             </div>
                             <div className="project-year">
-                              {createEditable(project.year || '', 'Year')}
+                              {/* {createEditable(project.year || '', 'Year')} */}
+                              {createEditable(project.year || '', 'Project Name', (val) => {
+  const updated = [...projects];
+  updated[index].name = val;
+  setProjects(updated);
+  setProfileData(prev => ({
+    ...prev,
+    projects: updated
+  }));
+})}
+
                             </div>
                           </div>
                           <div className="project-description">
-                            {createEditable(project.description || '', 'Project Description')}
+                            {/* {createEditable(project.description || '', 'Project Description')} */}
+                            {createEditable(project.project || '', 'Project Name', (val) => {
+  const updated = [...projects];
+  updated[index].name = val;
+  setProjects(updated);
+  setProfileData(prev => ({
+    ...prev,
+    projects: updated
+  }));
+})}
+
                           </div>
                         </div>
 
@@ -920,11 +1317,21 @@ const CandidateNewProfile = () => {
                             contentEditable
                             suppressContentEditableWarning={true}
                             data-placeholder="Interest"
+                            // onBlur={(e) => {
+                            //   const updated = [...interests];
+                            //   updated[index] = e.target.innerText;
+                            //   setInterests(updated);
+                            // }}
                             onBlur={(e) => {
                               const updated = [...interests];
                               updated[index] = e.target.innerText;
                               setInterests(updated);
+                              setProfileData(prev => ({
+                                ...prev,
+                                interests: updated
+                              }));
                             }}
+                            
                           >
                             {interest}
                           </div>
@@ -1032,365 +1439,15 @@ const CandidateNewProfile = () => {
             </div>
           </div>
         </div>
+        <button className="save-resume" onClick={handleSaveCV}>Save Resume</button>
+        <button className="preview-resume" onClick={() => setShowPreview(true)}>Preview Resume</button>
       </div>
-
-      {/* Action Buttons */}
-      <div className="resume-actions">
-        <label className="upload-resume">
-          <i className="bi bi-upload me-2"></i> Upload Resume
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx"
-            style={{ display: 'none' }}
-
-          />
-        </label>
-
-        <button className="save-resume" onClick={handleSaveCV}>
-          <i className="bi bi-save me-2"></i> Save Resume
-        </button>
-
-        <button className="preview-resume" onClick={() => setShowPreview(true)}>
-          <i className="bi bi-eye me-2"></i> Preview Resume
-        </button>
-      </div>
-
-      {/* model  */}
-     
-{showRecordingModal && (
-  <div className="recording-modal-overlay">
-    <div className="recording-modal">
-      <div className="modal-header">
-        <h5>Record Voice Introduction</h5>
-        <button className="close-modal" onClick={() => setShowRecordingModal(false)}>
-          <i className="bi bi-x-lg"></i>
-        </button>
-      </div>
-      
-      <div className="modal-body">
-        <div className="recording-controls">
-          <div className="recording-timer">{timer}</div>
-          <div className="recording-status">{recordingStatus}</div>
-          
-          <div className="control-buttons">
-            <button 
-              className={`record-button ${isRecording ? 'recording' : ''}`}
-              onClick={isRecording ? stopRecording : startRecording}
-            >
-              <i className={`bi ${isRecording ? 'bi-stop-fill' : 'bi-mic-fill'}`}></i>
-              {isRecording ? 'Stop Recording' : 'Start Recording'}
-            </button>
-          </div>
-        </div>
-        
-        <div className="recordings-list">
-          <h5>Your Recordings</h5>
-          
-          {recordings.length === 0 ? (
-            <div className="no-recordings">No recordings yet</div>
-          ) : (
-            recordings.map(recording => (
-              <div className="recording-item" key={recording.id}>
-                <div className="recording-info">
-                  <div className="recording-name">{recording.name}</div>
-                  <div className="recording-timestamp">{recording.timestamp}</div>
-                </div>
-                
-                <div className="recording-actions">
-                  <audio controls src={recording.url} className="audio-player"></audio>
-                  
-                  <button 
-                    className="delete-recording"
-                    onClick={() => deleteRecording(recording.id)}
-                  >
-                    <i className="bi bi-trash"></i>
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-      
-      <div className="modal-footer">
-        <button className="btn-done" onClick={() => setShowRecordingModal(false)}>
-          Done
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-     {showPreview && (
-  <div className="resume-preview-modal">
-    <div className="resume-preview-content">
-      <div className="resume-preview-header">
-        <h2>Resume Preview</h2>
-        <button className="close-preview" onClick={() => setShowPreview(false)}>
-          <i className="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div className="resume-preview-body">
-        {/* Professional Resume Template */}
-        <div className="resume-document">
-          {/* Header Section */}
-          <div className="resume-document-header">
-            <div className="resume-profile-section">
-              {user?.image ? (
-                <img 
-                  src={`${process.env.REACT_APP_BUCKET_URL}/${user.image}`} 
-                  alt="Profile" 
-                  className="resume-profile-image"
-                />
-              ) : (
-                <div className="resume-profile-placeholder">
-                  <i className="bi bi-person-circle"></i>
-                </div>
-              )}
-              
-              <div className="resume-header-content">
-                <h1 className="resume-name">{user?.name || 'Your Name'}</h1>
-                <p className="resume-title">
-                  {document.querySelector('[data-placeholder="Professional Title"]')?.textContent || 'Professional Title'}
-                </p>
-                
-                <div className="resume-contact-details">
-                  <div className="resume-contact-item">
-                    <i className="bi bi-telephone-fill"></i>
-                    <span>{document.querySelector('[data-placeholder="Phone Number"]')?.textContent || 'Phone Number'}</span>
-                  </div>
-                  <div className="resume-contact-item">
-                    <i className="bi bi-envelope-fill"></i>
-                    <span>{document.querySelector('[data-placeholder="Email Address"]')?.textContent || 'Email Address'}</span>
-                  </div>
-                  <div className="resume-contact-item">
-                    <i className="bi bi-geo-alt-fill"></i>
-                    <span>{document.querySelector('[data-placeholder="Location"]')?.textContent || 'Location'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="resume-summary">
-              <h2 className="resume-section-title">Professional Summary</h2>
-              <p>{document.querySelector('[data-placeholder="Write a brief professional summary here..."]')?.textContent || 'No summary provided'}</p>
-            </div>
-          </div>
-          
-          {/* Two Column Layout */}
-          <div className="resume-document-body">
-            {/* Left Column */}
-            <div className="resume-column resume-left-column">
-              {/* Experience Section */}
-              {experiences.length > 0 && experiences.some(exp => exp.jobTitle || document.querySelector('[data-placeholder="Job Title"]')?.textContent) && (
-                <div className="resume-section">
-                  <h2 className="resume-section-title">Work Experience</h2>
-                  
-                  {experiences.map((exp, index) => (
-                    <div className="resume-experience-item" key={index}>
-                      <div className="resume-item-header">
-                        <h3 className="resume-item-title">
-                          {document.querySelectorAll('[data-placeholder="Job Title"]')[index]?.textContent || exp.jobTitle || 'Job Title'}
-                        </h3>
-                        <p className="resume-item-subtitle">
-                          {document.querySelectorAll('[data-placeholder="Company Name"]')[index]?.textContent || exp.companyName || 'Company Name'}
-                        </p>
-                        <p className="resume-item-period">
-                          {exp.from || 'Start Date'} - {exp.to || 'Present'}
-                        </p>
-                      </div>
-                      <div className="resume-item-content">
-                        <p>
-                          {document.querySelectorAll('[data-placeholder="Job Description"]')[index]?.textContent || exp.jobDescription || 'No job description provided'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* Education Section */}
-              {educations.length > 0 && educations.some(edu => edu.degree || document.querySelector('[data-placeholder="University"]')?.textContent) && (
-                <div className="resume-section">
-                  <h2 className="resume-section-title">Education</h2>
-                  
-                  {educations.map((edu, index) => (
-                    <div className="resume-education-item" key={index}>
-                      <div className="resume-item-header">
-                        <h3 className="resume-item-title">
-                          {edu.degree || 'Degree'}
-                        </h3>
-                        <p className="resume-item-subtitle">
-                          {document.querySelectorAll('[data-placeholder="University"]')[index]?.textContent || edu.university || 'University/Institution'}
-                        </p>
-                        <p className="resume-item-period">
-                          {document.querySelectorAll('[data-placeholder="Passing Year"]')[index]?.textContent || edu.passingYear || 'Graduation Year'}
-                        </p>
-                      </div>
-                      <div className="resume-item-content">
-                        <p>
-                          {document.querySelectorAll('[data-placeholder="Additional Information"]')[index]?.textContent || edu.additionalInfo || ''}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            {/* Right Column */}
-            <div className="resume-column resume-right-column">
-              {/* Skills Section */}
-              {skills.length > 0 && skills.some(skill => skill.name) && (
-                <div className="resume-section">
-                  <h2 className="resume-section-title">Skills</h2>
-                  
-                  <div className="resume-skills-list">
-                    {skills.map((skill, index) => (
-                      <div className="resume-skill-item" key={index}>
-                        <div className="resume-skill-name">{skill.name}</div>
-                        <div className="resume-skill-bar-container">
-                          <div 
-                            className="resume-skill-bar" 
-                            style={{width: `${skill.level}%`}}
-                          ></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Languages Section */}
-              {languages.length > 0 && languages.some(lang => lang.name || document.querySelector('[data-placeholder="Language Name"]')?.textContent) && (
-                <div className="resume-section">
-                  <h2 className="resume-section-title">Languages</h2>
-                  
-                  <div className="resume-languages-list">
-                    {languages.map((lang, index) => (
-                      <div className="resume-language-item" key={index}>
-                        <div className="resume-language-name">
-                          {document.querySelectorAll('[data-placeholder="Language Name"]')[index]?.textContent || lang.name || 'Language'}
-                        </div>
-                        <div className="resume-language-level">
-                          {[1, 2, 3, 4, 5].map(dot => (
-                            <span 
-                              key={dot} 
-                              className={`resume-level-dot ${dot <= lang.level ? 'filled' : ''}`}
-                            ></span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Certifications Section */}
-              {certificates.length > 0 && certificates.some(cert => 
-                document.querySelector('[data-placeholder="Certificate Name"]')?.textContent
-              ) && (
-                <div className="resume-section">
-                  <h2 className="resume-section-title">Certifications</h2>
-                  
-                  <ul className="resume-certifications-list">
-                    {certificates.map((cert, index) => (
-                      <li key={index}>
-                        <strong>
-                          {document.querySelectorAll('[data-placeholder="Certificate Name"]')[index]?.textContent || cert.name || 'Certificate'}
-                        </strong>
-                        {document.querySelectorAll('[data-placeholder="Issuing Organization, Year"]')[index]?.textContent && (
-                          <span> - {document.querySelectorAll('[data-placeholder="Issuing Organization, Year"]')[index]?.textContent}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {/* Projects Section */}
-              {projects.length > 0 && projects.some(proj => 
-                document.querySelector('[data-placeholder="Project Name"]')?.textContent
-              ) && (
-                <div className="resume-section">
-                  <h2 className="resume-section-title">Projects</h2>
-                  
-                  {projects.map((proj, index) => (
-                    <div className="resume-project-item" key={index}>
-                      <div className="resume-item-header">
-                        <h3 className="resume-project-title">
-                          {document.querySelectorAll('[data-placeholder="Project Name"]')[index]?.textContent || proj.name || 'Project'}
-                          {document.querySelectorAll('[data-placeholder="Year"]')[index]?.textContent && (
-                            <span className="resume-project-year"> ({document.querySelectorAll('[data-placeholder="Year"]')[index]?.textContent})</span>
-                          )}
-                        </h3>
-                      </div>
-                      <div className="resume-item-content">
-                        <p>
-                          {document.querySelectorAll('[data-placeholder="Project Description"]')[index]?.textContent || proj.description || 'No project description provided'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* Interests Section */}
-              {interests.length > 0 && interests.some(interest => interest) && (
-                <div className="resume-section">
-                  <h2 className="resume-section-title">Interests</h2>
-                  
-                  <div className="resume-interests-tags">
-                    {interests.map((interest, index) => (
-                      interest && (
-                        <span className="resume-interest-tag" key={index}>
-                          {interest}
-                        </span>
-                      )
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Declaration */}
-          {declaration && (
-            <div className="resume-declaration">
-              <h2 className="resume-section-title">Declaration</h2>
-              <p>{declaration}</p>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="resume-preview-actions">
-        <button 
-          className="download-resume-btn"
-          onClick={() => {
-            // Here you would implement PDF download functionality
-            alert('Download functionality would be implemented here');
-          }}
-        >
-          <i className="bi bi-download"></i> Download PDF
-        </button>
-        <button 
-          className="close-preview-btn"
-          onClick={() => setShowPreview(false)}
-        >
-          Close Preview
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-      {/* CSS Styles */}
-    
+      {/* <div className="resume-actions">
+        <button className="save-resume" onClick={handleSaveCV}>Save Resume</button>
+        <button className="preview-resume" onClick={() => setShowPreview(true)}>Preview Resume</button>
+      </div> */}
     </div>
   );
 };
 
 export default CandidateNewProfile;
-
