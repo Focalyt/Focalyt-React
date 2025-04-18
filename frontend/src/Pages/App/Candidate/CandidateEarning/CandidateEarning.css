@@ -65,7 +65,7 @@ html body .content .content-wrapper {
 @media(max-width:768px){
     html body .content .content-wrapper {
     padding-block:30px;
-    padding-inline:0px;
+    padding-inline:20px;
     }
     .mipie-earn{
         width: 90%;

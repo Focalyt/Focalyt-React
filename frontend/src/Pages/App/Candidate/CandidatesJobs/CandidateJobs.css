@@ -156,13 +156,6 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
   left: 10%;
 }
 
-
-
-
-
-
-
-
 .searchjobspage .card {
   border-radius: 8px;
   box-shadow: 0 4px 24px 0 rgba(34, 41, 47, 0.1);
@@ -223,7 +216,18 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
   font-size: 0.9rem;
   margin-bottom: 1rem;
 }
-
+.curs_description span.job_cate {
+  background: #1b95391a;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  color: #1b9539;
+  border: solid 1px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  display: inline;
+}
 .course_spec {
   display: flex;
   align-items: flex-start;
@@ -558,7 +562,7 @@ input.star:checked ~ .rev-box {
 }
 
 .curs_description h4 {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   margin-bottom: 5px;
 }
@@ -572,7 +576,7 @@ input.star:checked ~ .rev-box {
 
 .course_spec {
   display: flex;
-  margin-bottom: 15px;
+  margin-top: 25px;
 }
 
 .spe_icon {
@@ -584,7 +588,7 @@ input.star:checked ~ .rev-box {
 }
 
 .spe_detail h3 {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   margin-bottom: 0;
 }
@@ -604,7 +608,14 @@ input.star:checked ~ .rev-box {
   font-weight: 600;
   margin: 20px 0 15px;
 }
-
+.v_pal img {
+  border-radius: 8px;
+}
+.course_dtl h6 {
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 35px;
+}
 .apply-thisjob {
   background-color: #FC2B5A;
   color: #fff;
@@ -618,8 +629,10 @@ input.star:checked ~ .rev-box {
 }
 
 .apply-thisjob:hover {
-  background-color: #e01846;
-  color: #fff;
+  border: 2px solid #FC2B5A;
+  background: #fff;
+  color: #FC2B5A;
+  text-decoration: none;
 }
 
 .apply-thisjob i {
@@ -914,7 +927,9 @@ input.star:checked ~ .rev-box {
   height: 20px;
   cursor: pointer;
 }
-
+.modal{
+  background-color: rgba(0,0,0,0.5);
+  }
 @media (max-width: 767px) {
   .swiper-slide {
     width: 50%;

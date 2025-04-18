@@ -150,21 +150,24 @@ const CourseDetails = () => {
       setAddress(candidate.location?.fullAddress || '');
     }
   }, [candidate]);
+  
+  
+
   const applyCourse = async (courseId) => {
     try {
 
-      console.log('selectedCenter', selectedCenter)
-
+      console.log('selectedCenter',selectedCenter)
+      
       const data = {
-        selectedCenter: selectedCenter
+        selectedCenter:selectedCenter        
       };
 
-      const response = await axios.post(`${backendUrl}/candidate/course/${courseId}/apply`, data, {
+      const response = await axios.post(`${backendUrl}/candidate/course/${courseId}/apply`,data, {
         headers: {
           'x-auth': localStorage.getItem('token')
         }
       });
-
+      
 
       // Close modal
       document.getElementById('apply').classList.remove('show');
@@ -189,10 +192,10 @@ const CourseDetails = () => {
   };
 
   const handlePayment = (courseId) => {
-
+   
     const data = {
       courseId,
-
+      
     };
 
     axios({
@@ -291,12 +294,12 @@ const CourseDetails = () => {
   }
   const nextBtnClick = () => {
     setNextbtnVisible(false);
-
+    
   };
   const backBtnClick = () => {
     setNextbtnVisible(true);
 
-
+    
   };
   const stripHTML = (html) => {
     const div = document.createElement("div");
@@ -352,8 +355,8 @@ const CourseDetails = () => {
                         <div className="curs_description">
                           <h3 className="text-capitalize mb-2 font-weight-bold">{course.name}</h3>
                           <h4 className="job_cate">
-                            {course?.sectors && course.sectors.length > 0 ? course.sectors[0].name : ""}
-                          </h4>
+  {course?.sectors && course.sectors.length > 0 ? course.sectors[0].name : ""}
+</h4>
 
                           <h6>Course Overview</h6>
                           <div className="row">
@@ -659,17 +662,17 @@ const CourseDetails = () => {
                     </a>
                   ) : (
                     <a
-                      href="#"
-                      style={{
-                        pointerEvents: 'none',
-                        opacity: 0.6,
-                        cursor: 'not-allowed',
-                        textDecoration: 'none',
-                      }}
-                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
-                    >
-                      <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
-                    </a>
+  href="#"
+  style={{
+    pointerEvents: 'none',
+    opacity: 0.6,
+    cursor: 'not-allowed',
+    textDecoration: 'none',
+  }}
+  className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+>
+  <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
+</a>
 
                   )}
 
@@ -816,17 +819,17 @@ const CourseDetails = () => {
                     </a>
                   ) : (
                     <a
-                      href="#"
-                      style={{
-                        pointerEvents: 'none',
-                        opacity: 0.6,
-                        cursor: 'not-allowed',
-                        textDecoration: 'none',
-                      }}
-                      className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
-                    >
-                      <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
-                    </a>
+  href="#"
+  style={{
+    pointerEvents: 'none',
+    opacity: 0.6,
+    cursor: 'not-allowed',
+    textDecoration: 'none',
+  }}
+  className="apply-thisjob text-left px-0 py-3 d-xl-block d-lg-block d-md-block d-sm-none d-none"
+>
+  <i className="la la-paper-plane ml-3"></i>Course Successfully Applied
+</a>
                   )}
                 </div>
 
@@ -1120,50 +1123,50 @@ const CourseDetails = () => {
                 </button>
               </div>
               <div className="modal-body pt-1" id="popup-body">
-                {nextbtnVisible && (
-                  <select onChange={(e) => setSelectedCenter(e.target.value)} className="form-control" value={selectedCenter}>
+              {nextbtnVisible&&  (
+              <select onChange={(e) => setSelectedCenter(e.target.value)} className="form-control" value={selectedCenter}>
                     <option value="" disabled>Select Center</option>
 
-                    {course.center.map((q) => (
+                   {course.center.map((q) => (
                       <option value={q._id}>{q.name}</option>))}
-
+                    
                   </select>)}
-                {!nextbtnVisible && (
-                  <h5 className="pb-1 mb-0">
-                    Register for this Course
-                  </h5>)}
+                  {!nextbtnVisible&&  (
+                <h5 className="pb-1 mb-0">
+                  Register for this Course
+                </h5>)}
 
               </div>
               <div className="modal-footer">
-                {nextbtnVisible && (
-                  <button
-
-                    className="btn btn-primary"
-                    id="next-btn"
-                    onClick={() => nextBtnClick()}
-                  >
-                    Next
-                  </button>)}
+              {nextbtnVisible &&(
+                <button
+                  
+                  className="btn btn-primary"
+                  id="next-btn"
+                  onClick={() => nextBtnClick()}
+                >
+                  Next
+                </button>)}
                 {!nextbtnVisible && (
-                  <>
-                    {centerRequired && (
-                      <button
-
-                        className="btn btn-primary"
-                        id="back-btn"
-                        onClick={() => backBtnClick()}
-                      >
-                        Back
-                      </button>)}
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      id="apply-btn"
-                      onClick={() => applyCourse(course._id)}
-                    >
-                      Proceed
-                    </button>
-                  </>)}
+                <>
+                {centerRequired && (
+                <button
+                  
+                  className="btn btn-primary"
+                  id="back-btn"
+                  onClick={() => backBtnClick()}
+                >
+                  Back
+                </button>)}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  id="apply-btn"
+                  onClick={() => applyCourse(course._id)}
+                >
+                  Proceed
+                </button>
+                </>)}
               </div>
             </div>
           ) : (
@@ -1285,45 +1288,45 @@ const CourseDetails = () => {
                 Congratulations!
               </h5>
               {!docsRequired && (
-                <span>You have successfully registered for this course.<br /> Our team will contact you shortly.</span>)}
+              <span>You have successfully registered for this course.<br /> Our team will contact you shortly.</span>)}
               {docsRequired && (
-                <span>
-                  You have successfully registered for this course. Please upload the required documents to proceed further.<br />
-                  Our team will reach out to you shortly.
-                </span>)}
+              <span>
+              You have successfully registered for this course. Please upload the required documents to proceed further.<br />
+              Our team will reach out to you shortly.
+            </span>)}
             </div>
             <div className="modal-footer">
-              {!docsRequired && (
+            {!docsRequired && (
 
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  id="close"
-                  onClick={() => {
-                    document.getElementById('completeRegistration').classList.remove('show');
-                    document.getElementById('completeRegistration').style.display = 'none';
-                    document.body.classList.remove('modal-open');
-                    document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                    window.location.reload();
-                  }}
-                >
-                  Close
-                </button>)}
+              <button
+                type="button"
+                className="btn btn-primary"
+                id="close"
+                onClick={() => {
+                  document.getElementById('completeRegistration').classList.remove('show');
+                  document.getElementById('completeRegistration').style.display = 'none';
+                  document.body.classList.remove('modal-open');
+                  document.getElementsByClassName('modal-backdrop')[0]?.remove();
+                  window.location.reload();
+                }}
+              >
+                Close
+              </button>)}
               {docsRequired && (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  id="addDocs"
-                  onClick={() => {
-                    document.getElementById('completeRegistration').classList.remove('show');
-                    document.getElementById('completeRegistration').style.display = 'none';
-                    document.body.classList.remove('modal-open');
-                    document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                    window.location.href = `/candidate/reqDocs/${courseId}`;
-                  }}
-                >
-                  Upload Documents
-                </button>)}
+              <button
+                type="button"
+                className="btn btn-primary"
+                id="addDocs"
+                onClick={() => {
+                  document.getElementById('completeRegistration').classList.remove('show');
+                  document.getElementById('completeRegistration').style.display = 'none';
+                  document.body.classList.remove('modal-open');
+                  document.getElementsByClassName('modal-backdrop')[0]?.remove();
+                  window.location.href = `/candidate/reqDocs/${courseId}`;
+                }}
+              >
+                Upload Documents
+              </button>)}
             </div>
           </div>
         </div>
