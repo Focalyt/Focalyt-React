@@ -41,6 +41,7 @@ import CandidateViewJobs from './Pages/App/Candidate/CandidatesJobs/CandidateVie
 import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredDocuments';
 import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
 import CandidateNewProfile from './Pages/App/Candidate/CandidateProfile/CandidateNewProfile';
+import CandidatesEvents from './Pages/App/Candidate/CandidateEvents/CandidatesEvents';
 const Layout = () => {
   const location = useLocation();
 
@@ -89,6 +90,7 @@ const Layout = () => {
           <Route path="reqDocs/:courseId" element={<RequiredDocuments/>}/>
           <Route path="pendingFee" element={<PaymentDetails/>}/>
           <Route path ='userProfile' element={<CandidateNewProfile/>}/>
+          <Route path ='candidateevent' element={<CandidatesEvents/>}/>
         </Route>
         <Route path='/admin' element ={<AdminLayout/>}>
         

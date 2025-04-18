@@ -290,14 +290,8 @@ const CandidateViewJobs = () => {
   }
 
   return (
-    <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" id="inner_job_page">
-     
-      
-      <div className="app-content content">
-        <div className="content-overlay"></div>
-        <div className="header-navbar-shadow"></div>
-        <div className="content-wrapper"></div>
-        
+    <>
+   
         <section className="ml-3">
           <div className="container-fluid px-1">
             <div className="card">
@@ -317,40 +311,40 @@ const CandidateViewJobs = () => {
                             <div className="row">
                               <div className="col-md-4">
                                 <div className="course_spec">
-                                  <div className="spe_icon">
+                                  <div className="spe_icon" style={{backgroundColor: "transparent"}}>
                                     <i className="la la-money"></i>
                                   </div>
                                   <div className="spe_detail">
                                     <h3 className="jobDetails-wrap">
                                       ₹ {jobDetails.isFixed ? jobDetails.amount || 'NA' : (jobDetails.min || 'NA') + ' - ' + (jobDetails.max || 'NA')}
                                     </h3>
-                                    <span className="text-capitalize jobDetails-wrap">Minimum Salary / न्यूनतम वेतन</span>
+                                    <span className="text-capitalize jobDetails-wrap" style={{whiteSpace:"normal"}}>Minimum Salary / न्यूनतम वेतन</span>
                                   </div>
                                 </div>
                               </div>
                               
                               <div className="col-md-4">
                                 <div className="course_spec">
-                                  <div className="spe_icon">
+                                  <div className="spe_icon" style={{backgroundColor: "transparent"}}>
                                     <i className="la la-money"></i>
                                   </div>
                                   <div className="spe_detail">
                                     <h3 className="jobDetails-wrap">
                                       {jobDetails.experience === 0 ? 'Fresher' : `${jobDetails.experience} Years`}
                                     </h3>
-                                    <span className="text-capitalize jobDetails-wrap">Experience / अनुभव</span>
+                                    <span className="text-capitalize jobDetails-wrap" style={{whiteSpace:"normal"}}>Experience / अनुभव</span>
                                   </div>
                                 </div>
                               </div>
                               
                               <div className="col-md-4">
                                 <div className="course_spec">
-                                  <div className="spe_icon">
+                                  <div className="spe_icon" style={{backgroundColor: "transparent"}}>
                                     <i className="la la-money"></i>
                                   </div>
                                   <div className="spe_detail">
                                     <h3 className="jobDetails-wrap">{jobDetails._qualification?.name}</h3>
-                                    <span className="text-capitalize jobDetails-wrap">Qualification / योग्यता</span>
+                                    <span className="text-capitalize jobDetails-wrap" style={{whiteSpace:"normal"}}>Qualification / योग्यता</span>
                                   </div>
                                 </div>
                               </div>
@@ -773,7 +767,7 @@ const CandidateViewJobs = () => {
             </div>
           </section>
         )}
-      </div>
+     
       
       {/* Modals */}
       
@@ -1193,7 +1187,7 @@ const CandidateViewJobs = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

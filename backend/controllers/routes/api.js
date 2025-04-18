@@ -47,6 +47,7 @@ commonRoutes.post("/sendOtptoRegister", commonFunc.sendOtptoRegister);
 commonRoutes.post("/verifyOtp", commonFunc.verifyOtp);
 commonRoutes.post("/verifyPass", commonFunc.verifyPass);
 commonRoutes.get("/resendOTP",commonFunc.resendOTP);
+commonRoutes.post("/resendOTP",commonFunc.resendOTP);
 commonRoutes.get("/currentUserWebapp", commonFunc.getProfileDetail);
 commonRoutes.get("/logout", commonFunc.logout);
 commonRoutes.get("/streams", authenti, commonFunc.streams);

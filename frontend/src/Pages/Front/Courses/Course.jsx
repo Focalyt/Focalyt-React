@@ -295,7 +295,7 @@ function Course() {
                                 className="form-control search-input"
                                 placeholder="Search courses by Name, Location, Duration, etc."
                                 value={searchTerm}
-                                onChange={handleSearchChange} style={{ background: "transparent", border: "1px solid" }}
+                                onChange={handleSearchChange} style={{ background: "transparent", border: "1px solid", paddingLeft: '22px' }}
                               />
                               <span className="search-icon">
                                 <FontAwesomeIcon icon={faSearch} />

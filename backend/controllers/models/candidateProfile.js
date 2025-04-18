@@ -23,7 +23,6 @@ const candidateProfileSchema = new Schema(
         lowercase: true,
         trim: true,
       },
-      place: { type: String },
       profilevideo: { type: String },
       sex: { type: String },
       dob: { type: Date },
@@ -57,18 +56,18 @@ const candidateProfileSchema = new Schema(
           city: { type: ObjectId, ref: "City" },
         },
       ],
-      skill: [
+      skills: [
         {
           skillName: { type: String },
           skillPercent: { type: Number }
         }
       ],
-      certification: [{
+      certifications: [{
         certificateName: { type: String },
         orgName: { type: String },
         year: { type: String }
       }],
-      language: [{
+      languages: [{
         lname: { type: String },
         level: { type: Number }
       }],
@@ -80,6 +79,13 @@ const candidateProfileSchema = new Schema(
       interest: [{
         type: String
       }],
+      voiceIntro: [{
+        name: { type: String },
+        url: { type: String },
+        timestamp: { type: String },
+        status: { type: Boolean, default: true }
+      }],
+      
       declaration: {
         isChecked: { type: Boolean, default: false },
         text: { type: String, default: "I hereby declare that all the information provided above is true to the best of my knowledge." }
@@ -126,10 +132,6 @@ const candidateProfileSchema = new Schema(
 
       }
     ],
-    regFee: {
-      type: Number,
-      default: 0
-    },
 
     qualifications: [
       {

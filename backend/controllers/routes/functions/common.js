@@ -370,6 +370,32 @@ module.exports.resendOTP = async (req, res) => {
     return req.errFunc(err);
   }
 }
+
+module.exports.resendOTP = async (req, res) => {
+  try {
+    console.log('resend OTP')
+    const mobile  = req.body.mobile;
+    console.log('body',req.body.mobile)
+    console.log('number',mobile)
+
+    const auth = authKey
+    let url = `https://api.msg91.com/api/v5/otp/retry?authkey=${auth}&mobile=91${mobile}`;
+    const result = await axios.get(url);
+    if (result.data.type === 'success') {
+      return res.send({
+        status: true,
+        message: 'OTP resend successfully.'
+      });
+    } else {
+      return res.send({
+        status: false,
+        message: 'OTP not send successfully!'
+      });
+    }
+  } catch (err) {
+    return req.errFunc(err);
+  }
+}
 module.exports.logout = async (req, res) => {
   try {
     const update = { $pull: { authTokens: req.session.user?.token } };
