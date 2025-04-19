@@ -48,9 +48,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).single('file');
 const {
-  Country, State, City, Candidate, College, Qualification, SubQualification, Skill, University, User, Vacancy,
+  Country, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy,
 } = require('../../models');
-const candidate = require('../../models/candidate');
+const Candidate = require('../../models/candidateProfile');
 
 module.exports.getProfileDetail = async (req, res) => {
   try {
