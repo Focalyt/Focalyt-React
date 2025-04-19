@@ -627,7 +627,7 @@ const HomePage = () => {
               </div>
             </div>
             <div className="row justify-content-center gutter-y-default">
-              <div className="col-lg-2 col-md-2 col-sm-12 col-12" >
+              <div className="col-lg-2 col-md-2 col-sm-12 col-12 mb-2" >
                 <div id="student" className="role text-center">
                   <h5 className="text-black fw-bold">STUDENT</h5>
                   <p className="text-black fw-normal pt-1 px-2">Aspiring to launch your career</p>
@@ -638,7 +638,7 @@ const HomePage = () => {
                 </figure> --> */}
                 </div>
               </div>
-              <div className="col-lg-2 col-md-2 col-sm-12 col-12" >
+              <div className="col-lg-2 col-md-2 col-sm-12 col-12 mb-2" >
                 <div id="employer" className="role text-center">
                   <h5 className="text-black fw-bold">JOB SEEKER</h5>
                   <p className="text-black fw-normal pt-1 px-2">Find jobs and Internships</p>
@@ -649,7 +649,7 @@ const HomePage = () => {
                 </figure> --> */}
                 </div>
               </div>
-              <div className="col-lg-2 col-md-2 col-sm-12 col-12" >
+              <div className="col-lg-2 col-md-2 col-sm-12 col-12 mb-2" >
                 <div id="employee" className="role text-center">
                   <h5 className="text-black fw-bold">EMPLOYER</h5>
                   <p className="text-black fw-normal pt-1 px-2">Seeking skilled talent</p>
@@ -661,7 +661,7 @@ const HomePage = () => {
                 </figure> --> */}
                 </div>
               </div>
-              <div className="col-lg-2 col-md-2 col-sm-12 col-12">
+              <div className="col-lg-2 col-md-2 col-sm-12 col-12 mb-2">
                 <div id="institute" className="role text-center">
                   <h5 className="text-black fw-bold">INSTITUTE</h5>
                   <p className="text-black fw-normal pt-1 px-2">Schools and Colleges</p>
@@ -672,7 +672,7 @@ const HomePage = () => {
                 </figure> --> */}
                 </div>
               </div>
-              <div className="col-lg-2 col-md-2 col-sm-12 col-12">
+              <div className="col-lg-2 col-md-2 col-sm-12 col-12 mb-2">
                 <div id="educator" className="role text-center">
                   <h5 className="text-black fw-bold">SKILL-EDUCATOR</h5>
                   <p className="text-black fw-normal pt-1 px-2">Passionate for Training</p>

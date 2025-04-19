@@ -376,6 +376,11 @@ const CandidateLogin = () => {
                                             value={mobileNumber}
                                             onChange={(e) => setMobileNumber(e.target.value)}
                                             onKeyPress={handleMobileNumberKeyPress}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                  handleGenerateOTP();
+                                                }
+                                              }}
                                             ref={inputRef}
                                         />
                                     </div>
