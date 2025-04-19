@@ -342,27 +342,40 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
     // Check if already applied
     if (candidate.appliedCourses && candidate.appliedCourses.includes(courseId)) {
       return res.status(400).json({ status: false, msg: "Already applied." });
+    };
+
+    const updateData = {
+      $addToSet: {
+        appliedCourses: courseId
+      }
+    };
+
+    if (selectedCenter) {
+      updateData.$addToSet.selectedCenter = {
+        courseId: courseId,
+        centerId: selectedCenter
+      };
     }
 
     // If event sent successfully, apply for course
     const apply = await Candidate.findOneAndUpdate(
       { mobile: candidateMobile },
-      { $addToSet: { appliedCourses: courseId,
-        if (selectedCenter) {
-          updateData.$addToSet.selectedCenter = {
-            courseId: courseId,
-            centerId: selectedCenter
-          };
-        }
-      } },
+      updateData,
       { new: true, upsert: true }
     );
 
-    const appliedData = await new AppliedCourses({
+    let data = {
       _candidate: candidate._id,
       _course: courseId,
-      _center: selectedCenter
-    }).save();
+    };
+
+    if (selectedCenter) {
+      data._center = selectedCenter
+    }
+
+
+
+    const appliedData = await new AppliedCourses(data).save();
 
 
     // Capitalize every word's first letter
