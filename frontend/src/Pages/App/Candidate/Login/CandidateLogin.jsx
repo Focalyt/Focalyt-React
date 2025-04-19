@@ -43,6 +43,7 @@ const CandidateLogin = () => {
     const [isResendDisabled, setIsResendDisabled] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [numberDisable, setnumberDisable] = useState(false);
     const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
@@ -140,6 +141,7 @@ const CandidateLogin = () => {
             return;
         }
         setShowSetBtn(false);
+        setnumberDisable(true);
 
         try {
             // const response = await axios.post('/api/sendCandidateOtp', { mobile: mobileNumber });
@@ -169,7 +171,7 @@ const CandidateLogin = () => {
     const handleResendOTP = async () => {
         if (isResendDisabled || !validateMobile()) return;
         try {
-            const res = await axios.post(`${backendUrl}/api/resendOTP`,  { mobile: mobileNumber } );
+            const res = await axios.post(`${backendUrl}/api/resendOTP`, { mobile: mobileNumber });
             // const res = await axios.get(`${backendUrl}/api/api/resendOTP`, { mobile: mobileNumber });
             if (res.data.status) {
                 setSuccessMessage('OTP resent successfully');
@@ -231,30 +233,31 @@ const CandidateLogin = () => {
                 // const registerRes = await axios.post('/candidate/register', body);
                 const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
                 if (otpVerifyRes.data.status) {
-                const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
+                    const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
 
-                if (registerRes.data.status === "success") {
-                    const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
-                    // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
-                    if (loginRes.data.status) {
-                        localStorage.setItem('name', loginRes.data.name);
-                        localStorage.setItem('token', loginRes.data.token);
-                        sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
-                        sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
+                    if (registerRes.data.status === "success") {
+                        const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
+                        // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
+                        if (loginRes.data.status) {
+                            localStorage.setItem('name', loginRes.data.name);
+                            localStorage.setItem('token', loginRes.data.token);
+                            sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
+                            sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
 
-                        if (returnUrl) {
+                            if (returnUrl) {
 
-                            window.location.href = returnUrl
-                        }
-                        else {
-                            window.location.href = '/candidate/dashboard';
+                                window.location.href = returnUrl
+                            }
+                            else {
+                                window.location.href = '/candidate/dashboard';
+                            }
+                        } else {
+                            setErrorMessage('Login failed after registration');
                         }
                     } else {
-                        setErrorMessage('Login failed after registration');
+                        setErrorMessage(registerRes.data.error);
                     }
-                } else {
-                    setErrorMessage(registerRes.data.error);
-                }}
+                }
             } catch (err) {
                 setErrorMessage('Something went wrong during registration');
             }
@@ -367,7 +370,8 @@ const CandidateLogin = () => {
 
                                 {/* Mobile Number Input */}
                                 <div className="row mb-3">
-                                    <div className={`${showSendBtn?'col-9':'col-12'} userMobile`}>
+                                    <div className={`${showSendBtn ? 'col-9' : 'col-12'} userMobile`}>
+
                                         <input
                                             type="tel"
                                             className="form-control"
@@ -378,23 +382,27 @@ const CandidateLogin = () => {
                                             onKeyPress={handleMobileNumberKeyPress}
                                             onKeyDown={(e) => {
                                                 if (e.key === "Enter") {
-                                                  handleGenerateOTP();
+                                                    handleGenerateOTP();
                                                 }
-                                              }}
+                                            }}
                                             ref={inputRef}
+                                            disabled={numberDisable} 
                                         />
+
+
+
                                     </div>
-                                    {showSendBtn &&(
-                                    <div className="col-3">
-                                        <button
-                                            className="btn btn-primary sendBtnn w-100"
-                                            onClick={handleGenerateOTP}
-                                            ref={generateOTPRef}
-                                        >
-                                            <img src="/Assets/images/login_arrow.png" alt="Focalyt logo" class="candid_arrow"/>
-                                            SEND
-                                        </button>
-                                    </div>
+                                    {showSendBtn && (
+                                        <div className="col-3">
+                                            <button
+                                                className="btn btn-primary sendBtnn w-100"
+                                                onClick={handleGenerateOTP}
+                                                ref={generateOTPRef}
+                                            >
+                                                <img src="/Assets/images/login_arrow.png" alt="Focalyt logo" class="candid_arrow" />
+                                                SEND
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
 
@@ -408,6 +416,11 @@ const CandidateLogin = () => {
                                             value={otp}
                                             onChange={(e) => setOtp(e.target.value)}
                                             ref={otpRef}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    handleVerifyLogin();
+                                                }
+                                            }}
                                         />
                                     </div>
                                 )}
@@ -471,14 +484,19 @@ const CandidateLogin = () => {
 
                                         </div>
                                         <div className="mb-3">
-                                        <input
-                                            type="number"
-                                            className="form-control"
-                                            placeholder="Enter OTP / अपना ओटीपी दर्ज करें"
-                                            value={otp}
-                                            onChange={(e) => setOtp(e.target.value)}
-                                            ref={otpRef}
-                                        />
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                placeholder="Enter OTP / अपना ओटीपी दर्ज करें"
+                                                value={otp}
+                                                onChange={(e) => setOtp(e.target.value)}
+                                                ref={otpRef}
+                                                onKeyDown={(e) =>{
+                                                    if(e.key === 'enter'){
+                                                        handleVerifyLogin()
+                                                    }
+                                                }}
+                                            />
                                         </div>
                                     </div>
                                 )}

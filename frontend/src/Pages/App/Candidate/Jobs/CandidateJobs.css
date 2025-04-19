@@ -75,8 +75,8 @@ form #debt-amount-slider label {
 }
 
 form:valid #debt-amount-slider input+label::before {
-  transform: translate(-50%, 45px) scale(0.9);
-  transition: all 0.15slinear;
+  transform: translate(-50%, 40px) scale(0.8);
+  transition: all 0.15s linear;
 }
 
 form #debt-amount-slider label::before {
@@ -84,13 +84,13 @@ form #debt-amount-slider label::before {
   position: absolute;
   left: 50%;
   padding-top: 10px;
-  transform: translate(-50%, 45px);
+  transform: translate(-50%, 40px);
   font-size: 14px;
   letter-spacing: 0.4px;
   font-weight: 400;
   white-space: nowrap;
   opacity: 0.85;
-  transition: all 0.15sease-in-out;
+  transition: all 0.15s ease-in-out;
 }
 
 form #debt-amount-slider label::after {
@@ -112,6 +112,15 @@ form #debt-amount-slider label::after {
   z-index: 1;
   cursor: pointer;
   transition: all 0.15sease-in-out;
+}
+form #debt-amount-slider input:checked:nth-child(3) ~ #debt-amount-pos {
+  left: 30%;
+}
+form #debt-amount-slider input:checked:nth-child(5) ~ #debt-amount-pos {
+  left: 50%;
+}
+form #debt-amount-slider input:checked:nth-child(7) ~ #debt-amount-pos {
+  left: 70%;
 }
 
 form #debt-amount-slider input:checked:nth-child(9)~#debt-amount-pos {
@@ -143,7 +152,7 @@ form #debt-amount-slider #debt-amount-pos {
 } */
 form:valid #debt-amount-slider input:checked+label::before {
   color: #FC2B5A;
-  transform: translate(-50%, 45px) scale(1.1);
+  transform: translate(-50%, 40px) scale(1.1);
   transition: all 0.15slinear;
 }
 
@@ -396,19 +405,19 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
 #debt-amount-slider label:before {
   content: '';
   position: absolute;
-  top: 5px;
+  top: 0px;
   left: 50%;
   transform: translateX(-50%);
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: #ddd;
+  /* background-color: #ddd; */
   transition: background-color 0.3s ease;
 }
 
-#debt-amount-slider input[type="radio"]:checked+label:before {
+/* #debt-amount-slider input[type="radio"]:checked+label:before {
   background-color: #7367f0;
-}
+} */
 
 #debt-amount-pos {
   position: absolute;

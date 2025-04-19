@@ -44,3 +44,5 @@ node_modules/
 node_modules/
 frontend/.env
 frontend/.env
+
+/frontend/src/Pages/App/Candidate/Courses/SearchCourseDetail.jsx.txt

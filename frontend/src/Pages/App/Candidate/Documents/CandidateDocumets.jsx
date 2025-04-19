@@ -131,7 +131,7 @@ const CandidateDocumets = ({ candidate, documents }) => {
                     <li class="breadcrumb-item">
                       <a href="/candidate/dashboard">Home</a>
                     </li>
-                    <li class="breadcrumb-item"><a href="#">Documents</a></li>
+                    <li class="breadcrumb-item"> <i data-feather="chevron-right"></i> <a href="#">Documents</a></li>
                   </ol>
                 </div>
               </div>

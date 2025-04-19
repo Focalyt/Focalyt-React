@@ -26,42 +26,47 @@ function CandidateHeader({toggleSidebar, isSideBarOpen}) {
         console.log("user (after sessionStorage):", parsed); // ✅ Right place to log
       }
     }, []);
-  
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
-  // useEffect(() => {
-  //   setUserName(localStorage.getItem('candidate') || '');
-  //   fetchUserCredit();
-  //   fetchNotifications();
-  //   fetchProfileStatus();
-  // }, []);
+  useEffect(() => {
+    setUserName(localStorage.getItem('candidate') || '');
+    fetchUserCredit();
+    fetchNotifications();
+    // fetchProfileStatus();
+  }, []);
 
-  // const fetchUserCredit = async () => {
-  //   try {
-  //     const res = await axios.get('/candidate/getCreditCount', {
-  //       headers: { 'x-auth': localStorage.getItem('token') },
-  //     });
-  //     setUserCredit(res.data.credit || 0);
-  //   } catch (error) {
-  //     console.error("Error fetching credit count:", error);
-  //   }
-  // };
+  const fetchUserCredit = async () => {
+    try {
+      // const res = await axios.get('/candidate/getCreditCount', {
+        const res = await axios.get(`${backendUrl}/candidate/getCreditCount`, {
+        headers: { 'x-auth': localStorage.getItem('token') },
+      });
+      setUserCredit(res.data.credit || 0);
+    } catch (error) {
+      console.error("Error fetching credit count:", error);
+    }
+  };
 
-  // const fetchNotifications = async () => {
-  //   try {
-  //     const res = await axios.get('/candidate/notificationCount', {
-  //       headers: { 'x-auth': localStorage.getItem('token') },
-  //     });
-  //     setNotificationCount(res.data?.count || 0);
-  //   } catch (error) {
-  //     console.error("Error fetching notifications:", error);
-  //   }
-  // };
+  const fetchNotifications = async () => {
+    try {
+      // const res = await axios.get('/candidate/notificationCount', {
+        const res = await axios.get(`${backendUrl}/candidate/notificationCount`, {
+
+        headers: { 'x-auth': localStorage.getItem('token') },
+      });
+      setNotificationCount(res.data?.count || 0);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
 
   // const fetchProfileStatus = async () => {
   //   try {
-  //     const res = await axios.get('/candidate/getcandidatestatus');
+  //     // const res = await axios.get('/candidate/getcandidatestatus');
+  //     const res = await axios.get(`${backendUrl}/candidate/getcandidatestatus`)
   //     setProfileVisibility(res.data.visibility);
-  //     if (!res.data.visibility && !localStorage.getItem("modalShown")) {
+  //     if (!res.data.visibility ) {
   //       setIsProfileModalOpen(true);
   //       localStorage.setItem('modalShown', 'true');
   //     }
@@ -195,8 +200,8 @@ function CandidateHeader({toggleSidebar, isSideBarOpen}) {
               <div className="modal-body">
                 <h3>Show my profile to the company?</h3>
                 <div className="modal-footer">
-                  <button className="btn btn-md text-white" onClick={() => handleProfileStatusUpdate(false)}>No</button>
-                  <button className="btn btn-md text-white" onClick={() => handleProfileStatusUpdate(true)}>Yes</button>
+                  <button className="btn btn-md text-black" onClick={() => handleProfileStatusUpdate(false)}>No</button>
+                  <button className="btn btn-md text-black" onClick={() => handleProfileStatusUpdate(true)}>Yes</button>
                 </div>
                 {successMsg && <p className="text-success">{successMsg}</p>}
                 {errorMsg && <p className="text-danger">{errorMsg}</p>}

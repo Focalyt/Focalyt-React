@@ -1683,6 +1683,7 @@ router.get("/dashboard", isCandidate, async (req, res) => {
         ],
       },
     ];
+    console.log("candidate verifying")
 
     let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
@@ -3046,7 +3047,8 @@ router.get("/getcandidatestatus", [isCandidate], async (req, res) => {
   }
 
   const candidate = await Candidate.findOne({ mobile: value.mobile });
-  res.send({ status: true, visibility: candidate.visibility })
+  // res.send({ status: true, visibility: candidate.visibility })
+  res.json({ status: true, visibility: candidate.visibility })
 })
 router.get("/nearbyJobs", [isCandidate], async (req, res) => {
   try {
