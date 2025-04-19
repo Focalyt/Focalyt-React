@@ -9,8 +9,7 @@ const { boolean } = require("joi");
 
 const candidateProfileSchema = new Schema(
   {
-    personalInfo: {
-      name: { type: String, trim: true },
+    name: { type: String, trim: true },
       mobile: {
         type: Number,
         lowercase: true,
@@ -23,10 +22,13 @@ const candidateProfileSchema = new Schema(
         lowercase: true,
         trim: true,
       },
-      profilevideo: { type: String },
       sex: { type: String },
       dob: { type: Date },
       whatsapp: { type: Number },
+    personalInfo: {
+    totalExperience: Number,
+
+      profilevideo: { type: String },  
       resume: { type: String },
       linkedInUrl: { type: String },
       facebookUrl: { type: String },
@@ -108,7 +110,7 @@ const candidateProfileSchema = new Schema(
         ),
       },
     ],
-    appliedJobs: [{ type: ObjectId, ref: "Vacancy" }],
+    appliedJobs: [{jobId:{ type: ObjectId, ref: "Vacancy" }}],
     appliedCourses: [
       {
         courseId: { type: ObjectId, ref: "courses" }, // Changed from type to courseId
@@ -143,11 +145,11 @@ const candidateProfileSchema = new Schema(
           type: {
             type: String,
             enum: ['Point'],
-            required: true
+            // required: true
           },
           coordinates: {
             type: [Number],
-            required: true
+            // required: true
           },
           city: String,
           state: String,
@@ -181,6 +183,7 @@ const candidateProfileSchema = new Schema(
     },
     otherUrls: [{}],
     highestQualification: { type: ObjectId, ref: "Qualification" },
+    
 
     isProfileCompleted: {
       type: Boolean,
@@ -215,7 +218,7 @@ const candidateProfileSchema = new Schema(
 
     upi: { type: String },
     referredBy: {
-      type: ObjectId, ref: "Candidate"
+      type: ObjectId, ref: "CandidateProfile"
     },
     verified: {
       type: Boolean,

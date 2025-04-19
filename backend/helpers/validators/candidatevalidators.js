@@ -10,7 +10,8 @@ module.exports = {
             city: Joi.string().required(),
             latitude: Joi.number().required(),
             longitude: Joi.number().required() ,
-            refCode:Joi.string().optional()
+            refCode:Joi.string().optional(),
+            fullAddress:Joi.string().optional()
         }).validate(data)
     },
     userMobile:(data) => {
