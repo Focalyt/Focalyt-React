@@ -300,8 +300,12 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
     let selectedCenter = req.body.selectedCenter;
     console.log('selectedCenter',selectedCenter)
+    if(!selectedCenter){
+      selectedCenter= ""
 
-    if (typeof selectedCenter === 'string') {
+    }
+
+    else if (typeof selectedCenter === 'string') {
       try {
         selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
       } catch (error) {
@@ -344,9 +348,11 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
     const apply = await Candidate.findOneAndUpdate(
       { mobile: candidateMobile },
       { $addToSet: { appliedCourses: courseId,
-        selectedCenter: {
-          courseId: courseId,
-          centerId: selectedCenter
+        if (selectedCenter) {
+          updateData.$addToSet.selectedCenter = {
+            courseId: courseId,
+            centerId: selectedCenter
+          };
         }
       } },
       { new: true, upsert: true }
