@@ -6,7 +6,7 @@ import html2pdf from 'html2pdf.js';
 const CandidateProfile = () => {
   // State for resume data
   const [user, setUser] = useState({});
-  const [voiceIntroduction , setVoiceIntroduction] = useState(false);
+  const [voiceIntroduction, setVoiceIntroduction] = useState(false);
   const [experiences, setExperiences] = useState([{
     jobTitle: '',
     companyName: '',
@@ -14,6 +14,7 @@ const CandidateProfile = () => {
     to: '',
     jobDescription: ''
   }]);
+
   const [educations, setEducations] = useState([{
     degree: '',
     university: '',
@@ -25,9 +26,9 @@ const CandidateProfile = () => {
     marks: '',
     additionalInfo: ''
   }]);
-  const [skills, setSkills] = useState([{ 
-    skillName: '', 
-    skillPercent: 0 
+  const [skills, setSkills] = useState([{
+    skillName: '',
+    skillPercent: 0
   }]);
   const [certificates, setCertificates] = useState([{
     certificateName: '',
@@ -39,24 +40,19 @@ const CandidateProfile = () => {
     proDescription: ''
   }]);
   const [interests, setInterests] = useState(['']);
-  const [languages, setLanguages] = useState([{ 
-    lname: '', 
-    level: 0 
+  const [languages, setLanguages] = useState([{
+    lname: '',
+    level: 0
   }]);
-  const [declaration, setDeclaration] = useState('');
+ const [declaration, setDeclaration] = useState({
+    isChecked: false,
+    text: 'I hereby declare that all the information provided above is true to the best of my knowledge.'
+  });
 
   // State for UI control
-  const [profileData, setProfileData] = useState({
-    personalInfo: {},
-    experience: [],
-    education: [],
-    skills: [],
-    language: [],
-    certification: [],
-    projects: [],
-    interests: []
-  });
-  
+  const [profileData, setProfileData] = useState({});
+  const [educationList, setEducationList] = useState([]);
+
   const [showPreview, setShowPreview] = useState(false);
   const [activeSection, setActiveSection] = useState('personal');
   const [showRecordingModal, setShowRecordingModal] = useState(false);
@@ -78,8 +74,9 @@ const CandidateProfile = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
   // For creating editable content
-  const createEditable = (content, placeholder, onChange) => (
+  const createEditable = (content, placeholder, onChange, id = '') => (
     <div
+      id={id}
       contentEditable
       data-placeholder={placeholder}
       suppressContentEditableWarning={true}
@@ -96,6 +93,173 @@ const CandidateProfile = () => {
   useEffect(() => {
     calculateProfileStrength();
   }, [user, experiences, educations, skills, languages, projects, interests]);
+
+  // Initialize Company Name Autocomplete
+  const initializeCompanyAutocomplete = (index) => {
+    setTimeout(() => {
+      const companyInput = document.getElementById(`company-name-${index}`);
+      if (!companyInput || !window.google || !window.google.maps || !window.google.maps.places) {
+        return; // Not ready yet
+      }
+
+      try {
+        // Create the autocomplete instance
+        const autocomplete = new window.google.maps.places.Autocomplete(companyInput, {
+          types: ['establishment'], // This ensures we only get businesses/establishments
+          componentRestrictions: { country: 'in' }
+        });
+
+        // Add styling to ensure visibility
+        companyInput.style.backgroundColor = "#ffffff";
+        companyInput.style.color = "#000000";
+
+        // When a place is selected
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+
+          if (!place) {
+            return;
+          }
+
+          // Get just the company name
+          const companyName = place.name || '';
+
+          // Update the experiences state
+          const updatedExperiences = [...experiences];
+          updatedExperiences[index].companyName = companyName;
+          setExperiences(updatedExperiences);
+        });
+
+        console.log(`Company autocomplete initialized for index ${index}`);
+      } catch (error) {
+        console.error("Error initializing company autocomplete:", error);
+      }
+    }, 100);
+  };
+
+  // Add this useEffect to set up the company autocomplete whenever experiences change
+  // Load Google Maps API only once
+  useEffect(() => {
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      // If not loaded, load the script
+      if (!document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
+        const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+        if (!apiKey) {
+          console.error("Missing Google Maps API key!");
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          // Set a flag to indicate Google Maps is loaded
+          window.googleMapsLoaded = true;
+          // Trigger a state update to force re-render and initialize autocompletes
+          setProfileData(prev => ({ ...prev }));
+        };
+        document.head.appendChild(script);
+      }
+    } else {
+      window.googleMapsLoaded = true;
+    }
+  }, []); // Empty dependency array - run once on mount
+
+  // Initialize company name autocomplete when experiences change
+  useEffect(() => {
+    if (window.googleMapsLoaded) {
+      experiences.forEach((_, index) => {
+        initializeCompanyAutocomplete(index);
+      });
+    }
+  }, [experiences.length]);
+
+  // Initialize address autocomplete separately
+  useEffect(() => {
+    if (window.googleMapsLoaded) {
+      initializeAddressAutocomplete();
+    }
+  }, [window.googleMapsLoaded]); // This will run whenever Google Maps becomes available 
+
+  // Only re-run when the number of experiences changes
+
+  // Address location autocomplete
+  const initializeAddressAutocomplete = () => {
+    console.log("Initializing address autocomplete...");
+    const input = document.getElementById('address-location');
+
+    if (!input) {
+      console.warn('Input element with ID "address-location" not found. Retrying...');
+      setTimeout(initializeAddressAutocomplete, 100);
+      return;
+    }
+
+    try {
+      console.log("Setting up autocomplete for input:", input);
+
+      // Create the autocomplete instance
+      const autocomplete = new window.google.maps.places.Autocomplete(input, {
+        types: ['geocode'],
+        componentRestrictions: { country: 'in' }
+      });
+
+      // Add styling to make sure the autocomplete dropdown is visible
+      input.style.backgroundColor = "#ffffff";
+      input.style.color = "#000000";
+      input.style.zIndex = "1000";
+
+      // Add change event listener
+      autocomplete.addListener('place_changed', () => {
+        console.log("Place changed event fired");
+        const place = autocomplete.getPlace();
+
+        if (!place || !place.geometry || !place.geometry.location) {
+          console.warn('Invalid place data selected.');
+          return;
+        }
+
+        console.log("Selected place:", place);
+
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const fullAddress = place.formatted_address || place.name || input.value;
+
+        let city = '', state = '', pincode = '';
+
+        if (Array.isArray(place.address_components)) {
+          place.address_components.forEach((component) => {
+            const types = component.types.join(',');
+            if (types.includes("postal_code")) pincode = component.long_name;
+            if (types.includes("locality")) city = component.long_name;
+            if (types.includes("administrative_area_level_1")) state = component.long_name;
+            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+          });
+        }
+
+        console.log("Extracted data:", { fullAddress, city, state, pincode, lat, lng });
+
+        setProfileData(prev => ({
+          ...prev,
+          personalInfo: {
+            ...(prev.personalInfo || {}),
+            location: {
+              fullAddress,
+              state,
+              city,
+              pincode,
+              latitude: lat,
+              longitude: lng
+            }
+          }
+        }));
+      });
+
+      console.log("Google Maps Places Autocomplete initialized successfully");
+    } catch (error) {
+      console.error("Error initializing autocomplete:", error);
+    }
+  };
 
   const calculateProfileStrength = () => {
     let strength = 0;
@@ -204,7 +368,7 @@ const CandidateProfile = () => {
     try {
       const token = localStorage.getItem('token');
       const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
-  
+
       // Format the data to match what your API expects
       const cvPayload = {
         personalInfo: {
@@ -261,15 +425,15 @@ const CandidateProfile = () => {
         interest: interests.filter(i => i !== ''),
         declaration: declaration
       };
-  
+
       console.log("📤 CV Payload being sent to backend:", cvPayload);
-  
+
       const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
         headers: {
           'x-auth': token
         }
       });
-  
+
       if (res.data.status) {
         alert('CV Saved Successfully!');
       } else {
@@ -281,7 +445,7 @@ const CandidateProfile = () => {
     }
   };
 
-  // Fetch profile data
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -290,67 +454,92 @@ const CandidateProfile = () => {
           console.log("No authentication token found");
           return;
         }
-        
+
         const response = await axios.get(`${backendUrl}/candidate/getProfile`, {
           headers: {
             'x-auth': token
           }
         });
-        
+
         if (response.data.status) {
           console.log("Profile data fetched:", response.data.data);
           const data = response.data.data;
+
+          // Set education options
+          setEducationList(data.educations || []);
           
-          setProfileData(data);
-          
-          // Update individual state items based on the fetched data
-          if (data.personalInfo) {
-            setUser(prev => ({
-              ...prev,
-              name: data.personalInfo.name || '',
-              image: data.personalInfo.image || ''
-            }));
-          }
-          
-          if (data.workexperience && data.workexperience.length > 0) {
-            setExperiences(data.workexperience);
-          }
-          
-          if (data.education && data.education.length > 0) {
-            setEducations(data.education);
-          }
-          
-          if (data.skill && data.skill.length > 0) {
-            setSkills(data.skill);
-          }
-          
-          if (data.certification && data.certification.length > 0) {
-            setCertificates(data.certification);
-          }
-          
-          if (data.language && data.language.length > 0) {
-            setLanguages(data.language);
-          }
-          
-          if (data.projects && data.projects.length > 0) {
-            setProjects(data.projects);
-          }
-          
-          if (data.interest && data.interest.length > 0) {
-            setInterests(data.interest);
-          }
-          
-          if (data.declaration) {
-            setDeclaration(data.declaration);
+          // Set candidate data
+          const candidate = data.candidate;
+          if (candidate) {
+            setProfileData(candidate);
+            
+            // Map backend data to frontend state
+            setUser({
+              name: candidate.name,
+              image: candidate.personalInfo?.image,
+              resume: candidate.personalInfo?.resume
+            });
+            
+            // Set experiences
+            if (Array.isArray(candidate.experiences) && candidate.experiences.length > 0) {
+              setExperiences(candidate.experiences);
+            }
+            
+            // Set qualifications/education
+            if (Array.isArray(candidate.qualifications) && candidate.qualifications.length > 0) {
+              setEducations(candidate.qualifications);
+            }
+            
+            // Set skills
+            if (Array.isArray(candidate.personalInfo?.skills) && candidate.personalInfo.skills.length > 0) {
+              setSkills(candidate.personalInfo.skills);
+            }
+            
+            // Set certificates
+            if (Array.isArray(candidate.personalInfo?.certifications) && candidate.personalInfo.certifications.length > 0) {
+              setCertificates(candidate.personalInfo.certifications);
+            }
+            
+            // Set languages
+            if (Array.isArray(candidate.personalInfo?.languages) && candidate.personalInfo.languages.length > 0) {
+              setLanguages(candidate.personalInfo.languages);
+            }
+            
+            // Set projects
+            if (Array.isArray(candidate.personalInfo?.projects) && candidate.personalInfo.projects.length > 0) {
+              setProjects(candidate.personalInfo.projects);
+            }
+            
+            // Set interests
+            if (Array.isArray(candidate.personalInfo?.interest) && candidate.personalInfo.interest.length > 0) {
+              setInterests(candidate.personalInfo.interest);
+            }
+            
+            // Set declaration
+            if (candidate.personalInfo?.declaration) {
+              setDeclaration(candidate.personalInfo.declaration);
+            }
+            
+            // Set voice recordings
+            if (Array.isArray(candidate.personalInfo?.voiceIntro) && candidate.personalInfo.voiceIntro.length > 0) {
+              setRecordings(candidate.personalInfo.voiceIntro.map(voice => ({
+                id: voice._id || Date.now(),
+                url: voice.url,
+                name: voice.name,
+                timestamp: voice.timestamp,
+                status: voice.status
+              })));
+              setVoiceIntroduction(true);
+            }
           }
         }
       } catch (error) {
         console.error("Error fetching profile:", error);
       }
     };
-  
+
     fetchProfile();
-  }, [backendUrl]); // Only re-run if backendUrl changes
+  }, [backendUrl]);
 
   // Clean up resources when component unmounts
   useEffect(() => {
@@ -359,18 +548,20 @@ const CandidateProfile = () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
-      
+
       // Stop any active audio stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-      
+
       // Clear any active timers
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
     };
   }, []);
+
+
 
   return (
     <div className="resume-builder-container">
@@ -408,72 +599,6 @@ const CandidateProfile = () => {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      {/* <div className="resume-tabs">
-        <ul className="nav nav-tabs nav-fill">
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'personal' ? 'active' : ''}`}
-              href="#"
-              onClick={(e) => { e.preventDefault(); setActiveSection('personal'); }}
-            >
-              <i className="bi bi-person-circle me-2"></i>
-              Personal
-            </a>
-          </li>
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'experience' ? 'active' : ''}`}
-              href="#"
-              onClick={(e) => { e.preventDefault(); setActiveSection('experience'); }}
-            >
-              <i className="bi bi-briefcase me-2"></i>
-              Experience
-            </a>
-          </li>
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'education' ? 'active' : ''}`}
-              href="#"
-              onClick={(e) => { e.preventDefault(); setActiveSection('education'); }}
-            >
-              <i className="bi bi-book me-2"></i>
-              Education
-            </a>
-          </li>
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'skills' ? 'active' : ''}`}
-              href="#"
-              onClick={(e) => { e.preventDefault(); setActiveSection('skills'); }}
-            >
-              <i className="bi bi-star me-2"></i>
-              Skills
-            </a>
-          </li>
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'extras' ? 'active' : ''}`}
-              href="#"
-              onClick={(e) => { e.preventDefault(); setActiveSection('extras'); }}
-            >
-              <i className="bi bi-plus-circle me-2"></i>
-              Additional
-            </a>
-          </li>
-          <li className="nav-item">
-            <a
-              className={`nav-link ${activeSection === 'recording' ? 'active' : ''}`}
-              href="#"
-              onClick={(e) => { e.preventDefault(); setActiveSection('recording'); }}
-            >
-              <i className="bi bi-mic me-2"></i>
-              Voice Intro
-            </a>
-          </li>
-        </ul>
-      </div> */}
-
       {/* Content Area */}
       <div className="resume-content">
         {/* Personal Info Section */}
@@ -492,10 +617,10 @@ const CandidateProfile = () => {
                   <div className="image-upload-overlay">
                     <label>
                       <i className="bi bi-camera"></i>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        style={{ display: 'none' }} 
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
                         onChange={(e) => {
                           // Handle image upload
                           if (e.target.files && e.target.files[0]) {
@@ -520,19 +645,17 @@ const CandidateProfile = () => {
 
               <div className="profile-info">
                 <div className="profile-name">
-                  {createEditable(profileData?.personalInfo?.name || user?.name || '', 'Your Name', (val) => {
+                  {createEditable(profileData?.name || user?.name || '', 'Your Name', (val) => {
                     setUser(prev => ({
                       ...prev,
                       name: val
                     }));
                     setProfileData(prev => ({
                       ...prev,
-                      personalInfo: {
-                        ...(prev.personalInfo || {}),
-                        name: val
-                      }
+                      name: val
                     }));
                   })}
+
                 </div>
                 <div className="profile-title">
                   {createEditable(profileData?.personalInfo?.title || '', 'Professional Title', (val) => {
@@ -560,40 +683,81 @@ const CandidateProfile = () => {
                 <div className="contact-info">
                   <div className="contact-item">
                     <i className="bi bi-telephone"></i>
-                    {createEditable(profileData?.personalInfo?.phone || '', 'Phone Number', (val) => {
+                    {createEditable(profileData?.mobile || '', 'Phone Number', (val) => {
                       setProfileData(prev => ({
                         ...prev,
-                        personalInfo: {
-                          ...(prev.personalInfo || {}),
-                          phone: val
-                        }
+                        mobile: val
                       }));
-                    })} 
+                    })}
                   </div>
                   <div className="contact-item">
                     <i className="bi bi-envelope"></i>
-                    {createEditable(profileData?.personalInfo?.email || '', 'Email Address', (val) => {
+                    {createEditable(profileData?.email || '', 'Email Address', (val) => {
                       setProfileData(prev => ({
                         ...prev,
-                        personalInfo: {
-                          ...(prev.personalInfo || {}),
-                          email: val
-                        }
+                        email: val
                       }));
                     })}
                   </div>
+
+                  {/* New Row for Gender and DOB */}
                   <div className="contact-item">
-                    <i className="bi bi-geo-alt"></i>
-                    {createEditable(profileData?.personalInfo?.location || '', 'Location', (val) => {
+                    <i className={`bi ${profileData?.gender === 'Female' ? 'bi-gender-female' :
+                      profileData?.gender === 'Other' ? 'bi-gender-trans' :
+                        profileData?.gender === 'Male' ? 'bi-gender-male' :
+                          'bi-person'
+                      }`}></i>
+
+                    <select
+                      className="form-select form-select-sm d-inline-block w-auto ms-2"
+                      value={profileData?.sex || ''}
+                      onChange={(e) =>
+                        setProfileData((prev) => ({ ...prev, sex: e.target.value }))
+                      }
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="contact-item">
+                    <i className="bi bi-calendar-event"></i>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={profileData?.dob ? profileData?.dob.slice(0, 10) : ''}  // to remove time part
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setUser(prev => ({ ...prev, dob: val }));
+                        setProfileData(prev => ({ ...prev, dob: val }));
+                      }}
+                    />
+                  </div>
+
+                </div>
+                <div className="contact-item">
+                  <i className="bi bi-geo-alt"></i>
+                  <input
+                    type="text"
+                    id="address-location"
+                    className="form-control"
+                    placeholder="Location"
+                    value={profileData?.personalInfo?.location?.fullAddress || ''}
+                    onChange={(e) => {
                       setProfileData(prev => ({
                         ...prev,
                         personalInfo: {
                           ...(prev.personalInfo || {}),
-                          location: val
+                          location: {
+                            ...(prev.personalInfo?.location || {}),
+                            fullAddress: e.target.value
+                          }
                         }
                       }));
-                    })}
-                  </div>
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -633,13 +797,20 @@ const CandidateProfile = () => {
                     setExperiences(updatedExperiences);
                   })}
                 </div>
-                
+
                 <div className="company-name">
-                  {createEditable(experience.companyName || '', 'Company Name', (val) => {
-                    const updatedExperiences = [...experiences];
-                    updatedExperiences[index].companyName = val;
-                    setExperiences(updatedExperiences);
-                  })}
+                  <input
+                    id={`company-name-${index}`}
+                    type="text"
+                    className="form-control"
+                    placeholder="Company Name"
+                    value={experience.companyName || ''}
+                    onChange={(e) => {
+                      const updatedExperiences = [...experiences];
+                      updatedExperiences[index].companyName = e.target.value;
+                      setExperiences(updatedExperiences);
+                    }}
+                  />
                 </div>
 
                 <div className="date-range">
@@ -729,16 +900,14 @@ const CandidateProfile = () => {
                     value={edu.degree || ''}
                     onChange={(e) => {
                       const updated = [...educations];
-                      updated[index].degree = e.target.value; 
+                      updated[index].degree = e.target.value;
                       setEducations(updated);
                     }}
                   >
                     <option value="">Select</option>
-                    <option value="10th">10th</option>
-                    <option value="12th">12th</option>
-                    <option value="ITI">ITI</option>
-                    <option value="Diploma">Diploma</option>
-                    <option value="After 12th Course">After 12th Course</option>
+                    {educationList.map((e, index) => (
+                    <option value={e._id}>{e.name}</option>))}
+                    
                   </select>
                 </div>
 
@@ -773,19 +942,7 @@ const CandidateProfile = () => {
                       />
                     </div>
 
-                    <div className="form-group mb-2">
-                      <label>School Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={edu.school || ''}
-                        onChange={(e) => {
-                          const updated = [...educations];
-                          updated[index].school = e.target.value;
-                          setEducations(updated);
-                        }}
-                      />
-                    </div>
+
 
                     <div className="form-group mb-2">
                       <label>Medium</label>
@@ -817,6 +974,19 @@ const CandidateProfile = () => {
                   </>
                 ) : (
                   <>
+                    <div className="form-group mb-2">
+                      <label>Univercity/College/Technical Board</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={edu.university || ''}
+                        onChange={(e) => {
+                          const updated = [...educations];
+                          updated[index].university = e.target.value;
+                          setEducations(updated);
+                        }}
+                      />
+                    </div>
                     <div className="form-group mb-2">
                       <label>Course</label>
                       <select
@@ -941,7 +1111,7 @@ const CandidateProfile = () => {
 
             <button
               className="add-button"
-              onClick={() => setSkills([...skills, { skillName: '', skillPercent: 50 }])} 
+              onClick={() => setSkills([...skills, { skillName: '', skillPercent: 50 }])}
             >
               <i className="bi bi-plus"></i> Add Skill
             </button>
@@ -1002,7 +1172,7 @@ const CandidateProfile = () => {
 
                     <button
                       className="add-button"
-                      onClick={() => setLanguages([...languages, { lname: '', level: 0 }])} style={{width: '55%' , height:'34px' , marginTop: '20px'}}
+                      onClick={() => setLanguages([...languages, { lname: '', level: 0 }])} style={{ width: '55%', height: '34px', marginTop: '20px' }}
                     >
                       <i className="bi bi-plus"></i> Add Language
                     </button>
@@ -1175,7 +1345,7 @@ const CandidateProfile = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Declaration */}
             <div className="extra-category">
               <div className="category-title">
@@ -1184,14 +1354,17 @@ const CandidateProfile = () => {
               </div>
 
               <div className="declaration-container">
-                <div
+              <div
                   className="declaration-content"
                   contentEditable
                   suppressContentEditableWarning={true}
                   data-placeholder="I hereby declare that all the information provided above is true to the best of my knowledge."
-                  onBlur={(e) => setDeclaration(e.target.innerText)}
+                  onBlur={(e) => setDeclaration({
+                    ...declaration,
+                    text: e.target.innerText
+                  })}
                 >
-                  {declaration}
+                  {declaration.text}
                 </div>
               </div>
             </div>
@@ -1200,14 +1373,98 @@ const CandidateProfile = () => {
 
         {/* Voice Recording Section */}
         {voiceIntroduction && (
-        <div className={`resume-section ${activeSection === 'recording' ? 'active' : ''}`}>
-          <div className="resume-paper">
-            <div className="section-title">
-              <i className="bi bi-mic me-2"></i>
-              Voice Introduction
+          <div className={`resume-section ${activeSection === 'recording' ? 'active' : ''}`}>
+            <div className="resume-paper">
+              <div className="section-title">
+                <i className="bi bi-mic me-2"></i>
+                Voice Introduction
+              </div>
+
+              <div className="recording-container">
+                <div className="recording-controls">
+                  <div className="recording-timer">{timer}</div>
+                  <div className="recording-status">{recordingStatus}</div>
+
+                  <div className="control-buttons">
+                    <button
+                      className={`record-button ${isRecording ? 'recording' : ''}`}
+                      onClick={isRecording ? stopRecording : startRecording}
+                    >
+                      <i className={`bi ${isRecording ? 'bi-stop-fill' : 'bi-mic-fill'}`}></i>
+                      {isRecording ? 'Stop Recording' : 'Start Recording'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="recordings-list">
+                  <h5>Your Recordings</h5>
+
+                  {recordings.length === 0 ? (
+                    <div className="no-recordings">No recordings yet</div>
+                  ) : (
+                    recordings.map(recording => (
+                      <div className="recording-item" key={recording.id}>
+                        <div className="recording-info">
+                          <div className="recording-name">{recording.name}</div>
+                          <div className="recording-timestamp">{recording.timestamp}</div>
+                        </div>
+
+                        <div className="recording-actions">
+                          <audio controls src={recording.url} className="audio-player"></audio>
+
+                          <button
+                            className="delete-recording"
+                            onClick={() => deleteRecording(recording.id)}
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="resume-actions">
+        <div className="audio-btn upload-resume" onClick={() => setShowRecordingModal(true)}>
+          <i className="bi bi-mic-fill"></i>
+          <span>Add Voice Introduction</span>
+        </div>
+        <label className="upload-resume">
+          <i className="bi bi-upload me-2"></i> Upload Resume
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            style={{ display: 'none' }}
+          />
+        </label>
+
+        <button className="save-resume" onClick={handleSaveCV}>
+          <i className="bi bi-save me-2"></i> Save Resume
+        </button>
+
+        <button className="preview-resume" onClick={() => setShowPreview(true)}>
+          <i className="bi bi-eye me-2"></i> Preview Resume
+        </button>
+      </div>
+
+      {/* Recording Modal */}
+      {showRecordingModal && (
+        <div className="recording-modal-overlay">
+          <div className="recording-modal">
+            <div className="modal-header">
+              <h5>Record Voice Introduction</h5>
+              <button className="close-modal" onClick={() => setShowRecordingModal(false)}>
+                <i className="bi bi-x-lg"></i>
+              </button>
             </div>
 
-            <div className="recording-container">
+            <div className="modal-body">
               <div className="recording-controls">
                 <div className="recording-timer">{timer}</div>
                 <div className="recording-status">{recordingStatus}</div>
@@ -1251,91 +1508,7 @@ const CandidateProfile = () => {
                 )}
               </div>
             </div>
-          </div>
-        </div>
-        )}
-      </div>
 
-      {/* Action Buttons */}
-      <div className="resume-actions">
-        <div className="audio-btn upload-resume" onClick={() => setShowRecordingModal(true)}>
-          <i className="bi bi-mic-fill"></i>
-          <span>Add Voice Introduction</span>
-        </div>
-        <label className="upload-resume">
-          <i className="bi bi-upload me-2"></i> Upload Resume
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx"
-            style={{ display: 'none' }}
-          />
-        </label>
-
-        <button className="save-resume" onClick={handleSaveCV}>
-          <i className="bi bi-save me-2"></i> Save Resume
-        </button>
-
-        <button className="preview-resume" onClick={() => setShowPreview(true)}>
-          <i className="bi bi-eye me-2"></i> Preview Resume
-        </button>
-      </div>
-
-      {/* Recording Modal */}
-      {showRecordingModal && (
-        <div className="recording-modal-overlay">
-          <div className="recording-modal">
-            <div className="modal-header">
-              <h5>Record Voice Introduction</h5>
-              <button className="close-modal" onClick={() => setShowRecordingModal(false)}>
-                <i className="bi bi-x-lg"></i>
-              </button>
-            </div>
-            
-            <div className="modal-body">
-              <div className="recording-controls">
-                <div className="recording-timer">{timer}</div>
-                <div className="recording-status">{recordingStatus}</div>
-                
-                <div className="control-buttons">
-                  <button 
-                    className={`record-button ${isRecording ? 'recording' : ''}`}
-                    onClick={isRecording ? stopRecording : startRecording}
-                  >
-                    <i className={`bi ${isRecording ? 'bi-stop-fill' : 'bi-mic-fill'}`}></i>
-                    {isRecording ? 'Stop Recording' : 'Start Recording'}
-                  </button>
-                </div>
-              </div>
-              
-              <div className="recordings-list">
-                <h5>Your Recordings</h5>
-                
-                {recordings.length === 0 ? (
-                  <div className="no-recordings">No recordings yet</div>
-                ) : (
-                  recordings.map(recording => (
-                    <div className="recording-item" key={recording.id}>
-                      <div className="recording-info">
-                        <div className="recording-name">{recording.name}</div>
-                        <div className="recording-timestamp">{recording.timestamp}</div>
-                      </div>
-                      
-                      <div className="recording-actions">
-                        <audio controls src={recording.url} className="audio-player"></audio>
-                        
-                        <button 
-                          className="delete-recording"
-                          onClick={() => deleteRecording(recording.id)}
-                        >
-                          <i className="bi bi-trash"></i>
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            
             <div className="modal-footer">
               <button className="btn-done" onClick={() => setShowRecordingModal(false)}>
                 Done
@@ -1362,9 +1535,9 @@ const CandidateProfile = () => {
                 <div className="resume-document-header">
                   <div className="resume-profile-section">
                     {user?.image ? (
-                      <img 
-                        src={`${process.env.REACT_APP_BUCKET_URL}/${user.image}`} 
-                        alt="Profile" 
+                      <img
+                        src={`${process.env.REACT_APP_BUCKET_URL}/${user.image}`}
+                        alt="Profile"
                         className="resume-profile-image"
                       />
                     ) : (
@@ -1372,7 +1545,7 @@ const CandidateProfile = () => {
                         <i className="bi bi-person-circle"></i>
                       </div>
                     )}
-                    
+
                     <div className="resume-header-content">
                       <h1 className="resume-name">
                         {profileData?.personalInfo?.name || user?.name || 'Your Name'}
@@ -1380,7 +1553,7 @@ const CandidateProfile = () => {
                       <p className="resume-title">
                         {profileData?.personalInfo?.title || 'Professional Title'}
                       </p>
-                      
+
                       <div className="resume-contact-details">
                         {profileData?.personalInfo?.phone && (
                           <div className="resume-contact-item">
@@ -1403,13 +1576,13 @@ const CandidateProfile = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="resume-summary">
                     <h2 className="resume-section-title">Professional Summary</h2>
                     <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
                   </div>
                 </div>
-                
+
                 {/* Two Column Layout */}
                 <div className="resume-document-body">
                   {/* Left Column */}
@@ -1418,7 +1591,7 @@ const CandidateProfile = () => {
                     {experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
                       <div className="resume-section">
                         <h2 className="resume-section-title">Work Experience</h2>
-                        
+
                         {experiences.map((exp, index) => (
                           (exp.jobTitle || exp.companyName || exp.jobDescription) && (
                             <div className="resume-experience-item" key={`resume-exp-${index}`}>
@@ -1445,12 +1618,12 @@ const CandidateProfile = () => {
                         ))}
                       </div>
                     )}
-                    
+
                     {/* Education Section */}
                     {educations.length > 0 && educations.some(edu => edu.degree || edu.university || edu.school) && (
                       <div className="resume-section">
                         <h2 className="resume-section-title">Education</h2>
-                        
+
                         {educations.map((edu, index) => (
                           (edu.degree || edu.university || edu.school) && (
                             <div className="resume-education-item" key={`resume-edu-${index}`}>
@@ -1481,14 +1654,14 @@ const CandidateProfile = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Right Column */}
                   <div className="resume-column resume-right-column">
                     {/* Skills Section */}
                     {skills.length > 0 && skills.some(skill => skill.skillName) && (
                       <div className="resume-section">
                         <h2 className="resume-section-title">Skills</h2>
-                        
+
                         <div className="resume-skills-list">
                           {skills.map((skill, index) => (
                             skill.skillName && (
@@ -1497,9 +1670,9 @@ const CandidateProfile = () => {
                                   {skill.skillName}
                                 </div>
                                 <div className="resume-skill-bar-container">
-                                  <div 
-                                    className="resume-skill-bar" 
-                                    style={{width: `${skill.skillPercent || 0}%`}}
+                                  <div
+                                    className="resume-skill-bar"
+                                    style={{ width: `${skill.skillPercent || 0}%` }}
                                   ></div>
                                 </div>
                               </div>
@@ -1508,12 +1681,12 @@ const CandidateProfile = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Languages Section */}
                     {languages.length > 0 && languages.some(lang => lang.lname) && (
                       <div className="resume-section">
                         <h2 className="resume-section-title">Languages</h2>
-                        
+
                         <div className="resume-languages-list">
                           {languages.map((lang, index) => (
                             lang.lname && (
@@ -1533,12 +1706,12 @@ const CandidateProfile = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Certifications Section */}
                     {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
                       <div className="resume-section">
                         <h2 className="resume-section-title">Certifications</h2>
-                        
+
                         <ul className="resume-certifications-list">
                           {certificates.map((cert, index) => (
                             (cert.certificateName || cert.orgName) && (
@@ -1551,7 +1724,7 @@ const CandidateProfile = () => {
                         </ul>
                       </div>
                     )}
-                    
+
                     {/* Projects Section */}
                     {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
                       <div className="resume-section">
@@ -1575,12 +1748,12 @@ const CandidateProfile = () => {
                         ))}
                       </div>
                     )}
-                    
+
                     {/* Interests Section */}
                     {interests.filter(i => i.trim() !== '').length > 0 && (
                       <div className="resume-section">
                         <h2 className="resume-section-title">Interests</h2>
-                        
+
                         <div className="resume-interests-tags">
                           {interests.filter(i => i.trim() !== '').map((interest, index) => (
                             <span className="resume-interest-tag" key={`resume-interest-${index}`}>
@@ -1592,7 +1765,7 @@ const CandidateProfile = () => {
                     )}
                   </div>
                 </div>
-                
+
                 {/* Declaration */}
                 {declaration && (
                   <div className="resume-declaration">
@@ -1602,9 +1775,9 @@ const CandidateProfile = () => {
                 )}
               </div>
             </div>
-            
+
             <div className="resume-preview-actions">
-              <button 
+              <button
                 className="download-resume-btn"
                 onClick={() => {
                   const element = document.getElementById('resume-download');
@@ -1615,13 +1788,13 @@ const CandidateProfile = () => {
                     html2canvas: { scale: 2 },
                     jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
                   };
-                
+
                   html2pdf().set(opt).from(element).save();
                 }}
               >
                 <i className="bi bi-download"></i> Download PDF
               </button>
-              <button 
+              <button
                 className="close-preview-btn"
                 onClick={() => setShowPreview(false)}
               >
@@ -1633,17 +1806,69 @@ const CandidateProfile = () => {
       )}
       <style>
         {`
-        
-        .add-certificate{
-        width:40%;
-        }
-       @media(max-width:768px){
-    .add-certificate{
-    max-width:59%;
-    width:100%;
-    }
-    }
-        `}
+/* Styling for company name input field */
+.company-name .form-control {
+border: none;
+border-bottom: 1px solid #e0e0e0;
+border-radius: 0;
+box-shadow: none;
+padding: 0.5rem 0;
+background-color: transparent;
+transition: border-color 0.3s;
+font-size: 1.1rem;
+width: 100%;
+}
+
+.company-name .form-control:focus {
+border-color: #6f42c1;
+box-shadow: none;
+outline: none;
+}
+
+.company-name .form-control::placeholder {
+opacity: 0.6;
+font-style: italic;
+}
+
+/* Google Maps autocomplete dropdown styling */
+.pac-container {
+z-index: 10000 !important;
+box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+background-color: white;
+border-radius: 4px;
+margin-top: 2px;
+font-family: inherit;
+}
+
+.pac-item {
+padding: 8px 12px;
+cursor: pointer;
+}
+
+.pac-item:hover {
+background-color: #f5f5f5;
+}
+
+.pac-icon {
+margin-right: 10px;
+}
+
+.pac-item-query {
+font-size: 14px;
+font-weight: bold;
+}
+
+.add-certificate {
+width: 40%;
+}
+
+@media(max-width: 768px) {
+.add-certificate {
+max-width: 59%;
+width: 100%;
+}
+}
+`}
       </style>
     </div>
   );

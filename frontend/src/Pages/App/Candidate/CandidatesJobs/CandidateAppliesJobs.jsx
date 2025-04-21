@@ -16,9 +16,13 @@ const CandidateAppliedJobs = () => {
 
   const fetchAppliedJobs = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/appliedJobs`, {
+      const response = await axios.get(`${backendUrl}/candidate/appliedJobs`, {
         params: { page },
+        headers: {
+          'x-auth': localStorage.getItem('token') // या जो भी auth token हो
+        }
       });
+      
       setJobs(response.data.jobs || []);
       setTotalPages(response.data.totalPages || 1);
     } catch (error) {

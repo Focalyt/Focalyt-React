@@ -5,6 +5,9 @@ import { Link } from "react-router-dom";
 import feather from 'feather-icons';
 const AppliedCourses = () => {
   const [courses, setCourses] = useState([]);
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+ 
   
     useEffect(() => {
       feather.replace(); 
@@ -16,9 +19,9 @@ const AppliedCourses = () => {
   const fetchAppliedCourses = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("/candidate/appliedCourses", {
+      const res = await axios.get(`${backendUrl}/candidate/appliedCourses`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          'x-auth': localStorage.getItem('token'),
         },
       });
       setCourses(res.data?.courses || []);

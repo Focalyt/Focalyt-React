@@ -14,6 +14,19 @@ import { Fancybox } from '@fancyapps/ui';
 const CandidateViewJobs = () => {
   const { JobId } = useParams();
   const [jobDetails, setJobDetails] = useState(null);
+  const [address, setAddress] = useState('');
+  const [highestQualificationdata, sethighestQualificationdata] = useState([]);
+  
+  const [totalExperience, setTotalExperience] = useState('');
+  const [highestQualification, setHighestQualification] = useState('');
+  const [city, setCity] = useState('');
+  const [dob, setDob] = useState('');
+  const [sex, setSex] = useState('');
+  const [state, setState] = useState('');
+  const [pincode, setPC] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
   const [candidate, setCandidate] = useState(null);
   const [isApplied, setIsApplied] = useState(false);
   const [isRegisterInterview, setIsRegisterInterview] = useState(false);
@@ -49,7 +62,77 @@ const CandidateViewJobs = () => {
     if (JobId) {
       fetchJobDetails();
     }
+    if (!canApply) {
+      waitForGoogle();
+    }
   }, [JobId]);
+
+  useEffect(() => {
+    if (showApplyModal && !canApply) {
+      setTimeout(() => {
+        waitForGoogle();
+      }, 100); // Delay thoda dena zaroori hota hai modal ke open hone ke baad DOM render ke liye
+    }
+  }, [showApplyModal]);
+  
+
+
+
+    const waitForGoogle = () => {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        const input = document.getElementById('address-location');
+        if (!input) {
+          console.warn('Input not found yet');
+          return;
+        }
+
+        const autocomplete = new window.google.maps.places.Autocomplete(input, {
+          types: ['geocode'],
+          componentRestrictions: { country: 'in' },
+        });
+
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+
+          if (!place || !place.geometry || !place.geometry.location) {
+            console.warn('Invalid place data.');
+            return;
+          }
+
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+
+          let fullAddress = '';
+          if (place.formatted_address) fullAddress = place.formatted_address;
+          else if (place.name) fullAddress = place.name;
+          else if (input.value) fullAddress = input.value;
+
+          let city = '', state = '', pincode = '';
+
+          if (Array.isArray(place.address_components)) {
+            place.address_components.forEach((component) => {
+              const types = component.types.join(',');
+              if (types.includes("postal_code")) pincode = component.long_name;
+              if (types.includes("locality")) city = component.long_name;
+              if (types.includes("administrative_area_level_1")) state = component.long_name;
+              if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+            });
+          }
+
+          setAddress(fullAddress);
+          setCity(city);
+          setState(state);
+          setLatitude(lat);
+          setLongitude(lng);
+          setLocation({ place: place.name || '', lat, lng });
+        });
+      } else {
+        setTimeout(waitForGoogle, 100);
+      }
+    };
+
+    
+
 
   useEffect(() => {
     // Initialize Swiper for gallery
@@ -90,6 +173,16 @@ const CandidateViewJobs = () => {
     }
   }, [jobDetails]);
 
+  useEffect(() => {
+      if (candidate) {
+        setSex(candidate.sex || '');
+        setDob(candidate.dob ? moment(candidate.dob).format("YYYY-MM-DD") : '');
+        setTotalExperience(candidate.personalInfo.totalExperience || '');
+        setHighestQualification(candidate.highestQualification?._id || '');
+        setAddress(candidate.personalInfo.location?.fullAddress || '');
+      }
+    }, [candidate]);
+
   const handleVideoModal = (videoUrl) => {
     const videoModal = document.getElementById('videoModal');
     const videoElement = document.getElementById('vodeoElement');
@@ -107,7 +200,7 @@ const CandidateViewJobs = () => {
     videoModal.style.display = 'block';
     document.body.classList.add('modal-open');
   };
-  
+
   const closeVideoModal = () => {
     const videoModal = document.getElementById('videoModal');
 
@@ -132,6 +225,8 @@ const CandidateViewJobs = () => {
       const data = response.data;
       console.log('response', data)
       setJobDetails(data.jobDetails);
+      sethighestQualificationdata(response.data.highestQualification);
+
       setCandidate(data.candidate);
       setIsApplied(data.isApplied);
       setIsRegisterInterview(data.isRegisterInterview);
@@ -323,6 +418,55 @@ const CandidateViewJobs = () => {
   if (!jobDetails) {
     return <div>Job not found</div>;
   }
+
+  const handleProfileSubmit = async () => {
+  
+      const profileData = {
+        highestQualification,
+        sex,
+        dob,
+        personalInfo: {
+          totalExperience,
+          location: {
+            state,
+            city,
+            fullAddress: address,
+            longitude,
+            latitude,
+  
+          }
+  
+  
+        },
+        
+        isExperienced: totalExperience == 0 ? false : true
+      }
+  
+      console.log('profileData',profileData)
+  
+      try {
+        await axios.post(`${backendUrl}/candidate/myprofile`, profileData, {
+          headers: { 'x-auth': localStorage.getItem('token') }
+        });
+  
+  
+        const response = await axios.post(`${backendUrl}/candidate/job/${JobId}/apply`, {}, {
+          headers: {
+            'x-auth': localStorage.getItem('token')
+          }
+        });
+  
+        if (response.data.status) {
+          setIsApplied(true);
+          setCanApply(true);
+          setShowApplyModal(false);
+          setShowRegisterModal(true);
+          
+        }
+      } catch (err) {
+        console.error("Profile update or apply failed:", err);
+      }
+    };
 
   return (
     <>
@@ -876,14 +1020,72 @@ const CandidateViewJobs = () => {
                   <p>Please complete your profile before applying for this job.</p>
                   {/* Profile completion form would go here */}
                 </div>
+                <div className="row">
+
+
+                  <div className="form-group mb-2">
+                    <select onChange={(e) => setSex(e.target.value)} className="form-control" value={sex}>
+                      <option value="">Your Gender / आपका लिंग</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group  mb-2">
+                    <input onChange={(e) => setDob(e.target.value)} type="date" className="form-control" placeholder="Date of Birth / जन्म तिथि" value={dob} />
+                  </div>
+
+                  <div className="form-group mb-2">
+                    <select onChange={(e) => setTotalExperience(e.target.value)} className="form-control" value={totalExperience}>
+                      <option value="">Experience / अनुभव</option>
+                      <option value="0">Fresher</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6</option>
+                      <option value="7">7</option>
+                      <option value="8">8</option>
+                      <option value="9">9</option>
+                      <option value="10">10</option>
+                      <option value="11">11</option>
+                      <option value="12">12</option>
+                      <option value="13">13</option>
+                      <option value="14">14</option>
+                      <option value="15">15</option>
+
+                    </select>
+                  </div>
+                  <div className="form-group mb-2">
+                    <select onChange={(e) => setHighestQualification(e.target.value)} className="form-control" value={ highestQualification} >
+                      <option value="">Highest Qualification / उच्चतम योग्यता</option>
+                      {highestQualificationdata.map((q) => (
+                        <option value={q._id}>{q.name}</option>))}
+
+
+                    </select>
+                  </div>
+                  <div className="form-group mb-2">
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="address-location"
+                      placeholder="City/ शहर"
+                      value={address}
+
+                      onChange={(e) => setAddress(e.target.value)}
+
+                    />
+
+
+                  </div>
+
+                </div>
                 <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => setShowApplyModal(false)}
-                  >
-                    Close
-                  </button>
+                <div className="modal-footer">
+                <button onClick={() => handleProfileSubmit()} id='updateAndApply' className="btn btn-primary" >Update and Apply</button>
+              </div>
                 </div>
               </div>
             )}
@@ -895,7 +1097,7 @@ const CandidateViewJobs = () => {
       {showRegisterModal && (
         <div className="modal fade show" style={{ display: 'block' }} id="registerApply">
           <div className="modal-dialog modal-dialog-centered">
-            {canApply && hasCredit ? (
+            {(canApply && hasCredit ) &&(
               <div className="modal-content">
                 <div className="modal-header">
                   <h5 className="modal-title text-white text-uppercase">Register for Interview</h5>
@@ -933,7 +1135,8 @@ const CandidateViewJobs = () => {
                   </button>
                 </div>
               </div>
-            ) : canApply && !hasCredit ? (
+            )}
+            { (canApply && !hasCredit) && (
               <div className="modal-content">
                 <div className="modal-header">
                   <h5 className="modal-title text-white text-uppercase">Insufficient Coins</h5>
@@ -974,8 +1177,8 @@ const CandidateViewJobs = () => {
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="modal-content">
+            )} 
+              {/* <div className="modal-content">
                 <div className="modal-header">
                   <h5 className="modal-title text-white text-uppercase">Complete Profile</h5>
                   <button type="button" className="close" onClick={() => setShowRegisterModal(false)}>
@@ -985,7 +1188,7 @@ const CandidateViewJobs = () => {
                 <div className="modal-body">
                   <p>Please complete your profile before registering for an interview.</p>
                   {/* Profile completion form would go here */}
-                </div>
+                {/* </div>
                 <div className="modal-footer">
                   <button
                     type="button"
@@ -993,11 +1196,10 @@ const CandidateViewJobs = () => {
                     onClick={() => setShowRegisterModal(false)}
                   >
                     Close
-                  </button>
-                </div>
+                  </button> */}
+                {/* </div>
+              </div> */}
               </div>
-            )}
-          </div>
         </div>
       )}
 

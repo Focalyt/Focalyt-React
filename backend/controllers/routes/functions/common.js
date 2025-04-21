@@ -48,7 +48,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).single('file');
 const {
-  Country, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy,
+  Country, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy,QualificationCourse,
 } = require('../../models');
 const Candidate = require('../../models/candidateProfile');
 
@@ -707,4 +707,49 @@ module.exports.university = async (req, res) => {
   } catch (err) {
     return req.errFunc(err);
   }
+};
+
+module.exports.education = async (req, res) => {
+  try {
+    const education = await Qualification.find({ status: true }).select('name');
+    if (!education) throw req.ykError('Education data not found!');
+    return res.send({
+      status: true,
+      message: 'Education data fetch successfully!',
+      data: { education },
+    });
+  } catch (err) {
+    return req.errFunc(err);
+  }
+};
+
+module.exports.educationCoursesList = async (req, res) => {
+  try {
+    const { qualificationId } = req.query; // or req.body based on your use case
+
+    if (!qualificationId) {
+      return res.status(400).json({
+        status: false,
+        message: 'Qualification ID is required!',
+      });
+    }
+
+    const courses = await QualificationCourse.find({
+      _qualification: qualificationId,
+      status: true
+    }).select('name');
+
+    if (!courses || courses.length === 0) {
+      throw req.ykError('No courses found for this qualification!');
+    }
+
+    return res.send({
+      status: true,
+      message: 'Courses fetched successfully by qualification!',
+      data: { courses }
+    });
+
+  } catch (err) {
+    return req.errFunc(err);
+  }
 };

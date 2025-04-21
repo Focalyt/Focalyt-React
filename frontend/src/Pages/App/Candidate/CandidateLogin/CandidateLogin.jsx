@@ -140,6 +140,7 @@ const CandidateLogin = () => {
             return;
         }
         setShowSetBtn(false);
+        
 
         try {
             // const response = await axios.post('/api/sendCandidateOtp', { mobile: mobileNumber });
@@ -219,6 +220,7 @@ const CandidateLogin = () => {
                 sex: gender,
                 city,
                 state,
+                fullAddress:address,
                 latitude,
                 longitude,
                 place: address

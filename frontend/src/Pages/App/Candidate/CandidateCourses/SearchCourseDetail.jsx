@@ -20,8 +20,7 @@ const CourseDetails = () => {
   const [canApply, setCanApply] = useState(true);
   const [mobileNumber, setMobileNumber] = useState('');
   const [showProfileForm, setShowProfileForm] = useState(false);
-  const [experience, setExperience] = useState('');
-  const [highestQualification, setHighestQualification] = useState('');
+
 
 
   const videoRef = useRef(null);
@@ -31,10 +30,12 @@ const CourseDetails = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [address, setAddress] = useState('');
   const [highestQualificationdata, sethighestQualificationdata] = useState([]);
-  const [cityName, setCity] = useState('');
+  const [totalExperience, setTotalExperience] = useState('');
+  const [highestQualification, setHighestQualification] = useState('');
+  const [city, setCity] = useState('');
   const [dob, setDob] = useState('');
   const [sex, setSex] = useState('');
-  const [stateName, setState] = useState('');
+  const [state, setState] = useState('');
   const [pincode, setPC] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
@@ -95,8 +96,10 @@ const CourseDetails = () => {
       }
     };
 
-    waitForGoogle();
-  }, [!canApply]); // ✅ only run when showExtraFields is true
+    if (!canApply) {
+      waitForGoogle();
+    }
+  }, [canApply]); // ✅ only run when showExtraFields is true
 
 
   useEffect(() => {
@@ -145,9 +148,9 @@ const CourseDetails = () => {
     if (candidate) {
       setSex(candidate.sex || '');
       setDob(candidate.dob ? moment(candidate.dob).format("YYYY-MM-DD") : '');
-      setExperience(candidate.totalExperience || '');
+      setTotalExperience(candidate.totalExperience || '');
       setHighestQualification(candidate.highestQualification?._id || '');
-      setAddress(candidate.location?.fullAddress || '');
+      setAddress(candidate.personalInfo.location?.fullAddress || '');
     }
   }, [candidate]);
   const applyCourse = async (courseId) => {
@@ -307,17 +310,23 @@ const CourseDetails = () => {
 
     const profileData = {
       highestQualification,
+      sex,
+      dob,
       personalInfo: {
-        sex,
-        stateName,
-        cityName,
-        address,
-        longitude,
-        latitude,
-        dob
+        location: {
+          state,
+          city,
+          fullAddress: address,
+          longitude,
+          latitude,
+
+        },
+        totalExperience,
+
+
       },
-      totalExperience: experience,
-      isExperienced: experience == 0 ? false : true
+      
+      isExperienced: totalExperience == 0 ? false : true
     }
 
 
@@ -1206,7 +1215,7 @@ const CourseDetails = () => {
                 </div>
 
                 <div className="form-group mb-2">
-                  <select onChange={(e) => setExperience(e.target.value)} className="form-control" value={experience}>
+                  <select onChange={(e) => setTotalExperience(e.target.value)} className="form-control" value={totalExperience}>
                     <option value="">Experience / अनुभव</option>
                     <option value="0">Fresher</option>
                     <option value="1">1</option>
@@ -1242,7 +1251,8 @@ const CourseDetails = () => {
                     className="form-control"
                     id="address-location"
                     placeholder="City/ शहर"
-                    value={candidate.location.fullAddress}
+                    value={candidate?.personalInfo.location?.fullAddress || address}
+
                     onChange={(e) => setAddress(e.target.value)}
 
                   />

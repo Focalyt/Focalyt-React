@@ -137,10 +137,10 @@ const candidateProfileSchema = new Schema(
 
     qualifications: [
       {
-        subQualification: { type: ObjectId, ref: "SubQualification" },
-        Qualification: { type: ObjectId, ref: "Qualification" },
-        QualificationCourse: { type: ObjectId, ref: "QualificationCourse" },
-        College: String,
+        education: { type: ObjectId, ref: "Qualification" },
+        course: { type: ObjectId, ref: "QualificationCourse" },
+        specialization: { type: ObjectId, ref: "SubQualification" },
+        college: String,
         location: {
           type: {
             type: String,
@@ -165,13 +165,24 @@ const candidateProfileSchema = new Schema(
     ],
     experiences: [
       {
-        Industry_Name: { type: ObjectId, ref: "Industry" },
-        SubIndustry_Name: { type: ObjectId, ref: "SubIndustry" },
-        Company_Name: String,
-
-        Company_State: { type: String },
-        Company_City: { type: String },
-        Company_longitude: { type: String },
+        sector: { type: ObjectId, ref: "Sector" },
+        company_Name: String,
+        location: {
+          type: {
+            type: String,
+            enum: ["Point"],
+            default: "Point"
+          },
+          coordinates: {
+            type: [Number],
+            default: [0, 0]
+          },
+          latitude: { type: String },
+          longitude: { type: String },
+          city: { type: String },
+          state: { type: String },
+          fullAddress: { type: String }
+        },
         Comments: String,
         FromDate: String,
         ToDate: String,

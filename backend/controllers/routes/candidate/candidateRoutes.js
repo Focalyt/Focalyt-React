@@ -4304,16 +4304,22 @@ router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
   try {
     const user = req.user;
 
-    const candidate = await Candidate.findOne({ _id: user._id });
+    const educations = await Qualification.find({ status:true });
+    
+
+
+    const candidate = await Candidate.findOne({ mobile: user.mobile });
 
     if (!candidate) {
       return res.status(404).json({ status: false, message: "Candidate not found" });
     }
 
+    console.log('candidate',candidate)
+
     res.status(200).json({
       status: true,
       message: "Profile fetched successfully",
-      data: candidate
+      data: {candidate,educations}
     });
   } catch (error) {
     console.error('Error fetching profile:', error);
