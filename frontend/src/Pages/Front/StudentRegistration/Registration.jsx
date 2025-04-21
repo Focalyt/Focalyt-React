@@ -36,6 +36,7 @@ const Registration = () => {
 
             if (res.status === 201) {
                 alert("Registration successful!");
+                window.location.reload();
                 // optionally clear form
                 setStudentData({
                     school: "",
@@ -476,7 +477,7 @@ textarea {
 }
 
 @media (max-width: 768px) {
-option-item-width{
+.option-item-width{
 width:100%}
   .form-group {
     flex-direction: column;
