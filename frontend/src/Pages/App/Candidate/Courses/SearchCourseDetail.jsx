@@ -147,7 +147,7 @@ const CourseDetails = () => {
       setDob(candidate.dob ? moment(candidate.dob).format("YYYY-MM-DD") : '');
       setExperience(candidate.totalExperience || '');
       setHighestQualification(candidate.highestQualification?._id || '');
-      setAddress(candidate.location?.fullAddress || '');
+      setAddress(candidate?.location?.fullAddress || '');
     }
   }, [candidate]);
   const applyCourse = async (courseId) => {
@@ -1242,7 +1242,7 @@ const CourseDetails = () => {
                     className="form-control"
                     id="address-location"
                     placeholder="City/ शहर"
-                    value={candidate.location.fullAddress}
+                    value={candidate?.location?.fullAddress}
                     onChange={(e) => setAddress(e.target.value)}
 
                   />

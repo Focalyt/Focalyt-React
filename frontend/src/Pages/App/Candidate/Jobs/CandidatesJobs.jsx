@@ -315,7 +315,13 @@ const CandidatesJobs = () => {
       // Add pagination
       params.append('page', page);
 
-      const response = await axios.get(`${backendUrl}/candidate/searchjob?${params.toString()}`);
+      // const response = await axios.get(`${backendUrl}/candidate/searchjob?${params.toString()}`);
+      const response = await axios.get(`${backendUrl}/candidate/searchjob?${params.toString()}`, {
+        headers: {
+          'x-auth': localStorage.getItem('token') || '', // token must be present
+        },
+      });
+      
       console.log("response from localhost", response.data)
       if (response.data) {
         console.log("Fetched Jobs:", response.data.jobs);
