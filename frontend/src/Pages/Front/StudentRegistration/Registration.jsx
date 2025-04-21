@@ -20,46 +20,103 @@ const Registration = () => {
         setStudentData({ ...studentData, [name]: value });
     };
 
+    // const handleSubmit = async (e) => {
+    //     e.preventDefault();
+
+    //     try {
+    //         const res = await fetch(`${backendUrl}/studentRegistration`, {
+    //             method: "POST",
+    //             headers: {
+    //                 "Content-Type": "application/json"
+    //             },
+    //             body: JSON.stringify(studentData)
+    //         });
+
+    //         const result = await res.json();
+
+    //         if (res.status === 201) {
+    //             alert("Registration successful!");
+    //             window.location.reload();
+    //             // optionally clear form
+    //             setStudentData({
+    //                 school: "",
+    //                 studentName: "",
+    //                 address: "",
+    //                 class: "",
+    //                 gender: "",
+    //                 dob: "",
+    //                 parentContact: "",
+    //                 interestedTech: "",
+    //                 wantsToExploreLab: "",
+    //                 exploreReasonOrInterest: "",
+    //                 wouldRecommend: ""
+    //             });
+    //         } else {
+    //             alert(result.message || "Something went wrong");
+    //         }
+    //     } catch (err) {
+    //         alert("Error submitting form.");
+    //         console.error(err);
+    //     }
+    // };
+    const [errors, setErrors] = useState({});
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        try {
-            const res = await fetch(`${backendUrl}/studentRegistration`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(studentData)
-            });
-
-            const result = await res.json();
-
-            if (res.status === 201) {
-                alert("Registration successful!");
-                window.location.reload();
-                // optionally clear form
-                setStudentData({
-                    school: "",
-                    studentName: "",
-                    address: "",
-                    class: "",
-                    gender: "",
-                    dob: "",
-                    parentContact: "",
-                    interestedTech: "",
-                    wantsToExploreLab: "",
-                    exploreReasonOrInterest: "",
-                    wouldRecommend: ""
-                });
-            } else {
-                alert(result.message || "Something went wrong");
-            }
-        } catch (err) {
-            alert("Error submitting form.");
-            console.error(err);
+      
+        const newErrors = {};
+        if (!studentData.school) newErrors.school = true;
+        if (!studentData.studentName) newErrors.studentName = true;
+        if (!studentData.class) newErrors.class = true;
+        if (!studentData.gender) newErrors.gender = true;
+        if (!studentData.dob) newErrors.dob = true;
+        if (!studentData.parentContact) newErrors.parentContact = true;
+        if (!studentData.interestedTech) newErrors.interestedTech = true;
+        if (!studentData.wantsToExploreLab) newErrors.wantsToExploreLab = true;
+        if (!studentData.wouldRecommend) newErrors.wouldRecommend = true;
+      
+        setErrors(newErrors);
+      
+        if (Object.keys(newErrors).length > 0) {
+          alert("Please fill all required fields.");
+          return;
         }
-    };
-
+      
+        try {
+          const res = await fetch(`${backendUrl}/studentRegistration`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(studentData)
+          });
+      
+          const result = await res.json();
+      
+          if (res.status === 201) {
+            alert("Registration successful!");
+            window.location.reload();
+            setStudentData({
+              school: "",
+              studentName: "",
+              address: "",
+              class: "",
+              gender: "",
+              dob: "",
+              parentContact: "",
+              interestedTech: "",
+              wantsToExploreLab: "",
+              exploreReasonOrInterest: "",
+              wouldRecommend: ""
+            });
+          } else {
+            alert(result.message || "Something went wrong");
+          }
+        } catch (err) {
+          alert("Error submitting form.");
+          console.error(err);
+        }
+      };
+      
 
 
     return (
@@ -84,11 +141,11 @@ const Registration = () => {
                     <div className="form-section">
                         <div className="form-group">
                             <label for="school" className="required-field">School/College/Centre Name:</label>
-                            <input type="text" id="school" name="school" placeholder="Enter your institution name" onChange={handleChange} required />
+                            <input type="text" id="school" name="school" placeholder="Enter your institution name" onChange={handleChange} className={errors.school ? 'error-input' : ''} required />
                         </div>
                         <div className="form-group">
                             <label for="name" className="required-field">Student Name:</label>
-                            <input type="text" id="name" name="studentName" placeholder="Enter your full name" onChange={handleChange} required />
+                            <input type="text" id="name" name="studentName" placeholder="Enter your full name" className={errors.studentName ? 'error-input' : ''} onChange={handleChange} required />
                         </div>
                         <div className="form-group">
                             <label for="address">Address:</label>
@@ -99,7 +156,7 @@ const Registration = () => {
                             <div className="col">
                                 <div className="form-group">
                                     <label for="class" className="required-field">Class:</label>
-                                    <input type="text" id="class" name="class" onChange={handleChange} placeholder="e.g. 10th, 12th, BCA" required />
+                                    <input type="text" id="class" name="class" onChange={handleChange} className={errors.class ? 'error-input' : ''} placeholder="e.g. 10th, 12th, BCA" required />
                                 </div>
                             </div>
 
@@ -110,7 +167,7 @@ const Registration = () => {
                                         alignItems: "baseline", marginLeft: "115px"
                                     }}>
                                     <label for="gender" className="required-field">Gender:</label>
-                                    <div style={{ display: "flex", gap: "15px" }}>
+                                    <div style={{ display: "flex", gap: "15px" }} className={errors.gender ? 'error-input' : ''}>
                                         <label style={{ width: "auto" }}><input type="radio" name="gender" value="male" onChange={handleChange} required /> Male</label>
                                         <label style={{ width: "auto" }}><input type="radio" name="gender" value="female" onChange={handleChange} /> Female</label>
                                     </div>
@@ -121,15 +178,15 @@ const Registration = () => {
                         <div className="row-group">
                             <div className="col">
                                 <div className="form-group">
-                                    <label htmlFor="dob" className="required-field">Date Of Birth:</label>
+                                    <label htmlFor="dob" className="required-field">Date of Birth:</label>
                                     <input
                                         type="date"
                                         id="dob"
                                         name="dob"
                                         value={studentData.dob}
                                         onChange={handleChange}
+                                         className={`form-control ${errors.dob ? 'error-input' : ''}`}
                                         required
-                                        className="form-control"
                                     />
                                 </div>
 
@@ -137,7 +194,8 @@ const Registration = () => {
                             <div className="col">
                                 <div className="form-group">
                                     <label for="contact" className="required-field">Parents/Guardian Contact No:</label>
-                                    <input type="text" id="contact" name="parentContact" placeholder="Enter 10-digit mobile number" onChange={handleChange} required />
+                                    <input type="text" id="contact" name="parentContact"   className={errors.parentContact ? 'error-input' : ''} placeholder="Enter 10-digit mobile number" onChange={handleChange} pattern="^\d{10}$"
+  maxLength={10} required />
                                 </div>
                             </div>
                         </div>
@@ -217,8 +275,11 @@ const Registration = () => {
 
                 <div className="footer">
                     <div className="contact-info">
-                        <div>www.focalyt.com</div>
-                        <div>info@focalyt.com</div>
+                        <div>
+                            <a href="www.focalyt.com">www.focalyt.com </a></div>
+                        <div>
+                        <a href="mailto:info@focalyt.com">info@focalyt.com</a>
+                        </div>
                     </div>
 
                 </div>
@@ -226,14 +287,23 @@ const Registration = () => {
 
             </div>
 
-            <style>
-                {
-                    `
-                    .contact-info > div:nth-child(1){
-                    border-right : 1px solid #f3345a;
-                    padding-right:10px;
-                    }
-        .Form-header {
+ <style>
+    {
+       `
+       .error-input {
+  border: 2px solid #e53935 !important;
+  background-color: #fff0f0;
+}
+
+       .contact-info > div:nth-child(1){
+            border-right : 1px solid #f3345a;
+            padding-right:10px;
+         }
+      .contact-info > div > a{
+          color:#f3345a;
+          text-decoration: #f3345a;
+               }
+.Form-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
