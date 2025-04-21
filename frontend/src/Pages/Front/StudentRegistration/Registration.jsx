@@ -179,15 +179,15 @@ const Registration = () => {
                             <h3>3. Do you want to explore Focalyt Future Technology Lab?</h3>
                         </div>
                         <div className="options-group">
-                            <div className="option-item" style={{ width: "100%" }}>
+                            <div className="option-item" >
                                 <input type="radio" id="explore_yes" name="wantsToExploreLab" onChange={handleChange} value="yes" required />
                                 <label for="explore_yes">Yes (Select Below Options)</label>
                             </div>
-                            <div className="option-item" style={{ width: "100%" }}>
+                            <div className="option-item option-item-width" >
                                 <input type="radio" id="explore_no" name="wantsToExploreLab" onChange={handleChange} value="no" />
                                 <label for="explore_no">No (Mention Reason Below)</label>
                             </div>
-                            <textarea style={{ width: "100%", marginTop: "10px" }} onChange={handleChange} placeholder="Please specify your interests or reasons here..." rows="3"></textarea>
+                            <textarea className='option-item-width' onChange={handleChange} placeholder="Please specify your interests or reasons here..." rows="3"></textarea>
                         </div>
                     </div>
 
@@ -261,7 +261,7 @@ const Registration = () => {
 }
 
 .logo {
-  width: 150px;
+  width: 200px;
   text-align: right;
   padding: 10px;
 }
@@ -476,6 +476,8 @@ textarea {
 }
 
 @media (max-width: 768px) {
+option-item-width{
+width:100%}
   .form-group {
     flex-direction: column;
     align-items: flex-start;
@@ -496,6 +498,7 @@ textarea {
     width: 100%;
   }
 }
+
 @media(max-width:768px){
 .regGen label{
                    display: flex;
@@ -503,7 +506,7 @@ textarea {
 }
     .regGen input {
     margin-right:10px}
-}
+
 .question-header h3 {
 font-size:16px;}
 .form-title {
@@ -512,7 +515,7 @@ font-size:24px}
 flex-direction: column-reverse;
     text-align: center;}
     .logo {
-width:240px}
+width:240px}}
         `
                 }
             </style>
