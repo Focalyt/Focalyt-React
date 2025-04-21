@@ -556,7 +556,7 @@ function Community() {
                     </div>
                     <div className="col-md-3">
                       <button
-                        className="btn btn-primary mt-2 w-100"
+                        className="btn btn-primary mt-2 w-100 filterBtn"
                         onClick={() => handleFilter()}
                       >
                         Filter Posts
@@ -664,6 +664,15 @@ function Community() {
           </div>
         </div>
       </section>
+      <style>
+        {
+          `
+          .filterBtn{
+          border: 1px solid #fc2b5a!important;
+          }
+          `
+        }
+      </style>
     </FrontLayout>
   );
 }

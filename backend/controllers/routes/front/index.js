@@ -25,7 +25,7 @@ const {
 	Industry,
 	Courses,
 	CourseSectors,
-	Contact, Post
+	Contact, Post , StudentRegistration
 } = require("../../models");
 const Team = require('../../models/team'); // PostSchema import करें
 const bcrypt = require("bcryptjs");
@@ -1403,6 +1403,26 @@ router.route('/parser')
 		rePath = res.render(`${req.vPath}/front/parser`, {
 		});
 	})
-
+	router.post("/studentRegistration", async (req, res) => {
+		try {
+		  const studentData = req.body;
+	  
+		  const newStudent = new StudentRegistration(studentData);
+		  const savedStudent = await newStudent.save();
+	  
+		  res.status(201).json({
+			status: "success",
+			message: "Student registered successfully",
+			data: savedStudent,
+		  });
+		} catch (error) {
+		  console.error("Error during student registration:", error);
+		  res.status(500).json({
+			status: "error",
+			message: "Failed to register student",
+			error: error.message,
+		  });
+		}
+	  });
 
 module.exports = router;
