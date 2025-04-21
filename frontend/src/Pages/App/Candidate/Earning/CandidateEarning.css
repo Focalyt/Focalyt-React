@@ -10,7 +10,7 @@ html body .content .content-wrapper {
 }
 .btn-orrage {
     background-color: #df4805 !important;
-    color: #fff;
+    color: #fff!important;
 }
 .btn.disabled, .btn:disabled {
     opacity: 0.65;
@@ -25,7 +25,10 @@ html body .content .content-wrapper {
     color: #FC2B5A;
     font-weight: 600;
 }
-
+.cashout-p{
+    font-size: 14px!important;
+    margin-bottom: 14px!important;
+}
 
 @media (max-width: 1920px) {
     .candid-box {

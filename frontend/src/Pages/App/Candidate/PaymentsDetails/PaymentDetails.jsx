@@ -3,7 +3,7 @@ import axios from "axios";
 import moment from "moment";
 import { Link } from "react-router-dom";
 // import "./AppliedCourses.css";
-import "../CandidateCourses/AppliedCourses.css"
+import "../Courses/AppliedCourses.css"
 const PaymentDetails = () => {
   const [courses, setCourses] = useState([]);
 

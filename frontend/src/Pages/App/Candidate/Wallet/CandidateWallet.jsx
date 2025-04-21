@@ -183,32 +183,62 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
                     border-top-right-radius: 0;
                     border-top-left-radius: 0;
                 }
+                .card-bottom-one:hover{
+                border: 2px solid #417ebd;
+                color:#000!important;
+                }
                 .icon-feature {
                     background-color: #417ebd;
                     font-size: 17px;
                     border: 2px solid #35679a;
+                    // transition: 3s ease-in-out;
+                }
+                .icon-feature:hover{
+                    background-color: transparent;
+                    border:2px solid #35679a;
+                    color:#000!important;
                 }
                 .icon-feature-two {
                     background-color: #e95b37;
                     font-size: 17px;
                     border: 2px solid #e95b37;
                 }
+                 .icon-feature-two:hover {
+                 background-color: transparent;
+                    border:2px solid #e95b37;
+                    color: #000!important;
+                 }
                 .card-bottom-two {
                     background-color: #e95b37;
                     font-size: 18px;
                     border-top-right-radius: 0;
                     border-top-left-radius: 0;
                 }
+                    .card-bottom-two:hover{
+                    border: 1px solid #e95b37;
+                    color: #000!important;
+                    }
                 .icon-feature-three {
                     background-color: #bc405a;
                     font-size: 17px;
+                    border: 2px solid #bc405a;
+                }
+                .icon-feature-three:hover{
+                background-color: transparent;
+                border: 2px solid #bc405a;
+                color:#000!important;
                 }
                 .card-bottom-three {
                     background-color: #bc405a;
+                    border: 2px solid #bc405a;
                     font-size: 18px;
                     border-top-right-radius: 0;
                     border-top-left-radius: 0;
                 }
+                    .card-bottom-three:hover{
+                    border: 2px solid #bc405a;
+                    color:#000!important;
+                    }
                 .icon-feature-four {
                     padding-top: 10px;
                     background-color: #42a181;
@@ -216,16 +246,31 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
                     border: 2px solid #42a181;
                     padding-bottom: 10px;
                 }
+                  .icon-feature-four:hover{
+                background-color: transparent;
+                border: 2px solid #42a181;
+                color:#000!important;
+                }  
                 .card-bottom-four {
                     background-color: #42a181;
                     font-size: 18px;
                     border-top-right-radius: 0;
                     border-top-left-radius: 0;
                 }
+                .card-bottom-four:hover{
+                border: 1px solid #42a181;
+                color:#000!important; 
+                }
                 .icon-feature-five {
                     background-color: #640064;
                     font-size: 17px;
                     border: 2px solid #640064;
+                    // transition: 3s ease-in-out;
+                }
+                .icon-feature-five:hover {
+                background-color:transparent;
+                border: 2px solid #640064;
+                color:#000!important;
                 }
                 .card-bottom-five {
                     background-color: #640064;
@@ -233,6 +278,11 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
                     border-top-right-radius: 0;
                     border-top-left-radius: 0;
                 }
+                    .card-bottom-five:hover{
+                    background-color: transparent;
+                    border: 1px solid #640064;
+                    color:#000!important;
+                    }
                     .applied_card{
     height: 100%;
     width:100%!important;

@@ -315,7 +315,13 @@ const CandidatesJobs = () => {
       // Add pagination
       params.append('page', page);
 
-      const response = await axios.get(`${backendUrl}/candidate/searchjob?${params.toString()}`);
+      // const response = await axios.get(`${backendUrl}/candidate/searchjob?${params.toString()}`);
+      const response = await axios.get(`${backendUrl}/candidate/searchjob?${params.toString()}`, {
+        headers: {
+          'x-auth': localStorage.getItem('token') || '', // token must be present
+        },
+      });
+      
       console.log("response from localhost", response.data)
       if (response.data) {
         console.log("Fetched Jobs:", response.data.jobs);
@@ -626,7 +632,7 @@ const CandidatesJobs = () => {
                     <div className="card border border-top-1">
                       <div id="filter">
                         <div className="card-content">
-                          <div className="card-body">
+                          <div className="card-body" style={{ padding: '1.5rem' }}>
                             <form onSubmit={handleSubmit}>
                               <div className="row my-0 mx-0" id="allFields">
                                 {/* Company Name */}
@@ -856,14 +862,14 @@ const CandidatesJobs = () => {
                                 <div className="col-xl-6 col-lg-6 col-md-4 col-sm-12 col-12 mt-3 text-right">
                                   <input type="hidden" id="jobView" name="jobView" value={filterData.jobView} />
                                   <button
-                                    className="btn btn-success waves-effect waves-light text-white d-inline px-xl-2 px-lg-2 px-md-2 px-sm-2 px-1 py-1 mx-2"
+                                    className="btn-success-px extra-ss btn btn-success d-inline waves-effect waves-light mb-md-0 mb-sm-0 mb-2 text-white mx-md-4 mx-0 px-xl-2 px-lg-2 px-md-2 px-sm-2 px-1"
                                     id="search-button"
                                     type="submit"
                                   >
                                     Go
                                   </button>
                                   <button
-                                    className="extra-ss btn btn-danger d-inline waves-effect waves-light mb-2 text-white mx-md-0 mx-0 px-xl-2 px-lg-2 px-md-2 px-sm-2 px-1"
+                                    className="btn-success-px extra-ss btn btn-danger d-inline waves-effect waves-light mb-md-0 mb-sm-0 mb-2 text-white mx-md-0 mx-0 px-xl-2 px-lg-2 px-md-2 px-sm-2 px-1"
                                     type="button"
                                     onClick={handleReset}
                                   >
@@ -901,7 +907,7 @@ const CandidatesJobs = () => {
                           onClick={(e) => {
                             e.preventDefault();
                             handleVideoClick(job.jobVideo || "");
-                        
+
                           }}
                           className="video-bttn position-relative d-block"
                         >
@@ -910,9 +916,9 @@ const CandidatesJobs = () => {
                             className="video_thum img-fluid"
                             alt="Job Thumbnail"
                           />
-                         
+
                         </a>
-                        
+
                         <div className="course_inf">
                           <Link to={`/candidate/job/${job._id}`}>
                             <h5>{job.displayCompanyName || job._company[0]?.name}</h5>
@@ -1240,7 +1246,16 @@ const CandidatesJobs = () => {
         </div>
       </div>
 
-
+      <style>
+        {
+          `
+.btn-success-px{
+padding-inline : 1.5rem!important;
+}    
+    
+    `
+        }
+      </style>
 
     </>
   );
