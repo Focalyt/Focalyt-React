@@ -2030,7 +2030,15 @@ router
     if (locationPreferences?.length) {
       updatedFields.locationPreferences = locationPreferences;
     }
-  
+  // ✅ Handle Voice Introduction
+if (personalInfo?.voiceIntro) {
+  updatedFields["personalInfo.voiceIntro"] = Array.isArray(personalInfo.voiceIntro)
+    ? personalInfo.voiceIntro
+    : [personalInfo.voiceIntro];
+    console.log("📥 Voice Intro Received from Frontend:", personalInfo.voiceIntro);
+}
+
+
     // ✅ Referral Cashback logic
     if (user?.referredBy && user.isProfileCompleted === false) {
       const cashback = await CashBackLogic.findOne().select("Referral");

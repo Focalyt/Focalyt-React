@@ -55,6 +55,7 @@ const CandidateProfile = () => {
   const [activeSection, setActiveSection] = useState('personal');
   const [showRecordingModal, setShowRecordingModal] = useState(false);
   const [profileStrength, setProfileStrength] = useState(0);
+  const [showIntroOptions, setShowIntroOptions] = useState(true);
 
   // Audio recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -408,7 +409,7 @@ const CandidateProfile = () => {
       // Add styling to make sure the autocomplete dropdown is visible
       input.style.backgroundColor = "#ffffff";
       input.style.color = "#000000";
-      input.style.zIndex = "1000";
+
 
       // Add change event listener
       autocomplete.addListener('place_changed', () => {
@@ -730,25 +731,30 @@ const CandidateProfile = () => {
               setCertificates(candidate.personalInfo.certifications);
             }
 
+
             // Set languages
             if (Array.isArray(candidate.personalInfo?.languages) && candidate.personalInfo.languages.length > 0) {
               setLanguages(candidate.personalInfo.languages);
             }
+
 
             // Set projects
             if (Array.isArray(candidate.personalInfo?.projects) && candidate.personalInfo.projects.length > 0) {
               setProjects(candidate.personalInfo.projects);
             }
 
+
             // Set interests
             if (Array.isArray(candidate.personalInfo?.interest) && candidate.personalInfo.interest.length > 0) {
               setInterests(candidate.personalInfo.interest);
             }
 
+
             // Set declaration
             if (candidate.personalInfo?.declaration) {
               setDeclaration(candidate.personalInfo.declaration);
             }
+
 
             // Set voice recordings
             if (Array.isArray(candidate.personalInfo?.voiceIntro) && candidate.personalInfo.voiceIntro.length > 0) {
@@ -795,6 +801,15 @@ const CandidateProfile = () => {
 
   return (
     <div className="resume-builder-container">
+
+      <button
+        className="audio-intro-btn mb-3"
+        onClick={() => setShowIntroOptions(true)}
+      >
+        <i className="bi bi-mic-fill"></i>
+        <span>Introduce Yourself to Build Your Resume</span>
+      </button>
+
       <div className="resume-builder-header mb-4">
         <h2 className="resume-builder-title">Professional Resume Builder</h2>
 
@@ -910,7 +925,7 @@ const CandidateProfile = () => {
                   })}
                 </div>
 
-                <div className="contact-info">
+                <div className="contact-info mb-3">
                   <div className="contact-item">
                     <i className="bi bi-telephone"></i>
                     {createEditable(profileData?.mobile || '', 'Phone Number', (val) => {
@@ -954,7 +969,7 @@ const CandidateProfile = () => {
 
                   <div className="contact-item">
                     <i className="bi bi-calendar-event"></i>
-                    <input
+                    <input style={{ height: "30px" }}
                       type="date"
                       className="form-control"
                       value={profileData?.dob ? profileData?.dob.slice(0, 10) : ''}  // to remove time part
@@ -1861,7 +1876,15 @@ const CandidateProfile = () => {
                     text: e.target.innerText
                   })}
                 >
-                  {declaration.text}
+                  <input
+                    type="checkbox"
+                    id="declaration-check"
+                    checked={declaration.isChecked}
+                    onChange={(e) => setDeclaration({
+                      ...declaration,
+                      isChecked: e.target.checked
+                    })}
+                  /> {declaration.text}
                 </div>
               </div>
             </div>
@@ -2068,11 +2091,14 @@ const CandidateProfile = () => {
                           </div>
                         )}
                         {profileData?.personalInfo?.location?.fullAddress && (
+                        {profileData?.personalInfo?.location?.fullAddress && (
                           <div className="resume-contact-item">
                             <i className="bi bi-geo-alt-fill"></i>
                             <span>{profileData.personalInfo.location.fullAddress}</span>
+                            <span>{profileData.personalInfo.location.fullAddress}</span>
                           </div>
                         )}
+
 
                       </div>
                     </div>
@@ -2280,6 +2306,7 @@ const CandidateProfile = () => {
                   <div className="resume-declaration">
                     <h2 className="resume-section-title">Declaration</h2>
                     <p>{declaration.text}</p>
+                    <p>{declaration.text}</p>
                   </div>
                 )}
 
@@ -2314,6 +2341,59 @@ const CandidateProfile = () => {
           </div>
         </div>
       )}
+
+      {/* model intro  */}
+      {showIntroOptions && (
+        <div className="intro-options-overlay">
+          <div className="intro-options-modal">
+            <div className="intro-options-header">
+              <h3>How would you like to introduce yourself?</h3>
+              <button className="close-intro-options" onClick={() => setShowIntroOptions(false)}>
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            <div className="intro-options-body">
+              <div
+                className="intro-option-card"
+                onClick={() => {
+                  setShowRecordingModal(true);
+                  setShowIntroOptions(false);
+                }}
+              >
+                <div className="intro-option-icon">
+                  <i className="bi bi-mic-fill"></i>
+                </div>
+                <div className="intro-option-text">
+                  <h4>Voice Introduction</h4>
+                  <p>Record a brief audio introduction to make your profile stand out</p>
+                </div>
+              </div>
+
+              <div className="intro-options-divider">
+                <span>OR</span>
+              </div>
+
+              <div
+                className="intro-option-card"
+                onClick={() => {
+                  setActiveSection('personal');
+                  setShowIntroOptions(false);
+                }}
+              >
+                <div className="intro-option-icon">
+                  <i className="bi bi-file-earmark-text-fill"></i>
+                </div>
+                <div className="intro-option-text">
+                  <h4>Fill Your Profile</h4>
+                  <p>Complete your professional details to create a comprehensive resume</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>
         {`
 /* Styling for company name input field */
@@ -2330,7 +2410,7 @@ width: 100%;
 }
 
 .company-name .form-control:focus {
-border-color: #6f42c1;
+border-color: #FC2B5A;
 box-shadow: none;
 outline: none;
 }
@@ -2374,12 +2454,183 @@ font-weight: bold;
 width: 40%;
 }
 
+.declaration-checkbox {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.declaration-checkbox input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  accent-color: #6f42c1;
+  cursor: pointer;
+}
+
+.declaration-checkbox label {
+  color: #444;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.declaration-checkbox:hover label {
+  color: #000;
+}
+
+.intro-options-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+}
+
+.intro-options-modal {
+  width: 90%;
+  max-width: 500px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.intro-options-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.intro-options-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.close-intro-options {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #666;
+}
+
+.close-intro-options:hover {
+  color: #000;
+}
+
+.intro-options-body {
+  padding: 20px;
+}
+
+.intro-option-card {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 15px;
+}
+
+.intro-option-card:hover {
+  border-color: #FC2B5A;
+  box-shadow: 0 2px 12px rgba(111, 66, 193, 0.1);
+  transform: translateY(-2px);
+}
+
+.intro-option-icon {
+  font-size: 2rem;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FC2B5A;
+  margin-right: 15px;
+}
+
+.intro-option-text h4 {
+  margin: 0 0 5px 0;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.intro-option-text p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.intro-options-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 15px 0;
+  color: #777;
+}
+
+.intro-options-divider::before,
+.intro-options-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.intro-options-divider span {
+  margin: 0 15px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.audio-intro-btn {
+  background-color: #fc2b5a;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-right: 15px;
+}
+
+// .audio-intro-btn:hover {
+//   background-color: #5a349a;
+// }
+
+.audio-intro-btn i {
+  margin-right: 8px;
+  font-size: 1.1rem;
+}
 @media(max-width: 768px) {
 .add-certificate {
 max-width: 59%;
 width: 100%;
 }
 }
+@media (max-width: 576px) {
+  .intro-option-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .intro-option-icon {
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+}
+
 `}
       </style>
 

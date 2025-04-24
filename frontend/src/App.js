@@ -42,6 +42,7 @@ import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredD
 import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
 import CandidateNewProfile from './Pages/App/Candidate/Profile/CandidateNewProfile';
 import CandidatesEvents from './Pages/App/Candidate/Events/CandidatesEvents';
+import Registration from './Pages/Front/StudentRegistration/Registration';
 const Layout = () => {
   const location = useLocation();
 
@@ -62,6 +63,7 @@ const Layout = () => {
         <Route path="/socialimpact" element={<SocialImpact />} />
         <Route path="/stulabs" element={<StuLabs />} />
         <Route path="/events" element={<Event />} />
+        <Route path="/studentRegistration" element={<Registration/>}/>
 
         {/* Candidate Parent Route */}
         <Route path ="/candidate/login" element={<CandidateLogin/>}/>
