@@ -2091,7 +2091,7 @@ const CandidateProfile = () => {
                           </div>
                         )}
                         {profileData?.personalInfo?.location?.fullAddress && (
-                        {profileData?.personalInfo?.location?.fullAddress && (
+                       
                           <div className="resume-contact-item">
                             <i className="bi bi-geo-alt-fill"></i>
                             <span>{profileData.personalInfo.location.fullAddress}</span>
