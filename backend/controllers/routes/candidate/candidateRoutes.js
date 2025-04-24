@@ -4256,51 +4256,128 @@ router.route('/review/:job')
 })
 // Backend (Node.js with Express)
 router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
-  const {
-    personalInfo,
-    workexperience,
-    education,
-    skill,
-    certification,
-    language,
-    projects,
-    interest,
-    declaration
-  } = req.body;
-
   try {
-    const user = req.user || {}; // Optional: If you're using token-based auth
+    const user = req.user;
     console.log('user',user)
-    const profileData = {
-      hiringStatus: [{
-        personalInfo,
-        workexperience,
-        education,
-        skill,
-        certification,
-        language,
-        projects,
-        interest
-      }],
-      declaration, // if stored directly
-      name: personalInfo?.[0]?.name || '', // optional fallback
-      email: personalInfo?.[0]?.email || '',
-      mobile: personalInfo?.[0]?.phone || null,
-      image: personalInfo?.[0]?.image || '',
-      resume: personalInfo?.[0]?.resume || ''
+
+    const {
+      name,
+      email,
+      mobile,
+      sex,
+      dob,
+      whatsapp,
+      personalInfo,
+      experiences,
+      qualifications,
+      declaration
+    } = req.body;
+
+    // Build dynamic update object
+    const updatePayload = {
+      declaration: declaration || {
+        isChecked: true,
+        text: "I hereby declare that all the information provided above is true to the best of my knowledge."
+      }
     };
 
-    const newProfile =  Candidate.findOneAndUpdate({_id:user._id}, profileData);
-   
-    console.log("user data" , newProfile)
-    console.log("user data" , profileData)
+    // Root level fields (only if present)
+    if (name) updatePayload.name = name;
+    if (email) updatePayload.email = email;
+    if (mobile) updatePayload.mobile = mobile;
+    if (sex) updatePayload.sex = sex;
+    if (dob) updatePayload.dob = dob;
+    if (whatsapp) updatePayload.whatsapp = whatsapp;
 
-    res.status(200).json({ status: true, message: "Profile saved successfully" });
+    // personalInfo: Only non-empty fields
+    if (personalInfo) {
+      updatePayload.personalInfo = {};
+
+      if (personalInfo.professionalTitle) updatePayload.personalInfo.professionalTitle = personalInfo.professionalTitle;
+      if (personalInfo.professionalSummary) updatePayload.personalInfo.professionalSummary = personalInfo.professionalSummary;
+      if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
+      if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;
+      if (personalInfo.location) updatePayload.personalInfo.location = personalInfo.location;
+
+      if (Array.isArray(personalInfo.voiceIntro) && personalInfo.voiceIntro.length > 0) {
+        updatePayload.personalInfo.voiceIntro = personalInfo.voiceIntro;
+      }
+      if (Array.isArray(personalInfo.skills) && personalInfo.skills.length > 0) updatePayload.personalInfo.skills = personalInfo.skills;
+      if (Array.isArray(personalInfo.certifications) && personalInfo.certifications.length > 0) updatePayload.personalInfo.certifications = personalInfo.certifications;
+      if (Array.isArray(personalInfo.languages) && personalInfo.languages.length > 0) {
+        updatePayload.personalInfo.languages = personalInfo.languages
+          .filter(lang => lang.name && typeof lang.level === 'number')
+          .map(lang => ({
+            name: lang.name,
+            level: lang.level
+          }));
+      }
+      
+      if (Array.isArray(personalInfo.projects) && personalInfo.projects.length > 0) updatePayload.personalInfo.projects = personalInfo.projects;
+      if (Array.isArray(personalInfo.interest) && personalInfo.interest.length > 0) updatePayload.personalInfo.interest = personalInfo.interest;
+      
+    }
+
+    // Work experience
+    if (Array.isArray(experiences) && experiences.length > 0) {
+      updatePayload.experiences = experiences;
+    }
+
+    // Qualifications (sanitize and only if non-empty)
+    if (Array.isArray(qualifications) && qualifications.length > 0) {
+      updatePayload.qualifications = qualifications
+        .filter(q => q.education)
+        .map(q => ({
+          education: q.education,
+          boardName: q.boardName || '',
+          schoolName: q.schoolName || '',
+          collegeName: q.collegeName || '',
+          universityName: q.universityName || '',
+          passingYear: q.passingYear || '',
+          marks: q.marks || '',
+          course: q.course || undefined,
+          specialization: q.specialization || '',
+          universityLocation: q.universityLocation || {
+            type: 'Point',
+            coordinates: [0, 0],
+            city: '',
+            state: '',
+            fullAddress: ''
+          },
+          collegeLocation: q.collegeLocation || {
+            type: 'Point',
+            coordinates: [0, 0],
+            city: '',
+            state: '',
+            fullAddress: ''
+          },
+          schoolLocation: q.schoolLocation || {
+            type: 'Point',
+            coordinates: [0, 0],
+            city: '',
+            state: '',
+            fullAddress: ''
+          }
+        }));
+    }
+console.log('updatePayload',updatePayload)
+    // Final DB Update
+    const updatedProfile = await Candidate.findOneAndUpdate(
+      { mobile: user.mobile },
+      { $set: updatePayload },
+      { new: true, runValidators: true }
+    );
+
+    console.log('updatedProfile',updatedProfile)
+
+
+    return res.status(200).json({ status: true, message: 'Profile updated successfully', data: updatedProfile });
   } catch (error) {
     console.error('Error saving profile data:', error);
-    res.status(500).json({ status: false, message: "Error saving profile data" });
+    return res.status(500).json({ status: false, message: 'Error saving profile data', error: error.message });
   }
 });
+
 
 router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
   try {

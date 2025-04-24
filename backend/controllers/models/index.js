@@ -67,4 +67,6 @@ module.exports.AppliedCourses = require("./appliedCourses");
 module.exports.FAQ = require("./chatfaqs");
 module.exports.Center = require("./center");
 module.exports.QualificationCourse = require("./qualificationCourse");
+module.exports.EducationBoard = require("./educationBoard");
+module.exports.Universities = require("./universities");
 // module.exports.Manager = required("");

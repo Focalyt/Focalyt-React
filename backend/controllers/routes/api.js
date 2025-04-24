@@ -36,8 +36,11 @@ const referenceRoutes = express.Router();
 const smsTemplateRoutes = express.Router();
 
 commonRoutes.post("/sendCandidateOtp", commonFunc.sendCandidateOtp);
+commonRoutes.get("/boards", commonFunc.educationBoardList);
 commonRoutes.get("/educationslist", commonFunc.education);
 commonRoutes.get("/courselist/:qualificationId", commonFunc.educationCoursesList);
+commonRoutes.get("/specializations/:courseId", commonFunc.courseSpecializationsList);
+
 commonRoutes.post("/postfiles", postFunc.uploadPostFiles);
 commonRoutes.post("/editpost", postFunc.editPost);
 commonRoutes.post("/uploadPostVideoFile", postFunc.uploadPostVideoFile);
