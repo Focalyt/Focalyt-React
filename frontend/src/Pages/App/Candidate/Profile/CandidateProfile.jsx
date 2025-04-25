@@ -12,6 +12,7 @@ const CandidateProfile = () => {
     companyName: '',
     from: '',
     to: '',
+    currentlyWorking: false,
     jobDescription: ''
   }]);
 
@@ -569,7 +570,10 @@ const CandidateProfile = () => {
 
       <button
         className="audio-intro-btn mb-3"
-        onClick={() => setShowIntroOptions(true)}
+        onClick={() => {
+          setShowRecordingModal(true);     
+          setShowIntroOptions(false);
+        }}
       >
         <i className="bi bi-mic-fill"></i>
         <span>Introduce Yourself to Build Your Resume</span>
@@ -822,11 +826,10 @@ const CandidateProfile = () => {
                     }}
                   />
                 </div>
-
-                <div className="date-range">
+                {/* <div className="date-range">
                   <span className="date-label">From:</span>
                   <input
-                    type="month"
+                    type="date"
                     value={experience.from || ''}
                     onChange={(e) => {
                       const updatedExperiences = [...experiences];
@@ -838,7 +841,7 @@ const CandidateProfile = () => {
 
                   <span className="date-label">To:</span>
                   <input
-                    type="month"
+                    type="date"
                     value={experience.to || ''}
                     onChange={(e) => {
                       const updatedExperiences = [...experiences];
@@ -847,6 +850,57 @@ const CandidateProfile = () => {
                     }}
                     className="date-input"
                   />
+                </div> */}
+
+                <div className="date-range">
+                  <span className="date-label">From:</span>
+                  <input
+                    type="date"
+                    value={experience.from || ''}
+                    onChange={(e) => {
+                      const updatedExperiences = [...experiences];
+                      updatedExperiences[index].from = e.target.value;
+                      setExperiences(updatedExperiences);
+                    }}
+                    className="date-input"
+                  />
+
+                  <span className="date-label">To:</span>
+                  {!experience.currentlyWorking ? (
+                    <input
+                      type="date"
+                      value={experience.to || ''}
+                      onChange={(e) => {
+                        const updatedExperiences = [...experiences];
+                        updatedExperiences[index].to = e.target.value;
+                        setExperiences(updatedExperiences);
+                      }}
+                      className="date-input"
+                      disabled={experience.currentlyWorking}
+                    />
+                  ) : (
+                    <span className="current-job-badge">Present</span>
+                  )}
+
+                  <div className="form-check ms-3">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id={`currently-working-${index}`}
+                      checked={experience.currentlyWorking || false}
+                      onChange={(e) => {
+                        const updatedExperiences = [...experiences];
+                        updatedExperiences[index].currentlyWorking = e.target.checked;
+                        if (e.target.checked) {
+                          updatedExperiences[index].to = '';
+                        }
+                        setExperiences(updatedExperiences);
+                      }}
+                    />
+                    <label className="form-check-label" htmlFor={`currently-working-${index}`}>
+                      I currently work here
+                    </label>
+                  </div>
                 </div>
 
                 <div className="job-description">
@@ -1450,10 +1504,7 @@ const CandidateProfile = () => {
 
       {/* Action Buttons */}
       <div className="resume-actions">
-        <div className="audio-btn upload-resume" onClick={() => setShowRecordingModal(true)}>
-          <i className="bi bi-mic-fill"></i>
-          <span>Add Voice Introduction</span>
-        </div>
+
         <label className="upload-resume">
           <i className="bi bi-upload me-2"></i> Upload Resume
           <input
@@ -1622,9 +1673,15 @@ const CandidateProfile = () => {
                                 {exp.companyName && (
                                   <p className="resume-item-subtitle">{exp.companyName}</p>
                                 )}
-                                {(exp.from || exp.to) && (
+                                {(exp.from || exp.to || exp.currentlyWorking) && (
                                   <p className="resume-item-period">
-                                    {exp.from || 'Start Date'} - {exp.to || 'Present'}
+                                    {exp.from ? new Date(exp.from).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      year: 'numeric'
+                                    }) : 'Start Date'} - {exp.currentlyWorking ? 'Present' : (exp.to ? new Date(exp.to).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      year: 'numeric'
+                                    }) : 'End Date')}
                                   </p>
                                 )}
                               </div>
@@ -1826,7 +1883,7 @@ const CandidateProfile = () => {
       )}
 
       {/* model intro  */}
-      {showIntroOptions && (
+      {profileStrength < 100 && showIntroOptions && (
         <div className="intro-options-overlay">
           <div className="intro-options-modal">
             <div className="intro-options-header">

@@ -2627,6 +2627,7 @@ router.post("/job/:jobId/registerInterviews",[isCandidate], async (req, res) => 
 //list of register for interview
 router.get("/registerInterviewsList", [isCandidate], async (req, res) => {
   try {
+    console.log('api hitting')
     const p = parseInt(req.query.page);
     const page = p || 1;
     const perPage = 10;
@@ -2732,12 +2733,19 @@ router.get("/registerInterviewsList", [isCandidate], async (req, res) => {
     const count = metadata[0]?.total || 0;
     const totalPages = Math.ceil(count / perPage);
 
-    res.render(`${req.vPath}/app/candidate/registerInterviews`, {
-      menu: "registerInterviews",
+    res.json({
       jobs: data,
       totalPages,
       page: p
     });
+    
+
+    // res.render(`${req.vPath}/app/candidate/registerInterviews`, {
+    //   menu: "registerInterviews",
+    //   jobs: data,
+    //   totalPages,
+    //   page: p
+    // });
 
   } catch (error) {
     console.error("Error fetching register interviews list:", error);

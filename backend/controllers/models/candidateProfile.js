@@ -186,6 +186,7 @@ const candidateProfileSchema = new Schema(
         Comments: String,
         FromDate: String,
         ToDate: String,
+        currentlyWorking: { type: Boolean, default: false },
       },
     ],
 

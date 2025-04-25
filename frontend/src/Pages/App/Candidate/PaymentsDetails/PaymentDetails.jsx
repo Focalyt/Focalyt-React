@@ -33,9 +33,13 @@ const PaymentDetails = () => {
             <div className="col-12 my-auto">
               <h3 className="content-header-title float-left mb-0">Pending Fee</h3>
               <div className="breadcrumb-wrapper col-12">
+
                 <ol className="breadcrumb">
                   <li className="breadcrumb-item">
                     <Link to="/candidate/dashboard">Home</Link>
+                  </li>
+                  <li className="breadcrumb-separator">
+                    <i className="fas fa-angle-right mx-1 text-muted"></i>
                   </li>
                   <li className="breadcrumb-item active">Pending Fee</li>
                 </ol>
@@ -89,43 +93,43 @@ const PaymentDetails = () => {
                         <span className="text-capitalize set-lineh">Aviation</span>
                       </div>
                     </div>
-                    
+
                     <div class="job-overview mt-1">
-                                      <ul class="mb-xl-2 mb-lg-2 mb-md-2 mb-sm-0 mb-0 list-unstyled">
-                                        <li><i class="la la-money"></i>
-                                          <h3 class="jobDetails-wrap">
-                                            N/A
-                                          </h3>
+                      <ul class="mb-xl-2 mb-lg-2 mb-md-2 mb-sm-0 mb-0 list-unstyled">
+                        <li><i class="la la-money"></i>
+                          <h3 class="jobDetails-wrap">
+                            N/A
+                          </h3>
 
-                                          <span class="text-capitalize jobDetails-wrap">
-                                            Course Fee
-                                          </span>
-                                        </li>
-                                        <li><i class="la la-shield"></i>
-                                          <h3 class="jobDetails-wrap">
-                                            Certificate
-                                          </h3>
+                          <span class="text-capitalize jobDetails-wrap">
+                            Course Fee
+                          </span>
+                        </li>
+                        <li><i class="la la-shield"></i>
+                          <h3 class="jobDetails-wrap">
+                            Certificate
+                          </h3>
 
-                                          <span class="jobDetails-wrap">
-                                            Course Level
-                                          </span>
-                                        </li>
-                                        <li><i class="la la-graduation-cap"></i>
-                                          <h3 class="jobDetails-wrap">
-                                            N/A
-                                              <span class="jobDetails-wrap">
-                                                Course Agency
-                                              </span>
-                                        </h3></li>
-                                        <li><i class="la la-money"></i>
-                                          <h3 class="jobDetails-wrap">
-                                            Unpaid
-                                              <span class="jobDetails-wrap">
-                                                Registration Status
-                                              </span>
-                                        </h3></li>
-                                      </ul>
-                                    </div>
+                          <span class="jobDetails-wrap">
+                            Course Level
+                          </span>
+                        </li>
+                        <li><i class="la la-graduation-cap"></i>
+                          <h3 class="jobDetails-wrap">
+                            N/A
+                            <span class="jobDetails-wrap">
+                              Course Agency
+                            </span>
+                          </h3></li>
+                        <li><i class="la la-money"></i>
+                          <h3 class="jobDetails-wrap">
+                            Unpaid
+                            <span class="jobDetails-wrap">
+                              Registration Status
+                            </span>
+                          </h3></li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
                 <div className="col-lg-4 col-md-5 column mt-xl-1 mt-lg-1 mt-md-1 mt-sm-3 mt-0">

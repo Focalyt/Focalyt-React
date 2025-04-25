@@ -100,7 +100,7 @@
 }
   .nav-item svg {
     color: black; /* Default color for inactive items */
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .nav-item.active svg {
@@ -149,12 +149,27 @@
     color: #fff;
     padding: 10px 10px 10px 10px;
     line-height: 1.45;
-    transition: padding 0.35sease 0s !important;
+    transition: padding 0.35s ease 0s !important;
 }
+.main-menu.menu-light .navigation li:hover > a,
+.main-menu.menu-light .navigation li.active > a {
+  padding-left: 25px;
+}
+
 .navigation li a {
   display: block;
   text-overflow: ellipsis;
   overflow: hidden;
+}
+.main-menu .main-menu-content {
+  overflow-y: auto;
+  scrollbar-width: none;      
+  -ms-overflow-style: none;
+}
+
+.main-menu .main-menu-content::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
 }
 
 .app-content.content {

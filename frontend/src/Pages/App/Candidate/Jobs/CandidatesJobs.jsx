@@ -585,7 +585,10 @@ const CandidatesJobs = () => {
                   <li className="breadcrumb-item">
                     <Link to="/candidate/dashboard">Home</Link>
                   </li>
-                  <li className="breadcrumb-item"><Link to="#">Search Job</Link></li>
+                  <li className="breadcrumb-separator">
+                    <i className="fas fa-angle-right mx-1 text-muted"></i>
+                  </li>
+                  <li className="breadcrumb-item active">Search Job</li>
                 </ol>
               </div>
             </div>

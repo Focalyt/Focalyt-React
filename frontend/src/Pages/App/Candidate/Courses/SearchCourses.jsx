@@ -72,7 +72,10 @@ const SearchCourses = () => {
                     <li className="breadcrumb-item">
                       <Link to="/candidate/dashboard">Home</Link>
                     </li>
-                    <li className="breadcrumb-item"><Link to="#">Search Courses</Link></li>
+                    <li className="breadcrumb-separator">
+                      <i className="fas fa-angle-right mx-1 text-muted"></i>
+                    </li>
+                    <li className="breadcrumb-item active">Search Courses</li>
                   </ol>
                 </div>
               </div>
@@ -132,7 +135,7 @@ const SearchCourses = () => {
                         className="video_thum img-fluid"
                         alt="Course Thumbnail"
                       />
-                     
+
                     </a>
 
                     <div className="course_inf pt-0">
@@ -140,10 +143,10 @@ const SearchCourses = () => {
 
                         <h5>{course.name || "N/A"}</h5>
                         <span className="job_cate">
-  {course.sectors?.length > 0 && course.sectors[0]?.name
-    ? course.sectors[0].name
-    : "N/A"}
-</span>
+                          {course.sectors?.length > 0 && course.sectors[0]?.name
+                            ? course.sectors[0].name
+                            : "N/A"}
+                        </span>
 
 
                         <div className="row">
@@ -271,7 +274,7 @@ const SearchCourses = () => {
           </div>
         </div>
 
-       
+
         <style>
           {`
           .course--apply {
