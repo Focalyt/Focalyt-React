@@ -12,6 +12,7 @@
   </div>
   <div class="shadow-bottom"></div>
   <div class="main-menu-content border border-left-0 border-right-0 border-bottom-0">
+      <% if (currentUser.role==0 || currentUser.role==10) { %>
     <ul class="navigation navigation-main" id="main-menu-navigation" data-menu="menu-navigation">
       <li class="nav-item <% if(menu==='dashboard') {%>active<%}%>"><a href="/admin"><i
             class="fa-solid fa-gauge"></i><span class="menu-title" data-i18n="Dashboard">Dashboard</span></a>
@@ -43,6 +44,12 @@
               <li class="<% if(menu==='courseRegistrations') {%>active<%}%>"><a href="/admin/courses/registrations"><i
                     class="fas fa-user-friends"></i><span class="menu-item"
                     data-i18n="Analytics">Registrations</span></a></li>
+                    <!-- <li class="<% if(menu==='listview') {%>active<%}%>">
+                        <a href="/admin/courses/listview">
+                            <i class="fas fa-user-friends"></i>
+                            <span class="menu-item" data-i18n="Analytics">View</span>
+                        </a>
+                    </li> -->
         </ul>
       </li>
       <li class="nav-item"><a href="#"><i class="fa-solid fa-graduation-cap"></i><span class="menu-title"
@@ -58,6 +65,22 @@
               </li>
         </ul>
       </li>
+      <li class="nav-item">
+            <a href="#"><i class="fa-solid fa-graduation-cap"></i><span class="menu-title"
+                data-i18n="Todo">Events</span></a>
+            <ul class="menu-content">
+              
+                <li class=" <% if(menu==='event') {%>active<%}%>">
+                  <a href="/admin/event/add">
+                        <i class="feather icon-plus-circle"></i>
+                        <span class="menu-item" data-i18n="Analytics">Add Event</span>
+                    </a>
+                    
+                </li>
+               
+            </ul>
+        </li>
+        
 
 
       <li class="nav-item"><a href="#"><i class="fa-solid fa-user"></i><span class="menu-title"
@@ -88,9 +111,9 @@
                   class="feather icon-plus-circle"></i><span class="menu-item" data-i18n="Analytics">Add
                   Freelancer</span></a></li>
             <% } %>
-              <li class=" <% if(menu==='college') {%>active<%}%>"><a href="/admin/college"><i
+              <!-- <li class=" <% if(menu==='college') {%>active<%}%>"><a href="/admin/college"><i
                     class="feather icon-list"></i><span class="menu-item" data-i18n="Analytics">All Colleges</span></a>
-              </li>
+              </li> -->
         </ul>
       </li>
       <li class=" nav-item"><a href="#"><i class="fa-solid fa-coins"></i><span class="menu-title"
@@ -169,6 +192,23 @@
             </li>
               <li class="<% if(menu==='chatBotList') {%>active<%}%>"><a href="/admin/chatBotFAQ/view"><i
                     class="feather icon-user"></i><span class="menu-title" data-i18n="Analytics">View</span></a>
+              </li>
+            
+        </ul>
+      </li>
+      <li class=" nav-item"><a href="#"><i class="fa-solid fa-coins"></i><span class="menu-title"
+            data-i18n="Todo">Portal Access</span></a>
+        <ul class="menu-content">
+          
+            <li class="nav-item <% if(menu==='accesstype') { %>active<% } %>">
+                  <a href="/admin/portalaccess/addaccess">
+                      <i class="fa-solid fa-money-bill"></i>
+                      <span class="menu-title" data-i18n="Todo">Add User</span>
+                  </a>
+              </li>
+              
+              <li class="<% if(menu==='viewaccess') {%>active<%}%>"><a href="/admin/portalaccess/viewaccess"><i
+                    class="feather icon-user"></i><span class="menu-title" data-i18n="Analytics">Access Type</span></a>
               </li>
             
         </ul>
@@ -263,12 +303,26 @@
                   <li class="<% if(menu==='subIndustry') {%>active<%}%>"><a href="/admin/subIndustry"><i
                         class="feather icon-list"></i><span class="menu-item" data-i18n="Analytics">Sub
                         Industries</span></a></li>
+                        <li class="nav-item"><a href="#"><i class="fa-solid fa-gear"></i><span class="menu-title"
+                              data-i18n="Todo">Education</span></a>
+                              <ul class="menu-content">
                   <li class="<% if(menu==='qualification') {%>active<%}%>"><a href="/admin/qualification"><i
-                        class="feather icon-award"></i><span class="menu-item" data-i18n="Analytics">Courses</span></a>
+                        class="feather icon-award"></i><span class="menu-item" data-i18n="Analytics">Qualification</span></a>
                   </li>
-                  <li class="<% if(menu==='subQualification') {%>active<%}%>"><a href="/admin/subQualification"><i
+                  <li class="<% if(menu==='addedu') {%>active<%}%>"><a href="/admin/qualification/addCourse"><i
+                        class="feather icon-award"></i><span class="menu-item" data-i18n="Analytics">Course</span></a>
+                  </li>
+                  <li class="<% if(menu==='subQualification') {%>active<%}%>"><a href="/admin/qualification/course/addstream"><i
                         class="feather icon-bookmark"></i><span class="menu-item"
-                        data-i18n="Analytics">Streams</span></a></li>
+                        data-i18n="Analytics">Stream</span></a></li>
+                  <!-- <li class="<% if(menu==='subQualification') {%>active<%}%>"><a href="/admin/subQualification"><i
+                        class="feather icon-bookmark"></i><span class="menu-item"
+                        data-i18n="Analytics">Stream</span></a></li> -->
+                  </ul>
+                        </li>
+                  <li class="<% if(menu==='center') {%>active<%}%>"><a href="/admin/center"><i
+                        class="feather icon-bookmark"></i><span class="menu-item"
+                        data-i18n="Analytics">Centers</span></a></li>
                   <li class="<% if(menu==='Contact') {%>active<%}%>"><a href="/admin/contact"><i
                         class="feather icon-phone"></i><span class="menu-item" data-i18n="Analytics">Contacts</span></a>
                   </li>
@@ -302,5 +356,32 @@
             </ul>
           </li>
     </ul>
+    <% } else if (currentUser.role==11) { %>
+      <ul class="navigation navigation-main" id="main-menu-navigation" data-menu="menu-navigation">
+            <li class="nav-item <% if(menu==='dashboard') {%>active<%}%>"><a href="/admin"><i
+                  class="fa-solid fa-gauge"></i><span class="menu-title" data-i18n="Dashboard">Dashboard</span></a>
+            </li>
+            <li class="nav-item"><a href="/admin/courses"><i class="fa-brands fa-google-scholar"></i><span class="menu-title"
+                  data-i18n="Todo">Courses</span></a>
+              <ul class="menu-content">
+                
+                    <li class="<% if(menu=='course') {%>active<%}%>"><a href="/admin/courses"><i
+                          class="feather icon-list"></i><span class="menu-item" data-i18n="Analytics">All Courses</span></a>
+                    </li>
+                    <li class="<% if(menu==='courseRegistrations') {%>active<%}%>"><a href="/admin/courses/registrations"><i
+                          class="fas fa-user-friends"></i><span class="menu-item"
+                          data-i18n="Analytics">Registrations</span></a></li>
+                          <!-- <li class="<% if(menu==='listview') {%>active<%}%>">
+                              <a href="/admin/courses/listview">
+                                  <i class="fas fa-user-friends"></i>
+                                  <span class="menu-item" data-i18n="Analytics">View</span>
+                              </a>
+                          </li> -->
+              </ul>
+            </li>
+
+      </ul>
+
+    <% } %>
   </div>
 </div>

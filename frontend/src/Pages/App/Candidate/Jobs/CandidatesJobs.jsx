@@ -609,19 +609,19 @@ const CandidatesJobs = () => {
                     </div>
 
                     <div className="col-xl-8 col-lg-8 col-md-8 col-sm-5 col-6 text-right my-auto">
-                      <div className="d-flex flex-wrap align-items-center justify-content-end">
+                      <div className="d-flex flex-wrap align-items-center justify-content-end gap-3">
                         <img
                           src={isMapView ? "/Assets/images/icons/map.png" : "/Assets/images/icons/map.png"}
                           // src={isMapView ? "/Assets/images/icons/map.png" : "/images/icons/listing.png"} 
                           onClick={toggleMapView}
-                          className="btn btn-link collapsed py-0 mx-0 px-1 list"
+                          className="btn btn-link collapsed py-0 mx-0 px-1 list" style={{border: 'none!important'}}
                           id="view"
                           alt="View toggle"
                         />
                         <img
                           src="/Assets/images/filtern.png"
                           className="btn btn-link collapsed py-0 mx-0"
-                          onClick={() => setFilterCollapsed(!filterCollapsed)}
+                          onClick={() => setFilterCollapsed(!filterCollapsed)} style={{border: 'none!important'}}
                           id="filter-img"
                           alt="Filter"
                         />
@@ -1254,7 +1254,10 @@ const CandidatesJobs = () => {
           `
 .btn-success-px{
 padding-inline : 1.5rem!important;
-}    
+} 
+#view, #filter-img {
+  border: none !important;
+}   
     
     `
         }

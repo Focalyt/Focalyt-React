@@ -4059,6 +4059,7 @@ router.route('/reqDocs/:courseId')
         return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
       };
       const candidateMobile = value.mobile;
+      console.log('mobile',candidateMobile)
 
       let { courseId } = req.params;
       if (typeof courseId === 'string' && mongoose.Types.ObjectId.isValid(courseId)) {
@@ -4071,7 +4072,7 @@ router.route('/reqDocs/:courseId')
 
       const candidate = await Candidate.findOne({
         mobile: candidateMobile,
-        appliedCourses: courseId  // Check if courseId exists in appliedCourses
+        'appliedCourses.courseId': courseId  // Check if courseId exists in appliedCourses
       });
 
       if (!candidate) {
