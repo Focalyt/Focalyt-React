@@ -466,6 +466,7 @@ const CandidateProfile = () => {
   useEffect(() => {
     if (window.googleMapsLoaded) {
       initializeAddressAutocomplete();
+      initializePermanentAddressAutocomplete();
     }
   }, [window.googleMapsLoaded]); // This will run whenever Google Maps becomes available 
 
@@ -552,7 +553,82 @@ const CandidateProfile = () => {
           ...prev,
           personalInfo: {
             ...(prev.personalInfo || {}),
-            location: {
+            currentAddress: {
+              fullAddress,
+              state,
+              city,
+              pincode,
+              latitude: lat,
+              longitude: lng
+            }
+          }
+        }));
+      });
+
+      console.log("Google Maps Places Autocomplete initialized successfully");
+    } catch (error) {
+      console.error("Error initializing autocomplete:", error);
+    }
+  };
+  const initializePermanentAddressAutocomplete = () => {
+    console.log("Initializing address autocomplete...");
+    const input = document.getElementById('permanent-address');
+
+    if (!input) {
+      console.warn('Input element with ID "address-location" not found. Retrying...');
+      setTimeout(initializePermanentAddressAutocomplete, 100);
+      return;
+    }
+
+    try {
+      console.log("Setting up autocomplete for input:", input);
+
+      // Create the autocomplete instance
+      const autocomplete = new window.google.maps.places.Autocomplete(input, {
+        types: ['geocode'],
+        componentRestrictions: { country: 'in' }
+      });
+
+      // Add styling to make sure the autocomplete dropdown is visible
+      input.style.backgroundColor = "#ffffff";
+      input.style.color = "#000000";
+
+
+      // Add change event listener
+      autocomplete.addListener('place_changed', () => {
+        console.log("Place changed event fired");
+        const place = autocomplete.getPlace();
+
+        if (!place || !place.geometry || !place.geometry.location) {
+          console.warn('Invalid place data selected.');
+          return;
+        }
+
+        console.log("Selected place:", place);
+
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const fullAddress = place.formatted_address || place.name || input.value;
+
+        let city = '', state = '', pincode = '';
+
+        if (Array.isArray(place.address_components)) {
+          place.address_components.forEach((component) => {
+            const types = component.types.join(',');
+            if (types.includes("postal_code")) pincode = component.long_name;
+            if (types.includes("locality")) city = component.long_name;
+            if (types.includes("administrative_area_level_1")) state = component.long_name;
+            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+          });
+        }
+
+        console.log("Extracted data:", { fullAddress, city, state, pincode, lat, lng });
+
+        setProfileData(prev => ({
+          ...prev,
+          personalInfo: {
+            ...(prev.personalInfo || {}),
+            permanentAddress: {
               fullAddress,
               state,
               city,
@@ -700,9 +776,8 @@ const CandidateProfile = () => {
         personalInfo: {
           professionalTitle: profileData?.personalInfo?.professionalTitle || '',
           professionalSummary: profileData?.personalInfo?.professionalSummary || '',
-          location: profileData?.personalInfo?.location || {},
-          currentAddress: profileData?.personalInfo?.currentAddress || '',
-          permanentAddress: profileData?.personalInfo?.permanentAddress || '',
+          currentAddress: profileData?.personalInfo?.currentAddress || {},
+          permanentAddress: profileData?.personalInfo?.permanentAddress || {},
           image: userData.image || user.image || '',
           resume: userData.resume || user.resume || '',
           voiceIntro: recordings.map(rec => ({
@@ -942,6 +1017,13 @@ const CandidateProfile = () => {
             type="file"
             accept=".pdf,.doc,.docx"
             style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                uploadCV(file, 'resume');
+                e.target.value = null; // Direct upload on file selection
+              }
+            }}
           />
         </label>
       </div>
@@ -1116,14 +1198,14 @@ const CandidateProfile = () => {
                     id="address-location"
                     className="form-control"
                     placeholder="Location"
-                    value={profileData?.personalInfo?.location?.fullAddress || ''}
+                    value={profileData?.personalInfo?.currentAddress?.fullAddress || ''}
                     onChange={(e) => {
                       setProfileData(prev => ({
                         ...prev,
                         personalInfo: {
                           ...(prev.personalInfo || {}),
-                          location: {
-                            ...(prev.personalInfo?.location || {}),
+                          currentAddress: {
+                            ...(prev.personalInfo?.currentAddress || {}),
                             fullAddress: e.target.value
                           }
                         }
@@ -1132,25 +1214,7 @@ const CandidateProfile = () => {
                   />
                 </div>
                 {/* Current Address */}
-                <div className="contact-item">
-                  <i className="bi bi-house-door"></i>
-                  <input
-                    type="text"
-                    id="current-address"
-                    className="form-control"
-                    placeholder="Current Address"
-                    value={profileData?.personalInfo?.currentAddress || ''}
-                    onChange={(e) => {
-                      setProfileData(prev => ({
-                        ...prev,
-                        personalInfo: {
-                          ...(prev.personalInfo || {}),
-                          currentAddress: e.target.value
-                        }
-                      }));
-                    }}
-                  />
-                </div>
+                
 
                 {/* Same as current address checkbox */}
                 <div className="form-check ms-3 mb-2">
@@ -1158,17 +1222,34 @@ const CandidateProfile = () => {
                     className="form-check-input"
                     type="checkbox"
                     id="same-address-check"
+                    checked={profileData.personalInfo?.permanentAddress?.sameCurrentAddress || false}
                     onChange={(e) => {
-                      if (e.target.checked && profileData?.personalInfo?.currentAddress) {
-                        setProfileData(prev => ({
-                          ...prev,
-                          personalInfo: {
-                            ...(prev.personalInfo || {}),
-                            permanentAddress: prev.personalInfo?.currentAddress || ''
-                          }
-                        }));
-                      }
+                      const isChecked = e.target.checked;
+                      const current = profileData?.personalInfo?.currentAddress || {};
+                    
+                      setProfileData(prev => ({
+                        ...prev,
+                        personalInfo: {
+                          ...(prev.personalInfo || {}),
+                          permanentAddress: isChecked
+                            ? {
+                                ...current,
+                                sameCurrentAddress: true
+                              }
+                            : {
+                                sameCurrentAddress: false,
+                                type: "Point",
+                                coordinates: [0, 0],
+                                latitude: '',
+                                longitude: '',
+                                city: '',
+                                state: '',
+                                fullAddress: ''
+                              }
+                        }
+                      }));
                     }}
+                    
                   />
                   <label className="form-check-label" htmlFor="same-address-check">
                     Same as current address
@@ -1183,13 +1264,16 @@ const CandidateProfile = () => {
                     id="permanent-address"
                     className="form-control"
                     placeholder="Permanent Address"
-                    value={profileData?.personalInfo?.permanentAddress || ''}
+                    value={profileData?.personalInfo?.permanentAddress.fullAddress || ''}
                     onChange={(e) => {
                       setProfileData(prev => ({
                         ...prev,
                         personalInfo: {
                           ...(prev.personalInfo || {}),
-                          permanentAddress: e.target.value
+                          permanentAddress: {
+                            ...(prev.personalInfo?.permanentAddress || {}),
+                            fullAddress: e.target.value
+                          }
                         }
                       }));
                     }}
@@ -2352,18 +2436,12 @@ const CandidateProfile = () => {
                             <span>{profileData.email}</span>
                           </div>
                         )}
-                        {profileData?.personalInfo?.location?.fullAddress && (
+                        {profileData?.personalInfo?.currentAddress?.fullAddress && (
 
                           <div className="resume-contact-item">
                             <i className="bi bi-geo-alt-fill"></i>
-                            <span>{profileData.personalInfo.location.fullAddress}</span>
-                            <span>{profileData.personalInfo.location.fullAddress}</span>
-                          </div>
-                        )}
-                        {profileData?.personalInfo?.currentAddress && (
-                          <div className="resume-contact-item">
-                            <i className="bi bi-house-door-fill"></i>
-                            <span>Current: {profileData.personalInfo.currentAddress}</span>
+                            <span>{profileData.personalInfo.currentAddress.fullAddress}</span>
+                            <span>{profileData.personalInfo.currentAddress.fullAddress}</span>
                           </div>
                         )}
 
@@ -2371,7 +2449,7 @@ const CandidateProfile = () => {
                         {profileData?.personalInfo?.permanentAddress && (
                           <div className="resume-contact-item">
                             <i className="bi bi-house-fill"></i>
-                            <span>Permanent: {profileData.personalInfo.permanentAddress}</span>
+                            <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
                           </div>
                         )}
 

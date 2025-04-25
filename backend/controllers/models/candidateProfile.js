@@ -38,8 +38,8 @@ const candidateProfileSchema = new Schema(
       twitterUrl: { type: String },
       professionalTitle: { type: String },
       professionalSummary: { type: String },
-      location: {
-        type: {
+      currentAddress: {
+       type: {
           type: String,
           enum: ["Point"],
           default: "Point"
@@ -54,8 +54,23 @@ const candidateProfileSchema = new Schema(
         state: { type: String },
         fullAddress: { type: String }
       },
-      currentAddress: { type: String },
-      permanentAddress: { type: String },
+      permanentAddress: {
+        sameCurrentAddress:{type:Boolean,default:false},
+        type: {
+           type: String,
+           enum: ["Point"],
+           default: "Point"
+         },
+         coordinates: {
+           type: [Number],
+           default: [0, 0]
+         },
+         latitude: { type: String },
+         longitude: { type: String },
+         city: { type: String },
+         state: { type: String },
+         fullAddress: { type: String }
+       },
       image: { type: String },
       jobLocationPreferences: [
         {
@@ -72,6 +87,20 @@ const candidateProfileSchema = new Schema(
       certifications: [{
         certificateName: { type: String },
         orgName: { type: String },
+        orgLocation: {
+          type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+          },
+          coordinates: {
+            type: [Number],
+            default: [0, 0]
+          },
+          city: String,
+          state: String,
+          fullAddress: String
+        },
         year: { type: String }
       }],
       languages: [{
@@ -116,6 +145,7 @@ const candidateProfileSchema = new Schema(
       },
     ],
     appliedJobs: [{ jobId: { type: ObjectId, ref: "Vacancy" } }],
+    appliedEvents: [{ EventId: { type: ObjectId, ref: "Event" } }],
     appliedCourses: [
       {
         courseId: { type: ObjectId, ref: "courses" }, // Changed from type to courseId
