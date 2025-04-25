@@ -12,7 +12,6 @@ const CandidateProfile = () => {
     companyName: '',
     from: '',
     to: '',
-    currentlyWorking: false,
     jobDescription: ''
   }]);
 
@@ -73,6 +72,42 @@ const CandidateProfile = () => {
   const [suggestionIndex, setSuggestionIndex] = useState(null); // active input index
   const [coursesList, setCoursesList] = useState({}); // इंडेक्स के आधार पर कोर्सेस स्टोर करेगा
   const [specializationsList, setSpecializationsList] = useState({}); // इंडेक्स के आधार पर स्पेशलाइजेशन स्टोर करेगा
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
+  const [videoStream, setVideoStream] = useState(null);
+  const videoChunksRef = useRef([]);
+  const videoRecorderRef = useRef(null);
+
+  const startVideoRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setVideoStream(stream);
+
+      const recorder = new MediaRecorder(stream);
+      videoRecorderRef.current = recorder;
+      videoChunksRef.current = [];
+
+      recorder.ondataavailable = e => videoChunksRef.current.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(videoChunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        console.log("Video URL", url); // Preview or upload it
+        // save it to state if needed
+      };
+
+      recorder.start();
+      setIsRecordingVideo(true);
+    } catch (err) {
+      console.error("Video recording failed:", err);
+    }
+  };
+
+  const stopVideoRecording = () => {
+    if (videoRecorderRef.current) {
+      videoRecorderRef.current.stop();
+      videoStream.getTracks().forEach(track => track.stop());
+      setIsRecordingVideo(false);
+    }
+  };
 
 
   // Backend URL
@@ -141,24 +176,24 @@ const CandidateProfile = () => {
   // जब भी शिक्षा चुनी जाए, तब कोर्स फेच करें
   const handleEducationChange = async (e, index) => {
     const educationId = e.target.value;
-  
+
     const updated = [...educations];
     updated[index].education = educationId;
     updated[index].course = '';
     updated[index].specialization = '';
     setEducations(updated);
-  
+
     const educationName = educationList.find(ed => ed._id === educationId)?.name;
-  
+
     if (educationName === 'ITI') {
       const courseRes = await fetchCoursesByEducation(educationId);
       if (courseRes.length > 0) {
         const itiCourseId = courseRes[0]._id;
-  
+
         // Set course ID in state
         updated[index].course = itiCourseId;
         setEducations([...updated]);
-  
+
         // Fetch specialization for this course
         const specializations = await fetchSpecializationsByCourse(itiCourseId);
         setSpecializationsList(prev => ({
@@ -175,7 +210,7 @@ const CandidateProfile = () => {
       }));
     }
   };
-  
+
 
   // For creating editable content
   const createEditable = (content, placeholder, onChange, id = '') => (
@@ -192,6 +227,9 @@ const CandidateProfile = () => {
       {content}
     </div>
   );
+  useEffect(() => {
+    console.log("✅ Is Declaration Checked:", declaration.isChecked);
+  }, [declaration.isChecked]);
 
   // Calculate profile strength
   useEffect(() => {
@@ -569,6 +607,11 @@ const CandidateProfile = () => {
   // Save resume function
   const handleSaveCV = async () => {
     try {
+      if (!declaration?.isChecked) {
+        alert("Please accept the declaration before saving your resume.");
+        return;
+      }
+
       const token = localStorage.getItem('token');
       const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
 
@@ -579,11 +622,13 @@ const CandidateProfile = () => {
         mobile: profileData?.mobile || '',
         sex: profileData?.sex || '',
         dob: profileData?.dob || '',
-        whatsapp: profileData?.whatsapp || '',      
+        whatsapp: profileData?.whatsapp || '',
         personalInfo: {
           professionalTitle: profileData?.personalInfo?.professionalTitle || '',
           professionalSummary: profileData?.personalInfo?.professionalSummary || '',
           location: profileData?.personalInfo?.location || {},
+          currentAddress: profileData?.personalInfo?.currentAddress || '',
+          permanentAddress: profileData?.personalInfo?.permanentAddress || '',
           image: userData.image || user.image || '',
           resume: userData.resume || user.resume || '',
           voiceIntro: recordings.map(rec => ({
@@ -612,7 +657,7 @@ const CandidateProfile = () => {
           interest: interests.filter(i => i.trim() !== ''),
           declaration: declaration
         },
-      
+
         experiences: experiences.map(e => ({
           jobTitle: e.jobTitle || '',
           companyName: e.companyName || '',
@@ -620,7 +665,7 @@ const CandidateProfile = () => {
           ToDate: e.ToDate || '',
           jobDescription: e.jobDescription || ''
         })),
-      
+
         qualifications: educations.map(edu => ({
           education: edu.education,
           boardName: edu.boardName,
@@ -631,7 +676,7 @@ const CandidateProfile = () => {
           marks: edu.marks,
           course: edu.course,
           specialization: edu.specialization,
-      
+
           universityLocation: edu.universityLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -639,7 +684,7 @@ const CandidateProfile = () => {
             state: '',
             fullAddress: ''
           },
-      
+
           collegeLocation: edu.collegeLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -647,7 +692,7 @@ const CandidateProfile = () => {
             state: '',
             fullAddress: ''
           },
-      
+
           schoolLocation: edu.schoolLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -657,7 +702,7 @@ const CandidateProfile = () => {
           }
         }))
       };
-      
+
       console.log("📤 CV Payload being sent to backend:", cvPayload);
 
       const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
@@ -802,17 +847,26 @@ const CandidateProfile = () => {
 
   return (
     <div className="resume-builder-container">
-
-      <button
-        className="audio-intro-btn mb-3"
-        onClick={() => {
-          setShowRecordingModal(true);     
-          setShowIntroOptions(false);
-        }}
-      >
-        <i className="bi bi-mic-fill"></i>
-        <span>Introduce Yourself to Build Your Resume</span>
-      </button>
+      <div className='d-flex align-items-center mb-3 mediawidth'>
+        <button
+          className="audio-intro-btn"
+          onClick={() => {
+            setShowRecordingModal(true);
+            setShowIntroOptions(false);
+          }}
+        >
+          <i className="bi bi-mic-fill"></i>
+          <span>Introduce Yourself to Build Your Resume</span>
+        </button>
+        <label className="upload-resume">
+          <i className="bi bi-upload me-2"></i> Upload Resume
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            style={{ display: 'none' }}
+          />
+        </label>
+      </div>
 
       <div className="resume-builder-header mb-4">
         <h2 className="resume-builder-title">Professional Resume Builder</h2>
@@ -1008,6 +1062,70 @@ const CandidateProfile = () => {
                     }}
                   />
                 </div>
+                {/* Current Address */}
+                <div className="contact-item">
+                  <i className="bi bi-house-door"></i>
+                  <input
+                    type="text"
+                    id="current-address"
+                    className="form-control"
+                    placeholder="Current Address"
+                    value={profileData?.personalInfo?.currentAddress || ''}
+                    onChange={(e) => {
+                      setProfileData(prev => ({
+                        ...prev,
+                        personalInfo: {
+                          ...(prev.personalInfo || {}),
+                          currentAddress: e.target.value
+                        }
+                      }));
+                    }}
+                  />
+                </div>
+
+                {/* Same as current address checkbox */}
+                <div className="form-check ms-3 mb-2">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="same-address-check"
+                    onChange={(e) => {
+                      if (e.target.checked && profileData?.personalInfo?.currentAddress) {
+                        setProfileData(prev => ({
+                          ...prev,
+                          personalInfo: {
+                            ...(prev.personalInfo || {}),
+                            permanentAddress: prev.personalInfo?.currentAddress || ''
+                          }
+                        }));
+                      }
+                    }}
+                  />
+                  <label className="form-check-label" htmlFor="same-address-check">
+                    Same as current address
+                  </label>
+                </div>
+
+                {/* Permanent Address */}
+                <div className="contact-item">
+                  <i className="bi bi-house-fill"></i>
+                  <input
+                    type="text"
+                    id="permanent-address"
+                    className="form-control"
+                    placeholder="Permanent Address"
+                    value={profileData?.personalInfo?.permanentAddress || ''}
+                    onChange={(e) => {
+                      setProfileData(prev => ({
+                        ...prev,
+                        personalInfo: {
+                          ...(prev.personalInfo || {}),
+                          permanentAddress: e.target.value
+                        }
+                      }));
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1151,7 +1269,6 @@ const CandidateProfile = () => {
                 </div>
               </div>
             ))}
-
             <button
               className="add-button"
               onClick={() => {
@@ -1925,14 +2042,7 @@ const CandidateProfile = () => {
 
               <div className="declaration-container">
                 <div
-                  className="declaration-content"
-                  contentEditable
-                  suppressContentEditableWarning={true}
-                  data-placeholder="I hereby declare that all the information provided above is true to the best of my knowledge."
-                  onBlur={(e) => setDeclaration({
-                    ...declaration,
-                    text: e.target.innerText
-                  })}
+                  className="d-flex align-items-center declaration-content"
                 >
                   <input
                     type="checkbox"
@@ -1941,8 +2051,13 @@ const CandidateProfile = () => {
                     onChange={(e) => setDeclaration({
                       ...declaration,
                       isChecked: e.target.checked
-                    })}
-                  /> {declaration.text}
+
+                    },
+                      console.log('Is Declaration Checked:', declaration.isChecked)
+                    )}
+                  />
+
+                  <p className='ms-2'>I hereby declare that all the information provided above is true to the best of my knowledge.</p>
                 </div>
               </div>
             </div>
@@ -2146,14 +2261,27 @@ const CandidateProfile = () => {
                           </div>
                         )}
                         {profileData?.personalInfo?.location?.fullAddress && (
-                       
+
                           <div className="resume-contact-item">
                             <i className="bi bi-geo-alt-fill"></i>
                             <span>{profileData.personalInfo.location.fullAddress}</span>
                             <span>{profileData.personalInfo.location.fullAddress}</span>
                           </div>
                         )}
+                        {profileData?.personalInfo?.currentAddress && (
+                          <div className="resume-contact-item">
+                            <i className="bi bi-house-door-fill"></i>
+                            <span>Current: {profileData.personalInfo.currentAddress}</span>
+                          </div>
+                        )}
 
+                        {/* Add permanent address */}
+                        {profileData?.personalInfo?.permanentAddress && (
+                          <div className="resume-contact-item">
+                            <i className="bi bi-house-fill"></i>
+                            <span>Permanent: {profileData.personalInfo.permanentAddress}</span>
+                          </div>
+                        )}
 
                       </div>
                     </div>
@@ -2184,15 +2312,9 @@ const CandidateProfile = () => {
                                 {exp.companyName && (
                                   <p className="resume-item-subtitle">{exp.companyName}</p>
                                 )}
-                                {(exp.from || exp.to || exp.currentlyWorking) && (
+                                {(exp.from || exp.to) && (
                                   <p className="resume-item-period">
-                                    {exp.from ? new Date(exp.from).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      year: 'numeric'
-                                    }) : 'Start Date'} - {exp.currentlyWorking ? 'Present' : (exp.to ? new Date(exp.to).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      year: 'numeric'
-                                    }) : 'End Date')}
+                                    {exp.from || 'Start Date'} - {exp.to || 'Present'}
                                   </p>
                                 )}
                               </div>
@@ -2366,7 +2488,6 @@ const CandidateProfile = () => {
                 {declaration?.text && (
                   <div className="resume-declaration">
                     <h2 className="resume-section-title">Declaration</h2>
-                    <p>{declaration.text}</p>
                     <p>{declaration.text}</p>
                   </div>
                 )}
@@ -2724,6 +2845,15 @@ width: 100%;
 .board-autocomplete-wrapper {
   position: relative;
 }
+  @media(max-width:768px){
+  .mediawidth{
+  flex-direction:column;}
+  .mediawidth button{
+  margin-bottom: 15px;
+  font-size:11px;}
+  .content h2{
+  font-size:1.1rem}
+  }
   
 `}
       </style>

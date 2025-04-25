@@ -51,6 +51,8 @@ const candidateProfileSchema = new Schema(
         state: { type: String },
         fullAddress: { type: String }
       },
+      currentAddress: { type: String },
+      permanentAddress: { type: String },
       image: { type: String },
       jobLocationPreferences: [
         {
