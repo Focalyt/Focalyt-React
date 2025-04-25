@@ -1359,7 +1359,14 @@ const CourseDetails = () => {
           </div>
         </div>
       </div>
-
+<style>
+  {
+    `
+    .contact-info {
+    display: inline-block}
+    `
+  }
+</style>
 
     </>
   );

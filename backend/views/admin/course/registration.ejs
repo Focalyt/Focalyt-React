@@ -34,6 +34,42 @@
                                                 <button class="btn btn-success waves-effect waves-light text-white d-inline" id="submit-btn">Go</button>
                                                 <a class="extra-ss btn btn-danger d-inline waves-effect waves-light mb-2 text-white mx-1" href="/admin/courses/registrations">RESET</a>
                                             </div>
+                                            <div class="col-xl-6 text-right mt-3">
+                                                <div class="custom-control custom-checkbox">
+                                                    <input type="checkbox" class="custom-control-input" id="filterToggle">
+                                                    <label class="custom-control-label" for="filterToggle"></label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row justify-content-end advanced-filters" style=" transition: 0.3s ease-in-out; overflow: hidden;">
+                                            <div class="col-xl-2 ml-1 mt-1">
+                                                <label>Course Fee Type</label>
+                                        <select class="form-control text-capitalize" name="courseType" id="courseType">
+                                            <option value="">Select</option>
+                                            <option class="text-capitalize" value="Free">Free</option>
+                                            <option class="text-capitalize" value="Paid">Paid</option>
+                                            
+                                        </select>
+                                            </div>
+                                            <div class="col-xl-2 ml-1 mt-1">
+                                                <label>From Date</label>
+                                                <input type="date" class="form-control" id="from-date" name="FromDate"
+                                                    value="<%= data.FromDate %>">
+                                            </div>
+                                            <div class="col-xl-2 ml-1 mt-1">
+                                                <label>To Date</label>
+                                                <input type="date" class="form-control" id="to-date" name="ToDate"
+                                                    value="<%= data.ToDate %>">
+                                            </div>
+                                           
+                                            <input type="hidden" class="form-control" name="status" value="true">
+                                            <div style="margin-top: 2.5rem !important;" class="col-xl-3 text-center mt-3">
+                                                <button
+                                                    class="btn btn-success  waves-effect waves-light  text-white d-inline "
+                                                    id="submit-btn">Go</button>
+                                                <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-1"
+                                                    href="/admin/registrations">RESET</a>
+                                            </div>
                                         </div>
                                     </form>
                                 </div>
@@ -46,13 +82,23 @@
                                             <th class="three column wide" width="18%" style="cursor: pointer;" onclick="sorting('createdAt')">DATE <i  class="fa-solid fa-arrow-down success cursors pointer" value="1"></i></th>
                                             <th class="three column wide candidate-wrap" width="19%" onclick="sorting('name')">CANDIDATE NAME</th>
                                             <th class="one column wide" width="15%">MOBILE NO.</th>
+                                            <th class="one column wide" width="15%">Email</th>
+                                            <th class="one column wide" width="15%">Document Status</th>
+                                            <th class="one column wide" width="15%">Lead Status</th>
+                                            <th class="one column wide" width="15%">Demo Status</th>
+                                            <th class="one column wide" width="15%">Center Status</th>
                                             <th class="one column wide" width="7%"  style="cursor: pointer;" onclick="sorting('courseName')">Course <i class="" value="1"></i></th>
                                             <th class="one column wide" width="7%"  style="cursor: pointer;" onclick="sorting('registrationCharges')">Reg Fee <i  class="" value="1"></i></th>
                                             <th class="one column wide" width="7%"  style="cursor: pointer;" >Reg Status <i  class="" value="1"></i></th>
                                             <th class="one column wide" width="7%"  style="cursor: pointer;" onclick="sorting('sector')">Sector <i class="" value="1"></i></th>
+                                            <th class="one column wide" width="10%"  style="cursor: pointer;">Course Fee Type</th>
+                                            <th class="one column wide" width="10%"  style="cursor: pointer;">Registered By</th>
+                                            
                                             <% if (view === false) { %>
                                             <th class="one column wide" width="10%">Action</th>
                                             <% } %>
+                                            <th class="one column wide" width="10%">View Docs</th>
+                                            <th class="one column wide" width="10%">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -68,6 +114,61 @@
                                                 <%= l.mobile ? l.mobile : "N/A" %>
                                             </td>
                                             <td class="text-capitalize">
+                                                <%= l.email ? l.email : "N/A" %>
+                                            </td>
+                                            <td class="text-capitalize">
+                                                <!-- <div class="circular-progress-container" data-percent="<%= l.docProgress.percent %>">
+                                                    <% if (l.docProgress.totalRequired && l.docProgress.totalRequired > 0) { %>
+                                                      <svg width="40" height="40">
+                                                        <circle class="circle-bg" cx="20" cy="20" r="16"></circle>
+                                                        <circle class="circle-progress" cx="20" cy="20" r="16"></circle>
+                                                      </svg>
+                                                    <% } %>
+                                                    <div class="progress-text">
+                                                      <%= l.docProgress.totalRequired && l.docProgress.totalRequired > 0 ? l.docProgress.percent + '%' : 'NDR' %>
+                                                    </div>
+                                                  </div> -->
+                                                  <% if (l.docProgress.totalRequired && l.docProgress.totalRequired > 0) { %>
+                                                  <div class="circular-progress-container" data-percent=<%= l.docProgress.percent %>>
+                                                    <svg width="40" height="40">
+                                                        <circle class="circle-bg" cx="20" cy="20" r="16">
+                                                        </circle>
+                                                        <circle class="circle-progress" cx="20" cy="20"
+                                                            r="16"></circle>
+                                                    </svg>
+                                                    <div class="progress-text"></div>
+                                                </div>
+                                      <% } else { %>
+                                        NDR
+                                      <% } %>
+                                                  
+                                            </td>
+                                            <td class="text-capitalize">
+                                                <select onchange="statusUpdate ('<%= l._id%>')" class="form-control leadsSelect">
+                                                    <option value="">Select</option>
+                                                    <option value="Hot">Hot</option>
+                                                    <option value="Warm">Warm</option>
+                                                    <option value="Cold">Cold</option>
+                                                  </select>
+                                            </td>
+                                            <td class="text-capitalize">
+                                                <select class="form-control leadsSelect">
+                                                    <option value="">Select</option>
+                                                    <option value="Hot">Demo Scheduled</option>
+                                                    <option value="Warm">Demo Pending</option>
+                                                    <option value="Cold">Demo Done</option>
+                                                  </select>
+                                                  
+                                            </td>
+                                            <td class="text-capitalize">
+                                                <select class="form-control leadsSelect">
+                                                    <option value="">Select</option>
+                                                    <option value="Hot">Add Center</option>
+                                                    <option value="Warm">Rejected</option>
+                                                    <option value="Cold">Drop Out</option>
+                                                  </select>
+                                            </td>
+                                            <td class="text-capitalize">
                                                 <%= l.courseName ? l.courseName : "N/A" %>
                                             </td>
                                             <td class="text-capitalize">
@@ -79,6 +180,8 @@
                                             <td class="text-capitalize">
                                                 <%= l.sector ? l.sector : "N/A" %>
                                             </td>
+                                            <td class="text-capitalize">Free/paid</td>
+                                            <td class="text-capitalize"><%= l.registeredByName ? l.registeredByName : "N/A" %></td>
                                             <% if (view === false) { %>
                                             <td class="text-capitalize">
                                                 <a class="btn <% if (l.courseStatus == 0) { %>btn-danger<% } else { %>btn-success<% } %> waves-effect waves-light text-white d-inline btn-sm" onclick="handleActionClick('<%= l._id %>', '<%= l.remarks %>', '<%= l.assignDate %>', '<%= l.url %>')">
@@ -90,6 +193,14 @@
                                                 </a>
                                             </td>
                                             <% } %>
+                                            <td class="text-capitalize">
+                                                <a href="/admin/courses/<%= l.courseId %>/<%= l.candidateId %>/docsview" class="btn btn-danger waves-effect waves-light text-white d-inline btn-sm" style="padding: 8px;">
+                                                   View Docs
+                                                </a>
+                                            </td>
+                                            <td class="text-capitalize">
+                                                <i class="feather icon-log-in fa-lg  primary cursor-pointer loginIcon" title="" onclick="loginAs('<%=l.mobile %>')"></i>
+                                            </td>
                                         </tr>
                                         <% }) %>
                                     </tbody>
@@ -196,6 +307,79 @@
     <!--Assign/Due modal end-->
 </div>
 <% include ../partials/footer %>
+<style>
+    #tblexportData td{
+        white-space: nowrap;
+    }
+    .circular-progress-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.circular-progress-container svg {
+  transform: rotate(-90deg);
+}
+
+.circle-bg {
+  fill: none;
+  stroke: #e6e6e6;
+  stroke-width: 4;
+}
+
+.circle-progress {
+  fill: none;
+  stroke: #FC2B5A;
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.circular-progress-container .progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: #333;
+}
+.leadsSelect{
+    width: 75px;
+}
+</style>
+<script>
+    document.querySelectorAll('.circular-progress-container').forEach(container => {
+        const percent = container.getAttribute('data-percent');
+        console.log(percent, "percent")
+        const circle = container.querySelector('circle.circle-progress');
+        console.log(circle, "circle")
+        const radius = 16;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percent / 100) * circumference;
+
+        circle.style.strokeDasharray = circumference;
+        circle.style.strokeDashoffset = offset;
+
+        // Set text also if needed
+        container.querySelector('.progress-text').innerText = percent + '%';
+    });
+       </script>
+  <script>
+    function statusUpdate (appliedId){
+
+        axios.post(`/admin/courses/leadStatus`,appliedId)
+        .then(response => {
+            console.log("aaaaaa");
+            
+        })
+        .catch(error => {
+            console.error(error);
+            alert('An error occurred while assigning the course.');
+        });
+
+    }
+  </script>
+  
 <script>
     function handleActionClick(id, remarks, assignDate, url) {
 		const formattedDate = new Date(assignDate).toLocaleDateString('en-GB', {
@@ -249,6 +433,20 @@
 //     const day = String(date.getDate()).padStart(2, '0'); // Add leading zero if needed
 //     return `${year}-${month}-${day}`;
 // }
+function loginAs(mobile){
+						$.ajax({
+								type: "POST",
+								data: {mobile, module: 'candidate'},
+								url: "/api/loginAsCandidate",
+								success: (data) => {
+									if(data.role===3) {
+										localStorage.setItem("candidate", data.name);
+                                        localStorage.setItem("token", data.token);
+                                        window.location.href = "/candidate/dashboard";
+									}									
+								}
+							});
+					}
 
     function updateProfileVisible(mobile,visibility){
         let field;
@@ -389,3 +587,37 @@
         return hasError
     }
 </script>
+<!-- filters  -->
+ <script>
+   document.addEventListener('DOMContentLoaded', function(){
+    const filterToggle = document.getElementById('filterToggle');
+    const advancedFilter = document.querySelector('.advanced-filter');
+    filterToggle.addEventListener('change', function(){
+        if (this.checked){
+            advancedFilter.style.display = 'block';
+            setTimeout(()=>{
+                advancedFilter.style.maxheight= '300px';
+                advancedFilter.style.opacity ='1';
+            }, 10) 
+        }
+        else{
+            advancedFilter.style.display= 'none';
+            setTimeout(() =>{
+                advancedFilter.style.maxheight= '0px';
+                advancedFilter.style.opacity ='0';
+            }, 300)
+            
+        }
+    })
+
+   })
+ </script>
+ <style>
+    .advanced-filters {
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+ </style>
+</body>
+</html>

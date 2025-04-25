@@ -1,0 +1,742 @@
+<% include ../partials/header %>
+    <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+        <div class="content-header-left col-md-12 col-12 mb-2">
+            <div class="row breadcrumbs-top">
+                <div class="col-12">
+                    <h3 class="content-header-title float-left mb-0">Add Leads</h3>
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+                            <li class="breadcrumb-item active">Add Leads</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="content-body">
+        <% include ../partials/flash %>
+            <section id="add-leads">
+                <div class="row">
+                    <div class="col-xl-12 col-lg-12">
+                        <div class="card">
+                            <div class="card-header border border-top-0 border-left-0 border-right-0">
+                                <h4 class="card-title pb-1">Add Lead </h4>
+                            </div>
+                            <div class="card-content">
+                                <div class="card-body">
+                                    <div class="row align-items-center">
+                                        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-1">
+                                            <label>Candidate Number
+                                                <span class="asterisk">*</span></label>
+                                            <input type="tel" class="form-control" pattern="[0-9]{10}"
+                                            onKeyPress="if(this.value.length==10) return false;"
+                                                maxlength="10" required name="number"
+                                                placeholder="Candidate Number" value='' id="user-input" />
+                                        </div>
+
+                                        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-1 d-none"
+                                            id="otp-field">
+                                            <label>Enter OTP
+                                                <span class="asterisk">*</span></label>
+                                            <input type="number" class="form-control" required name="otp" id="user-otp"
+                                                palaceholder="Enter OTP" value='' />
+                                        </div>
+                                        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 " id="sendbtndiv">
+
+                                            <button id="send-otp" type="button"
+                                                class="btn btn-success px-lg-2 ml-1 waves-effect waves-light">
+                                                Send OTP
+                                            </button>
+
+                                        </div>
+                                        <div class="row align-items-center d-none" id="otp-actions">
+                                            <div class="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
+                                                <a class="btn btn-success float-right btn-inline waves-effect waves-light text-white btn-block"
+                                                    id="verify-login-btn">
+                                                    Verify</a>
+                                            </div>
+                                            <div class="colx-l-6 col-lg-6 col-md-6 col-sm-6 col-6">
+                                                <div class="btn btn-success btn-block waves-effect waves-light text-white btn-block"
+                                                    id="resend-btn">Resend
+                                                    OTP</div>
+                                            </div>
+                                        </div>
+
+
+
+                                        <% if(course.center?.length>0) { %>
+                                            <div id="selectCenter"
+                                                class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-md-0 mb-1 d-none">
+                                                <select onchange="removeDisabled('applydiv')" class="form-control"
+                                                    id="centerSelect" name="center">
+                                                    <option value="">Select Training Center</option>
+                                                    <%course.center.forEach((c,i)=>{%>
+                                                        <option value="<%=c._id %>">
+                                                            <%=c.name %>
+                                                        </option>
+                                                        <%})%>
+                                                </select>
+                                            </div>
+                                            <% } %>
+                                                <div id="applydiv"
+                                                    class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 d-none">
+                                                    <button id="add__centers" type="button"
+                                                        class="btn btn-success px-lg-2 ml-1 waves-effect waves-light">
+                                                        Apply Course
+                                                    </button>
+                                                </div>
+                                                <script>
+                                                    function removeDisabled(id) {
+                                                        console.log(id)
+                                                        document.getElementById(id).classList.remove('d-none');
+
+                                                    }
+                                                </script>
+
+
+
+                                                <!-- <div id="error" style="color:red;font-weight: bold; display:none;">
+                                            </div>
+                                            <div id="success" style="color:green;font-weight: bold; display:none;">
+                                            </div> -->
+
+
+
+                                    </div>
+                                    <form action="" id="candidateDetails" class="row d-none">
+
+                                        <div class="col-12">
+                                            
+                                                <div class="row">
+                                                    
+                                                        <% if(course.center?.length>0) { %>
+                                                            <div id="selectCenterNewLead" class="col-xl-3 mb-1">
+                                                                <label>Select Training Center <span class="mandatory">*</span></label>
+                                                                <select class="form-control" id="centerSelectNewLead"
+                                                                    name="selectedCenter" required>
+                                                                    <option value="">Select Option</option>
+                                                                    <%course.center.forEach((c,i)=>{%>
+                                                                        <option value="<%=c._id %>">
+                                                                            <%=c.name %>
+                                                                        </option>
+                                                                        <%})%>
+                                                                </select>
+                                                            </div>
+                                                            <% } %>
+                                                    
+                                                    <div class="col-xl-3 mb-1">
+                                                        <label>Name <span class="mandatory">*</span></label>
+                                                        <input type="text" class="form-control" name="name" maxlength="50"
+                                                            required value="" />
+                                                    </div>
+                                                    <div class="col-xl-3 mb-1">
+                                                        <label>Email <span class="mandatory">*</span></label>
+                                                        <input type="email" class="form-control" maxlength="50" name="email"
+                                                            value="" required />
+                                                    </div>
+                                                    <div class="col-xl-3 mb-1">
+                                                        <label>Address</label>
+                                                        <input type="text" class="form-control" maxlength="100"
+                                                            name="address" value="" />
+                                                    </div>
+                                                   
+                                                    <div class="col-xl-3 mb-1">
+                                                        <label>State <span class="mandatory">*</span></label>
+                                                        <select style="cursor: pointer;" class="form-control" name="state"
+                                                            id="state" required>
+                                                            <option>Select Option</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-xl-3 mb-1">
+                                                        <label>City <span class="mandatory">*</span></label>
+                                                        <select style="cursor: pointer;" class="form-control" name="city"
+                                                            required id="city">
+                                                            <option>Select Option</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-xl-2 mb-1" id="pd-gender">
+                                                        <label>Gender<span class="mandatory"> *</span></label>
+                                                        <select class="form-control" name="sex" id="user-gender" value="">
+                                                            <option value="">Please select</option>
+                                                            <option value="Male">Male</option>
+                                                            <option value="Female">Female
+                                                            </option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-xl-2 mb-1" id="dob-field">
+                                                        <label>Date of Birth<span class="mandatory"> *</span></label>
+                                                        <input type="date" name="dob" class="form-control" value=""
+                                                            id="candidate-dob">
+                                                    </div>
+                                                    <div class="col-xl-3 mb-1" id="pd-number">
+                                                        <label>WhatsApp Number <span class="mandatory"> *</span></label>
+                                                        <input type="tel" maxlength="10" name="whatsapp"
+                                                            class="form-control" value="" id="candidate-whatsapp-number">
+                                                    </div>
+    
+                                                    <div class="col-xl-3 mb-1" id="highestQuali">
+                                                        <label>Highest Qualification <span class="mandatory">
+                                                                *</span></label>
+                                                        <select class="form-control single-field" value=""
+                                                            name="highestQualification" id="quali">
+                                                            <option value="">Select Highest Qualification</option>
+                                                            <% highestQualification.forEach((q)=> {%>
+                                                                <option value="<%=q._id%>" class="text-capitalize">
+                                                                    <%=q.name%>
+    
+                                                                </option>
+    
+                                                                <%} )%>
+    
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                        </div>
+    
+    
+    
+    
+    
+                                        <div class="col-xl-3 mb-1">
+    
+                                            <button type="submit" class="form-control btn btn-success px-lg-2 waves-effect waves-light"> Submit</button>
+                                        </div>
+    
+                                    </form>
+                                </div>
+                             
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <% if (course.docsRequired && course.docsRequired.length> 0) { %>
+
+
+            <section id="add-docs" class="d-none">
+                <div class="row">
+                    <div class="col-xl-12 col-lg-12">
+                        <div class="card">
+                            <div class="card-header border border-top-0 border-left-0 border-right-0">
+                                <h4 class="card-title pb-1">Upload Student Documents</h4>
+                            </div>
+                            <div class="card-content">
+                                <div class="card-body">
+                                        <% course.docsRequired.forEach((doc, index)=> { %>
+
+                                            <div class=" file-containers row align-items-center">
+                                                <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-1">
+                                                    <label>Add <%= doc.Name %>
+                                                            <span class="asterisk">*</span></label>
+                                                    <input type="file" class="form-control file-inputs fileInput"
+                                                        onchange="validateFile(this )" required name="file"
+                                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                        id="file<%= doc.Name %>" />
+                                                </div>
+                                                <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12 mb-m mb-1">
+                                                    <button id="add__dcs" type="button"
+                                                        class="btn btn-success px-lg-2 ml-1 waves-effect waves-light"
+                                                        onclick="uploadFile(this,'<%- doc.Name%>','<%- doc._id%>')">
+                                                        Upload
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <% }) %>
+                                               
+                                                   
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <% } %>
+            <div class="text-right reset">
+
+            </div>
+
+            <script>
+
+                function uploadFile(button, docsname, docsId) {
+                    let courseId = '<%= courseId %>';
+
+
+                    if (!courseId || courseId === "undefined") {
+                        console.error("Error: courseId is missing.");
+                        alert("Error: Course ID is not available.");
+                        return;
+                    }
+
+                    console.log("Course ID:", courseId);
+
+                    let inputElement = button.closest('.file-containers').querySelector('.file-inputs');
+                    let files = inputElement.files;
+                    let docsName = docsname;
+                    let candidateMobile = document.getElementById("user-input").value
+                    console.log(docsId);
+                    console.log(docsname)
+
+                    if (files.length === 0) {
+                        alert("Please select a file before uploading.");
+                        return;
+                    }
+
+                    let formData = new FormData();
+                    formData.append("file", files[0]);
+                    formData.append("docsName", docsname);
+                    formData.append("courseId", courseId);
+                    formData.append("docsId", docsId);
+                    formData.append("mobile", candidateMobile);
+                    console.log(formData)
+
+                    axios.post(`/admin/courses/${courseId}/candidate/upload-docs`, formData, {
+                        headers: {
+                            'x-auth': localStorage.getItem('token'),
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    })
+                        .then(result => {
+                            alert("Your documents uploadded successfully");
+                            // window.location.reload()
+
+                            // ✅ Disable the upload button and file input after success
+                            button.setAttribute('disabled', 'true');
+                            inputElement.setAttribute('disabled', 'true');
+                            button.classList.add('btn-secondary'); // Optional: change button color after upload
+                            button.innerText = 'Uploaded';
+
+
+
+                        }).catch(err => {
+                            console.log(err.message)
+                            // window.location.reload()
+                        })
+                }
+
+
+
+                function validateFile(input) {
+                    const allowedExtensions = ["pdf", "doc", "docx", "jpg", "jpeg", "png"];
+                    let validFiles = true;
+
+                    // Check each file for valid extension
+                    Array.from(input.files).forEach(file => {
+                        const fileExtension = file.name.split('.').pop().toLowerCase();
+                        if (!allowedExtensions.includes(fileExtension)) {
+                            validFiles = false;
+                        }
+                    });
+
+                    if (!validFiles) {
+                        alert("Please upload only PDF, DOC, DOCX, JPG, JPEG, or PNG files!");
+                        input.value = ""; // Clear input on invalid files
+                        return;
+                    }
+
+
+                }
+
+
+            </script>
+
+
+
+
+            <script type="text/javascript">
+               
+                document.querySelector('form').addEventListener('submit', function (e) {
+                    e.preventDefault(); // Form ka default reload roko
+                    const mobileNumber = userInput.value;
+                    if (!mobileNumber) {
+                        return alert("mobile number required")
+                    }
+
+
+                    const formData = new FormData(this); // Poora form ka data mil gaya
+                    const data = {};
+
+                    formData.forEach((value, key) => {
+                        console.log(key, value); // ✅ Console me har field ka name and value
+                        data[key] = value; // Optional: Object me bhi store karna ho to
+                    });
+
+                    data.courseId = '<%=courseId%>';
+                    data.mobile = mobileNumber;
+
+                    console.log("Final Form Data Object:", data); // ✅ Pura data object format me
+
+                    axios.post("/admin/candidate/addleaddandcourseapply", data).then((response) => {
+                        alert("Candidate added and Course applied")
+                        $('#candidateDetails').addClass('d-none');
+                        '<% if (course.docsRequired && course.docsRequired.length> 0) { %>'
+
+                        $('#add-docs').removeClass('d-none');
+                        '<% } else { %> window.location.href = "/admin/courses/<%=courseId%>/candidate/addleads" <% }%>'
+                        
+                        
+
+
+
+                    }).catch((error) => {
+                        console.error("Error sending OTP:", error);
+                        alert("Something went wrong. Please try again.");
+                    });
+                });
+
+
+
+
+
+
+
+
+
+                $(document).ready(() => {
+    $("#state")
+        .find("option")
+        .remove()
+        .end()
+        .append('<option disabled selected value="">Select Option</option>');
+
+    axios
+        .post("/admin/helper/getstate", {
+            countryId: 101, // Fix countryId 101
+        })
+        .then(({ data }) => {
+            data.forEach((d) => {
+                $("#state").append(
+                    `<option class='text-capitalize' value='${d._id}'>${d.name}</option>`
+                );
+            });
+        })
+        .catch((e) => console.log(e));
+});
+
+
+                $("#state").change(() => {
+                    $('#city')
+                        .find("option")
+                        .remove()
+                        .end()
+                        .append(
+                            '<option disabled selected value="">Select Option</option>'
+                        );
+                    axios
+                        .post("/admin/helper/getcity", {
+                            stateId: $("#state").val(),
+                        })
+                        .then(({ data }) => {
+                            data.forEach((d) => {
+                                $("#city").append(
+                                    `<option class='text-capitalize' value='${d._id}'>${d.name}</option>`
+                                );
+                            });
+                        })
+                        .catch((e) => console.log(e));
+                });
+                const userInput = document.getElementById("user-input");
+                const sendOtpBtn = document.getElementById("send-otp");
+                const sendbtndiv = document.getElementById("sendbtndiv");
+                const otpField = document.getElementById("otp-field");
+                const otpInput = document.getElementById("user-otp");
+                const verifyLoginBtn = document.getElementById("verify-login-btn");
+                const resendBtn = document.getElementById("resend-btn");
+                const otpActionRow = document.querySelector(".row.d-none");
+                otpActionRow.style.display = 'none';
+                const applybtn = document.getElementById("add__centers");
+                userInput.addEventListener("keypress", (e) => {
+            let k = e.which;
+            if (k > 58 || k < 48)
+                e.preventDefault();
+        })
+
+
+                applybtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    const mobileNumber = userInput.value;
+                    const body = { mobile: mobileNumber };
+                    '<% if(course.center?.length>0) { %>'
+                    const selectedCenter = document.getElementById('centerSelect').value
+                    
+                  
+                        body.selectedCenter = selectedCenter;
+                        console.log(selectedCenter)
+                   '<% } %>'
+
+                    console.log("body", body)
+                    axios.post("/admin/candidate/course/<%=courseId%>/apply", body).then((response) => {
+                        alert("Course applied successfully")
+                        document.getElementById('add__centers').setAttribute('disabled', 'true');
+                         '<% if(course.center?.length>0) { %>'
+                        document.getElementById('centerSelect').setAttribute('disabled', 'true');
+                         '<% } %>'
+            '<% if (course.docsRequired && course.docsRequired.length> 0) { %>'
+
+                        $('#add-docs').removeClass('d-none');
+                        '<% } else { %> window.location.href = "/admin/courses/<%=courseId%>/candidate/addleads" <% }%>'
+                        
+                    }).catch((error) => {
+
+                        alert(error.response?.data?.msg || "Something went wrong");
+                    });
+                });
+
+
+
+
+                sendOtpBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    const mobileNumber = userInput.value;
+
+                    if (mobileNumber.length !== 10) {
+                        alert("Please enter a valid 10-digit mobile number.");
+                        return;
+                    }
+
+                    const body = { mobile: mobileNumber };
+                    axios.post("/api/sendOtptoAddLead", body).then((response) => {
+                        if (response.data.status === true) {
+                            otpField.classList.remove('d-none');
+                            $('#otp-actions').removeClass('d-none')
+                            sendOtpBtn.classList.add('d-none');
+                            sendbtndiv.classList.add('d-none');
+                            userInput.setAttribute('disabled', 'true');
+
+                            // ✅ OTP भेजने के बाद Verify और Resend बटन दिखे
+                            otpActionRow.classList.remove('d-none');
+                            otpActionRow.style.display = 'flex';
+
+                            alert("OTP has been sent to your mobile number.");
+                        } else {
+                            alert("Failed to send OTP. Please try again.");
+                        }
+                    }).catch((error) => {
+                        console.error("Error sending OTP:", error);
+                        alert("Something went wrong. Please try again.");
+                    });
+                });
+
+                // ✅ Verify OTP Button Click
+                verifyLoginBtn.addEventListener('click', () => {
+                    const otp = otpInput.value;
+                    const mobileNumber = userInput.value;
+
+                    if (otp.length !== 4) {
+                        alert("Please enter a valid 4-digit OTP.");
+                        return;
+                    }
+
+                    const body = { mobile: mobileNumber, otp };
+                    axios.post("/api/verifyOtp", body).then((response) => {
+                        if (response.data.status === true) {
+                            $('#otp-field').addClass('d-none');
+                            $('#otp-actions').addClass('d-none');
+                            body.courseId = '<%=courseId%>';
+                            alert("Candidate OTP verified successfully.");
+                            axios.post("/admin/candidate/verifyuser", body).then((response) => {
+                                if (response.data.status === true && response.data.appliedStatus === true) {
+
+                                    alert("Course already applied");
+                                    window.location.href = "/admin/courses/<%=courseId%>/candidate/addleads";
+
+
+
+                                    // axios.post("/candidate/course/<%=courseId%>/apply", body).then((response) => {
+                                    //     if (response.data.status === true) {
+
+                                    //         console.log("User found", response.data.candidate)
+
+
+
+                                    //     } else if (response.data.status === false) {
+                                    //         $('#candidateDetails').removeClass('d-none')
+
+                                    //     }
+                                    // }).catch((error) => {
+                                    //     console.error("Error verifying User:", error);
+                                    //     alert("Error verifying User. Please try again.");
+                                    // });
+
+
+
+
+                                }
+                                else if (response.data.status === true && response.data.appliedStatus === false) {
+                                    '<% if(course.center?.length>0) { %>'
+                                    $('#selectCenter').removeClass('d-none')
+                                    '<% } else { %>'
+
+                                    $('#applydiv').removeClass('d-none')
+
+                                    '<% } %>'
+
+                                } else if (response.data.status === false) {
+                                    $('#candidateDetails').removeClass('d-none')
+
+                                }
+                            }).catch((error) => {
+                                console.error("Error verifying User:", error);
+                                alert("Error verifying User. Please try again.");
+                            });
+
+                        } else {
+                            alert("Incorrect OTP. Please try again.");
+                        }
+                    }).catch((error) => {
+                        console.error("Error verifying OTP:", error);
+                        alert("Error verifying OTP. Please try again.");
+                    });
+                });
+
+                // ✅ Resend OTP Button Click
+                resendBtn.addEventListener('click', () => {
+                    const mobileNumber = userInput.value;
+                    if (mobileNumber.length !== 10) {
+                        alert("Please enter a valid 10-digit mobile number.");
+                        return;
+                    }
+
+                    const body = { mobile: mobileNumber };
+                    axios.post("/api/sendOtptoAddLead", body).then((response) => {
+                        if (response.data.status === true) {
+                            alert("OTP resent successfully.");
+                        } else {
+                            alert("Failed to resend OTP. Please try again.");
+                        }
+                    }).catch((error) => {
+                        console.error("Error resending OTP:", error);
+                        alert("Something went wrong. Please try again.");
+                    });
+                });
+            </script>
+
+            <script>
+                $("#country").change(() => {
+                    $("#state")
+                        .find("option")
+                        .remove()
+                        .end()
+                        .append(
+                            '<option disabled selected value="">Select Option</option>'
+                        );
+                    axios
+                        .post("/admin/helper/getstate", {
+                            countryId: $("#country").val(),
+                        })
+                        .then(({ data }) => {
+                            data.forEach((d) => {
+                                $("#state").append(
+                                    <option class='text-capitalize' value='${d._id}'>${d.name}</option>
+                                );
+                            });
+                        })
+                        .catch((e) => console.log(e));
+                });
+
+                $("#state").change(() => {
+                    $("#city")
+                        .find("option")
+                        .remove()
+                        .end()
+                        .append(
+                            '<option disabled selected value="">Select Option</option>'
+                        );
+                    axios
+                        .post("/admin/helper/getcity", {
+                            stateId: $("#state").val(),
+                        })
+                        .then(({ data }) => {
+                            data.forEach((d) => {
+                                $("#city").append(
+                                    <option class='text-capitalize' value='${d._id}'>${d.name}</option>
+                                );
+                            });
+                        })
+                        .catch((e) => console.log(e));
+                });
+
+                $(".btnSubmit").click(function () {
+                    // const password = $("#password").val();
+                    // const confirmPassword = $("#confirm_password").val();
+                    // if (password != confirmPassword) {
+                    //   alert("Passwords do not match.");
+                    //   return false;
+                    // }
+                    return true;
+                });
+
+                $(".appoint").click(() => {
+                    $(".diningRows").append(`  <div class="form-group row">
+                            <div class="col-xl-2 mb-1">
+                                    <label>Name</label>
+                                    <input class="form-control text-capitalize" type="text" name="repName">
+                                </div>
+                                <div class="col-xl-2 mb-1">
+                                    <label>Designation</label>
+                                    <input class="form-control text-capitalize" type="text" name="repDesignation" >
+                                </div>
+                                <div class="col-xl-2 mb-1">
+                                    <label>Email</label>
+                                    <input class="form-control" type="email" name="repEmail" >
+                                </div>
+                                <div class="col-xl-2 mb-1">
+                                        <label>Contact Number</label>
+                                        <input class="form-control" type="text" name="repMobile" minlength="10" maxlength="13">
+                                    </div>
+                                <div class="col-xl-2 mt-2">
+                                    <button class="btn btn-danger removediv">-</button>
+                                </div>
+                        </div>
+                    
+         
+</div>`);
+                });
+
+                $(document).on("click", ".removediv", function () {
+                    $(this).closest(".row").remove();
+                });
+
+
+
+                function reset() {
+                    window.location.href = "/admin/college/add";
+                }
+
+            </script>
+
+            <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+            <link rel="stylesheet"
+                href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+            <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/chosen/1.8.7/chosen.jquery.min.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chosen/1.8.7/chosen.min.css">
+            <script type="text/javascript">
+                $(".chosen").chosen();
+            </script>
+    </div>
+    <script>
+        function populateHighestQualification(data, candidate) {
+            let options = '<option value="">Highest Qualification / उच्चतम योग्यता </option>';
+            for (let highestQualification of data) {
+                if (candidate && candidate.highestQualification == highestQualification._id) {
+                    options += `<option value="${highestQualification._id}" selected class="text-capitalize">${highestQualification.name}</option>`;
+                } else {
+                    options += `<option value="${highestQualification._id}" class="text-capitalize">${highestQualification.name}</option>`;
+                }
+            }
+            $('#highest-qual').html(options);   // For your first dropdown
+            $('#highest-qual-second').html(options);  // For your second dropdown (new)
+        }
+
+
+
+    </script>
+    <% include ../partials/footer %>
+</body>
+</html>

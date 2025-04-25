@@ -1,4 +1,75 @@
 <% include ../partials/header %>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+    <style>
+        .choices__list--multiple .choices__item {
+            position: relative !important;
+            margin: 3px 5px 3px 0 !important;
+            padding: 3px 20px 3px 5px !important;
+            border: 1px solid #aaa !important;
+            max-width: 100% !important;
+            border-radius: 3px !important;
+            background-color: #eee !important;
+            background-image: -webkit-gradient(linear, left top, left bottom, color-stop(20%, #f4f4f4), color-stop(50%, #f0f0f0), color-stop(52%, #e8e8e8), to(#eee)) !important;
+            background-image: linear-gradient(#f4f4f4 20%, #f0f0f0 50%, #e8e8e8 52%, #eee 100%) !important;
+            background-size: 100% 19px !important;
+            background-repeat: repeat-x !important;
+            background-clip: padding-box !important;
+            -webkit-box-shadow: 0 0 2px #fff inset, 0 1px 0 rgba(0, 0, 0, .05) !important;
+            box-shadow: 0 0 2px #fff inset, 0 1px 0 rgba(0, 0, 0, .05) !important;
+            color: #333 !important;
+            line-height: 13px !important;
+            cursor: default !important;
+        }
+
+        .chosen-container {
+            position: relative;
+            display: inline-block;
+            vertical-align: middle;
+            font-size: 13px;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        .choices__inner {
+            background-color: #fff;
+        }
+
+        .chosen-choices {
+            position: relative;
+            overflow: hidden;
+            margin: 0;
+            padding: 0 5px;
+            width: 100%;
+            height: auto;
+            border: 1px solid #aaa;
+            background-color: #fff;
+            background-image: -webkit-gradient(linear, left top, left bottom, color-stop(1%, #eee), color-stop(15%, #fff));
+            background-image: linear-gradient(#eee 1%, #fff 15%);
+            cursor: text;
+        }
+
+        .chosen-container-multi .chosen-choices li.search-choice .search-choice-close {
+            position: absolute;
+            top: 4px;
+            right: 3px;
+            display: block;
+            width: 12px;
+            height: 12px;
+            background: url(chosen-sprite.png) -42px 1px no-repeat;
+            font-size: 1px;
+        }
+
+        .choices__inner {
+            cursor: pointer;
+        }
+
+        .choices[data-type*=select-multiple] .choices__button,
+        .choices[data-type*=text] .choices__button {
+            background-image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjEiIGhlaWdodD0iMjEiIHZpZXdCb3g9IjAgMCAyMSAyMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSIjMDAwIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0yLjU5Mi4wNDRsMTguMzY0IDE4LjM2NC0yLjU0OCAyLjU0OEwuMDQ0IDIuNTkyeiIvPjxwYXRoIGQ9Ik0wIDE4LjM2NEwxOC4zNjQgMGwyLjU0OCAyLjU0OEwyLjU0OCAyMC45MTJ6Ii8+PC9nPjwvc3ZnPg==) !important;
+        }
+    </style>
     <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
         <div class="content-header-left col-md-9 col-12 mb-2">
             <div class="row breadcrumbs-top">
@@ -62,15 +133,50 @@
                                                 </select>
                                             </div>
                                             <div class="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1"
-                                                id="courseblock">
+                                                id="courseFeeTypeblock">
                                                 <label>Course Fee Type</label>
-                                                <select class="form-control" name="courseLevel" id="courseLevel">
+                                                <select class="form-control" name="courseFeeType" id="courseFeeType"
+                                                    onchange="toggleCourseFeeType()">
                                                     <option value="">Select Course Fee Type</option>
                                                     <option value="Paid">Paid</option>
                                                     <option value="Free">Free</option>
-                                                   
                                                 </select>
                                             </div>
+                                            <div class="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1"
+                                                id="projectNameblock" style="display: block;">
+                                                <label>Project Name </label>
+                                                <input class="form-control" type="text" name="projectName"
+                                                    id="projectName"></input>
+                                            </div>
+                                            <div class="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1"
+                                                id="courseProjectblock" style="display: block;">
+                                                <label>Type of Project</label>
+                                                <select class="form-control" name="typeOfProject" id="typeOfProject">
+                                                    <option value="">Select Type of Project</option>
+                                                    <option value="T&P">T&P</option>
+                                                    <option value="P&T">P&T</option>
+                                                    <option value="General">General</option>
+                                                </select>
+                                            </div>
+
+
+                                            <!-- <script>
+                                                function toggleCourseFeeType() {
+                                                    var courseFeeType = document.getElementById("courseFeeType").value;
+                                                    var typeOfProject = document.getElementById("courseProjectblock");
+                                                    var projectName = document.getElementById("projectNameblock");
+                                                    console.log(courseFeeType)
+
+                                                    if (courseFeeType === "Free") {
+                                                        typeOfProject.style.display = "block";
+                                                        projectName.style.display = "block";
+                                                    }  else {
+                                                        typeOfProject.style.display = "none";
+                                                        projectName.style.display = "none";
+                                                    }
+                                                }
+                                            </script> -->
+
                                             <div class="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1"
                                                 id="courseblock">
                                                 <label>Course Type</label>
@@ -105,7 +211,9 @@
                                                 <label>Qualification</label>
                                                 <select class="form-control" name="qualification" id="qualification">
                                                     <option value="">Select Qualification</option>
+                                                    <option value="8th">8th</option>
                                                     <option value="10th">10th</option>
+                                                    <option value="12th">12th</option>
                                                     <option value="Diploma">Diploma</option>
                                                     <option value="Advance Diploma">Advance Diploma</option>
                                                     <option value="Degree">Degree</option>
@@ -143,25 +251,72 @@
                                                 <textarea class="form-control" type="text" name="offlineTrainingTiming"
                                                     id="offlineTrainingTiming"></textarea>
                                             </div>
+                                            <div class="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1"
+                                                id="trainingCenterblock" style="display: none;">
+                                                <label>Training Center</label>
+                                                <select class="form-control" name="trainingCenter" id="trainingCenter"
+                                                    multiple>
+                                                    <!-- <option value="">Select Training Center</option> -->
+                                                    <%center.forEach((center,i)=>{%>
+                                                        <option value="<%=center._id %>">
+                                                            <%=center.name %>
+                                                        </option>
+                                                        <%})%>
+                                                </select>
+                                            </div>
+                                            <script
+                                                src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+
+                                          
+                                            <script>
+                                                document.addEventListener('DOMContentLoaded', function () {
+                                                    const trainingCenterSelect = new Choices('#trainingCenter', {
+                                                        removeItemButton: true,
+                                                        searchEnabled: true,
+                                                        itemSelectText: '',
+                                                        placeholder: false,
+                                                        allowHTML: false,
+                                                        maxItemCount: -1,  
+                                                        duplicateItemsAllowed: false,
+                                                        delimiter: ',',
+                                                        paste: true,
+                                                        maxItems: null,
+                                                        silent: false
+                                                    });
+                                                    const emptyOption = document.querySelector('#trainingCenter option[value=""]');
+                                                    if (emptyOption) {
+                                                        emptyOption.remove();
+                                                    }
+
+                                                    
+                                                });
+
+                                            </script>
 
                                             <script>
                                                 function toggleTrainingBlocks() {
                                                     var trainingMode = document.getElementById("trainingMode").value;
                                                     var onlineBlock = document.getElementById("onlinetrainingblock");
                                                     var offlineBlock = document.getElementById("offlinetrainingblock");
+                                                    var trainingCenterblock = document.getElementById("trainingCenterblock");
 
                                                     if (trainingMode === "Online") {
                                                         onlineBlock.style.display = "block";
                                                         offlineBlock.style.display = "none";
+                                                        trainingCenterblock.style.display = "none";
                                                     } else if (trainingMode === "Offline") {
                                                         onlineBlock.style.display = "none";
                                                         offlineBlock.style.display = "block";
+                                                        trainingCenterblock.style.display = "block";
                                                     } else if (trainingMode === "Blended") {
                                                         onlineBlock.style.display = "block";
                                                         offlineBlock.style.display = "block";
+                                                        trainingCenterblock.style.display = "block";
+
                                                     } else {
                                                         onlineBlock.style.display = "none";
                                                         offlineBlock.style.display = "none";
+                                                        trainingCenterblock.style.display = "none";
                                                     }
                                                 }
                                             </script>
@@ -287,13 +442,12 @@
                                                     placeholder="enter youtube url" id="youtubeURL" />
                                             </div>
 
-
-
-                                            <div class="col-xl-6 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                                            <!-- <div class="col-xl-6 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                                                 <label>Required Documents</label>
                                                 <textarea class="form-control" name="requiredDocuments"
                                                     id="requiredDocuments"></textarea>
-                                            </div>
+                                            </div> -->
+
 
                                             <!-- <script
                                                 src="https://cdn.ckeditor.com/ckeditor5/37.0.0/classic/ckeditor.js"></script> -->
@@ -304,6 +458,32 @@
                                 </div>
                             </div>
                         </div>
+                </section>
+                <section id="docsRequired">
+                    <div class="row">
+                        <div class="col-xl-12 col-lg-12">
+                            <div class="card">
+                                <div class="card-header border border-top-0 border-left-0 border-right-0">
+                                    <h4 class="card-title pb-1">Documents Required</h4>
+                                </div>
+                                <div class="col-12">
+                                    <div id="documentContainer">
+                                        <div class="row requiredDocsRow">
+                                            <div class="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                                                <label>Document Name</label>
+                                                <input rows="1" name="name" type="text" class="form-control docsName">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-xl-12 mb-1 px-0 text-right">
+                                    <a class="btn btn-success text-white add-another-button">+ Add
+                                        Another</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
                 <section id="personal-info">
                     <div class="row">
@@ -599,6 +779,38 @@
 
 
     </div>
+    <style>
+        #documentContainer {
+            width: 100%;
+        }
+    </style>
+    <script>
+        document.querySelector('.add-another-button').addEventListener('click', function () {
+            let container = document.querySelector("#documentContainer"); // Pure container ko select karega
+
+            // Nayi row create karein
+            let newRow = document.createElement("div");
+            newRow.classList.add("row", "requiredDocsRow");
+
+            let newInputDiv = document.createElement("div");
+            newInputDiv.classList.add("col-xl-3", "mb-1");
+
+            let newLabel = document.createElement("label");
+            newLabel.textContent = "Document Name";
+
+            let newInput = document.createElement("input");
+            newInput.type = "text";
+            newInput.classList.add("form-control", "docsName");
+
+            newInputDiv.appendChild(newLabel);
+            newInputDiv.appendChild(newInput);
+            newRow.appendChild(newInputDiv); // Naye row ke andar input field add karein
+            container.appendChild(newRow); // Naye row ko container ke andar add karein
+        });
+
+
+
+    </script>
     <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
 
 
@@ -934,8 +1146,12 @@
             //current
             const selectedSectors = Array.from(document.getElementById("sector").selectedOptions).map(option => option.value);
 
+            const centers = document.getElementById("trainingCenter").value
+            const selectedCenter = Array.from(document.getElementById("trainingCenter").selectedOptions).map(option => option.value);
+            console.log(selectedCenter);
             let body = {
                 sectors: selectedSectors,
+                center: selectedCenter,
                 courseLevel: document.getElementById("courseLevel").value,
                 name: document.getElementById("name").value,
                 duration: document.getElementById("duration").value,
@@ -949,6 +1165,9 @@
                 youtubeURL: $('#youtubeURL').val(),
                 courseType: $('#courseType').val(),
                 experience: document.getElementById('experience').value,
+                courseFeeType: document.getElementById('courseFeeType').value,
+                typeOfProject: document.getElementById('typeOfProject').value,
+                projectName: document.getElementById('projectName').value,
                 trainingMode: $('#trainingMode').val(),
                 onlineTrainingTiming: document.getElementById("onlineTrainingTiming").value,
                 offlineTrainingTiming: document.getElementById("offlineTrainingTiming").value,
@@ -966,7 +1185,7 @@
                 maxEMITenure: $('#maxEMITenure').val(),
                 stipendDuringTraining: $('#stipendDuringTraining').val(),
                 lastDateForApply: $('#lastDateForApply').val(),
-                requiredDocuments: $('#requiredDocuments').val(),
+                // requiredDocuments: $('#requiredDocuments').val(),
                 courseFeatures: $('.courseFeature').val(), // Get value of Course Features textarea
                 importantTerms: $('.importantTerms').val(),
                 faq: $('#faq').val(),
@@ -978,6 +1197,12 @@
                 counslerphonenumber: $('#counslerphonenumber').val(),
                 counslerwhatsappnumber: $('#counslerwhatsappnumber').val(),
                 counsleremail: $('#counsleremail').val(),
+                docsRequired: Array.from(document.querySelectorAll(".requiredDocsRow"))
+    .map(row => row.querySelector(".docsName").value.trim())
+    .filter(name => name !== "")
+    .map(name => ({ Name: name })),
+
+
                 questionAnswers: Array.from(document.querySelectorAll(".questionanswerrow")).map(row => {
                     let question = row.querySelector(".question").value;
                     let answer = row.querySelector(".answer").value;
@@ -987,10 +1212,13 @@
             }
 
 
+
             console.log('==============> Body ', body)
             axios.post("/admin/courses/add", body).then((res) => {
+
                 if (res && res.status) {
                     window.location.href = "/admin/courses"
+
                 }
             }).catch(error => {
                 console.error('Error adding courses:', error);
@@ -1056,7 +1284,7 @@
             var maxEMITenure = $('#maxEMITenure').val();
             var stipendDuringTraining = $('#stipendDuringTraining').val();
             var lastDateForApply = $('#lastDateForApply').val();
-            var requiredDocuments = $('#requiredDocuments').val();
+            // var requiredDocuments = $('#requiredDocuments').val();
             var courseFeatures = $('#courseFeatures').val();
             var importantTerms = $('#importantTerms').val();
             var photos = $('#photos').val();
@@ -1118,3 +1346,5 @@
     </script>
     <% include ../partials/footer %>
         </div>
+    </body>
+    </html>

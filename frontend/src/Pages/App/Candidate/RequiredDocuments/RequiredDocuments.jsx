@@ -25,6 +25,7 @@ const RequiredDocuments = () => {
         headers: { 'x-auth': localStorage.getItem('token') }
       });
       setMergedDocs(response.data.mergedDocs || []);
+      console.log('Merge docs',)
     } catch (error) {
       console.error("Error fetching documents:", error);
     }
