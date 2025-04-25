@@ -4293,10 +4293,7 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
 
     // Build dynamic update object
     const updatePayload = {
-      declaration: declaration || {
-        isChecked: true,
-        text: "I hereby declare that all the information provided above is true to the best of my knowledge."
-      }
+      
     };
 
     // Root level fields (only if present)
@@ -4312,10 +4309,12 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
       updatePayload.personalInfo = {};
 
       if (personalInfo.professionalTitle) updatePayload.personalInfo.professionalTitle = personalInfo.professionalTitle;
+      if (personalInfo.declaration) updatePayload.personalInfo.declaration = personalInfo.declaration;
       if (personalInfo.professionalSummary) updatePayload.personalInfo.professionalSummary = personalInfo.professionalSummary;
       if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
       if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;
-      if (personalInfo.location) updatePayload.personalInfo.location = personalInfo.location;
+      if (personalInfo.permanentAddress) updatePayload.personalInfo.permanentAddress = personalInfo.permanentAddress;
+      if (personalInfo.currentAddress) updatePayload.personalInfo.currentAddress = personalInfo.currentAddress;
 
       if (Array.isArray(personalInfo.voiceIntro) && personalInfo.voiceIntro.length > 0) {
         updatePayload.personalInfo.voiceIntro = personalInfo.voiceIntro;
