@@ -15,6 +15,7 @@ import Community from './Pages/Front/Community/Community';
 import CandidateLayout from './Component/Layouts/App/Candidates';
 import CandidateDashboard from './Pages/App/Candidate/Dashboard/CandidateDashboard';
 import CandidateProfile from './Pages/App/Candidate/Profile/CandidateProfile';
+import Resume from './Pages/App/Candidate/Profile/Resume';
 import CandidatesDocuments from "./Pages/App/Candidate/Documents/CandidateDocumets"
 import SearchCourses from "./Pages/App/Candidate/Courses/SearchCourses"
 import AppliedCourses from './Pages/App/Candidate/Courses/AppliedCourses';
@@ -40,7 +41,6 @@ import CandidateLogin from './Pages/App/Candidate/Login/CandidateLogin';
 import CandidateViewJobs from './Pages/App/Candidate/Jobs/CandidateViewJobs';
 import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredDocuments';
 import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
-import CandidateNewProfile from './Pages/App/Candidate/Profile/CandidateNewProfile';
 import CandidatesEvents from './Pages/App/Candidate/Events/CandidatesEvents';
 import Registration from './Pages/Front/StudentRegistration/Registration';
 const Layout = () => {
@@ -71,6 +71,7 @@ const Layout = () => {
           <Route path="dashboard" element={<CandidateDashboard />} />
           <Route path="myprofile" element={<CandidateProfile />} />
           <Route path="document" element={<CandidatesDocuments />} />
+          <Route path = "resume"  element={<Resume/>}/>
           <Route path="searchcourses" element={<SearchCourses />} />
           <Route path="appliedCourses" element={<AppliedCourses />} />
           <Route path="searchjob" element={<CandidatesJobs />} />
@@ -91,7 +92,6 @@ const Layout = () => {
           <Route path="job/:JobId" element={<CandidateViewJobs/>}/>
           <Route path="reqDocs/:courseId" element={<RequiredDocuments/>}/>
           <Route path="pendingFee" element={<PaymentDetails/>}/>
-          <Route path ='userProfile' element={<CandidateNewProfile/>}/>
           <Route path ='candidateevent' element={<CandidatesEvents/>}/>
         </Route>
         <Route path='/admin' element ={<AdminLayout/>}>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "./CandidatesDocuments.css"
+import "./CandidatesDocuments.css";
+import {Link} from "react-router-dom";
 import CandidateLayout from "../../../../Component/Layouts/App/Candidates";
 const CandidateDocumets = ({ candidate, documents }) => {
 
@@ -127,12 +128,16 @@ const CandidateDocumets = ({ candidate, documents }) => {
               <div class="col-12">
                 <h3 class="content-header-title float-left mb-0">Documents</h3>
                 <div class="breadcrumb-wrapper col-12">
-                  <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                      <a href="/candidate/dashboard">Home</a>
-                    </li>
-                    <li class="breadcrumb-item"> <i data-feather="chevron-right"></i> <a href="#">Documents</a></li>
-                  </ol>
+                  
+                  <ol className="breadcrumb">
+                  <li className="breadcrumb-item">
+                    <Link to="/candidate/dashboard">Home</Link>
+                  </li>
+                  <li className="breadcrumb-separator">
+                    <i className="fas fa-angle-right mx-1 text-muted"></i>
+                  </li>
+                  <li className="breadcrumb-item active">Documents</li>
+                </ol>
                 </div>
               </div>
             </div>

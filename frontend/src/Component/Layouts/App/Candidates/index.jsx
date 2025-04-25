@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { Link, Outlet , useLocation } from "react-router-dom";
+import React, { useState, useEffect, useRef , useLayoutEffect  } from 'react'
+import { Link, Outlet, useLocation } from "react-router-dom";
 import CandidateHeader from './CandidateHeader/CandidateHeader'
 import CandidateFooter from './CandidateFooter/CandidateFooter'
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -30,9 +30,9 @@ function CandidateLayout({ children }) {
       navigate('/candidate/login');
     }
   }, []);
-  
- 
-  
+
+
+
 
 
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -40,16 +40,16 @@ function CandidateLayout({ children }) {
   const toggleDropdown = (menu) => {
     setOpenDropdown((prev) => (prev === menu ? null : menu));
   };
-   const toggleSubmenu = (menu) => {
+  const toggleSubmenu = (menu) => {
     setOpenSubmenu(prev => {
-       const newState = { ...prev, [menu]: !prev[menu] };
+      const newState = { ...prev, [menu]: !prev[menu] };
 
 
       return newState;
-     });
-   };
+    });
+  };
 
-  
+
   const [expanded, setExpanded] = useState(true);
   const [activeItem, setActiveItem] = useState('dashboard');
   const [openSubmenu, setOpenSubmenu] = useState({
@@ -93,7 +93,8 @@ function CandidateLayout({ children }) {
   const handleSidebarClose = () => {
     if (isMobile) {
       setIsSidebarOpen(false);
-    }}
+    }
+  }
 
 
   const toggleSidebar = () => {
@@ -116,14 +117,73 @@ function CandidateLayout({ children }) {
   const handleItemClick = (item) => {
     setActiveItem(item);
   };
-   
-  const [submenuHeights, setSubmenuHeights] = useState({
+
+  const [submenuMaxHeight, setSubmenuMaxHeight] = useState({
     profile: '0px',
     courses: '0px',
     jobs: '0px',
     wallet: '0px'
   });
-  
+
+  // useLayoutEffect(() => {
+  //   const newHeights = {};
+  //   Object.keys(menuRefs).forEach((key) => {
+  //     const ref = menuRefs[key];
+  //     // Smooth open or close
+  //     newHeights[key] = openSubmenu[key] && ref.current
+  //       ? `${ref.current.scrollHeight}px`
+  //       : '0px';
+  //   });
+  //   setSubmenuMaxHeight(newHeights);
+  // }, [openSubmenu]);
+//  useLayoutEffect(() => {
+//     if (!menuRefs.profile.current) return;
+    
+//     const newHeights = {};
+//     Object.keys(menuRefs).forEach((key) => {
+//       const ref = menuRefs[key];
+//       if (ref.current) {
+//         if (openSubmenu[key]) {
+//           // When opening, get actual height
+//           newHeights[key] = `${ref.current.scrollHeight}px`;
+//         } else {
+//           // When closing, use 0px
+//           newHeights[key] = '0px';
+//         }
+//       }
+//     });
+//     setSubmenuMaxHeight(newHeights);
+//   }, [openSubmenu]); 
+useLayoutEffect(() => {
+  const newHeights = {};
+  Object.keys(menuRefs).forEach((key) => {
+    const ref = menuRefs[key];
+    if (ref.current) {
+      if (openSubmenu[key]) {
+        // Opening: set to scrollHeight immediately
+        newHeights[key] = `${ref.current.scrollHeight}px`;
+      } else {
+        const currentHeight = `${ref.current.scrollHeight}px`;
+        newHeights[key] = currentHeight;
+
+        setTimeout(() => {
+          setSubmenuMaxHeight(prev => ({
+            ...prev,
+            [key]: '0px'
+          }));
+        }, 5); 
+      }
+    }
+  });
+
+  // Set the heights for open menus immediately
+  setSubmenuMaxHeight(prev => ({
+    ...prev,
+    ...newHeights,
+  }));
+}, [openSubmenu]);
+
+
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex flex-1">
@@ -152,8 +212,8 @@ function CandidateLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/candidate/dashboard' ? 'active' : ''}`}>
                 <Link to="/candidate/dashboard" onClick={() => {
 
-  handleSidebarClose();
-}} >
+                  handleSidebarClose();
+                }} >
                   <FontAwesomeIcon icon={faChartLine} />
                   <span className="menu-title">Dashboard</span>
                 </Link>
@@ -165,16 +225,26 @@ function CandidateLayout({ children }) {
                   <FontAwesomeIcon icon={faUser} />
                   <span className="menu-title">Profile</span>
                 </a>
-                <ul className={`menu-content ${openSubmenu.profile ? 'open' : ''}`}>
+                {/* <ul className={`menu-content ${openSubmenu.profile ? 'open' : ''}`}> */}
+                <ul
+                  ref={menuRefs.profile}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.profile,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out,'
+                  }}
+                >
+
 
                   <li className={`nav-item ${location.pathname === '/candidate/myProfile' ? 'active' : ''}`}>
-                    <Link to="/candidate/myProfile" onClick={() => {handleSidebarClose();}}>
+                    <Link to="/candidate/myProfile" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faUser} />
                       <span className="menu-title">Your Profile</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/candidate/document' ? 'active' : ''}`}>
-                    <Link to="/candidate/document" onClick={() =>{  handleSidebarClose();}}>
+                    <Link to="/candidate/document" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farFile} />
                       <span className="menu-title">Documents</span>
                     </Link>
@@ -188,15 +258,25 @@ function CandidateLayout({ children }) {
                   <FontAwesomeIcon icon={farUser} />
                   <span className="menu-title">Courses</span>
                 </a>
-                <ul className={`menu-content ${openSubmenu.courses ? 'open' : ''}`}>
+                {/* <ul className={`menu-content ${openSubmenu.courses ? 'open' : ''}`}> */}
+                <ul
+                  ref={menuRefs.courses}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.courses,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out'
+                  }}
+                >
+
                   <li className={`nav-item ${location.pathname === '/candidate/searchcourses' ? 'active' : ''}`}>
-                    <Link to="/candidate/searchcourses" onClick={() => {handleSidebarClose();}}>
+                    <Link to="/candidate/searchcourses" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faSearch} />
                       <span className="menu-title">Search Courses</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/candidate/appliedCourses' ? 'active' : ''}`}>
-                    <Link to="/candidate/appliedCourses" onClick={() =>{handleSidebarClose();}}>
+                    <Link to="/candidate/appliedCourses" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farPaperPlane} />
                       <span className="menu-title">Applied Course</span>
                     </Link>
@@ -210,33 +290,43 @@ function CandidateLayout({ children }) {
                   <FontAwesomeIcon icon={faClipboardList} />
                   <span className="menu-title">Jobs</span>
                 </a>
-                <ul className={`menu-content ${openSubmenu.jobs ? 'open' : ''}`}>
+                {/* <ul className={`menu-content ${openSubmenu.jobs ? 'open' : ''}`}> */}
+                <ul
+                  ref={menuRefs.jobs}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.jobs,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out'
+                  }}
+                >
+
                   <li className={`nav-item ${activeItem === 'searchjob' ? 'active' : ''}`}>
-                    <Link to="/candidate/searchjob" onClick={() => {handleItemClick('searchjob'); handleSidebarClose();}}>
+                    <Link to="/candidate/searchjob" onClick={() => { handleItemClick('searchjob'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faSearch} />
                       <span className="menu-title">Search Job</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'nearbyJobs' ? 'active' : ''}`}>
-                    <Link to="/candidate/nearbyJobs" onClick={() => {handleItemClick('nearbyJobs');handleSidebarClose();}}>
+                    <Link to="/candidate/nearbyJobs" onClick={() => { handleItemClick('nearbyJobs'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farMap} />
                       <span className="menu-title">Jobs Near Me</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'appliedJobs' ? 'active' : ''}`}>
-                    <Link to="/candidate/appliedJobs" onClick={() => {handleItemClick('appliedJobs');handleSidebarClose();}}>
+                    <Link to="/candidate/appliedJobs" onClick={() => { handleItemClick('appliedJobs'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farPaperPlane} />
                       <span className="menu-title">Applied Jobs</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'registerInterviewsList' ? 'active' : ''}`}>
-                    <Link to="/candidate/registerInterviewsList" onClick={() => {handleItemClick('registerInterviewsList');handleSidebarClose();}}>
+                    <Link to="/candidate/registerInterviewsList" onClick={() => { handleItemClick('registerInterviewsList'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farHand} />
                       <span className="menu-title">Register For Interview</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'InterestedCompanies' ? 'active' : ''}`}>
-                    <Link to="/candidate/InterestedCompanies" onClick={() => {handleItemClick('InterestedCompanies');handleSidebarClose();}}>
+                    <Link to="/candidate/InterestedCompanies" onClick={() => { handleItemClick('InterestedCompanies'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farBookmark} />
                       <span className="menu-title">Shortlisting</span>
                     </Link>
@@ -250,27 +340,37 @@ function CandidateLayout({ children }) {
                   <FontAwesomeIcon icon={faWallet} />
                   <span className="menu-title">Wallet</span>
                 </a>
-                <ul className={`menu-content ${openSubmenu.wallet ? 'open' : ''}`}>
+                {/* <ul className={`menu-content ${openSubmenu.wallet ? 'open' : ''}`}> */}
+                <ul
+                  ref={menuRefs.wallet}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.wallet,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out'
+                  }}
+                >
+
                   <li className={`nav-item ${activeItem === 'cashback' ? 'active' : ''}`}>
-                    <Link to="/candidate/cashback" onClick={() => {handleItemClick('cashback');handleSidebarClose();}}>
+                    <Link to="/candidate/cashback" onClick={() => { handleItemClick('cashback'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faIndianRupeeSign} />;
                       <span className="menu-title">Cashback Offers</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'myEarnings' ? 'active' : ''}`}>
-                    <Link to="/candidate/myEarnings" onClick={() => {handleItemClick('myEarnings');handleSidebarClose();}}>
+                    <Link to="/candidate/myEarnings" onClick={() => { handleItemClick('myEarnings'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farMoneyBill1} />
                       <span className="menu-title">My Earnings</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'referral' ? 'active' : ''}`}>
-                    <Link to="/candidate/referral" onClick={() => {handleItemClick('referral');handleSidebarClose();}}>
+                    <Link to="/candidate/referral" onClick={() => { handleItemClick('referral'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faForward} />
                       <span className="menu-title">Refer & Earn</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${activeItem === 'Coins' ? 'active' : ''}`}>
-                    <Link to="/candidate/Coins" onClick={() => {handleItemClick('Coins');handleSidebarClose();}}>
+                    <Link to="/candidate/Coins" onClick={() => { handleItemClick('Coins'); handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={faCoins} />
                       <span className="menu-title">Coins</span>
                     </Link>
@@ -280,7 +380,7 @@ function CandidateLayout({ children }) {
 
               {/* Request Loan */}
               <li className={`nav-item ${activeItem === 'requestLoan' ? 'active' : ''}`}>
-                <Link to="/candidate/requestLoan" onClick={() => {handleItemClick('requestLoan');handleSidebarClose();}}>
+                <Link to="/candidate/requestLoan" onClick={() => { handleItemClick('requestLoan'); handleSidebarClose(); }}>
                   <FontAwesomeIcon icon={farCircle} />
                   <span className="menu-title">Request Loan</span>
                 </Link>
@@ -288,7 +388,7 @@ function CandidateLayout({ children }) {
 
               {/* Watch Videos */}
               <li className={`nav-item ${activeItem === 'watchVideos' ? 'active' : ''}`}>
-                <Link to="/candidate/watchVideos" onClick={() => {handleItemClick('watchVideos');handleSidebarClose();}}>
+                <Link to="/candidate/watchVideos" onClick={() => { handleItemClick('watchVideos'); handleSidebarClose(); }}>
                   <FontAwesomeIcon icon={farCirclePlay} />
                   <span className="menu-title">Watch Videos</span>
                 </Link>
@@ -296,7 +396,7 @@ function CandidateLayout({ children }) {
 
               {/* Share Profile */}
               <li className={`nav-item ${activeItem === 'shareCV' ? 'active' : ''}`}>
-                <Link to="/candidate/shareCV" onClick={() => {handleItemClick('shareCV');handleSidebarClose();}}>
+                <Link to="/candidate/shareCV" onClick={() => { handleItemClick('shareCV'); handleSidebarClose(); }}>
                   <FontAwesomeIcon icon={farShareFromSquare} />
                   <span className="menu-title">Share Profile</span>
                 </Link>
@@ -304,7 +404,7 @@ function CandidateLayout({ children }) {
 
               {/* Notifications */}
               <li className={`nav-item ${activeItem === 'notifications' ? 'active' : ''}`}>
-                <Link to="/candidate/notifications" onClick={() => {handleItemClick('notifications');handleSidebarClose();}}>
+                <Link to="/candidate/notifications" onClick={() => { handleItemClick('notifications'); handleSidebarClose(); }}>
                   <FontAwesomeIcon icon={farBell} />
                   <span className="menu-title">Notifications</span>
                 </Link>
@@ -322,37 +422,34 @@ function CandidateLayout({ children }) {
 
           </div>
         </div> */}
-        
-            <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static"
-            data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" id="inner_job_page">
 
-            <div className="app-content content">
-              <div className="content-overlay"></div>
-              <div className="header-navbar-shadow"></div>
-              <CandidateHeader toggleSidebar={handleSidebarToggle} isSideBarOpen={isSidebarOpen}/>
-              <div className="content-wrapper">
-                <div className="content-body mb-4">
+        <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static"
+          data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" id="inner_job_page">
+
+          <div className="app-content content">
+            <div className="content-overlay"></div>
+            <div className="header-navbar-shadow"></div>
+            <CandidateHeader toggleSidebar={handleSidebarToggle} isSideBarOpen={isSidebarOpen} />
+            <div className="content-wrapper">
+              <div className="content-body mb-4">
                 <Outlet />
-                </div>
-            <CandidateFooter />
               </div>
+              <CandidateFooter />
             </div>
           </div>
+        </div>
       </main>
-      <style>
-        {`
-  .menu-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.5s ease-in-out;
+    
+<style>
+  {
+    `
+    .menu-content {
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+    `
   }
-
-  .menu-content.open {
-    max-height: 500px;
-  }
-`}
-      </style>
-
+</style>
     </div>
   )
 }

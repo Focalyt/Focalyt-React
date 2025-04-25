@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useParams } from 'react-router-dom';
+import { useParams , Link } from 'react-router-dom';
 import moment from 'moment';
 import Swiper from 'swiper';
 import 'swiper/css';
@@ -271,7 +271,9 @@ const CandidateViewJobs = () => {
 
       if (response.data.status) {
         setIsRegisterInterview(true);
-        window.location.reload()
+        setShowAfterApplyModal(false);
+        setIsApplied(true);
+        // window.location.reload()
       }
     } catch (error) {
       console.error('Error registering for interview:', error);
@@ -1397,7 +1399,7 @@ const CandidateViewJobs = () => {
               <div className="modal-body py-3" id="popup-body">
                 <div className="row vfg">
                   <div className="space-ex mb-2">
-                    <div className="col-12">
+                    <div className="col-12" style={{display:'flex' , justifyContent: 'center' , flexDirection : 'row-reverse'}}>
                       {[5, 4, 3, 2, 1].map((star) => (
                         <React.Fragment key={star}>
                           <input
@@ -1414,7 +1416,7 @@ const CandidateViewJobs = () => {
                       ))}
                     </div>
                   </div>
-                  <div className="col-12">
+                  <div className="col-12 text-center">
                     <textarea
                       rows="2"
                       name="comment"

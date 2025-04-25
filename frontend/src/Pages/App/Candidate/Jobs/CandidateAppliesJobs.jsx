@@ -382,8 +382,8 @@ const AppliedJobs = () => {
               <div className="container-fluid pt-xl-2 pt-lg-0 pt-md-0 pt-sm-5 pt-0">
                 {jobs && jobs.length > 0 ? (
                   jobs.map((job, index) => {
-                    const vacancy = job.vacancy?.[0] || {};
-                    const company = job._company?.[0] || {};
+                    const vacancy = job.vacancy || {};
+                    const company = job._company || {};
                     const industry = job.industry?.[0] || {};
                     const city = job.city?.[0] || {};
                     const state = job.state?.[0] || {};
@@ -393,21 +393,21 @@ const AppliedJobs = () => {
                       <React.Fragment key={`mobile-${index}`}>
                         <div className="row pointer">
                           <div className="col-lg-8 col-md-7 column">
-                            <div className="job-single-sec" style={{backgroundColor: 'transparent'}}>
+                            <div className="job-single-sec new-job-single-sec" style={{background: 'transparent'}}>
                               <div className="job-single-head border-0 pb-0">
                                 <div className="job-thumb my-auto">
                                   <img
-                                    src={company.logo ? `${process.env.REACT_APP_MIPIE_BUCKET_URL}/${company.logo}` : '/images/logo90.png'}
+                                    src={company.logo ? `${process.env.REACT_APP_MIPIE_BUCKET_URL}/${company.logo}` : '/Assets/images/logo90.png'}
                                     className="p-1"
                                     alt="Company Logo"
                                   />
                                 </div>
                                 <div className="">
                                   <h6 className="text-capitalize font-weight-bolder">
-                                    {!vacancy.title ? "NA" : vacancy.title}
+                                  {!vacancy.title ? "NA" : vacancy.title}
                                   </h6>
                                   <span className="text-capitalize set-lineh">
-                                    {!company.name ? "NA" : company.name}
+                                  {!company.name ? "NA" : company.name}
                                   </span>
                                 </div>
                               </div>
@@ -537,6 +537,9 @@ const AppliedJobs = () => {
     border: 2px solid #e8ecec;
     border-radius: 8px;
 }
+    .job-single-sec{
+    background-color:transparent;
+    }
           `
         }
       </style>

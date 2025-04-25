@@ -70,3 +70,23 @@
   font-size: 30px;
   color: #FC2B5A;
 }
+.job-overview ul:hover {
+  border-color: #FC2B5A;
+  -webkit-box-shadow: 4px 4px 0px 0px rgba(241, 117, 37, 0.75);
+  -moz-box-shadow: 4px 4px 0px 0px rgba(241, 117, 37, 0.75);
+  box-shadow: 4px 4px 0px 0px rgba(241, 117, 37, 0.75);
+  cursor: pointer;
+}
+.btn-success:hover {
+  border-color: #24b263 !important;
+  color: #fff !important;
+  box-shadow: 0 8px 25px -8px #28c76f;
+}
+.set-lineh {
+  overflow-wrap: break-word;
+  /* white-space: inherit; */
+  width: 100% !important;
+  /* overflow: hidden !important; */
+  /* text-overflow: clip; */
+  padding: 2px !important;
+}

@@ -75,6 +75,42 @@ const CandidateProfile = () => {
   const [suggestionIndex, setSuggestionIndex] = useState(null); // active input index
   const [coursesList, setCoursesList] = useState({}); // इंडेक्स के आधार पर कोर्सेस स्टोर करेगा
   const [specializationsList, setSpecializationsList] = useState({}); // इंडेक्स के आधार पर स्पेशलाइजेशन स्टोर करेगा
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
+  const [videoStream, setVideoStream] = useState(null);
+  const videoChunksRef = useRef([]);
+  const videoRecorderRef = useRef(null);
+
+  const startVideoRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setVideoStream(stream);
+
+      const recorder = new MediaRecorder(stream);
+      videoRecorderRef.current = recorder;
+      videoChunksRef.current = [];
+
+      recorder.ondataavailable = e => videoChunksRef.current.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(videoChunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        console.log("Video URL", url); // Preview or upload it
+        // save it to state if needed
+      };
+
+      recorder.start();
+      setIsRecordingVideo(true);
+    } catch (err) {
+      console.error("Video recording failed:", err);
+    }
+  };
+
+  const stopVideoRecording = () => {
+    if (videoRecorderRef.current) {
+      videoRecorderRef.current.stop();
+      videoStream.getTracks().forEach(track => track.stop());
+      setIsRecordingVideo(false);
+    }
+  };
 
 
   // Backend URL
@@ -665,6 +701,8 @@ const CandidateProfile = () => {
           professionalTitle: profileData?.personalInfo?.professionalTitle || '',
           professionalSummary: profileData?.personalInfo?.professionalSummary || '',
           location: profileData?.personalInfo?.location || {},
+          currentAddress: profileData?.personalInfo?.currentAddress || '',
+          permanentAddress: profileData?.personalInfo?.permanentAddress || '',
           image: userData.image || user.image || '',
           resume: userData.resume || user.resume || '',
           voiceIntro: recordings.map(rec => ({
@@ -887,14 +925,26 @@ const CandidateProfile = () => {
 
   return (
     <div className="resume-builder-container">
-
-      <button
-        className="audio-intro-btn mb-3"
-        onClick={() => setShowIntroOptions(true)}
-      >
-        <i className="bi bi-mic-fill"></i>
-        <span>Introduce Yourself to Build Your Resume</span>
-      </button>
+      <div className='d-flex align-items-center mb-3 mediawidth'>
+        <button
+          className="audio-intro-btn"
+          onClick={() => {
+            setShowRecordingModal(true);
+            setShowIntroOptions(false);
+          }}
+        >
+          <i className="bi bi-mic-fill"></i>
+          <span>Introduce Yourself to Build Your Resume</span>
+        </button>
+        <label className="upload-resume">
+          <i className="bi bi-upload me-2"></i> Upload Resume
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            style={{ display: 'none' }}
+          />
+        </label>
+      </div>
 
       <div className="resume-builder-header mb-4">
         <h2 className="resume-builder-title">Professional Resume Builder</h2>
@@ -1081,6 +1131,70 @@ const CandidateProfile = () => {
                     }}
                   />
                 </div>
+                {/* Current Address */}
+                <div className="contact-item">
+                  <i className="bi bi-house-door"></i>
+                  <input
+                    type="text"
+                    id="current-address"
+                    className="form-control"
+                    placeholder="Current Address"
+                    value={profileData?.personalInfo?.currentAddress || ''}
+                    onChange={(e) => {
+                      setProfileData(prev => ({
+                        ...prev,
+                        personalInfo: {
+                          ...(prev.personalInfo || {}),
+                          currentAddress: e.target.value
+                        }
+                      }));
+                    }}
+                  />
+                </div>
+
+                {/* Same as current address checkbox */}
+                <div className="form-check ms-3 mb-2">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="same-address-check"
+                    onChange={(e) => {
+                      if (e.target.checked && profileData?.personalInfo?.currentAddress) {
+                        setProfileData(prev => ({
+                          ...prev,
+                          personalInfo: {
+                            ...(prev.personalInfo || {}),
+                            permanentAddress: prev.personalInfo?.currentAddress || ''
+                          }
+                        }));
+                      }
+                    }}
+                  />
+                  <label className="form-check-label" htmlFor="same-address-check">
+                    Same as current address
+                  </label>
+                </div>
+
+                {/* Permanent Address */}
+                <div className="contact-item">
+                  <i className="bi bi-house-fill"></i>
+                  <input
+                    type="text"
+                    id="permanent-address"
+                    className="form-control"
+                    placeholder="Permanent Address"
+                    value={profileData?.personalInfo?.permanentAddress || ''}
+                    onChange={(e) => {
+                      setProfileData(prev => ({
+                        ...prev,
+                        personalInfo: {
+                          ...(prev.personalInfo || {}),
+                          permanentAddress: e.target.value
+                        }
+                      }));
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1134,10 +1248,11 @@ const CandidateProfile = () => {
                     }}
                   />
                 </div>
-
-                <div className="date-range">
+                {/* <div className="date-range">
                   <span className="date-label">From:</span>
                   <input
+                    type="date"
+                    value={experience.from || ''}
                     type="month"
                     value={experience.FromDate || ''}
                     onChange={(e) => {
@@ -1150,6 +1265,8 @@ const CandidateProfile = () => {
 
                   <span className="date-label">To:</span>
                   <input
+                    type="date"
+                    value={experience.to || ''}
                     type="month"
                     value={experience.ToDate || ''}
                     onChange={(e) => {
@@ -1159,6 +1276,57 @@ const CandidateProfile = () => {
                     }}
                     className="date-input"
                   />
+                </div> */}
+
+                <div className="date-range">
+                  <span className="date-label">From:</span>
+                  <input
+                    type="date"
+                    value={experience.from || ''}
+                    onChange={(e) => {
+                      const updatedExperiences = [...experiences];
+                      updatedExperiences[index].from = e.target.value;
+                      setExperiences(updatedExperiences);
+                    }}
+                    className="date-input"
+                  />
+
+                  <span className="date-label">To:</span>
+                  {!experience.currentlyWorking ? (
+                    <input
+                      type="date"
+                      value={experience.to || ''}
+                      onChange={(e) => {
+                        const updatedExperiences = [...experiences];
+                        updatedExperiences[index].to = e.target.value;
+                        setExperiences(updatedExperiences);
+                      }}
+                      className="date-input"
+                      disabled={experience.currentlyWorking}
+                    />
+                  ) : (
+                    <span className="current-job-badge">Present</span>
+                  )}
+
+                  <div className="form-check ms-3">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id={`currently-working-${index}`}
+                      checked={experience.currentlyWorking || false}
+                      onChange={(e) => {
+                        const updatedExperiences = [...experiences];
+                        updatedExperiences[index].currentlyWorking = e.target.checked;
+                        if (e.target.checked) {
+                          updatedExperiences[index].to = '';
+                        }
+                        setExperiences(updatedExperiences);
+                      }}
+                    />
+                    <label className="form-check-label" htmlFor={`currently-working-${index}`}>
+                      I currently work here
+                    </label>
+                  </div>
                 </div>
 
                 <div className="job-description">
@@ -1170,7 +1338,6 @@ const CandidateProfile = () => {
                 </div>
               </div>
             ))}
-
             <button
               className="add-button"
               onClick={() => {
@@ -2026,10 +2193,7 @@ const CandidateProfile = () => {
 
       {/* Action Buttons */}
       <div className="resume-actions">
-        <div className="audio-btn upload-resume" onClick={() => setShowRecordingModal(true)}>
-          <i className="bi bi-mic-fill"></i>
-          <span>Add Voice Introduction</span>
-        </div>
+
         <label className="upload-resume">
           <i className="bi bi-upload me-2"></i> Upload Resume
           <input
@@ -2187,7 +2351,20 @@ const CandidateProfile = () => {
                             <span>{profileData.personalInfo.location.fullAddress}</span>
                           </div>
                         )}
+                        {profileData?.personalInfo?.currentAddress && (
+                          <div className="resume-contact-item">
+                            <i className="bi bi-house-door-fill"></i>
+                            <span>Current: {profileData.personalInfo.currentAddress}</span>
+                          </div>
+                        )}
 
+                        {/* Add permanent address */}
+                        {profileData?.personalInfo?.permanentAddress && (
+                          <div className="resume-contact-item">
+                            <i className="bi bi-house-fill"></i>
+                            <span>Permanent: {profileData.personalInfo.permanentAddress}</span>
+                          </div>
+                        )}
 
                       </div>
                     </div>
@@ -2431,7 +2608,7 @@ const CandidateProfile = () => {
       )}
 
       {/* model intro  */}
-      {showIntroOptions && (
+      {profileStrength < 100 && showIntroOptions && (
         <div className="intro-options-overlay">
           <div className="intro-options-modal">
             <div className="intro-options-header">
@@ -2751,6 +2928,15 @@ width: 100%;
 .board-autocomplete-wrapper {
   position: relative;
 }
+  @media(max-width:768px){
+  .mediawidth{
+  flex-direction:column;}
+  .mediawidth button{
+  margin-bottom: 15px;
+  font-size:11px;}
+  .content h2{
+  font-size:1.1rem}
+  }
   
 `}
       </style>

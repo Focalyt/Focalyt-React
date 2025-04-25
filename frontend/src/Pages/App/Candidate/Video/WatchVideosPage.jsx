@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
 import axios from 'axios';
+import {Link} from 'react-router-dom';
 
 const WatchVideosPage = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -45,14 +46,16 @@ const WatchVideosPage = () => {
               <div className="col-12">
                 <h3 className="content-header-title float-left mb-0">Videos </h3>
                 <div className="breadcrumb-wrapper col-12">
+                 
                   <ol className="breadcrumb">
-                    <li className="breadcrumb-item">
-                      <a href="/candidate/dashboard">Home</a>
-                    </li>
-                    <li className="breadcrumb-item">
-                      <a href="#">Watch Videos</a>
-                    </li>
-                  </ol>
+                  <li className="breadcrumb-item">
+                    <Link to="/candidate/dashboard">Home</Link>
+                  </li>
+                  <li className="breadcrumb-separator">
+                    <i className="fas fa-angle-right mx-1 text-muted"></i>
+                  </li>
+                  <li className="breadcrumb-item active">Watch Videos</li>
+                </ol>
                 </div>
               </div>
             </div>

@@ -29,7 +29,9 @@ html body .content .content-wrapper {
     font-size: 14px!important;
     margin-bottom: 14px!important;
 }
-
+#requestLoan-section .col-xl-12{
+    padding: 20px;
+}
 @media (max-width: 1920px) {
     .candid-box {
         font-size: 21px;

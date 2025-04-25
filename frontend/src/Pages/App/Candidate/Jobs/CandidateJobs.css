@@ -655,6 +655,8 @@ input.star:checked ~ .rev-box {
 
 .disabled-button:hover {
   background-color: #888;
+  border: 2px solid#888;
+  color: #fff!important;
 }
 
 .call-btn {
@@ -671,11 +673,17 @@ input.star:checked ~ .rev-box {
 
 .rebase-job:hover {
   background-color: #138496;
+  border: 2px solid #138496;
+  color: #fff!important;
+}
+.btn{
+  border: 1px solid #FC2B5A!important;
 }
 
 .rebase-job.disabled {
   background-color: #888;
   cursor: not-allowed;
+  border: 1px solid #888;
 }
 
 .extra-job-info {
@@ -939,6 +947,17 @@ input.star:checked ~ .rev-box {
 .modal{
   background-color: rgba(0,0,0,0.5);
   }
+  .job-thumb {
+    display: table-cell;
+    vertical-align: top;
+    width: 107px;
+}
+.job-thumb img {
+  float: left;
+  width: 100%;
+  border: 2px solid #e8ecec;
+  border-radius: 8px;
+}
 @media (max-width: 767px) {
   .swiper-slide {
     width: 50%;

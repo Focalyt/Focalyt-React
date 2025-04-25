@@ -14969,4 +14969,23 @@ transform: translateY(6px);
   border: 1px solid #FC2B5A;
 }
 
-
+.btn {
+  display: inline-block;
+  font-weight: 400;
+  color: #626262;
+  text-align: center;
+  vertical-align: middle;
+  user-select: none;
+  background-color: transparent;
+  border: 0 solid transparent;
+  padding: 0.9rem 2rem;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 0.4285rem;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+  .btn-danger {
+  border-color: #e42728 !important;
+  background-color: #ea5455 !important;
+  color: #fff !important;
+}

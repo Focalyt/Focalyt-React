@@ -216,7 +216,7 @@ const LoanApplicationPage = () => {
                   </div>
                   <div className="row mt-2 requestLoan-btn">
                     <div className="col-12 mb-2">
-                      <button type="button" className="btn btn-danger" onClick={handleReset}>Reset</button>
+                      <button type="button" className="btn btn-danger me-3" onClick={handleReset}>Reset</button>
                       <button 
                         type="submit" 
                         className={`btn btn-success ${isSubmitDisabled ? 'disabled' : ''}`} 
