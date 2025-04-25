@@ -15,7 +15,7 @@ module.exports = {
   msg91AuthKey: process.env.MIPIE_MSG91_AUTH_KEY,
   msg91SenderId: process.env.MIPIE_MSG91_SENDER_ID,
   jwtSecret: process.env.MIPIE_JWT_SECRET,
-  mimetypes: 'jpg png gif jpeg bmp pdf doc docx xlsx xls zip',
+  mimetypes: 'jpg png gif jpeg bmp pdf doc docx xlsx xls zip mp3 wav m4a',
   accessKeyId: process.env.AWS_ACCESS_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   bucketName: process.env.AWS_BUCKET_NAME,

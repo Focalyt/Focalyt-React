@@ -33,7 +33,7 @@ const {
   SubQualification,
   Industry,
   Skill,
-  
+
   Vacancy,
   HiringStatus,
   coinsOffers,
@@ -284,22 +284,22 @@ const getMetaParameters = (req) => {
 router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res) => {
   try {
     let { courseId } = req.params;
-    console.log("course appling")  
-      // Validate if it's a valid ObjectId before converting
-      if (typeof courseId === "string" && mongoose.Types.ObjectId.isValid(courseId)) {
-        courseId = new mongoose.Types.ObjectId(courseId); // Convert to ObjectId
-      } else {
-        return res.status(400).json({ error: "Invalid course ID" });
-      }
-    
+    console.log("course appling")
+    // Validate if it's a valid ObjectId before converting
+    if (typeof courseId === "string" && mongoose.Types.ObjectId.isValid(courseId)) {
+      courseId = new mongoose.Types.ObjectId(courseId); // Convert to ObjectId
+    } else {
+      return res.status(400).json({ error: "Invalid course ID" });
+    }
+
     const validation = { mobile: req.user.mobile };
     console.log('validation')
-    
+
 
     let selectedCenter = req.body.selectedCenter;
-    console.log('selectedCenter',selectedCenter)
-    if(!selectedCenter){
-      selectedCenter= ""
+    console.log('selectedCenter', selectedCenter)
+    if (!selectedCenter) {
+      selectedCenter = ""
 
     }
 
@@ -311,7 +311,7 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
       }
     }
 
-   
+
 
     const { value, error } = await CandidateValidators.userMobile(validation);
     if (error) {
@@ -341,7 +341,7 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
     const updateData = {
       $addToSet: {
-        appliedCourses: {courseId}
+        appliedCourses: { courseId }
       }
     };
 
@@ -395,10 +395,10 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
       course?.registrationCharges,
       appliedData?.registrationFee,
       'Lead From Portal',
-      course?.courseFeeType, 
+      course?.courseFeeType,
       course?.typeOfProject,
       course?.projectName,
-      "Self" 
+      "Self"
 
 
     ];
@@ -417,7 +417,7 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
 
     console.log(candidateMob);
-return res.status(200).json({ status: true, msg: "Course applied successfully." });
+    return res.status(200).json({ status: true, msg: "Course applied successfully." });
   } catch (error) {
     console.error("Error applying for course:", error.message);
     return res.status(500).json({ status: false, msg: "Internal server error.", error: error.message });
@@ -549,7 +549,7 @@ router
           }
         }
       };
-      
+
       console.log("Candidate Data", candidateBody)
       if (formData?.refCode && formData?.refCode !== '') {
         candidateBody["referredBy"] = formData?.refCode
@@ -990,114 +990,115 @@ router.get("/searchjob", [isCandidate], async (req, res) => {
   });
 });
 
-  router.get("/job/:jobId", [isCandidate], async (req, res) => {
+router.get("/job/:jobId", [isCandidate], async (req, res) => {
   // router.get("/job/:jobId", async (req, res) => {
-    let jobId = req.params.jobId;
-    console.log('jobId',jobId)
-    if (typeof jobId === 'string' && mongoose.Types.ObjectId.isValid(jobId)) {
-      console.log('converting id')
-      jobId = new mongoose.Types.ObjectId(jobId);
-    }
-    const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
-    const highestQualification = await Qualification.find({ status: true });
+  let jobId = req.params.jobId;
+  console.log('jobId', jobId)
+  if (typeof jobId === 'string' && mongoose.Types.ObjectId.isValid(jobId)) {
+    console.log('converting id')
+    jobId = new mongoose.Types.ObjectId(jobId);
+  }
+  const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 })
+  const highestQualification = await Qualification.find({ status: true });
 
-    const userMobile = req.user.mobile;
-    let validation = { mobile: userMobile }
-    let { value, error } = await CandidateValidators.userMobile(validation)
-    if (error) {
-      return res.send({ status: "failure", error: "Something went wrong!", error });
-    }
-  
-    const perPage = 10;
-    const page = parseInt(req.query.page) || 1;
-    const populate = [
-      { path: "_qualification" },
-      { path: "_industry" },
-      { path: "city" },
-      { path: "state" },
-      { path: "_jobCategory" },
-      { path: "_company", populate: "_concernPerson" },
-      { path: "_techSkills" },
-      { path: "_nonTechSkills" },
-    ];
-    const jobDetails = await Vacancy.findById(jobId).populate(populate);
-    if (jobDetails.status == false) {
-      return res.redirect("/candidate/searchJob");
-    }
-  
-    const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
+  const userMobile = req.user.mobile;
+  let validation = { mobile: userMobile }
+  let { value, error } = await CandidateValidators.userMobile(validation)
+  if (error) {
+    return res.send({ status: "failure", error: "Something went wrong!", error });
+  }
 
-    let canApply = false;
-    if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.location && candidate.highestQualification) {
-      if (candidate.isExperienced == false || candidate.isExperienced == true) {
-        canApply = true;
-      }
-    }
-    let isRegisterInterview = false;
-    const checkJobRegister = await AppliedJobs.findOne({
-      _candidate: candidate._id,
-      _job: new mongoose.Types.ObjectId(jobId)
-    });
-    if (checkJobRegister && checkJobRegister?.isRegisterInterview) {
-      isRegisterInterview = true;
-    }
-    let isApplied = false;
-    
-    if (candidate.appliedJobs && candidate.appliedJobs.length > 0) {
-      const applied = candidate.appliedJobs.find(c => {
-        return c.jobId && c.jobId.toString() === jobId.toString();
-      })
+  const perPage = 10;
+  const page = parseInt(req.query.page) || 1;
+  const populate = [
+    { path: "_qualification" },
+    { path: "_industry" },
+    { path: "city" },
+    { path: "state" },
+    { path: "_jobCategory" },
+    { path: "_company", populate: "_concernPerson" },
+    { path: "_techSkills" },
+    { path: "_nonTechSkills" },
+  ];
+  const jobDetails = await Vacancy.findById(jobId).populate(populate);
+  if (jobDetails.status == false) {
+    return res.redirect("/candidate/searchJob");
+  }
 
-      if (applied) {
-        isApplied = true;}    
-    }
+  const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
 
-
-    let hasCredit = true;
-    let coins = await CoinsAlgo.findOne({});
-    if (!candidate.creditLeft || candidate.creditLeft < coins.job) {
-      hasCredit = false;
+  let canApply = false;
+  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.location && candidate.highestQualification) {
+    if (candidate.isExperienced == false || candidate.isExperienced == true) {
+      canApply = true;
     }
-    let mobileNumber = jobDetails.phoneNumberof ? jobDetails.phoneNumberof : contact[0]?.mobile
-    let reviewed = await Review.findOne({ _job: jobId, _user: candidate._id });
-    let course = [];
-    const recomCo = await Vacancy.distinct('_courses.courseLevel', {
-      "_id": new mongoose.Types.ObjectId(jobId), "_courses.isRecommended": true
-    });
-    console.log(recomCo, "recomCorecomCorecomCorecomCo");
-    if (recomCo.length > 0) {
-      const fields = {
-        status: true,
-        isDeleted: false,
-        _id: {
-          $in: recomCo
-        }
-      };
-      // if (candidate?.appliedCourses.length > 0) {
-      //   fields._id = {
-      //     $nin: candidate.appliedCourses
-      //   }
-      // }
-      course = await Courses.find(fields).populate("sectors");
-    }
-  
-    return res.json( {
-      highestQualification,
-      jobDetails,
-      candidate,
-      isApplied,
-      isRegisterInterview,
-      canApply,
-      hasCredit,
-      coins,
-      mobileNumber,
-      reviewed: reviewed ? true : false,
-      course,
-      // page,
-      // totalPages
-    });
-  
+  }
+  let isRegisterInterview = false;
+  const checkJobRegister = await AppliedJobs.findOne({
+    _candidate: candidate._id,
+    _job: new mongoose.Types.ObjectId(jobId)
   });
+  if (checkJobRegister && checkJobRegister?.isRegisterInterview) {
+    isRegisterInterview = true;
+  }
+  let isApplied = false;
+
+  if (candidate.appliedJobs && candidate.appliedJobs.length > 0) {
+    const applied = candidate.appliedJobs.find(c => {
+      return c.jobId && c.jobId.toString() === jobId.toString();
+    })
+
+    if (applied) {
+      isApplied = true;
+    }
+  }
+
+
+  let hasCredit = true;
+  let coins = await CoinsAlgo.findOne({});
+  if (!candidate.creditLeft || candidate.creditLeft < coins.job) {
+    hasCredit = false;
+  }
+  let mobileNumber = jobDetails.phoneNumberof ? jobDetails.phoneNumberof : contact[0]?.mobile
+  let reviewed = await Review.findOne({ _job: jobId, _user: candidate._id });
+  let course = [];
+  const recomCo = await Vacancy.distinct('_courses.courseLevel', {
+    "_id": new mongoose.Types.ObjectId(jobId), "_courses.isRecommended": true
+  });
+  console.log(recomCo, "recomCorecomCorecomCorecomCo");
+  if (recomCo.length > 0) {
+    const fields = {
+      status: true,
+      isDeleted: false,
+      _id: {
+        $in: recomCo
+      }
+    };
+    // if (candidate?.appliedCourses.length > 0) {
+    //   fields._id = {
+    //     $nin: candidate.appliedCourses
+    //   }
+    // }
+    course = await Courses.find(fields).populate("sectors");
+  }
+
+  return res.json({
+    highestQualification,
+    jobDetails,
+    candidate,
+    isApplied,
+    isRegisterInterview,
+    canApply,
+    hasCredit,
+    coins,
+    mobileNumber,
+    reviewed: reviewed ? true : false,
+    course,
+    // page,
+    // totalPages
+  });
+
+});
 
 // router.get("/job/:jobId", [isCandidate], async (req, res) => {
 //   const jobId = req.params.jobId;
@@ -1345,7 +1346,7 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
   try {
     const data = req.query;
 
-   
+
     const perPage = 10;
     const p = parseInt(req.query.page);
     const page = p || 1;
@@ -1364,9 +1365,9 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     }
     if (candidate?.appliedCourses?.length > 0) {
       fields._id = {
-        $nin: candidate.appliedCourses.map(c =>new mongoose.Types.ObjectId(c.courseId))
+        $nin: candidate.appliedCourses.map(c => new mongoose.Types.ObjectId(c.courseId))
       };
-      
+
     }
     console.log('data: ', data);
     if (data['name'] != '' && data.hasOwnProperty('name')) {
@@ -1385,27 +1386,27 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     let courses = await Courses.find(fields).populate("sectors");
     count = await Courses.countDocuments(fields);
     const totalPages = Math.ceil(count / perPage);
-    
-    return res.json( {
+
+    return res.json({
       courses,
       data,
       totalPages,
       page,
     });
 
-  }  catch (err) {
+  } catch (err) {
     console.error("API Error:", err);
     return res.status(500).json({ status: false, message: "Internal server error" });
   }
 });
 /* course by id*/
 // router.get("/course/:courseId/", [isCandidate], async (req, res) => {
-router.get("/course/:courseId/", isCandidate,async (req, res) => {
+router.get("/course/:courseId/", isCandidate, async (req, res) => {
   try {
     const { courseId } = req.params;
-    console.log('courseId',courseId)
+    console.log('courseId', courseId)
     const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 });
-    const userMobile = req.user.mobile ;
+    const userMobile = req.user.mobile;
 
     let validation = { mobile: userMobile };
     let { value, error } = CandidateValidators.userMobile(validation);
@@ -1414,7 +1415,7 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
     }
 
     let course = await Courses.findById(courseId).populate('sectors').populate('center').lean();
-    console.log('course',course)
+    console.log('course', course)
 
 
     if (!course || course?.status === false) {
@@ -1424,8 +1425,8 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
     const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
     const highestQualification = await Qualification.find({ status: true });
 
-    console.log('candidate',candidate)
-    
+    console.log('candidate', candidate)
+
 
     let docsRequired = false;
     let centerRequired = false;
@@ -1434,18 +1435,18 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
 
     const requiredDocs = course.docsRequired ? course.docsRequired.length : 0;
 
-    console.log('requiredCenter',requiredCenter)
-    console.log('requiredDocs',requiredDocs)
+    console.log('requiredCenter', requiredCenter)
+    console.log('requiredDocs', requiredDocs)
 
-    if(requiredCenter>0){
+    if (requiredCenter > 0) {
       centerRequired = true
     };
 
-    if(requiredDocs>0){
+    if (requiredDocs > 0) {
       docsRequired = true
     };
 
-    
+
 
 
     let canApply = false;
@@ -1457,26 +1458,26 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
 
     let isApplied = false;
     let assignedCourseData = null;
-    
+
     if (candidate.appliedCourses && candidate.appliedCourses.length > 0) {
       const applied = candidate.appliedCourses.find(c => {
         return c.courseId && c.courseId.toString() === courseId.toString();
       });
-    
+
       console.log('applied:', applied);
-    
+
       if (applied) {
         isApplied = true;
-    
+
         assignedCourseData = await AppliedCourses.findOne({
           _candidate: candidate._id,
           _course: new mongoose.Types.ObjectId(courseId)
         }).lean();
-    
+
         if (course?.registrationCharges) {
           course.registrationCharges = course.registrationCharges.toString().replace(/,/g, '');
         }
-    
+
         if (assignedCourseData) {
           course.remarks = assignedCourseData.remarks;
           course.assignDate = assignedCourseData.assignDate
@@ -1486,10 +1487,10 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
         }
       }
     }
-    
+
 
     let mobileNumber = course.phoneNumberof ? course.phoneNumberof : contact[0]?.mobile;
-   
+
 
     return res.json({
       status: true,
@@ -1497,10 +1498,10 @@ router.get("/course/:courseId/", isCandidate,async (req, res) => {
       docsRequired,
       isApplied,
       mobileNumber,
-      canApply,      
+      canApply,
       highestQualification,
       requiredCenter,
-      centerRequired,candidate
+      centerRequired, candidate
 
     });
 
@@ -1652,7 +1653,7 @@ router.get("/appliedCourses", [isCandidate], async (req, res) => {
 
     const totalPages = Math.ceil(count / perPage);
 
-    console.log('courses',courses)
+    console.log('courses', courses)
 
     return res.json({
       courses,
@@ -1942,12 +1943,12 @@ router
     if (error) {
       return res.status(400).json({ status: "failure", message: "Validation failed", error });
     }
-  
-    let  {
+
+    let {
       personalInfo,
       qualifications,
       experiences,
-      highestQualification,      
+      highestQualification,
       isExperienced,
       yearOfPassing,
       technicalskills,
@@ -1956,21 +1957,21 @@ router
       sex,
       dob
     } = req.body;
-  
+
     const updatedFields = {
       isProfileCompleted: true,
       highestQualification,
-      
+
       isExperienced,
       yearOfPassing
     };
-  
+
     // ✅ Add root-level fields
     if (sex) updatedFields.sex = sex;
     if (dob) updatedFields.dob = dob;
-  
+
     const user = await Candidate.findOne({ mobile: value.mobile });
-  
+
     // ✅ Handle personalInfo
     if (personalInfo && typeof personalInfo === 'object') {
       Object.entries(personalInfo).forEach(([key, val]) => {
@@ -1980,7 +1981,7 @@ router
           }
         }
       });
-  
+
       // ✅ Handle Geo Location
       if (personalInfo.latitude && personalInfo.longitude) {
         updatedFields["personalInfo.location"] = {
@@ -1995,7 +1996,7 @@ router
         };
       }
     }
-  
+
     // ✅ Qualifications with location
     if (Array.isArray(qualifications)) {
       qualifications.forEach((q) => {
@@ -2011,32 +2012,32 @@ router
       });
       updatedFields.qualifications = qualifications;
     }
-  
-    
-  
+
+
+
     // ✅ Technical Skills
     if (technicalskills?.length) {
       const techSkills = await getTechSkills(technicalskills);
       updatedFields.techSkills = techSkills;
     }
-  
+
     // ✅ Non-Technical Skills
     if (nontechnicalskills?.length) {
       const nonTechSkills = await getNonTechSkills(nontechnicalskills);
       updatedFields.nonTechSkills = nonTechSkills;
     }
-  
+
     // ✅ Location Preferences
     if (locationPreferences?.length) {
       updatedFields.locationPreferences = locationPreferences;
     }
-  // ✅ Handle Voice Introduction
-if (personalInfo?.voiceIntro) {
-  updatedFields["personalInfo.voiceIntro"] = Array.isArray(personalInfo.voiceIntro)
-    ? personalInfo.voiceIntro
-    : [personalInfo.voiceIntro];
-    console.log("📥 Voice Intro Received from Frontend:", personalInfo.voiceIntro);
-}
+    // ✅ Handle Voice Introduction
+    if (personalInfo?.voiceIntro) {
+      updatedFields["personalInfo.voiceIntro"] = Array.isArray(personalInfo.voiceIntro)
+        ? personalInfo.voiceIntro
+        : [personalInfo.voiceIntro];
+      console.log("📥 Voice Intro Received from Frontend:", personalInfo.voiceIntro);
+    }
 
 
     // ✅ Referral Cashback logic
@@ -2053,16 +2054,16 @@ if (personalInfo?.voiceIntro) {
       await checkCandidateCashBack({ _id: user.referredBy });
       await candidateReferalCashBack(referral);
     }
-  
+
     // ✅ Update Candidate
     const updatedCandidate = await Candidate.findByIdAndUpdate(user._id, updatedFields, { new: true });
-  
+
     // ✅ Update in User model also
     const userInfo = {};
     if (personalInfo?.name) userInfo.name = personalInfo.name;
     if (personalInfo?.email) userInfo.email = personalInfo.email;
     await User.findOneAndUpdate({ mobile: user.mobile, role: 3 }, userInfo);
-  
+
     // ✅ ExtraEdge CRM push
     if (!user.isProfileCompleted && process.env.NODE_ENV === 'production') {
       try {
@@ -2081,7 +2082,7 @@ if (personalInfo?.voiceIntro) {
           ReasonCode: "27",
           AuthToken: extraEdgeAuthToken
         };
-  
+
         await axios.post(extraEdgeUrl, JSON.stringify(crmPayload), {
           headers: { "Content-Type": "multipart/form-data" }
         });
@@ -2089,18 +2090,18 @@ if (personalInfo?.voiceIntro) {
         console.error("ExtraEdge API error", err);
       }
     }
-  
+
     // ✅ Cashback tracking
     await checkCandidateCashBack(updatedCandidate);
     await candidateProfileCashBack(updatedCandidate);
     await candidateVideoCashBack(updatedCandidate);
-  
+
     // ✅ Calculate Total Cashback
     const totalCashback = await CandidateCashBack.aggregate([
       { $match: { candidateId: new mongoose.Types.ObjectId(user._id) } },
       { $group: { _id: null, totalAmount: { $sum: "$amount" } } }
     ]);
-  
+
     // ✅ Final response
     res.status(200).json({
       status: true,
@@ -2110,10 +2111,10 @@ if (personalInfo?.voiceIntro) {
       totalCashback: totalCashback?.[0]?.totalAmount || 0
     });
   });
-  
+
 
 router.post("/removelogo", isCandidate, async (req, res) => {
-  let validation = { mobile: req.user.mobile  }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2135,7 +2136,7 @@ router.post("/removelogo", isCandidate, async (req, res) => {
 });
 router.post("/removeKYCImage", isCandidate, async (req, res) => {
   const { type } = req.body
-  let validation = { mobile: req.user.mobile  }
+  let validation = { mobile: req.user.mobile }
   let { value, error } = await CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2219,8 +2220,8 @@ async function getUploadedURL() {
 }
 router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
   let jobId = req.params.jobId;
-  console.log('jobId',jobId)
-  let validation = { mobile: req.user.mobile  }
+  console.log('jobId', jobId)
+  let validation = { mobile: req.user.mobile }
   let { value, error } = CandidateValidators.userMobile(validation)
   if (error) {
     console.log(error)
@@ -2232,9 +2233,9 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     return res.send({ status: false, msg: "Vacancy not Found!" });
   }
   let candidate = await Candidate.findOne({ mobile: candidateMobile })
-  console.log('candidate',candidate)
+  console.log('candidate', candidate)
 
-  
+
   if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
     console.log("Already Applied")
     req.flash("error", "Already Applied");
@@ -2245,7 +2246,7 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
       _candidate: candidate._id,
       _job: vacancy._id,
     });
-    console.log("alreadyApplied checking",alreadyApplied)
+    console.log("alreadyApplied checking", alreadyApplied)
     if (alreadyApplied) {
       req.flash("error", "Already Applied");
       return res.send({ status: false, msg: "Already Applied" });
@@ -2258,9 +2259,10 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     let apply = await Candidate.findOneAndUpdate(
       { mobile: candidateMobile },
       {
-        $addToSet: { appliedJobs: {jobId}
+        $addToSet: {
+          appliedJobs: { jobId }
 
-         },
+        },
         // $inc: { creditLeft: -coinsDeducted },
       },
       { new: true, upsert: true }
@@ -2270,7 +2272,7 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     data["_candidate"] = candidate._id;
     data["_company"] = vacancy._company;
     // data["coinsDeducted"] = coinsDeducted
-    console.log('data',data)
+    console.log('data', data)
     const appliedData = await AppliedJobs.create(data);
 
     // let sheetData = [candidate?.name, candidate?.mobile, candidate?.email, candidate?.sex, candidate?.dob ? moment(candidate?.dob).format('DD MMM YYYY') : '', candidate?.state?.name, candidate.city?.name, 'Job', `${process.env.BASE_URL}/jobdetailsmore/${jobId}`, "", "", moment(appliedData?.createdAt).utcOffset('+05:30').format('DD MMM YYYY hh:mm')]
@@ -2306,7 +2308,7 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
 
     // Extract UTM Parameters
     const sanitizeInput = (value) => typeof value === 'string' ? value.replace(/[^a-zA-Z0-9-_]/g, '') : value;
-   
+
     if (!apply) {
       req.flash("error", "Already failed");
       return res.status(400).send({ status: false, msg: "Applied Failed!" });
@@ -2448,7 +2450,7 @@ router.get("/appliedJobs", [isCandidate], async (req, res) => {
     const jobs = appliedJobs[0].data || [];
     const totalPages = Math.ceil(count / perPage);
 
-    return res.json( {
+    return res.json({
       jobs,
       totalPages,
       page
@@ -2543,7 +2545,7 @@ router.get("/appliedJobs", [isCandidate], async (req, res) => {
 // });
 
 // router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) => {
-router.post("/job/:jobId/registerInterviews",[isCandidate], async (req, res) => {
+router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) => {
   let jobId = req.params.jobId;
 
   if (typeof jobId === 'string' && mongoose.Types.ObjectId.isValid(jobId)) {
@@ -3475,9 +3477,9 @@ router.post("/requestCashback", [isCandidate], async (req, res) => {
 //     }
 //   })
 
-  router.route('/cashback')
+router.route('/cashback')
   // .get([isCandidate], async (req, res) => {
-  .get( async (req, res) => {
+  .get(async (req, res) => {
     try {
       // let validation = { mobile: req.session.user.mobile }
       // let { value, error } = await CandidateValidators.userMobile(validation)
@@ -3655,7 +3657,7 @@ router.get("/watchVideos", [isCandidate], async (req, res) => {
     const videos = await VideoData.find({ status: true })
     res.render(`${req.vPath}/app/candidate/watchVideos.ejs`, { menu: 'videos', videos })
   } catch (err) {
-    
+
     return res.status(500).send({ status: false, message: err.message })
   }
 })
@@ -3664,7 +3666,7 @@ router.get('/notificationCount', [isCandidate, authenti], async (req, res) => {
     let validation = { mobile: req.user.mobile }
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
-      
+
       return res.send({ status: "failure", error: "Something went wrong!", error });
     }
 
@@ -3678,7 +3680,7 @@ router.get('/notificationCount', [isCandidate, authenti], async (req, res) => {
     res.send({ status: true, count: notifications })
   }
   catch (err) {
-    
+
     return res.status(500).send({ status: false, message: err.message })
   }
 })
@@ -4033,31 +4035,31 @@ router.route('/review/:job')
     }
   });
 
-  router.route('/reqDocs/:courseId')
-  .get(isCandidate, async (req, res) => {    
+router.route('/reqDocs/:courseId')
+  .get(isCandidate, async (req, res) => {
     try {
 
-      
+
       const filter = { status: true };
       const validation = { mobile: req.user.mobile };
-      
+
 
       const { value, error } = await CandidateValidators.userMobile(validation);
       if (error) {
-     
+
 
         return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
       };
       const candidateMobile = value.mobile;
-      
+
       let { courseId } = req.params;
       if (typeof courseId === 'string' && mongoose.Types.ObjectId.isValid(courseId)) {
-       courseId = new mongoose.Types.ObjectId(courseId);
-   
-       
+        courseId = new mongoose.Types.ObjectId(courseId);
+
+
       }
-      
-     
+
+
 
       const candidate = await Candidate.findOne({
         mobile: candidateMobile,
@@ -4072,7 +4074,7 @@ router.route('/review/:job')
       let docsRequired = null
       if (course) {
         docsRequired = course.docsRequired; // requireDocs array fetch ho jayega
-        
+
       } else {
         console.log("Course not found");
       };
@@ -4087,36 +4089,36 @@ router.route('/review/:job')
         }
       }
       let mergedDocs = [];
-      
+
       if (course && course.docsRequired) {
         docsRequired = course.docsRequired;
-      
-      // Create a merged array with both required docs and uploaded docs info
-      mergedDocs = docsRequired.map(reqDoc => {
-        // Convert Mongoose document to plain object
-        const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
-        
-        // Find matching uploaded docs for this required doc
-        const matchingUploads = uploadedDocs.filter(
-          uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
-        );
-        
-        return {
-          _id: docObj._id,
-          Name: docObj.Name,
-          
-          description: docObj.description || '',
-          uploads: matchingUploads || []
-        };
-      });
-      
-      // console.log("Merged docs:", JSON.stringify(mergedDocs, null, 2));
-    } else {
-      console.log("Course not found or no docs required");
-    };
 
-    console.log("mergedDocs",mergedDocs)
-      
+        // Create a merged array with both required docs and uploaded docs info
+        mergedDocs = docsRequired.map(reqDoc => {
+          // Convert Mongoose document to plain object
+          const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+          // Find matching uploaded docs for this required doc
+          const matchingUploads = uploadedDocs.filter(
+            uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+          );
+
+          return {
+            _id: docObj._id,
+            Name: docObj.Name,
+
+            description: docObj.description || '',
+            uploads: matchingUploads || []
+          };
+        });
+
+        // console.log("Merged docs:", JSON.stringify(mergedDocs, null, 2));
+      } else {
+        console.log("Course not found or no docs required");
+      };
+
+      console.log("mergedDocs", mergedDocs)
+
       res.json({
         docsRequired,
         courseId,
@@ -4130,143 +4132,143 @@ router.route('/review/:job')
 
   .post(isCandidate, async (req, res) => {
     try {
-        let { docsName, courseId, docsId } = req.body;
+      let { docsName, courseId, docsId } = req.body;
 
-        if (typeof docsId  === 'String' &&!mongoose.Types.ObjectId.isValid(docsId)) {
-          docsId = new mongoose.Types.ObjectId(docsId);
+      if (typeof docsId === 'String' && !mongoose.Types.ObjectId.isValid(docsId)) {
+        docsId = new mongoose.Types.ObjectId(docsId);
+      }
+
+      const validation = { mobile: req.user.mobile };
+      const { value, error } = await CandidateValidators.userMobile(validation);
+      if (error) {
+        return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
+      }
+      const candidateMobile = value.mobile;
+
+      const candidate = await Candidate.findOne({
+        mobile: candidateMobile,
+        appliedCourses: courseId
+      });
+
+      if (!candidate) {
+        return res.status(400).json({ error: "You have not applied for this course." });
+      }
+
+      let files = req.files?.file;
+      if (!files) {
+        return res.status(400).send({ status: false, message: "No files uploaded" });
+      }
+
+      console.log("Files", files);
+      const candidateId = candidate._id
+
+      const filesArray = Array.isArray(files) ? files : [files];
+      const uploadedFiles = [];
+      const uploadPromises = [];
+
+      filesArray.forEach((item) => {
+        const { name, mimetype } = item;
+        const ext = name?.split('.').pop().toLowerCase();
+
+        console.log(`Processing File: ${name}, Extension: ${ext}`);
+
+        if (!allowedExtensions.includes(ext)) { // ✅ Now includes PDFs
+          console.log("File type not supported")
+          throw new Error(`File type not supported: ${ext}`);
         }
 
-        const validation = { mobile: req.user.mobile };
-        const { value, error } = await CandidateValidators.userMobile(validation);
-        if (error) {
-            return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
-        }
-        const candidateMobile = value.mobile;
-
-        const candidate = await Candidate.findOne({
-            mobile: candidateMobile,
-            appliedCourses: courseId
-        });
-
-        if (!candidate) {
-            return res.status(400).json({ error: "You have not applied for this course." });
+        let fileType = "document"; // ✅ Default to "document"
+        if (allowedImageExtensions.includes(ext)) {
+          fileType = "image";
+        } else if (allowedVideoExtensions.includes(ext)) {
+          fileType = "video";
         }
 
-        let files = req.files?.file;
-        if (!files) {
-            return res.status(400).send({ status: false, message: "No files uploaded" });
-        }
+        const key = `Documents for course/${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
+        const params = {
+          Bucket: bucketName,
+          Key: key,
+          Body: item.data,
+          ContentType: mimetype,
+        };
 
-        console.log("Files", files);
-        const candidateId = candidate._id
-
-        const filesArray = Array.isArray(files) ? files : [files];
-        const uploadedFiles = [];
-        const uploadPromises = [];
-
-        filesArray.forEach((item) => {
-            const { name, mimetype } = item;
-            const ext = name?.split('.').pop().toLowerCase();
-
-            console.log(`Processing File: ${name}, Extension: ${ext}`);
-
-            if (!allowedExtensions.includes(ext)) { // ✅ Now includes PDFs
-                console.log("File type not supported")
-                throw new Error(`File type not supported: ${ext}`);
-            }
-
-            let fileType = "document"; // ✅ Default to "document"
-            if (allowedImageExtensions.includes(ext)) {
-                fileType = "image";
-            } else if (allowedVideoExtensions.includes(ext)) {
-                fileType = "video";
-            }
-
-            const key = `Documents for course/${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
-            const params = {
-                Bucket: bucketName,
-                Key: key,
-                Body: item.data,
-                ContentType: mimetype,
-            };
-
-            uploadPromises.push(
-                s3.upload(params).promise().then((uploadResult) => {
-                    uploadedFiles.push({
-                        fileURL: uploadResult.Location,
-                        fileType,
-                    });
-                })
-            );
-        });
-
-        await Promise.all(uploadPromises);
-        console.log(uploadedFiles)
-
-        const fileUrl = uploadedFiles[0].fileURL;
-
-        const existingCourseDoc = await Candidate.findOne({
-            mobile: candidateMobile,
-            "docsForCourses.courseId": courseId
-        });
-
-        if (existingCourseDoc) {
-            const updatedCandidate = await Candidate.findOneAndUpdate(
-                { mobile: candidateMobile, "docsForCourses.courseId": courseId },
-                {
-                    $push: {
-                        "docsForCourses.$.uploadedDocs": {
-                            docsId: new mongoose.Types.ObjectId(docsId),
-                            fileUrl: fileUrl,
-                            status: "Pending",
-                            uploadedAt: new Date()
-                        }
-                    }
-                },
-                { new: true }
-            );
-
-            return res.status(200).json({
-                status: true,
-                message: "Document uploaded successfully",
-                data: updatedCandidate
+        uploadPromises.push(
+          s3.upload(params).promise().then((uploadResult) => {
+            uploadedFiles.push({
+              fileURL: uploadResult.Location,
+              fileType,
             });
-        } else {
-            const updatedCandidate = await Candidate.findOneAndUpdate(
-                { mobile: candidateMobile },
-                {
-                    $push: {
-                        "docsForCourses": {
-                            courseId: new mongoose.Types.ObjectId(courseId),
-                            uploadedDocs: [{
-                                docsId: new mongoose.Types.ObjectId(docsId),
-                                fileUrl: fileUrl,
-                                status: "Pending",
-                                uploadedAt: new Date()
-                            }]
-                        }
-                    }
-                },
-                { new: true }
-            );
+          })
+        );
+      });
 
-            return res.status(200).json({
-                status: true,
-                message: "Document uploaded successfully",
-                data: updatedCandidate
-            });
-        }
+      await Promise.all(uploadPromises);
+      console.log(uploadedFiles)
+
+      const fileUrl = uploadedFiles[0].fileURL;
+
+      const existingCourseDoc = await Candidate.findOne({
+        mobile: candidateMobile,
+        "docsForCourses.courseId": courseId
+      });
+
+      if (existingCourseDoc) {
+        const updatedCandidate = await Candidate.findOneAndUpdate(
+          { mobile: candidateMobile, "docsForCourses.courseId": courseId },
+          {
+            $push: {
+              "docsForCourses.$.uploadedDocs": {
+                docsId: new mongoose.Types.ObjectId(docsId),
+                fileUrl: fileUrl,
+                status: "Pending",
+                uploadedAt: new Date()
+              }
+            }
+          },
+          { new: true }
+        );
+
+        return res.status(200).json({
+          status: true,
+          message: "Document uploaded successfully",
+          data: updatedCandidate
+        });
+      } else {
+        const updatedCandidate = await Candidate.findOneAndUpdate(
+          { mobile: candidateMobile },
+          {
+            $push: {
+              "docsForCourses": {
+                courseId: new mongoose.Types.ObjectId(courseId),
+                uploadedDocs: [{
+                  docsId: new mongoose.Types.ObjectId(docsId),
+                  fileUrl: fileUrl,
+                  status: "Pending",
+                  uploadedAt: new Date()
+                }]
+              }
+            }
+          },
+          { new: true }
+        );
+
+        return res.status(200).json({
+          status: true,
+          message: "Document uploaded successfully",
+          data: updatedCandidate
+        });
+      }
     }
     catch (err) {
-        console.log(err)
-        return res.status(500).send({ status: false, message: err.message })
+      console.log(err)
+      return res.status(500).send({ status: false, message: err.message })
     }
-})
+  })
 // Backend (Node.js with Express)
 router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
   try {
     const user = req.user;
-    console.log('user',user)
+    console.log('user', user)
 
     const {
       name,
@@ -4320,10 +4322,10 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
             level: lang.level
           }));
       }
-      
+
       if (Array.isArray(personalInfo.projects) && personalInfo.projects.length > 0) updatePayload.personalInfo.projects = personalInfo.projects;
       if (Array.isArray(personalInfo.interest) && personalInfo.interest.length > 0) updatePayload.personalInfo.interest = personalInfo.interest;
-      
+
     }
 
     // Work experience
@@ -4368,7 +4370,7 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
           }
         }));
     }
-console.log('updatePayload',updatePayload)
+    console.log('updatePayload', updatePayload)
     // Final DB Update
     const updatedProfile = await Candidate.findOneAndUpdate(
       { mobile: user.mobile },
@@ -4376,7 +4378,7 @@ console.log('updatePayload',updatePayload)
       { new: true, runValidators: true }
     );
 
-    console.log('updatedProfile',updatedProfile)
+    console.log('updatedProfile', updatedProfile)
 
 
     return res.status(200).json({ status: true, message: 'Profile updated successfully', data: updatedProfile });
@@ -4386,13 +4388,53 @@ console.log('updatePayload',updatePayload)
   }
 });
 
+router.patch('/updatefiles', [isCandidate, authenti], async (req, res) => {
+  try {
+    // Step 1: Find dynamic key (should be only 1 key in body)
+    const keys = Object.keys(req.body);
+    if (keys.length !== 1) {
+      return res.send({ status: false, message: 'Invalid request structure' });
+    }
+
+    const fieldName = keys[0];
+    const fileData = req.body[fieldName];
+
+    // Step 2: Validate allowed fields
+    const arrayFields = ['resume', 'voiceIntro'];
+    const singleFields = ['profilevideo', 'image'];
+
+    if (![...arrayFields, ...singleFields].includes(fieldName)) {
+      return res.send({ status: false, message: 'Unauthorized field update' });
+    }
+
+    // Step 3: Create update object
+    const updateQuery = arrayFields.includes(fieldName)
+      ? { $push: { [`personalInfo.${fieldName}`]: fileData } }
+      : { [`personalInfo.${fieldName}`]: fileData.url }; // Assuming single fields hold only URL
+
+    // Step 4: Execute update
+    await Candidate.findOneAndUpdate(
+      { mobile: req.user.mobile },
+      updateQuery
+    );
+
+    return res.send({ status: true, message: `${fieldName} updated successfully` });
+
+  } catch (err) {
+    console.error("❌ Error updating file in profile:", err);
+    return res.send({ status: false, message: 'Error updating file in profile' });
+  }
+});
+
+
+
 
 router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
   try {
     const user = req.user;
 
-    const educations = await Qualification.find({ status:true });
-    
+    const educations = await Qualification.find({ status: true });
+
 
 
     const candidate = await Candidate.findOne({ mobile: user.mobile });
@@ -4401,12 +4443,12 @@ router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
       return res.status(404).json({ status: false, message: "Candidate not found" });
     }
 
-    console.log('candidate',candidate)
+    console.log('candidate', candidate)
 
     res.status(200).json({
       status: true,
       message: "Profile fetched successfully",
-      data: {candidate,educations}
+      data: { candidate, educations }
     });
   } catch (error) {
     console.error('Error fetching profile:', error);
@@ -4416,14 +4458,4 @@ router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
 
 
 
-
-// router.get('/savecvcv/:userId', async (req, res) => {
-//   try {
-//     const candidate = await Candidate.findOne({ userId: req.params.userId });
-//     res.status(200).json({ status: true, data: candidate });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ status: false, message: "Error fetching CV" });
-//   }
-// });
 module.exports = router;

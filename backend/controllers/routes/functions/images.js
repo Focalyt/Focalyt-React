@@ -53,10 +53,12 @@ module.exports.getUploadUrl = async (req, res) => {
 
 module.exports.uploadSingleImage = async (req, res) => {
   try {
+    console.log('api hiting upload file')
     const { name, mimetype: ContentType } = req.files.file;
     const ext = name.split('.').pop();
+    const {filename} = req.params
     let userId =  req.user?._id || req.session.user?._id
-    const key = `uploads/${userId}/${uuid()}.${ext}`;
+    const key = `uploads/${userId}/${filename}/${uuid()}.${ext}`;
     if (!mimetypes.includes(ext.toLowerCase())) throw new InvalidParameterError('File type not supported!');
 
     const data = req.files.file.data
@@ -68,6 +70,7 @@ module.exports.uploadSingleImage = async (req, res) => {
       if(err){
         return res.send({ status: false, err });
       }
+      console.log('file uploaded',data)
       return res.send({ status: true, data });
     });
 

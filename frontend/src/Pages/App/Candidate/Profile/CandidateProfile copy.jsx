@@ -28,6 +28,9 @@ const CandidateProfile = () => {
     skillName: '',
     skillPercent: 0
   }]);
+  const [resume, setResume] = useState([{
+
+  }]);
   const [certificates, setCertificates] = useState([{
     certificateName: '',
     orgName: ''
@@ -55,6 +58,7 @@ const CandidateProfile = () => {
   const [activeSection, setActiveSection] = useState('personal');
   const [showRecordingModal, setShowRecordingModal] = useState(false);
   const [profileStrength, setProfileStrength] = useState(0);
+  const [showIntroOptions, setShowIntroOptions] = useState(true);
 
   // Audio recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -75,6 +79,71 @@ const CandidateProfile = () => {
 
   // Backend URL
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  const uploadCV = async (file, filename) => {
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await axios.post(`${backendUrl}/api/uploadSingleFile/${filename}`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (res.data.status && res.data.data.Location) {
+        // ✅ Resume uploaded, now update profile
+        const uploadeddata = {
+          name: file.name,
+          url: res.data.data.Location,
+          uploadedAt: new Date()
+        };
+
+        updateFileInProfile(uploadeddata, filename);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+    }
+  };
+
+
+  const updateFileInProfile = async (dataObject, schemaFieldName) => {
+    try {
+      const token = localStorage.getItem('token');
+
+      const res = await axios.patch(`${backendUrl}/candidate/updatefiles`, {
+        [schemaFieldName]: dataObject
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (res.data.status) {
+        alert(`${schemaFieldName} updated successfully!`);
+
+        // Dynamically update in local state too
+        setProfileData(prev => ({
+          ...prev,
+          personalInfo: {
+            ...(prev.personalInfo || {}),
+            [schemaFieldName]: [
+              ...(prev.personalInfo?.[schemaFieldName] || []),
+              dataObject
+            ]
+          }
+        }));
+
+        window.location.reload();
+
+      }
+    } catch (err) {
+      console.error(`${schemaFieldName} update failed:`, err);
+    }
+  };
+
+
+
 
   // कोर्स के आधार पर स्पेशलाइजेशन फेच करने का फंक्शन
   const fetchSpecializationsByCourse = async (courseId) => {
@@ -139,24 +208,24 @@ const CandidateProfile = () => {
   // जब भी शिक्षा चुनी जाए, तब कोर्स फेच करें
   const handleEducationChange = async (e, index) => {
     const educationId = e.target.value;
-  
+
     const updated = [...educations];
     updated[index].education = educationId;
     updated[index].course = '';
     updated[index].specialization = '';
     setEducations(updated);
-  
+
     const educationName = educationList.find(ed => ed._id === educationId)?.name;
-  
+
     if (educationName === 'ITI') {
       const courseRes = await fetchCoursesByEducation(educationId);
       if (courseRes.length > 0) {
         const itiCourseId = courseRes[0]._id;
-  
+
         // Set course ID in state
         updated[index].course = itiCourseId;
         setEducations([...updated]);
-  
+
         // Fetch specialization for this course
         const specializations = await fetchSpecializationsByCourse(itiCourseId);
         setSpecializationsList(prev => ({
@@ -173,7 +242,7 @@ const CandidateProfile = () => {
       }));
     }
   };
-  
+
 
   // For creating editable content
   const createEditable = (content, placeholder, onChange, id = '') => (
@@ -190,6 +259,9 @@ const CandidateProfile = () => {
       {content}
     </div>
   );
+  useEffect(() => {
+    console.log("✅ Is Declaration Checked:", declaration.isChecked);
+  }, [declaration.isChecked]);
 
   // Calculate profile strength
   useEffect(() => {
@@ -408,7 +480,7 @@ const CandidateProfile = () => {
       // Add styling to make sure the autocomplete dropdown is visible
       input.style.backgroundColor = "#ffffff";
       input.style.color = "#000000";
-      input.style.zIndex = "1000";
+
 
       // Add change event listener
       autocomplete.addListener('place_changed', () => {
@@ -516,7 +588,7 @@ const CandidateProfile = () => {
         audioChunksRef.current.push(event.data);
       };
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(audioBlob);
         const timestamp = new Date().toLocaleString();
@@ -532,7 +604,13 @@ const CandidateProfile = () => {
         ]);
 
         setRecordingStatus('Recording saved successfully!');
+        // ✅ Define audioFile from blob
+        const audioFile = new File([audioBlob], `voice-${Date.now()}.wav`, {
+          type: 'audio/wav'
+        });
+        
         resetTimer();
+        await uploadCV(audioFile, 'voiceIntro');
 
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
@@ -567,6 +645,11 @@ const CandidateProfile = () => {
   // Save resume function
   const handleSaveCV = async () => {
     try {
+      if (!declaration?.isChecked) {
+        alert("Please accept the declaration before saving your resume.");
+        return;
+      }
+
       const token = localStorage.getItem('token');
       const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
 
@@ -577,7 +660,7 @@ const CandidateProfile = () => {
         mobile: profileData?.mobile || '',
         sex: profileData?.sex || '',
         dob: profileData?.dob || '',
-        whatsapp: profileData?.whatsapp || '',      
+        whatsapp: profileData?.whatsapp || '',
         personalInfo: {
           professionalTitle: profileData?.personalInfo?.professionalTitle || '',
           professionalSummary: profileData?.personalInfo?.professionalSummary || '',
@@ -610,7 +693,7 @@ const CandidateProfile = () => {
           interest: interests.filter(i => i.trim() !== ''),
           declaration: declaration
         },
-      
+
         experiences: experiences.map(e => ({
           jobTitle: e.jobTitle || '',
           companyName: e.companyName || '',
@@ -618,7 +701,7 @@ const CandidateProfile = () => {
           ToDate: e.ToDate || '',
           jobDescription: e.jobDescription || ''
         })),
-      
+
         qualifications: educations.map(edu => ({
           education: edu.education,
           boardName: edu.boardName,
@@ -629,7 +712,7 @@ const CandidateProfile = () => {
           marks: edu.marks,
           course: edu.course,
           specialization: edu.specialization,
-      
+
           universityLocation: edu.universityLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -637,7 +720,7 @@ const CandidateProfile = () => {
             state: '',
             fullAddress: ''
           },
-      
+
           collegeLocation: edu.collegeLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -645,7 +728,7 @@ const CandidateProfile = () => {
             state: '',
             fullAddress: ''
           },
-      
+
           schoolLocation: edu.schoolLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -655,7 +738,7 @@ const CandidateProfile = () => {
           }
         }))
       };
-      
+
       console.log("📤 CV Payload being sent to backend:", cvPayload);
 
       const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
@@ -666,6 +749,8 @@ const CandidateProfile = () => {
 
       if (res.data.status) {
         alert('CV Saved Successfully!');
+        window.location.reload();
+
       } else {
         alert('Failed to save CV!');
       }
@@ -702,12 +787,10 @@ const CandidateProfile = () => {
           const candidate = data.candidate;
           if (candidate) {
             setProfileData(candidate);
-
             // Map backend data to frontend state
             setUser({
               name: candidate.name,
-              image: candidate.personalInfo?.image,
-              resume: candidate.personalInfo?.resume
+              image: candidate.personalInfo?.image
             });
 
             // Set experiences
@@ -723,6 +806,10 @@ const CandidateProfile = () => {
             // Set skills
             if (Array.isArray(candidate.personalInfo?.skills) && candidate.personalInfo.skills.length > 0) {
               setSkills(candidate.personalInfo.skills);
+
+              //Set Resume
+            } if (Array.isArray(candidate.personalInfo?.resume) && candidate.personalInfo.resume.length > 0) {
+              setResume(candidate.personalInfo.resume);
             }
 
             // Set certificates
@@ -730,25 +817,30 @@ const CandidateProfile = () => {
               setCertificates(candidate.personalInfo.certifications);
             }
 
+
             // Set languages
             if (Array.isArray(candidate.personalInfo?.languages) && candidate.personalInfo.languages.length > 0) {
               setLanguages(candidate.personalInfo.languages);
             }
+
 
             // Set projects
             if (Array.isArray(candidate.personalInfo?.projects) && candidate.personalInfo.projects.length > 0) {
               setProjects(candidate.personalInfo.projects);
             }
 
+
             // Set interests
             if (Array.isArray(candidate.personalInfo?.interest) && candidate.personalInfo.interest.length > 0) {
               setInterests(candidate.personalInfo.interest);
             }
 
+
             // Set declaration
             if (candidate.personalInfo?.declaration) {
               setDeclaration(candidate.personalInfo.declaration);
             }
+
 
             // Set voice recordings
             if (Array.isArray(candidate.personalInfo?.voiceIntro) && candidate.personalInfo.voiceIntro.length > 0) {
@@ -795,6 +887,15 @@ const CandidateProfile = () => {
 
   return (
     <div className="resume-builder-container">
+
+      <button
+        className="audio-intro-btn mb-3"
+        onClick={() => setShowIntroOptions(true)}
+      >
+        <i className="bi bi-mic-fill"></i>
+        <span>Introduce Yourself to Build Your Resume</span>
+      </button>
+
       <div className="resume-builder-header mb-4">
         <h2 className="resume-builder-title">Professional Resume Builder</h2>
 
@@ -837,8 +938,8 @@ const CandidateProfile = () => {
             <div className="resume-header">
               <div className="profile-image-container">
                 <div className="profile-image">
-                  {user?.image ? (
-                    <img src={user.image} alt="Profile" />
+                  {profileData?.personalInfo?.image? (
+                    <img src={profileData.personalInfo.image} alt="Profile" />
                   ) : (
                     <div className="profile-placeholder">
                       <i className="bi bi-person"></i>
@@ -852,19 +953,10 @@ const CandidateProfile = () => {
                         accept="image/*"
                         style={{ display: 'none' }}
                         onChange={(e) => {
-                          // Handle image upload
-                          if (e.target.files && e.target.files[0]) {
-                            // You would typically upload this to your server
-                            // For now, we'll just update the local state
-                            const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setUser(prev => ({
-                                ...prev,
-                                image: reader.result
-                              }));
-                            };
-                            reader.readAsDataURL(file);
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            uploadCV(file, 'image');
+                            e.target.value = null; // Direct upload on file selection
                           }
                         }}
                       />
@@ -910,7 +1002,7 @@ const CandidateProfile = () => {
                   })}
                 </div>
 
-                <div className="contact-info">
+                <div className="contact-info mb-3">
                   <div className="contact-item">
                     <i className="bi bi-telephone"></i>
                     {createEditable(profileData?.mobile || '', 'Phone Number', (val) => {
@@ -954,7 +1046,7 @@ const CandidateProfile = () => {
 
                   <div className="contact-item">
                     <i className="bi bi-calendar-event"></i>
-                    <input
+                    <input style={{ height: "30px" }}
                       type="date"
                       className="form-control"
                       value={profileData?.dob ? profileData?.dob.slice(0, 10) : ''}  // to remove time part
@@ -1852,16 +1944,22 @@ const CandidateProfile = () => {
 
               <div className="declaration-container">
                 <div
-                  className="declaration-content"
-                  contentEditable
-                  suppressContentEditableWarning={true}
-                  data-placeholder="I hereby declare that all the information provided above is true to the best of my knowledge."
-                  onBlur={(e) => setDeclaration({
-                    ...declaration,
-                    text: e.target.innerText
-                  })}
+                  className="d-flex align-items-center declaration-content"
                 >
-                  {declaration.text}
+                  <input
+                    type="checkbox"
+                    id="declaration-check"
+                    checked={declaration.isChecked}
+                    onChange={(e) => setDeclaration({
+                      ...declaration,
+                      isChecked: e.target.checked
+
+                    },
+                      console.log('Is Declaration Checked:', declaration.isChecked)
+                    )}
+                  />
+
+                  <p className='ms-2'>I hereby declare that all the information provided above is true to the best of my knowledge.</p>
                 </div>
               </div>
             </div>
@@ -1938,14 +2036,28 @@ const CandidateProfile = () => {
             type="file"
             accept=".pdf,.doc,.docx"
             style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                uploadCV(file, 'resume');
+                e.target.value = null; // Direct upload on file selection
+              }
+            }}
           />
+
         </label>
 
         <button className="save-resume" onClick={handleSaveCV}>
           <i className="bi bi-save me-2"></i> Save Resume
         </button>
 
-        <button className="preview-resume" onClick={() => setShowPreview(true)}>
+        <button className="preview-resume" onClick={() => {
+          if (!declaration?.isChecked) {
+            alert("Please accept the declaration before saving your resume.");
+            return;
+          };
+          setShowPreview(true)
+        }}>
           <i className="bi bi-eye me-2"></i> Preview Resume
         </button>
       </div>
@@ -2068,11 +2180,14 @@ const CandidateProfile = () => {
                           </div>
                         )}
                         {profileData?.personalInfo?.location?.fullAddress && (
+
                           <div className="resume-contact-item">
                             <i className="bi bi-geo-alt-fill"></i>
                             <span>{profileData.personalInfo.location.fullAddress}</span>
+                            <span>{profileData.personalInfo.location.fullAddress}</span>
                           </div>
                         )}
+
 
                       </div>
                     </div>
@@ -2314,6 +2429,59 @@ const CandidateProfile = () => {
           </div>
         </div>
       )}
+
+      {/* model intro  */}
+      {showIntroOptions && (
+        <div className="intro-options-overlay">
+          <div className="intro-options-modal">
+            <div className="intro-options-header">
+              <h3>How would you like to introduce yourself?</h3>
+              <button className="close-intro-options" onClick={() => setShowIntroOptions(false)}>
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            <div className="intro-options-body">
+              <div
+                className="intro-option-card"
+                onClick={() => {
+                  setShowRecordingModal(true);
+                  setShowIntroOptions(false);
+                }}
+              >
+                <div className="intro-option-icon">
+                  <i className="bi bi-mic-fill"></i>
+                </div>
+                <div className="intro-option-text">
+                  <h4>Voice Introduction</h4>
+                  <p>Record a brief audio introduction to make your profile stand out</p>
+                </div>
+              </div>
+
+              <div className="intro-options-divider">
+                <span>OR</span>
+              </div>
+
+              <div
+                className="intro-option-card"
+                onClick={() => {
+                  setActiveSection('personal');
+                  setShowIntroOptions(false);
+                }}
+              >
+                <div className="intro-option-icon">
+                  <i className="bi bi-file-earmark-text-fill"></i>
+                </div>
+                <div className="intro-option-text">
+                  <h4>Fill Your Profile</h4>
+                  <p>Complete your professional details to create a comprehensive resume</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>
         {`
 /* Styling for company name input field */
@@ -2330,7 +2498,7 @@ width: 100%;
 }
 
 .company-name .form-control:focus {
-border-color: #6f42c1;
+border-color: #FC2B5A;
 box-shadow: none;
 outline: none;
 }
@@ -2374,12 +2542,183 @@ font-weight: bold;
 width: 40%;
 }
 
+.declaration-checkbox {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.declaration-checkbox input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  accent-color: #6f42c1;
+  cursor: pointer;
+}
+
+.declaration-checkbox label {
+  color: #444;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.declaration-checkbox:hover label {
+  color: #000;
+}
+
+.intro-options-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+}
+
+.intro-options-modal {
+  width: 90%;
+  max-width: 500px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.intro-options-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.intro-options-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.close-intro-options {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #666;
+}
+
+.close-intro-options:hover {
+  color: #000;
+}
+
+.intro-options-body {
+  padding: 20px;
+}
+
+.intro-option-card {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 15px;
+}
+
+.intro-option-card:hover {
+  border-color: #FC2B5A;
+  box-shadow: 0 2px 12px rgba(111, 66, 193, 0.1);
+  transform: translateY(-2px);
+}
+
+.intro-option-icon {
+  font-size: 2rem;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FC2B5A;
+  margin-right: 15px;
+}
+
+.intro-option-text h4 {
+  margin: 0 0 5px 0;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.intro-option-text p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.intro-options-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 15px 0;
+  color: #777;
+}
+
+.intro-options-divider::before,
+.intro-options-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.intro-options-divider span {
+  margin: 0 15px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.audio-intro-btn {
+  background-color: #fc2b5a;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-right: 15px;
+}
+
+// .audio-intro-btn:hover {
+//   background-color: #5a349a;
+// }
+
+.audio-intro-btn i {
+  margin-right: 8px;
+  font-size: 1.1rem;
+}
 @media(max-width: 768px) {
 .add-certificate {
 max-width: 59%;
 width: 100%;
 }
 }
+@media (max-width: 576px) {
+  .intro-option-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .intro-option-icon {
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+}
+
 `}
       </style>
 

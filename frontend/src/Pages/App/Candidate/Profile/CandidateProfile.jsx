@@ -28,6 +28,9 @@ const CandidateProfile = () => {
     skillName: '',
     skillPercent: 0
   }]);
+  const [resume, setResume] = useState([{
+
+  }]);
   const [certificates, setCertificates] = useState([{
     certificateName: '',
     orgName: ''
@@ -76,6 +79,71 @@ const CandidateProfile = () => {
 
   // Backend URL
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  const uploadCV = async (file, filename) => {
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await axios.post(`${backendUrl}/api/uploadSingleFile/${filename}`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (res.data.status && res.data.data.Location) {
+        // ✅ Resume uploaded, now update profile
+        const uploadeddata = {
+          name: file.name,
+          url: res.data.data.Location,
+          uploadedAt: new Date()
+        };
+
+        updateFileInProfile(uploadeddata, filename);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+    }
+  };
+
+
+  const updateFileInProfile = async (dataObject, schemaFieldName) => {
+    try {
+      const token = localStorage.getItem('token');
+
+      const res = await axios.patch(`${backendUrl}/candidate/updatefiles`, {
+        [schemaFieldName]: dataObject
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (res.data.status) {
+        alert(`${schemaFieldName} updated successfully!`);
+
+        // Dynamically update in local state too
+        setProfileData(prev => ({
+          ...prev,
+          personalInfo: {
+            ...(prev.personalInfo || {}),
+            [schemaFieldName]: [
+              ...(prev.personalInfo?.[schemaFieldName] || []),
+              dataObject
+            ]
+          }
+        }));
+
+        window.location.reload();
+
+      }
+    } catch (err) {
+      console.error(`${schemaFieldName} update failed:`, err);
+    }
+  };
+
+
+
 
   // कोर्स के आधार पर स्पेशलाइजेशन फेच करने का फंक्शन
   const fetchSpecializationsByCourse = async (courseId) => {
@@ -140,24 +208,24 @@ const CandidateProfile = () => {
   // जब भी शिक्षा चुनी जाए, तब कोर्स फेच करें
   const handleEducationChange = async (e, index) => {
     const educationId = e.target.value;
-  
+
     const updated = [...educations];
     updated[index].education = educationId;
     updated[index].course = '';
     updated[index].specialization = '';
     setEducations(updated);
-  
+
     const educationName = educationList.find(ed => ed._id === educationId)?.name;
-  
+
     if (educationName === 'ITI') {
       const courseRes = await fetchCoursesByEducation(educationId);
       if (courseRes.length > 0) {
         const itiCourseId = courseRes[0]._id;
-  
+
         // Set course ID in state
         updated[index].course = itiCourseId;
         setEducations([...updated]);
-  
+
         // Fetch specialization for this course
         const specializations = await fetchSpecializationsByCourse(itiCourseId);
         setSpecializationsList(prev => ({
@@ -174,7 +242,7 @@ const CandidateProfile = () => {
       }));
     }
   };
-  
+
 
   // For creating editable content
   const createEditable = (content, placeholder, onChange, id = '') => (
@@ -191,6 +259,9 @@ const CandidateProfile = () => {
       {content}
     </div>
   );
+  useEffect(() => {
+    console.log("✅ Is Declaration Checked:", declaration.isChecked);
+  }, [declaration.isChecked]);
 
   // Calculate profile strength
   useEffect(() => {
@@ -517,7 +588,7 @@ const CandidateProfile = () => {
         audioChunksRef.current.push(event.data);
       };
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(audioBlob);
         const timestamp = new Date().toLocaleString();
@@ -533,7 +604,13 @@ const CandidateProfile = () => {
         ]);
 
         setRecordingStatus('Recording saved successfully!');
+        // ✅ Define audioFile from blob
+        const audioFile = new File([audioBlob], `voice-${Date.now()}.wav`, {
+          type: 'audio/wav'
+        });
+        
         resetTimer();
+        await uploadCV(audioFile, 'voiceIntro');
 
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
@@ -568,6 +645,11 @@ const CandidateProfile = () => {
   // Save resume function
   const handleSaveCV = async () => {
     try {
+      if (!declaration?.isChecked) {
+        alert("Please accept the declaration before saving your resume.");
+        return;
+      }
+
       const token = localStorage.getItem('token');
       const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
 
@@ -578,7 +660,7 @@ const CandidateProfile = () => {
         mobile: profileData?.mobile || '',
         sex: profileData?.sex || '',
         dob: profileData?.dob || '',
-        whatsapp: profileData?.whatsapp || '',      
+        whatsapp: profileData?.whatsapp || '',
         personalInfo: {
           professionalTitle: profileData?.personalInfo?.professionalTitle || '',
           professionalSummary: profileData?.personalInfo?.professionalSummary || '',
@@ -611,7 +693,7 @@ const CandidateProfile = () => {
           interest: interests.filter(i => i.trim() !== ''),
           declaration: declaration
         },
-      
+
         experiences: experiences.map(e => ({
           jobTitle: e.jobTitle || '',
           companyName: e.companyName || '',
@@ -619,7 +701,7 @@ const CandidateProfile = () => {
           ToDate: e.ToDate || '',
           jobDescription: e.jobDescription || ''
         })),
-      
+
         qualifications: educations.map(edu => ({
           education: edu.education,
           boardName: edu.boardName,
@@ -630,7 +712,7 @@ const CandidateProfile = () => {
           marks: edu.marks,
           course: edu.course,
           specialization: edu.specialization,
-      
+
           universityLocation: edu.universityLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -638,7 +720,7 @@ const CandidateProfile = () => {
             state: '',
             fullAddress: ''
           },
-      
+
           collegeLocation: edu.collegeLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -646,7 +728,7 @@ const CandidateProfile = () => {
             state: '',
             fullAddress: ''
           },
-      
+
           schoolLocation: edu.schoolLocation || {
             type: 'Point',
             coordinates: [0, 0],
@@ -656,7 +738,7 @@ const CandidateProfile = () => {
           }
         }))
       };
-      
+
       console.log("📤 CV Payload being sent to backend:", cvPayload);
 
       const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
@@ -667,6 +749,8 @@ const CandidateProfile = () => {
 
       if (res.data.status) {
         alert('CV Saved Successfully!');
+        window.location.reload();
+
       } else {
         alert('Failed to save CV!');
       }
@@ -703,12 +787,10 @@ const CandidateProfile = () => {
           const candidate = data.candidate;
           if (candidate) {
             setProfileData(candidate);
-
             // Map backend data to frontend state
             setUser({
               name: candidate.name,
-              image: candidate.personalInfo?.image,
-              resume: candidate.personalInfo?.resume
+              image: candidate.personalInfo?.image
             });
 
             // Set experiences
@@ -724,6 +806,10 @@ const CandidateProfile = () => {
             // Set skills
             if (Array.isArray(candidate.personalInfo?.skills) && candidate.personalInfo.skills.length > 0) {
               setSkills(candidate.personalInfo.skills);
+
+              //Set Resume
+            } if (Array.isArray(candidate.personalInfo?.resume) && candidate.personalInfo.resume.length > 0) {
+              setResume(candidate.personalInfo.resume);
             }
 
             // Set certificates
@@ -852,8 +938,8 @@ const CandidateProfile = () => {
             <div className="resume-header">
               <div className="profile-image-container">
                 <div className="profile-image">
-                  {user?.image ? (
-                    <img src={user.image} alt="Profile" />
+                  {profileData?.personalInfo?.image? (
+                    <img src={profileData.personalInfo.image} alt="Profile" />
                   ) : (
                     <div className="profile-placeholder">
                       <i className="bi bi-person"></i>
@@ -867,19 +953,10 @@ const CandidateProfile = () => {
                         accept="image/*"
                         style={{ display: 'none' }}
                         onChange={(e) => {
-                          // Handle image upload
-                          if (e.target.files && e.target.files[0]) {
-                            // You would typically upload this to your server
-                            // For now, we'll just update the local state
-                            const file = e.target.files[0];
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setUser(prev => ({
-                                ...prev,
-                                image: reader.result
-                              }));
-                            };
-                            reader.readAsDataURL(file);
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            uploadCV(file, 'image');
+                            e.target.value = null; // Direct upload on file selection
                           }
                         }}
                       />
@@ -1867,14 +1944,7 @@ const CandidateProfile = () => {
 
               <div className="declaration-container">
                 <div
-                  className="declaration-content"
-                  contentEditable
-                  suppressContentEditableWarning={true}
-                  data-placeholder="I hereby declare that all the information provided above is true to the best of my knowledge."
-                  onBlur={(e) => setDeclaration({
-                    ...declaration,
-                    text: e.target.innerText
-                  })}
+                  className="d-flex align-items-center declaration-content"
                 >
                   <input
                     type="checkbox"
@@ -1883,8 +1953,13 @@ const CandidateProfile = () => {
                     onChange={(e) => setDeclaration({
                       ...declaration,
                       isChecked: e.target.checked
-                    })}
-                  /> {declaration.text}
+
+                    },
+                      console.log('Is Declaration Checked:', declaration.isChecked)
+                    )}
+                  />
+
+                  <p className='ms-2'>I hereby declare that all the information provided above is true to the best of my knowledge.</p>
                 </div>
               </div>
             </div>
@@ -1961,14 +2036,28 @@ const CandidateProfile = () => {
             type="file"
             accept=".pdf,.doc,.docx"
             style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                uploadCV(file, 'resume');
+                e.target.value = null; // Direct upload on file selection
+              }
+            }}
           />
+
         </label>
 
         <button className="save-resume" onClick={handleSaveCV}>
           <i className="bi bi-save me-2"></i> Save Resume
         </button>
 
-        <button className="preview-resume" onClick={() => setShowPreview(true)}>
+        <button className="preview-resume" onClick={() => {
+          if (!declaration?.isChecked) {
+            alert("Please accept the declaration before saving your resume.");
+            return;
+          };
+          setShowPreview(true)
+        }}>
           <i className="bi bi-eye me-2"></i> Preview Resume
         </button>
       </div>
@@ -2091,7 +2180,7 @@ const CandidateProfile = () => {
                           </div>
                         )}
                         {profileData?.personalInfo?.location?.fullAddress && (
-                       
+
                           <div className="resume-contact-item">
                             <i className="bi bi-geo-alt-fill"></i>
                             <span>{profileData.personalInfo.location.fullAddress}</span>
@@ -2305,7 +2394,6 @@ const CandidateProfile = () => {
                 {declaration?.text && (
                   <div className="resume-declaration">
                     <h2 className="resume-section-title">Declaration</h2>
-                    <p>{declaration.text}</p>
                     <p>{declaration.text}</p>
                   </div>
                 )}

@@ -70,6 +70,7 @@ commonRoutes.get("/state", commonFunc.state);
 commonRoutes.get("/city", commonFunc.city);
 commonRoutes.post("/getUploadUrl", [authenti, isCandidate], imageFunc.getUploadUrl);
 commonRoutes.post("/uploadSingleFile", [authenti], imageFunc.uploadSingleImage);
+commonRoutes.post("/uploadSingleFile/:filename", [authenti], imageFunc.uploadSingleImage);
 commonRoutes.post("/uploadAdminFile", [auth1], imageFunc.uploadSingleImage);
 commonRoutes.post("/uploadMultipleFiles", [authenti], imageFunc.uploadMultipleFiles);
 commonRoutes.post("/uploadMultiFiles", [auth1], imageFunc.uploadAdminMultipleFiles);

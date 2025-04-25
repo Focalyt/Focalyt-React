@@ -29,7 +29,10 @@ const candidateProfileSchema = new Schema(
       totalExperience: Number,
 
       profilevideo: { type: String },
-      resume: { type: String },
+      resume: [{ name: {type:String},
+        url: {type:String},
+        uploadedAt: { type: Date, default: Date.now }
+        }],
       linkedInUrl: { type: String },
       facebookUrl: { type: String },
       twitterUrl: { type: String },
@@ -84,7 +87,7 @@ const candidateProfileSchema = new Schema(
       voiceIntro: [{
         name: { type: String },
         url: { type: String },
-        timestamp: { type: String },
+        uploadedAt: { type: Date, default: Date.now },
         status: { type: Boolean, default: true }
       }],
 
