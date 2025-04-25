@@ -20,4 +20,4 @@ const universitySchema = new Schema({
   },
 }, { timestamps: true });
 
-module.exports = model('University', universitySchema);
+module.exports = model('Universities', universitySchema);

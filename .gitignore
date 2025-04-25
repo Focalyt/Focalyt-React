@@ -10,6 +10,7 @@ node_modules/
 **/.cache/
 **/dist
 frontend/node_modules/.cache/
+frontend/src/Pages/Candidate/Profile/CandidateProfile copy.jsx
 frontend/node_modules/.cache/default-development/
 backend/node_modules/.cache/
 backend/node_modules/.cache/default-development/

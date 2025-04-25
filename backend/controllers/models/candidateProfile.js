@@ -10,25 +10,25 @@ const { boolean } = require("joi");
 const candidateProfileSchema = new Schema(
   {
     name: { type: String, trim: true },
-      mobile: {
-        type: Number,
-        lowercase: true,
-        trim: true,
-        unique: true,
-        //unique: "Mobile number already exists!",
-      },
-      email: {
-        type: String,
-        lowercase: true,
-        trim: true,
-      },
-      sex: { type: String },
-      dob: { type: Date },
-      whatsapp: { type: Number },
+    mobile: {
+      type: Number,
+      lowercase: true,
+      trim: true,
+      unique: true,
+      //unique: "Mobile number already exists!",
+    },
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+    sex: { type: String },
+    dob: { type: Date },
+    whatsapp: { type: Number },
     personalInfo: {
-    totalExperience: Number,
+      totalExperience: Number,
 
-      profilevideo: { type: String },  
+      profilevideo: { type: String },
       resume: { type: String },
       linkedInUrl: { type: String },
       facebookUrl: { type: String },
@@ -70,7 +70,7 @@ const candidateProfileSchema = new Schema(
         year: { type: String }
       }],
       languages: [{
-        lname: { type: String },
+        name: { type: String },
         level: { type: Number }
       }],
       projects: [{
@@ -87,7 +87,7 @@ const candidateProfileSchema = new Schema(
         timestamp: { type: String },
         status: { type: Boolean, default: true }
       }],
-      
+
       declaration: {
         isChecked: { type: Boolean, default: false },
         text: { type: String, default: "I hereby declare that all the information provided above is true to the best of my knowledge." }
@@ -110,7 +110,7 @@ const candidateProfileSchema = new Schema(
         ),
       },
     ],
-    appliedJobs: [{jobId:{ type: ObjectId, ref: "Vacancy" }}],
+    appliedJobs: [{ jobId: { type: ObjectId, ref: "Vacancy" } }],
     appliedCourses: [
       {
         courseId: { type: ObjectId, ref: "courses" }, // Changed from type to courseId
@@ -137,36 +137,65 @@ const candidateProfileSchema = new Schema(
 
     qualifications: [
       {
-        education: { type: ObjectId, ref: "Qualification" },
-        course: { type: ObjectId, ref: "QualificationCourse" },
-        specialization: { type: ObjectId, ref: "SubQualification" },
-        college: String,
-        location: {
+        education: { type: ObjectId, ref: "Qualification" },          // 10th / 12th / Diploma / UG / PG
+        universityName: { type: String },
+        boardName: { type: String },
+        collegeName: { type: String },
+        schoolName: { type: String },
+        course: { type: ObjectId, ref: "QualificationCourse" },       // For higher education
+        specialization: { type: String },
+        passingYear: { type: String },
+        marks: { type: String },
+        universityLocation: {
           type: {
             type: String,
             enum: ['Point'],
-            // required: true
+            default: 'Point'
           },
           coordinates: {
             type: [Number],
-            // required: true
+            default: [0, 0]
           },
           city: String,
           state: String,
           fullAddress: String
-
+        },
+        collegeLocation: {
+          type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+          },
+          coordinates: {
+            type: [Number],
+            default: [0, 0]
+          },
+          city: String,
+          state: String,
+          fullAddress: String
+        },
+        schoolLocation: {
+          type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+          },
+          coordinates: {
+            type: [Number],
+            default: [0, 0]
+          },
+          city: String,
+          state: String,
+          fullAddress: String
         }
-        ,
-        UniversityName: { type: ObjectId, ref: "University" },
-        
-        PassingYear: String,
-       
-      },
+      }
     ],
+
     experiences: [
       {
-        sector: { type: ObjectId, ref: "Sector" },
-        company_Name: String,
+        jobTitle: String,
+        jobDescription:String,        
+        companyName: String,
         location: {
           type: {
             type: String,
@@ -182,8 +211,7 @@ const candidateProfileSchema = new Schema(
           city: { type: String },
           state: { type: String },
           fullAddress: { type: String }
-        },
-        Comments: String,
+        },        
         FromDate: String,
         ToDate: String,
         currentlyWorking: { type: Boolean, default: false },
@@ -195,7 +223,7 @@ const candidateProfileSchema = new Schema(
     },
     otherUrls: [{}],
     highestQualification: { type: ObjectId, ref: "Qualification" },
-    
+
 
     isProfileCompleted: {
       type: Boolean,

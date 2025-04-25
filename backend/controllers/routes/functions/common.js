@@ -1,4 +1,5 @@
 const pick = require('lodash.pick');
+const mongoose = require('mongoose');
 const { decode } = require('jsonwebtoken');
 const { sign } = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -48,7 +49,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).single('file');
 const {
-  Country, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy,QualificationCourse,
+  Country, EducationBoard, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy,QualificationCourse,
 } = require('../../models');
 const Candidate = require('../../models/candidateProfile');
 
@@ -725,13 +726,19 @@ module.exports.education = async (req, res) => {
 
 module.exports.educationCoursesList = async (req, res) => {
   try {
-    const { qualificationId } = req.query; // or req.body based on your use case
-
+   
+    const qualificationId = req.params.qualificationId; // or req.body based on your use case
+    console.log("Qualification ID:", qualificationId);
     if (!qualificationId) {
       return res.status(400).json({
         status: false,
         message: 'Qualification ID is required!',
       });
+    }
+
+    if( typeof qualificationId === 'String' ){
+      console.log("Id is string")
+
     }
 
     const courses = await QualificationCourse.find({
@@ -748,6 +755,61 @@ module.exports.educationCoursesList = async (req, res) => {
       message: 'Courses fetched successfully by qualification!',
       data: { courses }
     });
+
+  } catch (err) {
+    return req.errFunc(err);
+  }
+};
+
+module.exports.courseSpecializationsList = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+
+    console.log('courseId',courseId)
+
+    if (!courseId) {
+      return res.status(400).json({
+        status: false,
+        message: 'Course ID is required!',
+      });
+    }
+
+    if( typeof courseId === 'String' ){
+      console.log("Id is string")
+
+    }
+
+    const specializations = await SubQualification.find({
+      _course: new mongoose.Types.ObjectId(courseId),
+      status: true
+    }).select('name');
+
+    return res.send({
+      status: true,
+      message: specializations.length > 0 
+        ? 'Specializations fetched successfully by course!'
+        : 'No specializations found for this course.',
+      data: { specializations: specializations || [] }
+    });
+
+  } catch (err) {
+    return req.errFunc(err);
+  }
+};
+
+// Route
+
+
+module.exports.educationBoardList = async (req, res) => {
+  try {  
+
+    const search = req.query.search || '';
+    const boards = await EducationBoard.find({
+      name: { $regex: search, $options: 'i' },
+      status: true
+    }).limit(10);
+  
+    res.send(boards);
 
   } catch (err) {
     return req.errFunc(err);
