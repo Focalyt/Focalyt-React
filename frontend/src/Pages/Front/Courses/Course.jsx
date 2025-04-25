@@ -561,7 +561,7 @@ function Course() {
                                       <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
                                         <a
                                           className="btn cta-callnow btn-bg-color shr--width"
-                                          href={`https://app.focalyt.com/candidate/login?returnUrl=/candidate/course/${course._id}`}
+                                          href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}
                                         >
                                           Apply Now
                                         </a>
