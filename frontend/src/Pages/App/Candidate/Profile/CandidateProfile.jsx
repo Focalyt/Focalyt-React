@@ -2193,7 +2193,16 @@ const CandidateProfile = () => {
 
       {/* Action Buttons */}
       <div className="resume-actions">
-
+      <button
+          className="audio-intro-btn"
+          onClick={() => {
+            setShowRecordingModal(true);
+            setShowIntroOptions(false);
+          }}
+        >
+          <i className="bi bi-mic-fill"></i>
+          <span>Introduce Yourself to Build Your Resume</span>
+        </button>
         <label className="upload-resume">
           <i className="bi bi-upload me-2"></i> Upload Resume
           <input
@@ -2937,6 +2946,8 @@ width: 100%;
   .content h2{
   font-size:1.1rem}
   }
+  .add-button{
+  height: auto !important}
   
 `}
       </style>
