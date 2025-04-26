@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
+import './CollegeRegister.css';
 
 const CollegeRegister = () => {
     const urlLocation = useLocation();
     const queryParams = new URLSearchParams(urlLocation.search);
     const returnUrl = queryParams.get('returnUrl');
-    
+
     const [collegeName, setCollegeName] = useState('');
     const [concernedPerson, setConcernedPerson] = useState('');
     const [email, setEmail] = useState('');
@@ -26,18 +27,18 @@ const CollegeRegister = () => {
     const [showResendBtn, setShowResendBtn] = useState(false);
     const [isResendDisabled, setIsResendDisabled] = useState(false);
     const [resendBtnText, setResendBtnText] = useState('Resend OTP');
-    
+
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-    
+
     const signupBtnRef = useRef(null);
     const otpInputRef = useRef(null);
     const generateOTPRef = useRef(null);
-    
+
     const checkEmail = (email) => {
         let emailReg = /^([\w-\.]+@([\w-]+\.)+[\w-]{2,4})?$/;
         return emailReg.test(email);
     };
-    
+
     const verifyPassword = () => {
         if (password === confirmPassword && password.length > 0) {
             return {
@@ -50,37 +51,37 @@ const CollegeRegister = () => {
         }
         return {};
     };
-    
+
     const togglePassword = () => {
         setShowPassword(!showPassword);
     };
-    
+
     const confirmTogglePassword = () => {
         setShowConfirmPassword(!showConfirmPassword);
     };
-    
+
     const handlePhoneNumberKeyPress = (e) => {
         const charCode = e.which ? e.which : e.keyCode;
         if (charCode < 48 || charCode > 57) {
             e.preventDefault();
         }
     };
-    
+
     const handleConcernedPersonKeyPress = (e) => {
         const charCode = e.which ? e.which : e.keyCode;
         if (!((charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122))) {
             e.preventDefault();
         }
     };
-    
+
     const handlePhoneNumberChange = (e) => {
         const value = e.target.value;
         setPhoneNumber(value);
-        
+
         if (value.length === 10 || value.length === 12) {
             let pattern = /[0-9]{10,12}/gm;
             let test = pattern.test(value);
-            
+
             if (test === true) {
                 setErrorMessage('');
                 setOtpDisabled(false);
@@ -95,11 +96,11 @@ const CollegeRegister = () => {
             setOtpDisabled(true);
         }
     };
-    
+
     const handleOtpChange = (e) => {
         const value = e.target.value;
         setOtp(value);
-        
+
         if (value.length === 4) {
             setErrorMessage('');
         } else {
@@ -107,7 +108,7 @@ const CollegeRegister = () => {
             setErrorMessage('Incorrect OTP');
         }
     };
-    
+
     const startResendTimer = () => {
         setIsResendDisabled(true);
         let time = 20000;
@@ -115,7 +116,7 @@ const CollegeRegister = () => {
             time -= 1000;
             const timeLeft = (time / 1000) % 60;
             setResendBtnText(`Resend in ${timeLeft} secs`);
-            
+
             if (time <= 0) {
                 clearInterval(interval);
                 setResendBtnText('Resend OTP');
@@ -123,15 +124,15 @@ const CollegeRegister = () => {
             }
         }, 1000);
     };
-    
+
     const handleGenerateOTP = async (e) => {
         e.preventDefault();
-        
+
         const body = { mobile: phoneNumber, module: 'college' };
-        
+
         try {
             const res = await axios.post(`${backendUrl}/api/sendOtptoRegister`, body);
-            
+
             if (res.data.status === true) {
                 setErrorMessage('');
                 setSuccessMessage('OTP sent successfully.');
@@ -140,7 +141,7 @@ const CollegeRegister = () => {
                 setShowSignupBtn(true);
                 setShowResendBtn(true);
                 startResendTimer();
-                
+
                 if (otpInputRef.current) {
                     otpInputRef.current.focus();
                 }
@@ -153,16 +154,16 @@ const CollegeRegister = () => {
             setSuccessMessage('');
         }
     };
-    
+
     const handleResendOTP = async (e) => {
         if (isResendDisabled) return;
-        
+
         e.preventDefault();
         const body = { mobile: phoneNumber };
-        
+
         try {
             const res = await axios.get(`${backendUrl}/api/resendOTP`, { params: body });
-            
+
             if (res.status === true) {
                 setErrorMessage('');
                 setSuccessMessage('OTP resent');
@@ -176,25 +177,25 @@ const CollegeRegister = () => {
             setSuccessMessage('');
         }
     };
-    
+
     const handleSignup = async () => {
         if (email.length && !checkEmail(email)) {
             setMessage('Not a Valid Email!');
             return;
         }
-        
-        if (collegeName.length !== 0 && concernedPerson.length !== 0 && 
+
+        if (collegeName.length !== 0 && concernedPerson.length !== 0 &&
             phoneNumber.length !== 0 && otp.length !== 0) {
-            
+
             let body = { mobile: phoneNumber, otp: otp, module: 'college' };
-            
+
             try {
                 const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, body);
-                
+
                 if (verifyRes.data.status === true) {
                     setErrorMessage('');
                     setSuccessMessage('OTP verified');
-                    
+
                     body = {
                         collegeName,
                         concernedPerson,
@@ -204,19 +205,19 @@ const CollegeRegister = () => {
                         confirmPassword,
                         type: instituteType
                     };
-                    
+
                     const registerRes = await axios.post(`${backendUrl}/college/register`, body);
-                    
+
                     if (registerRes.data.status) {
                         body = { mobile: phoneNumber, module: 'college' };
                         const loginRes = await axios.post(`${backendUrl}/api/otpLogin`, body);
-                        
+
                         if (loginRes.data.status === true) {
                             localStorage.setItem("collegeName", loginRes.data.collegeName);
                             localStorage.setItem("collegeId", loginRes.data.collegeId);
                             localStorage.setItem("name", loginRes.data.name);
                             localStorage.setItem("token", loginRes.data.token);
-                            
+
                             if (returnUrl) {
                                 window.location.href = decodeURIComponent(returnUrl);
                             } else {
@@ -244,7 +245,7 @@ const CollegeRegister = () => {
             setErrorMessage('Please fill all the fields !!!');
         }
     };
-    
+
     const handleKeyPress = (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -253,7 +254,7 @@ const CollegeRegister = () => {
             }
         }
     };
-    
+
     const handlePhoneKeyPress = (e) => {
         if (e.key === 'Enter' && phoneNumber.length === 10) {
             e.preventDefault();
@@ -267,9 +268,9 @@ const CollegeRegister = () => {
             }, 600);
         }
     };
-    
+
     return (
-        <body
+        <div
             className="vertical-layout vertical-menu-modern 1-column navbar-floating footer-static bg-full-screen-image blank-page blank-page"
             data-open="click"
             data-menu="vertical-menu-modern"
@@ -286,8 +287,8 @@ const CollegeRegister = () => {
                                 <div className="col-xl-12 card bg-authentication mb-0 shadow px-0">
                                     <div className="row m-0">
                                         <div className="col-lg-12 text-center align-self-center px-1 py-0 logo_sec my-1">
-                                            <img 
-                                                src="/images/logo/logo.png"
+                                            <img
+                                                src="/Assets/images/logo/logo.png"
                                                 alt="branding logo"
                                                 className="img-fluid brand_logo brand-custom"
                                             />
@@ -304,7 +305,7 @@ const CollegeRegister = () => {
                                                     <div className="card-body px-1">
                                                         <ul className="nav nav-tabs justify-content-left" role="tablist">
                                                             <li className="nav-item">
-                                                                <a 
+                                                                <a
                                                                     className="nav-link"
                                                                     id="service-tab-center"
                                                                     data-toggle="tab"
@@ -317,7 +318,7 @@ const CollegeRegister = () => {
                                                                 </a>
                                                             </li>
                                                             <li className="nav-item">
-                                                                <a 
+                                                                <a
                                                                     className="nav-link active"
                                                                     id="home-tab-center"
                                                                     data-toggle="tab"
@@ -330,9 +331,9 @@ const CollegeRegister = () => {
                                                                 </a>
                                                             </li>
                                                         </ul>
-                                                        
+
                                                         <div className="tab-content">
-                                                            <div 
+                                                            <div
                                                                 className="tab-pane"
                                                                 id="service-center"
                                                                 aria-labelledby="service-tab-center"
@@ -344,20 +345,20 @@ const CollegeRegister = () => {
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            
-                                                            <div 
+
+                                                            <div
                                                                 className="tab-pane active"
                                                                 id="home-center"
                                                                 aria-labelledby="home-tab-center"
                                                                 role="tabpanel"
                                                             >
-                                                                <div className="card rounded-0 mb-0">
+                                                                <div className="rounded-0 mb-0">
                                                                     <div className="card-content">
                                                                         <div className="card-body p-0">
-                                                                            <form onSubmit={(e) => e.preventDefault()}>
+                                                                            <form onSubmit={(e) => e.preventDefault()} className='collegeRegistration'>
                                                                                 <div className="row">
                                                                                     <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12">
-                                                                                        <input 
+                                                                                        <input
                                                                                             type="text"
                                                                                             className="form-control"
                                                                                             id="collegeName"
@@ -372,13 +373,13 @@ const CollegeRegister = () => {
                                                                                             }}
                                                                                         />
                                                                                         <div className="form-control-position">
-                                                                                            <i className="feather icon-user"></i>
+                                                                                            <i className="fa-regular fa-user"></i>
                                                                                         </div>
                                                                                         <label htmlFor="user-name"></label>
                                                                                     </fieldset>
-                                                                                    
+
                                                                                     <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12">
-                                                                                        <input 
+                                                                                        <input
                                                                                             type="text"
                                                                                             className="form-control"
                                                                                             id="concernedPerson"
@@ -394,13 +395,13 @@ const CollegeRegister = () => {
                                                                                             }}
                                                                                         />
                                                                                         <div className="form-control-position">
-                                                                                            <i className="feather icon-user"></i>
+                                                                                            <i className="fa-regular fa-user"></i>
                                                                                         </div>
                                                                                         <label htmlFor="user-name"></label>
                                                                                     </fieldset>
-                                                                                    
+
                                                                                     <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input 
+                                                                                        <input
                                                                                             type="text"
                                                                                             className="form-control"
                                                                                             id="user-mail"
@@ -415,14 +416,14 @@ const CollegeRegister = () => {
                                                                                             }}
                                                                                         />
                                                                                         <div className="form-control-position">
-                                                                                            <i className="feather icon-mail"></i>
+                                                                                            <i className="fa-regular fa-envelope"></i>
                                                                                         </div>
                                                                                         <label htmlFor="user-name"></label>
                                                                                     </fieldset>
-                                                                                    
+
                                                                                     <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <label htmlFor="select">Choose an option</label>
-                                                                                        <select 
+                                                                                        
+                                                                                        <select
                                                                                             className="form-control"
                                                                                             id="select"
                                                                                             value={instituteType}
@@ -438,9 +439,9 @@ const CollegeRegister = () => {
                                                                                             <i className="fa-solid fa-check"></i>
                                                                                         </div>
                                                                                     </fieldset>
-                                                                                    
+
                                                                                     <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input 
+                                                                                        <input
                                                                                             type={showPassword ? "text" : "password"}
                                                                                             className="form-control"
                                                                                             id="pass"
@@ -449,19 +450,19 @@ const CollegeRegister = () => {
                                                                                             onChange={(e) => setPassword(e.target.value)}
                                                                                             style={verifyPassword()}
                                                                                         />
-                                                                                        <div 
+                                                                                        <div
                                                                                             className="form-control-position"
                                                                                             onClick={togglePassword}
                                                                                         >
-                                                                                            <i 
+                                                                                            <i
                                                                                                 className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}
                                                                                                 id="toggleIcon"
                                                                                             ></i>
                                                                                         </div>
                                                                                     </fieldset>
-                                                                                    
+
                                                                                     <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input 
+                                                                                        <input
                                                                                             type={showConfirmPassword ? "text" : "password"}
                                                                                             className="form-control"
                                                                                             id="confirmPass"
@@ -470,19 +471,19 @@ const CollegeRegister = () => {
                                                                                             onChange={(e) => setConfirmPassword(e.target.value)}
                                                                                             style={verifyPassword()}
                                                                                         />
-                                                                                        <div 
+                                                                                        <div
                                                                                             className="form-control-position"
                                                                                             onClick={confirmTogglePassword}
                                                                                         >
-                                                                                            <i 
+                                                                                            <i
                                                                                                 className={`fa-regular ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}
                                                                                                 id="toggleBtn"
                                                                                             ></i>
                                                                                         </div>
                                                                                     </fieldset>
-                                                                                    
+
                                                                                     <fieldset className="input-group form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input 
+                                                                                        <input
                                                                                             type="tel"
                                                                                             className="form-control"
                                                                                             maxLength="10"
@@ -503,12 +504,12 @@ const CollegeRegister = () => {
                                                                                             aria-describedby="basic-addon2"
                                                                                         />
                                                                                         <div className="form-control-position">
-                                                                                            <i className="feather icon-phone"></i>
+                                                                                            <i className="fa-solid fa-phone"></i>
                                                                                         </div>
                                                                                         <div className="input-group-append">
                                                                                             {showGenerateOTP && (
                                                                                                 <button
-                                                                                                    className="btn btn-primary float-right btn-inline waves-effect waves-light text-white"
+                                                                                                    className="btn btn-primary float-right btn-inline waves-effect waves-light text-white sendOTP"
                                                                                                     type="button"
                                                                                                     id="generate-otp"
                                                                                                     onClick={handleGenerateOTP}
@@ -519,9 +520,9 @@ const CollegeRegister = () => {
                                                                                             )}
                                                                                         </div>
                                                                                     </fieldset>
-                                                                                    
+
                                                                                     <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input 
+                                                                                        <input
                                                                                             type="number"
                                                                                             className="form-control"
                                                                                             id="user-otp"
@@ -533,19 +534,19 @@ const CollegeRegister = () => {
                                                                                             onKeyPress={handleKeyPress}
                                                                                         />
                                                                                         <div className="form-control-position">
-                                                                                            <i className="feather icon-lock"></i>
+                                                                                            <i className="fa-solid fa-lock"></i>
                                                                                         </div>
-                                                                                        <label htmlFor="user-otp">Enter the OTP</label>
+                                                                                        
                                                                                     </fieldset>
-                                                                                    
+
                                                                                     <p className="pt-0 px-1">
                                                                                         I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
                                                                                     </p>
-                                                                                    
+
                                                                                     <div className="row">
                                                                                         <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
                                                                                             {showSignupBtn && (
-                                                                                                <a 
+                                                                                                <a
                                                                                                     className="btn btn-primary btn-block waves-effect waves-light text-white"
                                                                                                     id="submit-button"
                                                                                                     style={{ padding: '1rem' }}
@@ -558,7 +559,7 @@ const CollegeRegister = () => {
                                                                                         </div>
                                                                                         <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
                                                                                             {showResendBtn && (
-                                                                                                <div 
+                                                                                                <div
                                                                                                     className={`btn btn-primary btn-block waves-effect waves-light text-white ${isResendDisabled ? 'disabled' : ''}`}
                                                                                                     id="resend-btn"
                                                                                                     style={{ padding: '1rem' }}
@@ -569,10 +570,10 @@ const CollegeRegister = () => {
                                                                                             )}
                                                                                         </div>
                                                                                     </div>
-                                                                                    
+
                                                                                     <div>&nbsp;</div>
-                                                                                    
-                                                                                    <div 
+
+                                                                                    <div
                                                                                         id="error"
                                                                                         style={{
                                                                                             color: 'rgb(243, 56, 56)',
@@ -582,8 +583,8 @@ const CollegeRegister = () => {
                                                                                     >
                                                                                         {errorMessage}
                                                                                     </div>
-                                                                                    
-                                                                                    <div 
+
+                                                                                    <div
                                                                                         id="success"
                                                                                         style={{
                                                                                             color: 'green',
@@ -593,7 +594,7 @@ const CollegeRegister = () => {
                                                                                     >
                                                                                         {successMessage}
                                                                                     </div>
-                                                                                    
+
                                                                                     <div id="msg">{message}</div>
                                                                                 </div>
                                                                             </form>
@@ -613,7 +614,21 @@ const CollegeRegister = () => {
                     </div>
                 </div>
             </div>
-        </body>
+
+            <style>
+                {
+                    `
+.app-content.content{
+height: 100dvh;}
+
+html body .content {
+    margin-left: 0!important;
+}
+        `
+                }
+            </style>
+
+        </div>
     );
 };
 

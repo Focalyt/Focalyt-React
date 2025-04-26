@@ -20,15 +20,15 @@ function CollegeLayout({ children }) {
   const [user, setUser] = useState();
   const location = useLocation();
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const collegeData = localStorage.getItem('collegeName');
-    if (token && collegeData) {
-      setUser({ token, collegeName: collegeData });
-    } else {
-      navigate('/college/login');
-    }
-  }, []);
+  // useEffect(() => {
+  //   const token = localStorage.getItem('token');
+  //   const collegeData = localStorage.getItem('collegeName');
+  //   if (token && collegeData) {
+  //     setUser({ token, collegeName: collegeData });
+  //   } else {
+  //     navigate('/college/login');
+  //   }
+  // }, []);
 
   const [openDropdown, setOpenDropdown] = useState(null);
   const profileMenuRef = useRef(null);
@@ -143,12 +143,12 @@ function CollegeLayout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <main className="flex flex-1">
+   <main className="flex flex-1">
         <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${isSidebarOpen ? 'expanded' : 'collapsed'}`}>
           <div className={`navbar-header ${expanded ? 'expanded' : ''}`}>
             <ul className="nav navbar-nav flex-row">
               <li className="nav-item mr-auto">
-                <Link to="/college/dashboard" className="navbar-brand">
+                <Link to="/college/myprofile" className="navbar-brand">
                   <img className="img-fluid logocs" src="/Assets/images/logo/logo.png" alt="Logo" />
                 </Link>
               </li>
@@ -168,163 +168,83 @@ function CollegeLayout({ children }) {
                 <Link to="/college/dashboard" onClick={() => {
                   handleSidebarClose();
                 }} >
-                  <FontAwesomeIcon icon={faChartLine} />
+                  {/* <FontAwesomeIcon icon={faHouse} /> */}
                   <span className="menu-title">Dashboard</span>
                 </Link>
               </li>
 
-              {/* Profile */}
-              <li className={`nav-item has-sub ${openSubmenu.profile ? 'open' : ''}`}>
-                <a href="#" onClick={() => toggleSubmenu('profile')}>
-                  <FontAwesomeIcon icon={faBuilding} />
-                  <span className="menu-title">Institute Profile</span>
-                </a>
-                <ul
-                  ref={menuRefs.profile}
-                  className="menu-content"
-                  style={{
-                    maxHeight: submenuMaxHeight.profile,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
-                  }}
-                >
-                  <li className={`nav-item ${location.pathname === '/college/profile' ? 'active' : ''}`}>
-                    <Link to="/college/profile" onClick={() => { handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={faBuilding} />
-                      <span className="menu-title">Institute Details</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/college/documents' ? 'active' : ''}`}>
-                    <Link to="/college/documents" onClick={() => { handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={farFile} />
-                      <span className="menu-title">Documents</span>
-                    </Link>
-                  </li>
-                </ul>
+              {/* Your Profile */}
+              <li className={`nav-item ${location.pathname === '/college/myProfile' ? 'active' : ''}`}>
+                <Link to="/college/myProfile" onClick={() => {
+                  handleSidebarClose();
+                }} >
+                  <FontAwesomeIcon icon={faUser} />
+                  <span className="menu-title">Your Profile</span>
+                </Link>
               </li>
 
-              {/* Students */}
-              <li className={`nav-item has-sub ${openSubmenu.students ? 'open' : ''}`}>
-                <a href="#" onClick={() => toggleSubmenu('students')}>
+              {/* Upload Candidates */}
+              <li className={`nav-item ${location.pathname === '/college/uploadCandidates' ? 'active' : ''}`}>
+                <Link to="/college/uploadCandidates" onClick={() => {
+                  handleSidebarClose();
+                }} >
+                  {/* <FontAwesomeIcon icon={faUserDoctor} /> */}
+                  <span className="menu-title">Upload Candidates</span>
+                </Link>
+              </li>
+
+              {/* Upload Templates */}
+              <li className={`nav-item ${location.pathname === '/college/uploadTemplates' ? 'active' : ''}`}>
+                <Link to="/college/uploadTemplates" onClick={() => {
+                  handleSidebarClose();
+                }} >
+                  {/* <FontAwesomeIcon icon={faPenToSquare} /> */}
+                  <span className="menu-title">Upload Templates</span>
+                </Link>
+              </li>
+
+              {/* My Students */}
+              <li className={`nav-item ${location.pathname === '/college/myStudents' ? 'active' : ''}`}>
+                <Link to="/college/myStudents" onClick={() => {
+                  handleSidebarClose();
+                }} >
                   <FontAwesomeIcon icon={faGraduationCap} />
-                  <span className="menu-title">Students</span>
-                </a>
-                <ul
-                  ref={menuRefs.students}
-                  className="menu-content"
-                  style={{
-                    maxHeight: submenuMaxHeight.students,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
-                  }}
-                >
-                  <li className={`nav-item ${location.pathname === '/college/students' ? 'active' : ''}`}>
-                    <Link to="/college/students" onClick={() => { handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={farUser} />
-                      <span className="menu-title">All Students</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/college/addStudent' ? 'active' : ''}`}>
-                    <Link to="/college/addStudent" onClick={() => { handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={faUser} />
-                      <span className="menu-title">Add Student</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/college/studentReports' ? 'active' : ''}`}>
-                    <Link to="/college/studentReports" onClick={() => { handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={faClipboardList} />
-                      <span className="menu-title">Student Reports</span>
-                    </Link>
-                  </li>
-                </ul>
-              </li>
-
-              {/* Courses */}
-              <li className={`nav-item has-sub ${openSubmenu.courses ? 'open' : ''}`}>
-                <a href="#" onClick={() => toggleSubmenu('courses')}>
-                  <FontAwesomeIcon icon={faBookOpen} />
-                  <span className="menu-title">Courses</span>
-                </a>
-                <ul
-                  ref={menuRefs.courses}
-                  className="menu-content"
-                  style={{
-                    maxHeight: submenuMaxHeight.courses,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
-                  }}
-                >
-                  <li className={`nav-item ${location.pathname === '/college/courses' ? 'active' : ''}`}>
-                    <Link to="/college/courses" onClick={() => { handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={faBookOpen} />
-                      <span className="menu-title">All Courses</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/college/addCourse' ? 'active' : ''}`}>
-                    <Link to="/college/addCourse" onClick={() => { handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={faSearch} />
-                      <span className="menu-title">Add Course</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/college/enrollments' ? 'active' : ''}`}>
-                    <Link to="/college/enrollments" onClick={() => { handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={farPaperPlane} />
-                      <span className="menu-title">Enrollments</span>
-                    </Link>
-                  </li>
-                </ul>
-              </li>
-
-              {/* Jobs & Placement */}
-              <li className={`nav-item has-sub ${openSubmenu.jobs ? 'open' : ''}`}>
-                <a href="#" onClick={() => toggleSubmenu('jobs')}>
-                  <FontAwesomeIcon icon={faClipboardList} />
-                  <span className="menu-title">Jobs & Placement</span>
-                </a>
-                <ul
-                  ref={menuRefs.jobs}
-                  className="menu-content"
-                  style={{
-                    maxHeight: submenuMaxHeight.jobs,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
-                  }}
-                >
-                  <li className={`nav-item ${activeItem === 'jobPostings' ? 'active' : ''}`}>
-                    <Link to="/college/jobPostings" onClick={() => { handleItemClick('jobPostings'); handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={faClipboardList} />
-                      <span className="menu-title">Job Postings</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${activeItem === 'placementDrives' ? 'active' : ''}`}>
-                    <Link to="/college/placementDrives" onClick={() => { handleItemClick('placementDrives'); handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={farHand} />
-                      <span className="menu-title">Placement Drives</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${activeItem === 'placedStudents' ? 'active' : ''}`}>
-                    <Link to="/college/placedStudents" onClick={() => { handleItemClick('placedStudents'); handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={farBookmark} />
-                      <span className="menu-title">Placed Students</span>
-                    </Link>
-                  </li>
-                </ul>
-              </li>
-
-              {/* Reports */}
-              <li className={`nav-item ${activeItem === 'reports' ? 'active' : ''}`}>
-                <Link to="/college/reports" onClick={() => { handleItemClick('reports'); handleSidebarClose(); }}>
-                  <FontAwesomeIcon icon={faClipboardList} />
-                  <span className="menu-title">Reports</span>
+                  <span className="menu-title">My Students</span>
                 </Link>
               </li>
 
-              {/* Notifications */}
-              <li className={`nav-item ${activeItem === 'notifications' ? 'active' : ''}`}>
-                <Link to="/college/notifications" onClick={() => { handleItemClick('notifications'); handleSidebarClose(); }}>
-                  <FontAwesomeIcon icon={farBell} />
-                  <span className="menu-title">Notifications</span>
+              {/* Available Jobs */}
+              <li className={`nav-item ${location.pathname === '/college/availablejobs' ? 'active' : ''}`}>
+                <Link to="/college/availablejobs" onClick={() => {
+                  handleSidebarClose();
+                }} >
+                  {/* <FontAwesomeIcon icon={faBriefcase} /> */}
+                  <span className="menu-title">Available Jobs</span>
                 </Link>
+              </li>
+
+              {/* Events */}
+              <li className={`nav-item has-sub ${openSubmenu.events ? 'open' : ''}`}>
+                <a href="#" onClick={() => toggleSubmenu('events')}>
+                  <FontAwesomeIcon icon={farUser} />
+                  <span className="menu-title">Events</span>
+                </a>
+                <ul
+                  ref={menuRefs.events}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.events,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out'
+                  }}
+                >
+                  <li className={`nav-item ${location.pathname === '/college/viewEvent' ? 'active' : ''}`}>
+                    <Link to="/college/viewEvent" onClick={() => { handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farFile} />
+                      <span className="menu-title">View Events</span>
+                    </Link>
+                  </li>
+                </ul>
               </li>
             </ul>
           </div>
@@ -336,7 +256,6 @@ function CollegeLayout({ children }) {
           <div className="app-content content">
             <div className="content-overlay"></div>
             <div className="header-navbar-shadow"></div>
-            {/* <CollegeHeader toggleSidebar={handleSidebarToggle} isSideBarOpen={isSidebarOpen} /> */}
             <CollegeHeader/>
             <div className="content-wrapper">
               <div className="content-body mb-4">
@@ -347,6 +266,7 @@ function CollegeLayout({ children }) {
           </div>
         </div>
       </main>
+    
     
       <style>
         {`

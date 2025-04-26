@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import "./CompanyLogin.css";
 import { useLocation } from 'react-router-dom';
-
+import "./CollegeLogin.css";
 const CollegeLogin = () => {
     const urlLocation = useLocation();
     const queryParams = new URLSearchParams(urlLocation.search);
     const returnUrl = queryParams.get('returnUrl');
-    
+
     const [mobileNumber, setMobileNumber] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [activeTab, setActiveTab] = useState('login');
-    
+
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const loginBtnRef = useRef(null);
 
@@ -38,19 +37,19 @@ const CollegeLogin = () => {
 
         try {
             const verifyRes = await axios.post(`${backendUrl}/api/verifyPass`, body);
-            
+
             if (verifyRes.data.status === true) {
                 setErrorMessage('');
                 setSuccessMessage('Password verified');
-                
+
                 const loginRes = await axios.post(`${backendUrl}/api/otpLogin`, body);
-                
+
                 if (loginRes.data.status === true) {
                     localStorage.setItem("collegeName", loginRes.data.collegeName);
                     localStorage.setItem("collegeId", loginRes.data.collegeId);
                     localStorage.setItem("name", loginRes.data.name);
                     localStorage.setItem("token", loginRes.data.token);
-                    
+
                     if (returnUrl) {
                         window.location.href = decodeURIComponent(returnUrl);
                     } else {
@@ -79,7 +78,7 @@ const CollegeLogin = () => {
     };
 
     return (
-        <body
+        <div
             className="vertical-layout vertical-menu-modern 1-column navbar-floating footer-static bg-full-screen-image blank-page blank-page"
             data-open="click"
             data-menu="vertical-menu-modern"
@@ -95,7 +94,7 @@ const CollegeLogin = () => {
                 ></iframe>
             </noscript> */}
             {/* End Google Tag Manager (noscript) */}
-            
+
             <div className="app-content content">
                 <div className="content-overlay"></div>
                 <div className="header-navbar-shadow"></div>
@@ -107,7 +106,7 @@ const CollegeLogin = () => {
                                 <div className="col-xl-12 card bg-authentication rounded mb-0 shadow px-0 card-placement">
                                     <div className="row m-0">
                                         <div className="col-lg-12 col-sm-12 col-12 text-center align-self-center px-1 py-0 logo_sec">
-                                            <img 
+                                            <img
                                                 src="/Assets/images/logo/logo.png"
                                                 alt="branding logo"
                                                 className="img-fluid brand_logo py-1 w-25"
@@ -125,7 +124,7 @@ const CollegeLogin = () => {
                                                     <div className="card-body px-1">
                                                         <ul className="nav nav-tabs justify-content-left" role="tablist">
                                                             <li className="nav-item">
-                                                                <a 
+                                                                <a
                                                                     className={`nav-link ${activeTab === 'login' ? 'active' : ''}`}
                                                                     id="service-tab-center"
                                                                     data-toggle="tab"
@@ -142,7 +141,7 @@ const CollegeLogin = () => {
                                                                 </a>
                                                             </li>
                                                             <li className="nav-item">
-                                                                <a 
+                                                                <a
                                                                     className={`nav-link ${activeTab === 'signup' ? 'active' : ''}`}
                                                                     id="home-tab-center"
                                                                     data-toggle="tab"
@@ -155,19 +154,19 @@ const CollegeLogin = () => {
                                                                 </a>
                                                             </li>
                                                         </ul>
-                                                        
+
                                                         <div className="tab-content mt-3">
-                                                            <div 
+                                                            <div
                                                                 className={`tab-pane ${activeTab === 'login' ? 'active' : ''}`}
                                                                 id="service-center"
                                                                 aria-labelledby="service-tab-center"
                                                                 role="tabpanel"
                                                             >
-                                                                <div className="card rounded-0 mb-0">
+                                                                <div className=" rounded-0 mb-0">
                                                                     <div className="card-content">
                                                                         <div className="card-body p-0">
                                                                             <fieldset className="input-group form-label-group form-group position-relative has-icon-left">
-                                                                                <input 
+                                                                                <input
                                                                                     type="tel"
                                                                                     className="form-control"
                                                                                     maxLength="10"
@@ -190,18 +189,18 @@ const CollegeLogin = () => {
                                                                                     <i className="fa-regular fa-user"></i>
                                                                                 </div>
                                                                             </fieldset>
-                                                                            
+
                                                                             <fieldset className="input-group form-label-group form-group position-relative has-icon-left">
-                                                                                <div 
+                                                                                <div
                                                                                     className="form-control-position"
                                                                                     onClick={togglePassword}
                                                                                 >
-                                                                                    <i 
+                                                                                    <i
                                                                                         className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}
                                                                                         id="toggleIcon"
                                                                                     ></i>
                                                                                 </div>
-                                                                                <input 
+                                                                                <input
                                                                                     type={showPassword ? "text" : "password"}
                                                                                     placeholder="Enter your password"
                                                                                     id="userPassword"
@@ -211,14 +210,14 @@ const CollegeLogin = () => {
                                                                                     onKeyPress={handleKeyPress}
                                                                                 />
                                                                             </fieldset>
-                                                                            
+
                                                                             <p className="pt-0 px-0 mb-0">
                                                                                 I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
                                                                             </p>
-                                                                            
+
                                                                             <div className="row">
                                                                                 <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mt-1">
-                                                                                    <a 
+                                                                                    <a
                                                                                         className="btn btn-primary float-right btn-inline waves-effect waves-light text-white btn-block"
                                                                                         id="login-btn"
                                                                                         onClick={handleLogin}
@@ -228,11 +227,11 @@ const CollegeLogin = () => {
                                                                                     </a>
                                                                                 </div>
                                                                             </div>
-                                                                            
+
                                                                             <div className="form-group d-flex justify-content-between align-items-center">
                                                                             </div>
-                                                                            
-                                                                            <div 
+
+                                                                            <div
                                                                                 id="error"
                                                                                 style={{
                                                                                     color: 'red',
@@ -242,8 +241,8 @@ const CollegeLogin = () => {
                                                                             >
                                                                                 {errorMessage}
                                                                             </div>
-                                                                            
-                                                                            <div 
+
+                                                                            <div
                                                                                 id="success"
                                                                                 style={{
                                                                                     color: 'green',
@@ -257,8 +256,8 @@ const CollegeLogin = () => {
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            
-                                                            <div 
+
+                                                            <div
                                                                 className={`tab-pane ${activeTab === 'signup' ? 'active' : ''}`}
                                                                 id="home-center"
                                                                 aria-labelledby="home-tab-center"
@@ -283,7 +282,19 @@ const CollegeLogin = () => {
                     </div>
                 </div>
             </div>
-        </body>
+
+            <style>
+                {
+                    `
+                    .app-content.content{
+                    height: 100dvh;}
+                    html body .content {
+    margin-left: 0!important;
+}
+                    `
+                }
+            </style>
+        </div>
     );
 };
 

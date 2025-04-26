@@ -14,3 +14,7 @@
   color: #FC2B5A!important;
 } */
 
+.btn-block {
+  display: block;
+  width: 100%;
+}
