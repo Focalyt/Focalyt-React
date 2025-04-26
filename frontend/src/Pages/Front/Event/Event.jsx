@@ -51,10 +51,6 @@ function Event() {
           const fromTime = moment(event.timing.from).format('hh:mm A');
           const toDate = moment(event.timing.to).format('DD-MM-YYYY');
           const toTime = moment(event.timing.to).format('hh:mm A');
-
-          console.log(`🗓️ Event: ${event.eventTitle}`);
-          console.log(`📅 From Date: ${fromDate} | ⏰ From Time: ${fromTime}`);
-          console.log(`📅 To Date: ${toDate} | ⏰ To Time: ${toTime}`);
         });
         setEvents(response.data.events);
 
