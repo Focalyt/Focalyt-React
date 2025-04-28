@@ -43,6 +43,15 @@ import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredD
 import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
 import CandidatesEvents from './Pages/App/Candidate/Events/CandidatesEvents';
 import Registration from './Pages/Front/StudentRegistration/Registration';
+import CollegeLayout from './Component/Layouts/App/College';
+import CollegeLogin from './Pages/App/College/Login/CollegeLogin';
+import CollegeRegister from './Pages/App/College/Register/CollegeRegister';
+import Dashboard from './Pages/App/College/Dashboard/Dashboard';
+import Profile from './Pages/App/College/Profile/Profile';
+import UploadCandidates from './Pages/App/College/UploadCandidates/UploadCandidates';
+import UploadTemplates from './Pages/App/College/UploadTemplates/UploadTemplates';
+import MyStudents from './Pages/App/College/MyStudents/MyStudents';
+import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
 const Layout = () => {
   const location = useLocation();
 
@@ -63,15 +72,15 @@ const Layout = () => {
         <Route path="/socialimpact" element={<SocialImpact />} />
         <Route path="/stulabs" element={<StuLabs />} />
         <Route path="/events" element={<Event />} />
-        <Route path="/studentRegistration" element={<Registration/>}/>
+        <Route path="/studentRegistration" element={<Registration />} />
 
         {/* Candidate Parent Route */}
-        <Route path ="/candidate/login" element={<CandidateLogin/>}/>
+        <Route path="/candidate/login" element={<CandidateLogin />} />
         <Route path="/candidate" element={<CandidateLayout />}>
           <Route path="dashboard" element={<CandidateDashboard />} />
           <Route path="myprofile" element={<CandidateProfile />} />
           <Route path="document" element={<CandidatesDocuments />} />
-          <Route path = "resume"  element={<Resume/>}/>
+          <Route path="resume" element={<Resume />} />
           <Route path="searchcourses" element={<SearchCourses />} />
           <Route path="appliedCourses" element={<AppliedCourses />} />
           <Route path="searchjob" element={<CandidatesJobs />} />
@@ -89,14 +98,29 @@ const Layout = () => {
           <Route path='InterestedCompanies' element={<Shortlisting />} />
           {/* <Route path="course" element={<CourseDetail/>}/> */}
           <Route path="course/:courseId" element={<SearchCourseDetail />} />
-          <Route path="job/:JobId" element={<CandidateViewJobs/>}/>
-          <Route path="reqDocs/:courseId" element={<RequiredDocuments/>}/>
-          <Route path="pendingFee" element={<PaymentDetails/>}/>
-          <Route path ='candidateevent' element={<CandidatesEvents/>}/>
+          <Route path="job/:JobId" element={<CandidateViewJobs />} />
+          <Route path="reqDocs/:courseId" element={<RequiredDocuments />} />
+          <Route path="pendingFee" element={<PaymentDetails />} />
+          <Route path='candidateevent' element={<CandidatesEvents />} />
         </Route>
-        <Route path='/admin' element ={<AdminLayout/>}>
-        
+        <Route path='/admin' element={<AdminLayout />}>
+
         </Route>
+
+        <Route path="/college/login" element={<CollegeLogin />} />
+        <Route path="/college/register" element={<CollegeRegister />} />
+
+        {/* CollegeLayout will wrap only protected pages */}
+        <Route path="/college" element={<CollegeLayout  />}>
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="myprofile" element={<Profile/>}/>
+          <Route path="uploadCandidates" element={<UploadCandidates/>}/>
+          <Route path="uploadTemplates" element={<UploadTemplates/>}/>
+          <Route path="myStudents" element={<MyStudents/>}/>
+          <Route path="availablejobs" element={<AvailableJobs/>}/>
+        </Route>
+
+
       </Routes>
 
 

@@ -162,6 +162,9 @@ const FrontHeader = () => {
                     <li class="nav-item">
                       <a class='nav-link-item drop-trigger' href='/labs'>Labs</a>
                     </li>
+                    <li class="nav-item">
+                      <a class='nav-link-item drop-trigger' href='/events'>Events</a>
+                    </li>
                     <li class="nav-item d-xl-none d-lg-none d-md-none d-sm-block d-block">
                       <a class='nav-link-item drop-trigger' href='/contact'>Contact Us</a>
                     </li>

@@ -10234,9 +10234,9 @@ div#loading img {
   background: #F4B905;
 }
 
-.tab-content .tab-pane:not(.show) {
+/* .tab-content .tab-pane:not(.show) {
   transform: translateY(50px);
-}
+} */
 .tab-content .tab-pane.show {
   animation: fadeUp 1s;
 }

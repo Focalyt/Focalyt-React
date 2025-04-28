@@ -157,7 +157,7 @@ module.exports.sendCandidateOtp = async (req, res) => {
     let newUser = false
     if (!user) {
       newUser = true
-      return res.send({ status: true, newUser });
+      
     }
     
     const url = msg91Url.replace("<<template>>", templateId).replace("<<mobile>>", mobile).replace("<<auth>>", authKey)

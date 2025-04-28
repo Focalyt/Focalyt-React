@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef , useLayoutEffect  } from 'react'
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { Link, Outlet, useLocation } from "react-router-dom";
 import CandidateHeader from './CandidateHeader/CandidateHeader'
 import CandidateFooter from './CandidateFooter/CandidateFooter'
@@ -136,52 +136,52 @@ function CandidateLayout({ children }) {
   //   });
   //   setSubmenuMaxHeight(newHeights);
   // }, [openSubmenu]);
-//  useLayoutEffect(() => {
-//     if (!menuRefs.profile.current) return;
-    
-//     const newHeights = {};
-//     Object.keys(menuRefs).forEach((key) => {
-//       const ref = menuRefs[key];
-//       if (ref.current) {
-//         if (openSubmenu[key]) {
-//           // When opening, get actual height
-//           newHeights[key] = `${ref.current.scrollHeight}px`;
-//         } else {
-//           // When closing, use 0px
-//           newHeights[key] = '0px';
-//         }
-//       }
-//     });
-//     setSubmenuMaxHeight(newHeights);
-//   }, [openSubmenu]); 
-useLayoutEffect(() => {
-  const newHeights = {};
-  Object.keys(menuRefs).forEach((key) => {
-    const ref = menuRefs[key];
-    if (ref.current) {
-      if (openSubmenu[key]) {
-        // Opening: set to scrollHeight immediately
-        newHeights[key] = `${ref.current.scrollHeight}px`;
-      } else {
-        const currentHeight = `${ref.current.scrollHeight}px`;
-        newHeights[key] = currentHeight;
+  //  useLayoutEffect(() => {
+  //     if (!menuRefs.profile.current) return;
 
-        setTimeout(() => {
-          setSubmenuMaxHeight(prev => ({
-            ...prev,
-            [key]: '0px'
-          }));
-        }, 5); 
+  //     const newHeights = {};
+  //     Object.keys(menuRefs).forEach((key) => {
+  //       const ref = menuRefs[key];
+  //       if (ref.current) {
+  //         if (openSubmenu[key]) {
+  //           // When opening, get actual height
+  //           newHeights[key] = `${ref.current.scrollHeight}px`;
+  //         } else {
+  //           // When closing, use 0px
+  //           newHeights[key] = '0px';
+  //         }
+  //       }
+  //     });
+  //     setSubmenuMaxHeight(newHeights);
+  //   }, [openSubmenu]); 
+  useLayoutEffect(() => {
+    const newHeights = {};
+    Object.keys(menuRefs).forEach((key) => {
+      const ref = menuRefs[key];
+      if (ref.current) {
+        if (openSubmenu[key]) {
+          // Opening: set to scrollHeight immediately
+          newHeights[key] = `${ref.current.scrollHeight}px`;
+        } else {
+          const currentHeight = `${ref.current.scrollHeight}px`;
+          newHeights[key] = currentHeight;
+
+          setTimeout(() => {
+            setSubmenuMaxHeight(prev => ({
+              ...prev,
+              [key]: '0px'
+            }));
+          }, 5);
+        }
       }
-    }
-  });
+    });
 
-  // Set the heights for open menus immediately
-  setSubmenuMaxHeight(prev => ({
-    ...prev,
-    ...newHeights,
-  }));
-}, [openSubmenu]);
+    // Set the heights for open menus immediately
+    setSubmenuMaxHeight(prev => ({
+      ...prev,
+      ...newHeights,
+    }));
+  }, [openSubmenu]);
 
 
   return (
@@ -378,6 +378,15 @@ useLayoutEffect(() => {
                 </ul>
               </li>
 
+              {/* Event page  */}
+
+              <li className={`nav-item ${activeItem === 'candidateevent' ? 'active' : ''}`}>
+                <Link to="/candidate/candidateevent" onClick={() => { handleItemClick('candidateevent'); handleSidebarClose(); }}>
+                  <FontAwesomeIcon icon={farCircle} />
+                  <span className="menu-title">Event</span>
+                </Link>
+              </li>
+
               {/* Request Loan */}
               <li className={`nav-item ${activeItem === 'requestLoan' ? 'active' : ''}`}>
                 <Link to="/candidate/requestLoan" onClick={() => { handleItemClick('requestLoan'); handleSidebarClose(); }}>
@@ -439,17 +448,17 @@ useLayoutEffect(() => {
           </div>
         </div>
       </main>
-    
-<style>
-  {
-    `
+
+      <style>
+        {
+          `
     .menu-content {
   overflow: hidden;
   transition: max-height 0.3s ease-in-out;
 }
     `
-  }
-</style>
+        }
+      </style>
     </div>
   )
 }
