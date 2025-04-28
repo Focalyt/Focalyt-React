@@ -483,7 +483,7 @@ router
         return res.send({ status: "failure", error: "Something went wrong!" });
       }
       let formData = value;
-      const { name, mobile, sex, place, latitude, longitude } = formData;
+      const { name, mobile, sex, personalInfo } = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
         let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
@@ -536,18 +536,7 @@ router
         verified: true,
         availableCredit: coins?.candidateCoins,
         creditLeft: coins?.candidateCoins,
-        personalInfo: {
-          whatsapp: mobile,
-          location: {
-            type: "Point",
-            coordinates: [latitude, longitude],
-            ...(formData.fullAddress && { fullAddress: formData.place }),
-            ...(formData.city && { city: formData.city }),
-            ...(formData.state && { state: formData.state }),
-            latitude,
-            longitude
-          }
-        }
+        personalInfo
       };
 
       console.log("Candidate Data", candidateBody)

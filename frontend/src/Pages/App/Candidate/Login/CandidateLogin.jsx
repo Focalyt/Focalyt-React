@@ -219,14 +219,19 @@ const CandidateLogin = () => {
                 name: fullName,
                 mobile: mobileNumber,
                 sex: gender,
-                city,
-                state,
-                fullAddress:address,
-                latitude,
-                longitude,
-                place: address
-
+                personalInfo: {
+                    currentAddress: {
+                        type: "Point", // ✅ Always mention type also
+                        coordinates: [Number(longitude), Number(latitude)], // ✅ longitude first
+                        city,
+                        state,
+                        fullAddress: address,
+                        latitude: String(latitude),
+                        longitude: String(longitude)
+                    }
+                }
             };
+            
             if (refCode) {
                 body.refCode = refCode;
             }

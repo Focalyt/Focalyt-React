@@ -29,12 +29,21 @@ const migrateData = async () => {
           personalInfo: {
             profilevideo: old.profilevideo,
             whatsapp: old.whatsapp,
-            resume: old.resume,
+            resume: [{url:old.resume}],
             linkedInUrl: old.linkedInUrl,
             facebookUrl: old.facebookUrl,
             twitterUrl: old.twitterUrl,
             professionalTitle: old.careerObjective,
-            location: {
+            currentAddress: {
+              type: "Point",
+              coordinates: old.location?.coordinates || [0, 0],
+              latitude: old.latitude || "",
+              longitude: old.longitude || "",
+              city: old.city?.toString() || "",
+              state: old.state?.toString() || "",
+              fullAddress: old.address || "",
+            },
+            permanentAddress: {
               type: "Point",
               coordinates: old.location?.coordinates || [0, 0],
               latitude: old.latitude || "",
@@ -100,6 +109,8 @@ const migrateData = async () => {
           upi: old.upi,
           referredBy: old.referredBy,
           verified: old.verified,
+          createdAt: old.createdAt,
+          updatedAt: old.updatedAt,
         };
 
         await NewCandidate.create(newData);
