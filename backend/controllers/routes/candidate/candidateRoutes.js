@@ -562,7 +562,7 @@ router
       if (candName.length >= 2) {
         surName = candName[candName.length - 1]
       }
-      let city = place.split(',')
+     
 
       let phone = "91" + mobile.toString();
       let num = parseInt(phone);
