@@ -146,6 +146,7 @@ const CandidateLogin = () => {
         try {
             // const response = await axios.post('/api/sendCandidateOtp', { mobile: mobileNumber });
             const res = await axios.post(`${backendUrl}/api/sendCandidateOtp`, { mobile: mobileNumber });
+            console.log("OTP Send API Response:", res.data);
             setShowOtpField(true);
             setShowLoginBtn(true);
             setErrorMessage('');
