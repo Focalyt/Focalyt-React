@@ -15,6 +15,7 @@ import Community from './Pages/Front/Community/Community';
 import CandidateLayout from './Component/Layouts/App/Candidates';
 import CandidateDashboard from './Pages/App/Candidate/Dashboard/CandidateDashboard';
 import CandidateProfile from './Pages/App/Candidate/Profile/CandidateProfile';
+import CandidateProfileVideo from './Pages/App/Candidate/Profile/CandidateProfile_video-copy';
 import Resume from './Pages/App/Candidate/Profile/Resume';
 import CandidatesDocuments from "./Pages/App/Candidate/Documents/CandidateDocumets"
 import SearchCourses from "./Pages/App/Candidate/Courses/SearchCourses"
@@ -79,6 +80,7 @@ const Layout = () => {
         <Route path="/candidate" element={<CandidateLayout />}>
           <Route path="dashboard" element={<CandidateDashboard />} />
           <Route path="myprofile" element={<CandidateProfile />} />
+          <Route path="testprofile" element={<CandidateProfileVideo/>}/>
           <Route path="document" element={<CandidatesDocuments />} />
           <Route path="resume" element={<Resume />} />
           <Route path="searchcourses" element={<SearchCourses />} />

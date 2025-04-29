@@ -101,7 +101,8 @@ const candidateProfileSchema = new Schema(
           state: String,
           fullAddress: String
         },
-        year: { type: String }
+        year: { type: String },
+        month: { type: String},
       }],
       languages: [{
         name: { type: String },
@@ -225,7 +226,11 @@ const candidateProfileSchema = new Schema(
         }
       }
     ],
-
+    experienceType: { 
+      type: String, 
+      enum: ['fresher', 'experienced'],
+      default: 'experienced'
+    },
     experiences: [
       {
         jobTitle: String,

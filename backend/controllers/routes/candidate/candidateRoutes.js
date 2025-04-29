@@ -4368,6 +4368,8 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
         }));
     }
     console.log('updatePayload', updatePayload)
+    console.log('Incoming Data:', req.body);
+  
     // Final DB Update
     const updatedProfile = await Candidate.findOneAndUpdate(
       { mobile: user.mobile },
