@@ -33,7 +33,9 @@ const CandidateProfile = () => {
   }]);
   const [certificates, setCertificates] = useState([{
     certificateName: '',
-    orgName: ''
+    orgName: '',
+    month: '',
+    year: ''
   }]);
   const [projects, setProjects] = useState([{
     projectName: '',
@@ -720,7 +722,7 @@ const CandidateProfile = () => {
         const audioFile = new File([audioBlob], `voice-${Date.now()}.wav`, {
           type: 'audio/wav'
         });
-        
+
         resetTimer();
         await uploadCV(audioFile, 'voiceIntro');
 
@@ -764,7 +766,20 @@ const CandidateProfile = () => {
 
       const token = localStorage.getItem('token');
       const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
-
+      const monthNames = {
+        "01": "January",
+        "02": "February",
+        "03": "March",
+        "04": "April",
+        "05": "May",
+        "06": "June",
+        "07": "July",
+        "08": "August",
+        "09": "September",
+        "10": "October",
+        "11": "November",
+        "12": "December"
+      };
       // Format the data to match what your API expects
       const cvPayload = {
         name: profileData.name || '',
@@ -792,7 +807,9 @@ const CandidateProfile = () => {
           })),
           certifications: certificates.map(c => ({
             certificateName: c.certificateName || '',
-            orgName: c.orgName || ''
+            orgName: c.orgName || '',
+            month: c.month ? monthNames[c.month] || c.month : '',
+            year: c.year || ''
           })),
           languages: languages.map(l => ({
             name: l.name || '',
@@ -1070,7 +1087,7 @@ const CandidateProfile = () => {
             <div className="resume-header">
               <div className="profile-image-container">
                 <div className="profile-image">
-                  {profileData?.personalInfo?.image? (
+                  {profileData?.personalInfo?.image ? (
                     <img src={profileData.personalInfo.image} alt="Profile" />
                   ) : (
                     <div className="profile-placeholder">
@@ -1214,7 +1231,7 @@ const CandidateProfile = () => {
                   />
                 </div>
                 {/* Current Address */}
-                
+
 
                 {/* Same as current address checkbox */}
                 <div className="form-check ms-3 mb-2">
@@ -1226,30 +1243,30 @@ const CandidateProfile = () => {
                     onChange={(e) => {
                       const isChecked = e.target.checked;
                       const current = profileData?.personalInfo?.currentAddress || {};
-                    
+
                       setProfileData(prev => ({
                         ...prev,
                         personalInfo: {
                           ...(prev.personalInfo || {}),
                           permanentAddress: isChecked
                             ? {
-                                ...current,
-                                sameCurrentAddress: true
-                              }
+                              ...current,
+                              sameCurrentAddress: true
+                            }
                             : {
-                                sameCurrentAddress: false,
-                                type: "Point",
-                                coordinates: [0, 0],
-                                latitude: '',
-                                longitude: '',
-                                city: '',
-                                state: '',
-                                fullAddress: ''
-                              }
+                              sameCurrentAddress: false,
+                              type: "Point",
+                              coordinates: [0, 0],
+                              latitude: '',
+                              longitude: '',
+                              city: '',
+                              state: '',
+                              fullAddress: ''
+                            }
                         }
                       }));
                     }}
-                    
+
                   />
                   <label className="form-check-label" htmlFor="same-address-check">
                     Same as current address
@@ -1292,151 +1309,183 @@ const CandidateProfile = () => {
               Work Experience
             </div>
 
-            {/* Map through the experiences array */}
-            {experiences.map((experience, index) => (
-              <div className="experience-item" key={`experience-${index}`}>
-                <div className="item-controls">
-                  {experiences.length > 1 && (
-                    <button
-                      className="remove-button"
-                      onClick={() => {
-                        const updated = [...experiences];
-                        updated.splice(index, 1);
-                        setExperiences(updated);
-                      }}
-                    >
-                      <i className="bi bi-trash"></i>
-                    </button>
-                  )}
-                </div>
+            {/* Experience Type Dropdown */}
+            <div className="form-group mb-4 experienceLevel">
+              <label className="form-label">Experience Level:</label>
+              <select
+                className="form-select experience-dropdown" style={{ width: "auto!important" }}
+                value={profileData?.experienceType || 'experienced'}
+                onChange={(e) => {
+                  const expType = e.target.value;
+                  setProfileData(prev => ({
+                    ...prev,
+                    experienceType: expType
+                  }));
 
-                <div className="job-title">
-                  {createEditable(experience.jobTitle || '', 'Job Title', (val) => {
-                    const updatedExperiences = [...experiences];
-                    updatedExperiences[index].jobTitle = val;
-                    setExperiences(updatedExperiences);
-                  })}
-                </div>
+                  // If switching to fresher and there are job experiences, save them temporarily
+                  if (expType === 'fresher' && experiences.length > 0) {
+                    // Store current experiences in a ref or another state if needed
+                    // Reset experiences to a single empty item for fresher
+                    setExperiences([{
+                      jobTitle: 'Fresher',
+                      companyName: '',
+                      from: '',
+                      to: '',
+                      jobDescription: ''
+                    }]);
+                  } else if (expType === 'experienced' && experiences.length === 1 && experiences[0].jobTitle === 'Fresher') {
+                    // If switching back to experienced and currently has just the fresher placeholder
+                    // Reset to a blank experience form or restore previous experiences
+                    setExperiences([{
+                      jobTitle: '',
+                      companyName: '',
+                      from: '',
+                      to: '',
+                      jobDescription: ''
+                    }]);
+                  }
+                }}
+              >
+                <option value="fresher">Fresher</option>
+                <option value="experienced">Experienced</option>
+              </select>
+            </div>
 
-                <div className="company-name">
+            {/* Conditional rendering based on selection */}
+            {profileData?.experienceType === 'fresher' ? (
+              // Fresher input field
+              <div className="fresher-experience">
+                <div className="form-group mb-3 d-flex gap-5 align-items-center" style={{ display: 'flex', alignItems: 'center' }}>
+                  <label className="form-label">Experience Status:</label>
                   <input
-                    id={`company-name-${index}`}
                     type="text"
                     className="form-control"
-                    placeholder="Company Name"
-                    value={experience.companyName || ''}
-                    onChange={(e) => {
-                      const updatedExperiences = [...experiences];
-                      updatedExperiences[index].companyName = e.target.value;
-                      setExperiences(updatedExperiences);
-                    }}
+                    value="Fresher"
+                    readOnly
                   />
-                </div>
-                {/* <div className="date-range">
-                  <span className="date-label">From:</span>
-                  <input
-                    type="date"
-                    value={experience.from || ''}
-                    type="month"
-                    value={experience.FromDate || ''}
-                    onChange={(e) => {
-                      const updatedExperiences = [...experiences];
-                      updatedExperiences[index].FromDate = e.target.value;
-                      setExperiences(updatedExperiences);
-                    }}
-                    className="date-input"
-                  />
-
-                  <span className="date-label">To:</span>
-                  <input
-                    type="date"
-                    value={experience.to || ''}
-                    type="month"
-                    value={experience.ToDate || ''}
-                    onChange={(e) => {
-                      const updatedExperiences = [...experiences];
-                      updatedExperiences[index].ToDate = e.target.value;
-                      setExperiences(updatedExperiences);
-                    }}
-                    className="date-input"
-                  />
-                </div> */}
-
-                <div className="date-range">
-                  <span className="date-label">From:</span>
-                  <input
-                    type="date"
-                    value={experience.from || ''}
-                    onChange={(e) => {
-                      const updatedExperiences = [...experiences];
-                      updatedExperiences[index].from = e.target.value;
-                      setExperiences(updatedExperiences);
-                    }}
-                    className="date-input"
-                  />
-
-                  <span className="date-label">To:</span>
-                  {!experience.currentlyWorking ? (
-                    <input
-                      type="date"
-                      value={experience.to || ''}
-                      onChange={(e) => {
-                        const updatedExperiences = [...experiences];
-                        updatedExperiences[index].to = e.target.value;
-                        setExperiences(updatedExperiences);
-                      }}
-                      className="date-input"
-                      disabled={experience.currentlyWorking}
-                    />
-                  ) : (
-                    <span className="current-job-badge">Present</span>
-                  )}
-
-                  <div className="form-check ms-3">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id={`currently-working-${index}`}
-                      checked={experience.currentlyWorking || false}
-                      onChange={(e) => {
-                        const updatedExperiences = [...experiences];
-                        updatedExperiences[index].currentlyWorking = e.target.checked;
-                        if (e.target.checked) {
-                          updatedExperiences[index].to = '';
-                        }
-                        setExperiences(updatedExperiences);
-                      }}
-                    />
-                    <label className="form-check-label" htmlFor={`currently-working-${index}`}>
-                      I currently work here
-                    </label>
-                  </div>
-                </div>
-
-                <div className="job-description">
-                  {createEditable(experience.jobDescription || '', 'Job Description', (val) => {
-                    const updatedExperiences = [...experiences];
-                    updatedExperiences[index].jobDescription = val;
-                    setExperiences(updatedExperiences);
-                  })}
                 </div>
               </div>
-            ))}
-            <button
-              className="add-button"
-              onClick={() => {
-                // Add a new empty experience object
-                setExperiences([...experiences, {
-                  jobTitle: '',
-                  companyName: '',
-                  from: '',
-                  to: '',
-                  jobDescription: ''
-                }]);
-              }}
-            >
-              <i className="bi bi-plus"></i> Add Experience
-            </button>
+            ) : (
+              // Experienced UI (existing functionality)
+              <>
+                {/* Map through the experiences array */}
+                {experiences.map((experience, index) => (
+                  <div className="experience-item" key={`experience-${index}`}>
+                    <div className="item-controls">
+                      {experiences.length > 1 && (
+                        <button
+                          className="remove-button"
+                          onClick={() => {
+                            const updated = [...experiences];
+                            updated.splice(index, 1);
+                            setExperiences(updated);
+                          }}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="job-title">
+                      {createEditable(experience.jobTitle || '', 'Job Title', (val) => {
+                        const updatedExperiences = [...experiences];
+                        updatedExperiences[index].jobTitle = val;
+                        setExperiences(updatedExperiences);
+                      })}
+                    </div>
+
+                    <div className="company-name">
+                      <input
+                        id={`company-name-${index}`}
+                        type="text"
+                        className="form-control"
+                        placeholder="Company Name"
+                        value={experience.companyName || ''}
+                        onChange={(e) => {
+                          const updatedExperiences = [...experiences];
+                          updatedExperiences[index].companyName = e.target.value;
+                          setExperiences(updatedExperiences);
+                        }}
+                      />
+                    </div>
+
+                    <div className="date-range">
+                      <span className="date-label">From:</span>
+                      <input
+                        type="date"
+                        value={experience.from || ''}
+                        onChange={(e) => {
+                          const updatedExperiences = [...experiences];
+                          updatedExperiences[index].from = e.target.value;
+                          setExperiences(updatedExperiences);
+                        }}
+                        className="date-input"
+                      />
+
+                      <span className="date-label">To:</span>
+                      {!experience.currentlyWorking ? (
+                        <input
+                          type="date"
+                          value={experience.to || ''}
+                          onChange={(e) => {
+                            const updatedExperiences = [...experiences];
+                            updatedExperiences[index].to = e.target.value;
+                            setExperiences(updatedExperiences);
+                          }}
+                          className="date-input"
+                          disabled={experience.currentlyWorking}
+                        />
+                      ) : (
+                        <span className="current-job-badge">Present</span>
+                      )}
+
+                      <div className="form-check ms-3">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id={`currently-working-${index}`}
+                          checked={experience.currentlyWorking || false}
+                          onChange={(e) => {
+                            const updatedExperiences = [...experiences];
+                            updatedExperiences[index].currentlyWorking = e.target.checked;
+                            if (e.target.checked) {
+                              updatedExperiences[index].to = '';
+                            }
+                            setExperiences(updatedExperiences);
+                          }}
+                        />
+                        <label className="form-check-label" htmlFor={`currently-working-${index}`}>
+                          I currently work here
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="job-description">
+                      {createEditable(experience.jobDescription || '', 'Job Description', (val) => {
+                        const updatedExperiences = [...experiences];
+                        updatedExperiences[index].jobDescription = val;
+                        setExperiences(updatedExperiences);
+                      })}
+                    </div>
+                  </div>
+                ))}
+                <button
+                  className="add-button"
+                  onClick={() => {
+                    // Add a new empty experience object
+                    setExperiences([...experiences, {
+                      jobTitle: '',
+                      companyName: '',
+                      from: '',
+                      to: '',
+                      jobDescription: ''
+                    }]);
+                  }}
+                >
+                  <i className="bi bi-plus"></i> Add Experience
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -2037,20 +2086,73 @@ const CandidateProfile = () => {
                               setCertificates(updated);
                             })}
                           </div>
-                          <div className="certificate-issuer">
-                            {createEditable(certificate.orgName || '', 'Issuing Organization, Year', (val) => {
-                              const updated = [...certificates];
-                              updated[index].orgName = val;
-                              setCertificates(updated);
-                            })}
+
+                          <div className="certificate-org">
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Issuing Organization"
+                              value={certificate.orgName || ''}
+                              onChange={(e) => {
+                                const updated = [...certificates];
+                                updated[index].orgName = e.target.value;
+                                setCertificates(updated);
+                              }}
+                            />
+                          </div>
+
+                          <div className="certificate-date-fields">
+                            <div className="cert-month">
+                              <select
+                                className="form-select"
+                                value={certificate.month || ''}
+                                onChange={(e) => {
+                                  const updated = [...certificates];
+                                  updated[index].month = e.target.value;
+                                  setCertificates(updated);
+                                }}
+                              >
+                                <option value="">Month</option>
+                                <option value="01">January</option>
+                                <option value="02">February</option>
+                                <option value="03">March</option>
+                                <option value="04">April</option>
+                                <option value="05">May</option>
+                                <option value="06">June</option>
+                                <option value="07">July</option>
+                                <option value="08">August</option>
+                                <option value="09">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                              </select>
+                            </div>
+
+                            <div className="cert-year">
+                              <select
+                                className="form-select"
+                                value={certificate.year || ''}
+                                onChange={(e) => {
+                                  const updated = [...certificates];
+                                  updated[index].year = e.target.value;
+                                  setCertificates(updated);
+                                }}
+                              >
+                                <option value="">Year</option>
+                                {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                                  <option key={year} value={year}>{year}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
+
                         <button
                           className="remove-certificate"
                           onClick={() => {
                             const updated = [...certificates];
                             if (certificates.length === 1) {
-                              updated[0] = { certificateName: '', orgName: '' };
+                              updated[0] = { certificateName: '', orgName: '', month: '', year: '' };
                             } else {
                               updated.splice(index, 1);
                             }
@@ -2064,7 +2166,7 @@ const CandidateProfile = () => {
 
                     <button
                       className="add-button add-certificate"
-                      onClick={() => setCertificates([...certificates, { certificateName: '', orgName: '' }])}
+                      onClick={() => setCertificates([...certificates, { certificateName: '', orgName: '', month: '', year: '' }])}
                     >
                       <i className="bi bi-plus"></i> Add Certificate
                     </button>
@@ -2277,7 +2379,7 @@ const CandidateProfile = () => {
 
       {/* Action Buttons */}
       <div className="resume-actions">
-      <button
+        <button
           className="audio-intro-btn"
           onClick={() => {
             setShowRecordingModal(true);
@@ -2468,35 +2570,53 @@ const CandidateProfile = () => {
                   {/* Left Column */}
                   <div className="resume-column resume-left-column">
                     {/* Experience Section */}
-                    {experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                    {profileData?.experienceType === 'fresher' ? (
+                      /* Fresher Preview */
                       <div className="resume-section">
                         <h2 className="resume-section-title">Work Experience</h2>
+                        <div className="resume-experience-item">
+                          <div className="resume-item-header">
+                            <h3 className="resume-item-title">Fresher</h3>
+                          </div>
+                          {profileData?.fresherDetails && (
+                            <div className="resume-item-content">
+                              <p>{profileData.fresherDetails}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Experienced Preview */
+                      experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                        <div className="resume-section">
+                          <h2 className="resume-section-title">Work Experience</h2>
 
-                        {experiences.map((exp, index) => (
-                          (exp.jobTitle || exp.companyName || exp.jobDescription) && (
-                            <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                              <div className="resume-item-header">
-                                {exp.jobTitle && (
-                                  <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                )}
-                                {exp.companyName && (
-                                  <p className="resume-item-subtitle">{exp.companyName}</p>
-                                )}
-                                {(exp.from || exp.to) && (
-                                  <p className="resume-item-period">
-                                    {exp.from || 'Start Date'} - {exp.to || 'Present'}
-                                  </p>
+                          {experiences.map((exp, index) => (
+                            (exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                              <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                <div className="resume-item-header">
+                                  {exp.jobTitle && (
+                                    <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                  )}
+                                  {exp.companyName && (
+                                    <p className="resume-item-subtitle">{exp.companyName}</p>
+                                  )}
+                                  {(exp.from || exp.to || exp.currentlyWorking) && (
+                                    <p className="resume-item-period">
+                                      {exp.from || 'Start Date'} - {exp.currentlyWorking ? 'Present' : (exp.to || 'End Date')}
+                                    </p>
+                                  )}
+                                </div>
+                                {exp.jobDescription && (
+                                  <div className="resume-item-content">
+                                    <p>{exp.jobDescription}</p>
+                                  </div>
                                 )}
                               </div>
-                              {exp.jobDescription && (
-                                <div className="resume-item-content">
-                                  <p>{exp.jobDescription}</p>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        ))}
-                      </div>
+                            )
+                          ))}
+                        </div>
+                      )
                     )}
                     {/* Education Section */}
                     {educations.length > 0 && educations.some(edu =>
@@ -2603,9 +2723,26 @@ const CandidateProfile = () => {
                         <ul className="resume-certifications-list">
                           {certificates.map((cert, index) => (
                             (cert.certificateName || cert.orgName) && (
-                              <li key={`resume-cert-${index}`}>
-                                <strong>{cert.certificateName || 'Certificate'}</strong>
-                                {cert.orgName && <span> - {cert.orgName}</span>}
+                              <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                {cert.certificateName && (
+                                  <strong>{cert.certificateName}</strong>
+                                )}
+
+                                {cert.orgName && (
+                                  <span className="resume-cert-org"> - {cert.orgName}</span>
+                                )}
+
+                                {(cert.month || cert.year) && (
+                                  <span className="resume-cert-date">
+                                    {cert.month && cert.year ?
+                                      ` (${cert.month}/${cert.year})` :
+                                      cert.month ?
+                                        ` (${cert.month})` :
+                                        cert.year ?
+                                          ` (${cert.year})` :
+                                          ''}
+                                  </span>
+                                )}
                               </li>
                             )
                           ))}
@@ -2636,7 +2773,37 @@ const CandidateProfile = () => {
                         ))}
                       </div>
                     )}
+                    {/* {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                      <div className="resume-section">
+                        <h2 className="resume-section-title">Projects</h2>
+                        {projects.map((proj, index) => (
+                          (proj.projectName || proj.proDescription) && (
+                            <div className="resume-project-item" key={`resume-proj-${index}`}>
+                              <div className="resume-item-header">
+                                <h3 className="resume-project-title">
+                                  {proj.projectName || 'Project'}
+                                  {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
+                                </h3>
+                              </div>
 
+                              {proj.projectUrl && (
+                                <div className="resume-project-url">
+                                  <a href={proj.projectUrl} target="_blank" rel="noopener noreferrer">
+                                    <i className="bi bi-link-45deg"></i> {proj.projectUrl}
+                                  </a>
+                                </div>
+                              )}
+
+                              {proj.proDescription && (
+                                <div className="resume-item-content">
+                                  <p>{proj.proDescription}</p>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    )} */}
                     {/* Interests Section */}
                     {interests.filter(i => i.trim() !== '').length > 0 && (
                       <div className="resume-section">
@@ -3026,7 +3193,18 @@ width: 100%;
   }
   .add-button{
   height: auto !important}
+  .certificate-date-fields{
+  display:flex;
+  gap:10px;
+  }
+  .experienceLevel{
+  display: flex;
+  align-items:center;
+  gap:10px;
   
+  }
+  .experience-dropdown{
+  width:auto!important;}
 `}
       </style>
 
