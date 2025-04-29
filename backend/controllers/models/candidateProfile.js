@@ -151,23 +151,6 @@ const candidateProfileSchema = new Schema(
       {
         courseId: { type: ObjectId, ref: "courses" }, // Changed from type to courseId
         centerId: { type: ObjectId, ref: "Center" }, // Course reference
-        docsForCourses: [
-          {
-            courseId: { type: ObjectId, ref: "courses" }, // Changed from type to courseId
-            uploadedDocs: [
-              {
-                docsId: { type: ObjectId, ref: "courses.docsRequired" },
-                fileUrl: String,
-                status: { type: String, enum: ["Pending", "Verified", "Rejected"], default: "Pending" }, // Verification Status
-                reason: { type: String }, // Rejection ka reason
-                verifiedBy: { type: ObjectId, ref: "User" },
-                verifiedDate: { type: Date },
-                uploadedAt: { type: Date, default: Date.now } // Upload Timestamp
-              }
-            ]
-          }
-        ]
-
       }
     ],
 
@@ -257,6 +240,7 @@ const candidateProfileSchema = new Schema(
         currentlyWorking: { type: Boolean, default: false },
       },
     ],
+    
 
     availableCredit: {
       type: Number,

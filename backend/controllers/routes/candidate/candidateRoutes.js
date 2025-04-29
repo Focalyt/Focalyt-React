@@ -4033,155 +4033,138 @@ router.route('/review/:job')
   });
 
 router.route('/reqDocs/:courseId')
-  .get(isCandidate, async (req, res) => {
-    try {
+.get(isCandidate, async (req, res) => {
+  try {
+    const validation = { mobile: req.user.mobile };
+    const { value, error } = await CandidateValidators.userMobile(validation);
 
-
-      const filter = { status: true };
-      const validation = { mobile: req.user.mobile };
-
-
-      const { value, error } = await CandidateValidators.userMobile(validation);
-      if (error) {
-
-
-        return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
-      };
-      const candidateMobile = value.mobile;
-      console.log('mobile',candidateMobile)
-
-      let { courseId } = req.params;
-      if (typeof courseId === 'string' && mongoose.Types.ObjectId.isValid(courseId)) {
-        courseId = new mongoose.Types.ObjectId(courseId);
-
-
-      }
-
-
-
-      const candidate = await Candidate.findOne({
-        mobile: candidateMobile,
-        'appliedCourses.courseId': courseId  // Check if courseId exists in appliedCourses
-      });
-
-      if (!candidate) {
-        console.log("You have not applied for this course.")
-        res.redirect("/candidate/searchcourses");
-      };
-      const course = await Courses.findById(courseId);
-      let docsRequired = null
-      if (course) {
-        docsRequired = course.docsRequired; // requireDocs array fetch ho jayega
-
-      } else {
-        console.log("Course not found");
-      };
-
-      let uploadedDocs = [];
-      if (candidate.docsForCourses && candidate.docsForCourses.length > 0) {
-        const courseEntry = candidate.docsForCourses.find(
-          entry => entry.courseId.toString() === courseId.toString()
-        );
-        if (courseEntry && courseEntry.uploadedDocs) {
-          uploadedDocs = courseEntry.uploadedDocs;
-        }
-      }
-      let mergedDocs = [];
-
-      if (course && course.docsRequired) {
-        docsRequired = course.docsRequired;
-
-        // Create a merged array with both required docs and uploaded docs info
-        mergedDocs = docsRequired.map(reqDoc => {
-          // Convert Mongoose document to plain object
-          const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
-
-          // Find matching uploaded docs for this required doc
-          const matchingUploads = uploadedDocs.filter(
-            uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
-          );
-
-          return {
-            _id: docObj._id,
-            Name: docObj.Name,
-
-            description: docObj.description || '',
-            uploads: matchingUploads || []
-          };
-        });
-
-        // console.log("Merged docs:", JSON.stringify(mergedDocs, null, 2));
-      } else {
-        console.log("Course not found or no docs required");
-      };
-
-      console.log("mergedDocs", mergedDocs)
-
-      res.json({
-        docsRequired,
-        courseId,
-        uploadedDocs,
-        mergedDocs: mergedDocs || []
-      });
-    } catch (err) {
-      console.log("caught error ", err);
+    if (error) {
+      return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
     }
-  })
 
-  .post(isCandidate, async (req, res) => {
+    const candidateMobile = value.mobile;
+    console.log('mobile', candidateMobile);
+
+    let { courseId } = req.params;
+    if (typeof courseId === 'string' && mongoose.Types.ObjectId.isValid(courseId)) {
+      courseId = new mongoose.Types.ObjectId(courseId);
+    }
+
+    // ✅ Candidate find karo
+    const candidate = await Candidate.findOne({ mobile: candidateMobile });
+
+    if (!candidate) {
+      console.log("You have not applied for this course.");
+      return res.redirect("/candidate/searchcourses");
+    }
+
+    const candidateId = candidate._id;
+
+    // ✅ AppliedCourses se uploadedDocs fetch karo
+    const appliedCourse = await AppliedCourses.findOne({
+      _candidate: candidateId,
+      _course: courseId
+    });
+
+    let uploadedDocs = [];
+    if (appliedCourse && appliedCourse.uploadedDocs && appliedCourse.uploadedDocs.length > 0) {
+      uploadedDocs = appliedCourse.uploadedDocs;
+    }
+
+    // ✅ Course ke docsRequired bhi fetch karo
+    const course = await Courses.findById(courseId);
+
+    let docsRequired = [];
+    if (course) {
+      docsRequired = course.docsRequired || [];
+    } else {
+      console.log("Course not found");
+    }
+
+    // ✅ Merge karo docsRequired + uploadedDocs
+    let mergedDocs = [];
+
+    if (docsRequired.length > 0) {
+      mergedDocs = docsRequired.map(reqDoc => {
+        const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+        const matchingUploads = uploadedDocs.filter(
+          uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+        );
+
+        return {
+          _id: docObj._id,
+          Name: docObj.Name,
+          description: docObj.description || '',
+          uploads: matchingUploads || []
+        };
+      });
+    }
+
+    console.log("mergedDocs", mergedDocs);
+
+    res.json({
+      docsRequired,
+      courseId,
+      uploadedDocs,
+      mergedDocs: mergedDocs || []
+    });
+
+  } catch (err) {
+    console.log("caught error ", err);
+    res.status(500).send({ status: false, message: "Something went wrong", error: err.message });
+  }
+})
+
+.post(isCandidate, async (req, res) => {
     try {
       let { docsName, courseId, docsId } = req.body;
-
-      if (typeof docsId === 'String' && !mongoose.Types.ObjectId.isValid(docsId)) {
+  
+      if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
         docsId = new mongoose.Types.ObjectId(docsId);
       }
-
+  
       const validation = { mobile: req.user.mobile };
       const { value, error } = await CandidateValidators.userMobile(validation);
       if (error) {
         return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
       }
+  
       const candidateMobile = value.mobile;
-
+  
       const candidate = await Candidate.findOne({
-        mobile: candidateMobile,
-        appliedCourses: courseId
+        mobile: candidateMobile
       });
-
+  
       if (!candidate) {
-        return res.status(400).json({ error: "You have not applied for this course." });
+        return res.status(400).json({ error: "Candidate not found." });
       }
-
-      let files = req.files?.file;
+  
+      const files = req.files?.file;
       if (!files) {
         return res.status(400).send({ status: false, message: "No files uploaded" });
       }
-
-      console.log("Files", files);
-      const candidateId = candidate._id
-
+  
+      const candidateId = candidate._id;
       const filesArray = Array.isArray(files) ? files : [files];
       const uploadedFiles = [];
       const uploadPromises = [];
-
+  
       filesArray.forEach((item) => {
         const { name, mimetype } = item;
         const ext = name?.split('.').pop().toLowerCase();
-
-        console.log(`Processing File: ${name}, Extension: ${ext}`);
-
-        if (!allowedExtensions.includes(ext)) { // ✅ Now includes PDFs
-          console.log("File type not supported")
+  
+        if (!allowedExtensions.includes(ext)) {
           throw new Error(`File type not supported: ${ext}`);
         }
-
-        let fileType = "document"; // ✅ Default to "document"
+  
+        let fileType = "document";
         if (allowedImageExtensions.includes(ext)) {
           fileType = "image";
         } else if (allowedVideoExtensions.includes(ext)) {
           fileType = "video";
         }
-
+  
         const key = `Documents for course/${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
         const params = {
           Bucket: bucketName,
@@ -4189,7 +4172,7 @@ router.route('/reqDocs/:courseId')
           Body: item.data,
           ContentType: mimetype,
         };
-
+  
         uploadPromises.push(
           s3.upload(params).promise().then((uploadResult) => {
             uploadedFiles.push({
@@ -4199,69 +4182,42 @@ router.route('/reqDocs/:courseId')
           })
         );
       });
-
+  
       await Promise.all(uploadPromises);
-      console.log(uploadedFiles)
-
+  
       const fileUrl = uploadedFiles[0].fileURL;
-
-      const existingCourseDoc = await Candidate.findOne({
-        mobile: candidateMobile,
-        "docsForCourses.courseId": courseId
+  
+      // ✅ Ab update hoga AppliedCourses ke andar
+      const appliedCourse = await AppliedCourses.findOne({
+        _candidate: candidate._id,
+        _course: courseId
       });
-
-      if (existingCourseDoc) {
-        const updatedCandidate = await Candidate.findOneAndUpdate(
-          { mobile: candidateMobile, "docsForCourses.courseId": courseId },
-          {
-            $push: {
-              "docsForCourses.$.uploadedDocs": {
-                docsId: new mongoose.Types.ObjectId(docsId),
-                fileUrl: fileUrl,
-                status: "Pending",
-                uploadedAt: new Date()
-              }
-            }
-          },
-          { new: true }
-        );
-
-        return res.status(200).json({
-          status: true,
-          message: "Document uploaded successfully",
-          data: updatedCandidate
-        });
-      } else {
-        const updatedCandidate = await Candidate.findOneAndUpdate(
-          { mobile: candidateMobile },
-          {
-            $push: {
-              "docsForCourses": {
-                courseId: new mongoose.Types.ObjectId(courseId),
-                uploadedDocs: [{
-                  docsId: new mongoose.Types.ObjectId(docsId),
-                  fileUrl: fileUrl,
-                  status: "Pending",
-                  uploadedAt: new Date()
-                }]
-              }
-            }
-          },
-          { new: true }
-        );
-
-        return res.status(200).json({
-          status: true,
-          message: "Document uploaded successfully",
-          data: updatedCandidate
-        });
+  
+      if (!appliedCourse) {
+        return res.status(400).json({ error: "You have not applied for this course." });
       }
-    }
-    catch (err) {
+  
+      appliedCourse.uploadedDocs.push({
+        docsId: new mongoose.Types.ObjectId(docsId),
+        fileUrl: fileUrl,
+        status: "Pending",
+        uploadedAt: new Date()
+      });
+  
+      await appliedCourse.save();
+  
+      return res.status(200).json({
+        status: true,
+        message: "Document uploaded successfully",
+        data: appliedCourse
+      });
+  
+    } catch (err) {
       console.log(err)
-      return res.status(500).send({ status: false, message: err.message })
+      return res.status(500).send({ status: false, message: err.message });
     }
   })
+  
 // Backend (Node.js with Express)
 router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
   try {

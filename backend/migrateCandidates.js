@@ -20,6 +20,7 @@ const migrateData = async () => {
     for (const old of oldCandidates) {
       try {
         const newData = {
+          _id:old._id,
           name: old.name,
           mobile: old.mobile,
           email: old.email,
