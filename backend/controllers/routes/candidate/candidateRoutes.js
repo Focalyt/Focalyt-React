@@ -1340,13 +1340,14 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     const p = parseInt(req.query.page);
     const page = p || 1;
     let validation = { mobile: req.user.mobile }
+    let mobile = req.user.mobile
     let { value, error } = await CandidateValidators.userMobile(validation)
     if (error) {
       console.log(error)
       return res.send({ status: "failure", error: "Something went wrong!", error });
     }
     const candidate = await Candidate.findOne({
-      mobile: value.mobile,
+      mobile: mobile,
     });
     const fields = {
       status: true,

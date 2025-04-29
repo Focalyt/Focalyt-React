@@ -137,6 +137,7 @@ module.exports.isCandidate = async (req, res, next) => {
     } else {
       // ✅ Else check for token in headers (for React SPA project)
       const token = req.header('x-auth');
+      console.log('token',token)
       if (!token) throw error;
 
       const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
