@@ -10,9 +10,10 @@ const CandidateProfile = () => {
   const [experiences, setExperiences] = useState([{
     jobTitle: '',
     companyName: '',
-    from: '',
-    to: '',
-    jobDescription: ''
+    from: null,
+    to: null,
+    jobDescription: '',
+    currentlyWorking:false
   }]);
 
   const [educations, setEducations] = useState([{
@@ -358,6 +359,14 @@ const CandidateProfile = () => {
     }
   }, [experiences.length]);
 
+  useEffect(() => {
+    if (window.googleMapsLoaded) {
+      certificates.forEach((_, index) => {
+        initializeCertificationOrgAutocomplete(index);
+      });
+    }
+  }, [certificates.length]);
+
   // सामान्य ऑटोकम्पलीट इनिशियलाइज़ फंक्शन
   const initializeAutocomplete = (inputId, stateUpdater, index, propertyName) => {
     setTimeout(() => {
@@ -495,6 +504,85 @@ const CandidateProfile = () => {
     }
   };
 
+
+  // certificat organization
+  
+
+  const initializeCertificationOrgAutocomplete = (index) => {
+    console.log("Initializing address autocomplete...");
+    const input = document.getElementById(`issuing-organization-${index}`);
+  
+    if (!input) {
+      console.warn('Input element with ID "issuing-organization-{index}" not found. Retrying...');
+      setTimeout(() => initializeCertificationOrgAutocomplete(index), 100);
+      return;
+    }
+  
+    try {
+      console.log("Setting up autocomplete for input:", input);
+  
+      const autocomplete = new window.google.maps.places.Autocomplete(input, {
+        types: ['establishment'],
+        componentRestrictions: { country: 'in' }
+      });
+  
+      input.style.backgroundColor = "#ffffff";
+      input.style.color = "#000000";
+  
+      autocomplete.addListener('place_changed', () => {
+        console.log("Place changed event fired");
+        const place = autocomplete.getPlace();
+  
+        if (!place || !place.geometry || !place.geometry.location) {
+          console.warn('Invalid place data selected.');
+          return;
+        }
+  
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const fullAddress = place.formatted_address || place.name || input.value;
+  
+        let city = '', state = '', pincode = '';
+  
+        if (Array.isArray(place.address_components)) {
+          place.address_components.forEach((component) => {
+            const types = component.types.join(',');
+            if (types.includes("postal_code")) pincode = component.long_name;
+            if (types.includes("locality")) city = component.long_name;
+            if (types.includes("administrative_area_level_1")) state = component.long_name;
+            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+          });
+        }
+  
+        console.log("Extracted data:", { fullAddress, city, state, pincode, lat, lng });
+  
+        // 👇 Set directly into certificates[index]
+        setCertificates(prev => {
+          const updated = [...prev];
+          updated[index] = {
+            ...updated[index],
+            orgName: place.name || '', // ✅ Set orgName
+            orgLocation: {
+              type: 'Point',
+              coordinates: [lng, lat],
+              city,
+              state,
+              fullAddress
+            }
+          };
+          return updated;
+        });
+  
+        // 👇 Update input value too (optional visual update)
+        input.value = place.name || '';
+      });
+  
+      console.log("Google Maps Places Autocomplete initialized successfully");
+    } catch (error) {
+      console.error("Error initializing autocomplete:", error);
+    }
+  };
+  
 
   // Address location autocomplete
   const initializeAddressAutocomplete = () => {
@@ -809,7 +897,14 @@ const CandidateProfile = () => {
             certificateName: c.certificateName || '',
             orgName: c.orgName || '',
             month: c.month ? monthNames[c.month] || c.month : '',
-            year: c.year || ''
+            year: c.year || '',
+            orgLocation: c.orgLocation || {
+              type: 'Point',
+              coordinates: [0, 0],
+              city: '',
+              state: '',
+              fullAddress: ''
+            }
           })),
           languages: languages.map(l => ({
             name: l.name || '',
@@ -827,11 +922,20 @@ const CandidateProfile = () => {
         experiences: experiences.map(e => ({
           jobTitle: e.jobTitle || '',
           companyName: e.companyName || '',
-          FromDate: e.FromDate || '',
-          ToDate: e.ToDate || '',
-          jobDescription: e.jobDescription || ''
-        })),
-
+          from: e.from ? new Date(e.from) : null,
+          to: e.to ? new Date(e.to) : null,
+          jobDescription: e.jobDescription || '',
+          currentlyWorking: e.currentlyWorking || false,
+          location: e.location || {
+            type: 'Point',
+            coordinates: [0, 0],
+            city: '',
+            state: '',
+            fullAddress: ''
+          }
+        }))
+        ,
+        isExperienced: profileData.isExperienced || 'Fresher',
         qualifications: educations.map(edu => ({
           education: edu.education,
           boardName: edu.boardName,
@@ -1314,12 +1418,13 @@ const CandidateProfile = () => {
               <label className="form-label">Experience Level:</label>
               <select
                 className="form-select experience-dropdown" style={{ width: "auto!important" }}
-                value={profileData?.experienceType || 'experienced'}
+                value={profileData.isExperienced ? 'experienced' : 'fresher'}
                 onChange={(e) => {
                   const expType = e.target.value;
                   setProfileData(prev => ({
                     ...prev,
-                    experienceType: expType
+                    experienceType: expType,
+                    isExperienced: expType === 'experienced' ? true : false   // ✅ Add this line
                   }));
 
                   // If switching to fresher and there are job experiences, save them temporarily
@@ -1413,12 +1518,15 @@ const CandidateProfile = () => {
                       <span className="date-label">From:</span>
                       <input
                         type="date"
-                        value={experience.from || ''}
+                        value={experience.from ? new Date(experience.from).toISOString().slice(0, 10) : ''}
+
                         onChange={(e) => {
                           const updatedExperiences = [...experiences];
-                          updatedExperiences[index].from = e.target.value;
+                          updatedExperiences[index].from = new Date(e.target.value); // <-- String नहीं, Date बनाकर दो
                           setExperiences(updatedExperiences);
+                          console.log('experiences',experiences)
                         }}
+                        
                         className="date-input"
                       />
 
@@ -1426,12 +1534,14 @@ const CandidateProfile = () => {
                       {!experience.currentlyWorking ? (
                         <input
                           type="date"
-                          value={experience.to || ''}
+                          value={experience.to ? new Date(experience.to).toISOString().slice(0, 10) : ''}
+
                           onChange={(e) => {
                             const updatedExperiences = [...experiences];
-                            updatedExperiences[index].to = e.target.value;
+                            updatedExperiences[index].to = new Date(e.target.value); // <-- String नहीं, Date बनाकर दो
                             setExperiences(updatedExperiences);
                           }}
+                          
                           className="date-input"
                           disabled={experience.currentlyWorking}
                         />
@@ -1454,10 +1564,23 @@ const CandidateProfile = () => {
                             setExperiences(updatedExperiences);
                           }}
                         />
-                        <label className="form-check-label" htmlFor={`currently-working-${index}`}>
+                        <label
+                          className="form-check-label"
+                          htmlFor={`currently-working-${index}`}
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent default label behavior
+                            const updatedExperiences = [...experiences];
+                            updatedExperiences[index].currentlyWorking = !updatedExperiences[index].currentlyWorking;
+                            if (updatedExperiences[index].currentlyWorking) {
+                              updatedExperiences[index].to = '';
+                            }
+                            setExperiences(updatedExperiences);
+                          }}
+                        >
                           I currently work here
                         </label>
                       </div>
+
                     </div>
 
                     <div className="job-description">
@@ -1702,7 +1825,7 @@ const CandidateProfile = () => {
                           <input
                             type="text"
                             autoComplete="off"
-                            id={`passing-year-${index}`}
+                            
                             className="form-control"
                             value={edu.passingYear || ''}
                             onChange={(e) => {
@@ -2090,6 +2213,7 @@ const CandidateProfile = () => {
                           <div className="certificate-org">
                             <input
                               type="text"
+                              id={`issuing-organization-${index}`}
                               className="form-control"
                               placeholder="Issuing Organization"
                               value={certificate.orgName || ''}
@@ -2519,7 +2643,7 @@ const CandidateProfile = () => {
                         {profileData?.personalInfo?.name || user?.name || 'Your Name'}
                       </h1>
                       <p className="resume-title">
-                        {profileData?.personalInfo?.title || 'Professional Title'}
+                        {profileData?.personalInfo?.professionalTitle  || 'Professional Title'}
                       </p>
                       <p className="resume-title">
                         {profileData?.sex || 'Sex'}

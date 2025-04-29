@@ -209,11 +209,7 @@ const candidateProfileSchema = new Schema(
         }
       }
     ],
-    experienceType: { 
-      type: String, 
-      enum: ['fresher', 'experienced'],
-      default: 'experienced'
-    },
+    
     experiences: [
       {
         jobTitle: String,
@@ -235,8 +231,8 @@ const candidateProfileSchema = new Schema(
           state: { type: String },
           fullAddress: { type: String }
         },        
-        FromDate: String,
-        ToDate: String,
+        from: { type: Date },   // <-- Change here ✅
+    to: { type: Date },
         currentlyWorking: { type: Boolean, default: false },
       },
     ],
