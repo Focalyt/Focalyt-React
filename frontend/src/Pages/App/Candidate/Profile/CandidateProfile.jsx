@@ -1045,7 +1045,7 @@ const CandidateProfile = () => {
           }
         }))
         ,
-        isExperienced: profileData.isExperienced || 'Fresher',
+        isExperienced: profileData.isExperienced,
         qualifications: educations.map(edu => ({
           education: edu.education,
           boardName: edu.boardName,
@@ -1525,61 +1525,61 @@ const CandidateProfile = () => {
 
             {/* Experience Type Dropdown */}
             <div className="form-group mb-4 experienceLevel">
-              <label className="form-label">Experience Level:</label>
-              <select
-                className="form-select experience-dropdown" style={{ width: "auto!important" }}
-                value={profileData.isExperienced ? 'experienced' : 'fresher'}
-                onChange={(e) => {
-                  const expType = e.target.value;
-                  setProfileData(prev => ({
-                    ...prev,
-                    experienceType: expType,
-                    isExperienced: expType === 'experienced' ? true : false   // ✅ Add this line
-                  }));
+  <label className="form-label">Experience Level:</label>
+  <select
+    className="form-select experience-dropdown"
+    style={{ width: "auto" }}
+    value={profileData.isExperienced ? "Experienced" : "Fresher"}
+    onChange={(e) => {
+      const isExperienced = e.target.value === "Experienced";
+      setProfileData(prev => ({
+        ...prev,
+        isExperienced
+      }));
 
-                  // If switching to fresher and there are job experiences, save them temporarily
-                  if (expType === 'fresher' && experiences.length > 0) {
-                    // Store current experiences in a ref or another state if needed
-                    // Reset experiences to a single empty item for fresher
-                    setExperiences([{
-                      jobTitle: 'Fresher',
-                      companyName: '',
-                      from: '',
-                      to: '',
-                      jobDescription: ''
-                    }]);
-                  } else if (expType === 'experienced' && experiences.length === 1 && experiences[0].jobTitle === 'Fresher') {
-                    // If switching back to experienced and currently has just the fresher placeholder
-                    // Reset to a blank experience form or restore previous experiences
-                    setExperiences([{
-                      jobTitle: '',
-                      companyName: '',
-                      from: '',
-                      to: '',
-                      jobDescription: ''
-                    }]);
-                  }
-                }}
-              >
-                <option value="fresher">Fresher</option>
-                <option value="experienced">Experienced</option>
-              </select>
-            </div>
+      // Optional logic to reset or manage experiences based on the switch
+      if (!isExperienced) {
+        setExperiences([{
+          jobTitle: 'Fresher',
+          companyName: '',
+          from: '',
+          to: '',
+          jobDescription: '',
+          currentlyWorking: false
+        }]);
+      } else {
+        setExperiences([{
+          jobTitle: '',
+          companyName: '',
+          from: '',
+          to: '',
+          jobDescription: '',
+          currentlyWorking: false
+        }]);
+      }
+    }}
+  >
+    <option value="Fresher">Fresher</option>
+    <option value="Experienced">Experienced</option>
+  </select>
+</div>
+
 
             {/* Conditional rendering based on selection */}
-            {profileData?.experienceType === 'fresher' ? (
+            {!profileData.isExperienced ? (
               // Fresher input field
-              <div className="fresher-experience">
-                <div className="form-group mb-3 d-flex gap-5 align-items-center" style={{ display: 'flex', alignItems: 'center' }}>
-                  <label className="form-label">Experience Status:</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value="Fresher"
-                    readOnly
-                  />
-                </div>
-              </div>
+              // <div className="fresher-experience">
+              //   <div className="form-group mb-3 d-flex gap-5 align-items-center" style={{ display: 'flex', alignItems: 'center' }}>
+              //     <label className="form-label">Experience Status:</label>
+              //     <input
+              //       type="text"
+              //       className="form-control"
+              //       value="Fresher"
+              //       readOnly
+              //     />
+              //   </div>
+              // </div>
+              <></>
             ) : (
               // Experienced UI (existing functionality)
               <>
@@ -2826,7 +2826,7 @@ const CandidateProfile = () => {
                           </div>
                           {profileData?.fresherDetails && (
                             <div className="resume-item-content">
-                              <p>{profileData.fresherDetails}</p>
+                              <p>{profileData.isExperienced}</p>
                             </div>
                           )}
                         </div>

@@ -4250,7 +4250,10 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
     if (name) updatePayload.name = name;
     if (email) updatePayload.email = email;
     if (mobile) updatePayload.mobile = mobile;
-    if (isExperienced) updatePayload.isExperienced = isExperienced;
+    if (typeof isExperienced !== 'undefined') {
+      updatePayload.isExperienced = isExperienced;
+    }
+    
     if (sex) updatePayload.sex = sex;
     if (dob) updatePayload.dob = dob;
     if (whatsapp) updatePayload.whatsapp = whatsapp;
