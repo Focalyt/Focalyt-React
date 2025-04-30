@@ -414,7 +414,7 @@ const CourseDetails = () => {
 
                     <div className="row py-4">
                       <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-4 mb-4">
-                        <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
+                        {/* <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
                           <div className="carousel-indicators">
                             {course.photos && course.photos.length > 0 ? (
                               course.photos.map((photo, i) => (
@@ -480,6 +480,60 @@ const CourseDetails = () => {
                               </button>
                             </>
                           )}
+                        </div> */}
+                         <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
+                          {course.photos && course.photos.length > 0 && (
+                            <>
+                              <div className="carousel-indicators">
+                                {course.photos.map((photo, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    data-bs-target="#carouselExampleIndicators"
+                                    data-bs-slide-to={i}
+                                    className={i === 0 ? "active" : ""}
+                                    aria-label={`Slide ${i + 1}`}
+                                  ></button>
+                                ))}
+                              </div>
+
+                              <div className="carousel-inner">
+                                {course.photos.map((photo, i) => (
+                                  <div key={i} className={`carousel-item ${i === 0 ? 'active' : ''}`}>
+                                    <img
+                                      className="d-block w-100"
+                                      src={`${bucketUrl}/${photo}`}
+                                      alt={`Slide ${i + 1}`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                          {!course.photos?.length && (
+                            <div className="carousel-inner">
+                              <div className="carousel-item active">
+                                <img
+                                  src="/public_assets/images/newjoblistingbanner2.jpg"
+                                  className="d-block w-100 rounded shadow"
+                                  alt="Default course banner"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {course.photos?.length > 1 && (
+                            <>
+                              <button className="carousel-control-prev" type="button" data-bs-target="#carouselExampleIndicators" data-bs-slide="prev">
+                                <span className="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span className="visually-hidden">Previous</span>
+                              </button>
+                              <button className="carousel-control-next" type="button" data-bs-target="#carouselExampleIndicators" data-bs-slide="next">
+                                <span className="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span className="visually-hidden">Next</span>
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -523,7 +577,7 @@ const CourseDetails = () => {
                                 className="video_thum img-fluid"
                                 alt="Video thumbnail"
                               />
-                              <img src="/public_assets/images/newjoblisting/play.svg" alt="Play button" className="group1" />
+                              {/* <img src="/public_assets/images/newjoblisting/play.svg" alt="Play button" className="group1" /> */}
                             </a>
                           )}
                         </div>
@@ -1364,6 +1418,16 @@ const CourseDetails = () => {
     `
     .contact-info {
     display: inline-block}
+    
+    .carousel-indicators [data-bs-target]{
+        width:5px;
+        height:5px;
+        border-radius:50%;  
+    }
+
+    .carousel-indicators{
+           transform: translate(10px, 10px);
+    }
     `
   }
 </style>

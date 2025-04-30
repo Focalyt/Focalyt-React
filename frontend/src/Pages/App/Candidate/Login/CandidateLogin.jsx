@@ -47,6 +47,10 @@ const CandidateLogin = () => {
     const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
+    const [permanentAddress, setPermanentAddress] = useState('');
+    const [sameAddress, setSameAddress] = useState(false);
+    const [highestQualificationdata, sethighestQualificationdata] = useState([]);
+    const [highestQualification, setHighestQualification] = useState('');
     const inputRef = useRef(null);
     const otpRef = useRef(null);
     const generateOTPRef = useRef(null);
@@ -123,9 +127,7 @@ const CandidateLogin = () => {
 
         waitForGoogle();
     }, [showExtraFields]); // ✅ only run when showExtraFields is true
-
-
-
+   
 
 
     const validateMobile = () => {
@@ -157,6 +159,7 @@ const CandidateLogin = () => {
                 setShowExtraFields(true);
                 setShowOtpField(false);
                 setShowLoginBtn(true);
+                await fetchHighestQualifications();
             } else {
                 setIsNewUser(false);
                 setShowOtpField(true);
@@ -168,7 +171,10 @@ const CandidateLogin = () => {
             setErrorMessage('Error sending OTP');
         }
     };
-
+    useEffect(() => {
+        console.log("Qualification list updated:", highestQualificationdata);
+      }, [highestQualificationdata]);
+      
     const handleResendOTP = async () => {
         if (isResendDisabled || !validateMobile()) return;
         try {
@@ -208,7 +214,19 @@ const CandidateLogin = () => {
             e.preventDefault();
         }
     };
-
+    const fetchHighestQualifications = async () => {
+        try {
+          const res = await axios.get(`${backendUrl}/panel/helper/qualification`);
+          if (res.data?.data?.length > 0) {
+            sethighestQualificationdata(res.data.data);  // ✅ adjust this if response is in res.data only
+          } else {
+            console.warn("No qualification data received.");
+          }
+        } catch (err) {
+          console.error("Error fetching qualifications:", err);
+        }
+      };
+      
     const handleVerifyLogin = async () => {
         setErrorMessage('');
         if (isNewUser) {
@@ -220,6 +238,7 @@ const CandidateLogin = () => {
                 name: fullName,
                 mobile: mobileNumber,
                 sex: gender,
+                highestQualification,
                 personalInfo: {
                     currentAddress: {
                         type: "Point", // ✅ Always mention type also
@@ -229,10 +248,14 @@ const CandidateLogin = () => {
                         fullAddress: address,
                         latitude: String(latitude),
                         longitude: String(longitude)
+                    },
+                    permanentAddress: {
+                        fullAddress: permanentAddress,
                     }
+
                 }
             };
-            
+
             if (refCode) {
                 body.refCode = refCode;
             }
@@ -393,7 +416,7 @@ const CandidateLogin = () => {
                                                 }
                                             }}
                                             ref={inputRef}
-                                            disabled={numberDisable} 
+                                            disabled={numberDisable}
                                         />
 
 
@@ -464,11 +487,40 @@ const CandidateLogin = () => {
                                                 type="text"
                                                 className="form-control"
                                                 id="address-location"
-                                                placeholder="City/ शहर"
+                                                placeholder="Current address/ वर्तमान पता"
                                                 value={address}
-                                                onChange={(e) => setAddress(e.target.value)}
+                                                onChange={(e) => {
+                                                    setAddress(e.target.value)
+                                                    if (sameAddress) setPermanentAddress(e.target.value);
+                                                }}
 
                                             />
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                id="permanent-location"
+                                                placeholder="Permanent address/ स्थायी पता"
+                                                value={permanentAddress}
+                                                onChange={(e) => setPermanentAddress(e.target.value)}
+                                                disabled={sameAddress}
+
+                                            />
+                                            <label>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={sameAddress}
+                                                    onChange={(e) => {
+                                                        setSameAddress(e.target.checked);
+                                                        if (e.target.checked) {
+                                                            setPermanentAddress(address);
+                                                        }
+
+                                                    }}
+
+
+                                                />
+                                                Same as Current Address
+                                            </label>
                                             <input
                                                 type="hidden"
                                                 name="state"
@@ -490,6 +542,21 @@ const CandidateLogin = () => {
                                             <input type="hidden" className="form-control" value={longitude} placeholder="Longitude" readOnly />
 
                                         </div>
+
+                                        <div className="mb-3">
+                                            <select onChange={(e) => setHighestQualification(e.target.value)} className="form-control" value={highestQualification} >
+                                                <option value="">Highest Qualification / उच्चतम योग्यता</option>
+                                                {highestQualificationdata.map((q) => (
+                                                    <option key={q.qualification._id} value={q.qualification._id}>
+                                                        {q.qualification.name}
+                                                    </option>
+                                                ))}
+
+                                            </select>
+
+                                        </div>
+
+
                                         <div className="mb-3">
                                             <input
                                                 type="number"
@@ -498,8 +565,8 @@ const CandidateLogin = () => {
                                                 value={otp}
                                                 onChange={(e) => setOtp(e.target.value)}
                                                 ref={otpRef}
-                                                onKeyDown={(e) =>{
-                                                    if(e.key === 'enter'){
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'enter') {
                                                         handleVerifyLogin()
                                                     }
                                                 }}

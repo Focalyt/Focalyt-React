@@ -483,7 +483,7 @@ router
         return res.send({ status: "failure", error: "Something went wrong!" });
       }
       let formData = value;
-      const { name, mobile, sex, personalInfo } = formData;
+      const { name, mobile, sex, personalInfo ,highestQualification } = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
         let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
@@ -536,7 +536,8 @@ router
         verified: true,
         availableCredit: coins?.candidateCoins,
         creditLeft: coins?.candidateCoins,
-        personalInfo
+        personalInfo,
+        highestQualification 
       };
 
       console.log("Candidate Data", candidateBody)

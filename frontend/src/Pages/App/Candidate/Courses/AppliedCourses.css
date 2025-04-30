@@ -90,3 +90,13 @@
   /* text-overflow: clip; */
   padding: 2px !important;
 }
+
+@media(max-width:768px){
+  .job-overview > ul{
+display: flex;
+flex-direction: column;
+  }
+  .job-single-sec .job-overview ul li{
+    width: 100%!important;
+  }
+}
