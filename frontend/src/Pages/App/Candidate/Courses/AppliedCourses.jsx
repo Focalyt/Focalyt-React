@@ -72,7 +72,7 @@ const AppliedCourses = () => {
       </section>
 
       <section className="searchjobspage">
-        <div className="forlrgscreen pt-xl-2 pt-lg-0 pt-md-0 pt-sm-5 pt-0">
+        <div className=" pt-xl-2 pt-lg-0 pt-md-0 pt-sm-5 pt-0">
           {courses && courses.length > 0 ? (
             courses.map((appliedCourse, index) => {
               const course = appliedCourse._course;
