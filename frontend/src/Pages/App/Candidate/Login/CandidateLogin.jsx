@@ -48,6 +48,12 @@ const CandidateLogin = () => {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
     const [permanentAddress, setPermanentAddress] = useState('');
+    const [permanentLat, setPermanentLat] = useState('');
+const [permanentLng, setPermanentLng] = useState('');
+const [permanentCity, setPermanentCity] = useState('');
+const [permanentState, setPermanentState] = useState('');
+const [permanentPincode, setPermanentPincode] = useState('');
+
     const [sameAddress, setSameAddress] = useState(false);
     const [highestQualificationdata, sethighestQualificationdata] = useState([]);
     const [highestQualification, setHighestQualification] = useState('');
@@ -70,64 +76,86 @@ const CandidateLogin = () => {
 
     useEffect(() => {
         if (!showExtraFields) return;
-
+    
         const waitForGoogle = () => {
             if (window.google && window.google.maps && window.google.maps.places) {
                 const input = document.getElementById('address-location');
-                if (!input) {
-                    console.warn('Input not found yet');
-                    return;
-                }
-
-                const autocomplete = new window.google.maps.places.Autocomplete(input, {
-                    types: ['geocode'],
-                    componentRestrictions: { country: 'in' },
-                });
-
-                autocomplete.addListener('place_changed', () => {
-                    const place = autocomplete.getPlace();
-
-                    if (!place || !place.geometry || !place.geometry.location) {
-                        console.warn('Invalid place data.');
-                        return;
-                    }
-
-                    const lat = place.geometry.location.lat();
-                    const lng = place.geometry.location.lng();
-
-                    let fullAddress = '';
-                    if (place.formatted_address) fullAddress = place.formatted_address;
-                    else if (place.name) fullAddress = place.name;
-                    else if (input.value) fullAddress = input.value;
-
-                    let city = '', state = '', pincode = '';
-
-                    if (Array.isArray(place.address_components)) {
-                        place.address_components.forEach((component) => {
+                if (input) {
+                    const autocomplete = new window.google.maps.places.Autocomplete(input, {
+                        types: ['geocode'],
+                        componentRestrictions: { country: 'in' },
+                    });
+    
+                    autocomplete.addListener('place_changed', () => {
+                        const place = autocomplete.getPlace();
+                        if (!place || !place.geometry || !place.geometry.location) return;
+    
+                        const lat = place.geometry.location.lat();
+                        const lng = place.geometry.location.lng();
+                        let fullAddress = place.formatted_address || place.name || input.value;
+    
+                        let city = '', state = '', pincode = '';
+                        place.address_components?.forEach((component) => {
                             const types = component.types.join(',');
                             if (types.includes("postal_code")) pincode = component.long_name;
                             if (types.includes("locality")) city = component.long_name;
                             if (types.includes("administrative_area_level_1")) state = component.long_name;
                             if (!city && types.includes("sublocality_level_1")) city = component.long_name;
                         });
-                    }
-
-                    setAddress(fullAddress);
-                    setCity(city);
-                    setState(state);
-                    setPC(pincode);
-                    setLatitude(lat);
-                    setLongitude(lng);
-                    setLocation({ place: place.name || '', lat, lng });
-                });
+    
+                        setAddress(fullAddress);
+                        setCity(city);
+                        setState(state);
+                        setPC(pincode);
+                        setLatitude(lat);
+                        setLongitude(lng);
+                        setLocation({ place: place.name || '', lat, lng });
+    
+                        if (sameAddress) setPermanentAddress(fullAddress);
+                    });
+                }
+    
+                const permanentInput = document.getElementById('permanent-location');
+                if (permanentInput && !sameAddress) {
+                    const autocompletePermanent = new window.google.maps.places.Autocomplete(permanentInput, {
+                        types: ['geocode'],
+                        componentRestrictions: { country: 'in' },
+                    });
+                
+                    autocompletePermanent.addListener('place_changed', () => {
+                        const place = autocompletePermanent.getPlace();
+                        if (!place || !place.geometry || !place.geometry.location) return;
+                
+                        const lat = place.geometry.location.lat();
+                        const lng = place.geometry.location.lng();
+                        let fullAddress = place.formatted_address || place.name || permanentInput.value;
+                
+                        let city = '', state = '', pincode = '';
+                        place.address_components?.forEach((component) => {
+                            const types = component.types.join(',');
+                            if (types.includes("postal_code")) pincode = component.long_name;
+                            if (types.includes("locality")) city = component.long_name;
+                            if (types.includes("administrative_area_level_1")) state = component.long_name;
+                            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+                        });
+                
+                        setPermanentAddress(fullAddress);
+                        setPermanentLat(lat);
+                        setPermanentLng(lng);
+                        setPermanentCity(city);
+                        setPermanentState(state);
+                        setPermanentPincode(pincode);
+                    });
+                }
+                
             } else {
                 setTimeout(waitForGoogle, 100);
             }
         };
-
+    
         waitForGoogle();
-    }, [showExtraFields]); // ✅ only run when showExtraFields is true
-   
+    }, [showExtraFields, sameAddress]);
+    
 
 
     const validateMobile = () => {
@@ -159,7 +187,17 @@ const CandidateLogin = () => {
                 setShowExtraFields(true);
                 setShowOtpField(false);
                 setShowLoginBtn(true);
-                await fetchHighestQualifications();
+
+                try {
+                    const qualificationRes = await axios.get(`${backendUrl}/candidate/api/highestQualifications`);
+                    if (qualificationRes.data.status) {
+                        sethighestQualificationdata(qualificationRes.data.data);
+                    }
+                    console.log("higherQualificaitons :-", qualificationRes)
+                } catch (err) {
+                    console.error("Error fetching qualifications:", err);
+                }
+
             } else {
                 setIsNewUser(false);
                 setShowOtpField(true);
@@ -171,10 +209,7 @@ const CandidateLogin = () => {
             setErrorMessage('Error sending OTP');
         }
     };
-    useEffect(() => {
-        console.log("Qualification list updated:", highestQualificationdata);
-      }, [highestQualificationdata]);
-      
+
     const handleResendOTP = async () => {
         if (isResendDisabled || !validateMobile()) return;
         try {
@@ -214,19 +249,8 @@ const CandidateLogin = () => {
             e.preventDefault();
         }
     };
-    const fetchHighestQualifications = async () => {
-        try {
-          const res = await axios.get(`${backendUrl}/panel/helper/qualification`);
-          if (res.data?.data?.length > 0) {
-            sethighestQualificationdata(res.data.data);  // ✅ adjust this if response is in res.data only
-          } else {
-            console.warn("No qualification data received.");
-          }
-        } catch (err) {
-          console.error("Error fetching qualifications:", err);
-        }
-      };
-      
+
+
     const handleVerifyLogin = async () => {
         setErrorMessage('');
         if (isNewUser) {
@@ -250,7 +274,13 @@ const CandidateLogin = () => {
                         longitude: String(longitude)
                     },
                     permanentAddress: {
+                        type: "Point",
+                        coordinates: [Number(permanentLng), Number(permanentLat)],
                         fullAddress: permanentAddress,
+                        latitude: String(permanentLat),
+                        longitude: String(permanentLng),
+                        city: permanentCity,
+                        state: permanentState
                     }
 
                 }
@@ -264,7 +294,9 @@ const CandidateLogin = () => {
                 const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
                 if (otpVerifyRes.data.status) {
                     const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
-
+                    console.log("OTP Verified, sending data to register API:", body);
+                    console.log("Register API response:", registerRes.data);
+                    
                     if (registerRes.data.status === "success") {
                         const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                         // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
@@ -546,11 +578,12 @@ const CandidateLogin = () => {
                                         <div className="mb-3">
                                             <select onChange={(e) => setHighestQualification(e.target.value)} className="form-control" value={highestQualification} >
                                                 <option value="">Highest Qualification / उच्चतम योग्यता</option>
-                                                {highestQualificationdata.map((q) => (
-                                                    <option key={q.qualification._id} value={q.qualification._id}>
-                                                        {q.qualification.name}
-                                                    </option>
-                                                ))}
+                                                {Array.isArray(highestQualificationdata) &&
+                                                    highestQualificationdata.map((q) => (
+                                                        <option key={q._id} value={q._id}>
+                                                            {q.name}
+                                                        </option>
+                                                    ))}
 
                                             </select>
 

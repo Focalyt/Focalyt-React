@@ -477,10 +477,11 @@ router
   })
   .post(async (req, res) => {
     try {
+      console.log("Received data from frontend:", req.body); 
       let { value, error } = await CandidateValidators.register(req.body)
       if (error) {
         console.log('====== register error ', error, value)
-        return res.send({ status: "failure", error: "Something went wrong!" });
+        return res.send({ status: "failure", error: value });
       }
       let formData = value;
       const { name, mobile, sex, personalInfo ,highestQualification } = formData;
@@ -1499,6 +1500,23 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
   } catch (err) {
     console.error("API Error:", err);
     return res.status(500).json({ status: false, message: "Internal server error" });
+  }
+});
+router.get("/api/highestQualifications", async (req, res) => {
+  try {
+    const qualifications = await Qualification.find({ status: true }).select("_id name").sort({ name: 1 });
+
+    return res.json({
+      status: true,
+      message: "Highest qualifications fetched successfully.",
+      data: qualifications
+    });
+  } catch (error) {
+    console.error("Error fetching highest qualifications:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal server error",
+    });
   }
 });
 
