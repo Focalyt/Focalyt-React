@@ -13,18 +13,45 @@ const CandidateProfile = () => {
     from: null,
     to: null,
     jobDescription: '',
-    currentlyWorking:false
+    currentlyWorking: false
   }]);
 
-  const [educations, setEducations] = useState([{
-    education: '',
-    course: '',
-    specialization: '',
-    university: '',
-    passingYear: '',
-    schoolName: '',
-    collegeName: ''
-  }]);
+  const [educations, setEducations] = useState([
+    {
+      education: '',          // ObjectId of Qualification (e.g., 10th, UG)
+      universityName: '',
+      boardName: '',
+      collegeName: '',
+      schoolName: '',
+      course: '',             // ObjectId of QualificationCourse
+      specialization: '',
+      passingYear: '',
+      marks: '',
+
+      universityLocation: {
+        type: 'Point',
+        coordinates: [0, 0],
+        city: '',
+        state: '',
+        fullAddress: ''
+      },
+      collegeLocation: {
+        type: 'Point',
+        coordinates: [0, 0],
+        city: '',
+        state: '',
+        fullAddress: ''
+      },
+      schoolLocation: {
+        type: 'Point',
+        coordinates: [0, 0],
+        city: '',
+        state: '',
+        fullAddress: ''
+      }
+    }
+  ]);
+
   const [skills, setSkills] = useState([{
     skillName: '',
     skillPercent: 0
@@ -244,6 +271,7 @@ const CandidateProfile = () => {
     }
   };
 
+
   // जब भी शिक्षा चुनी जाए, तब कोर्स फेच करें
   const handleEducationChange = async (e, index) => {
     const educationId = e.target.value;
@@ -281,6 +309,65 @@ const CandidateProfile = () => {
       }));
     }
   };
+
+  useEffect(() => {
+    if (educations.length > 0 && educationList.length > 0) {
+      educations.forEach(async (edu, index) => {
+        const educationName = educationList.find(q => q._id === edu.education)?.name;
+
+        // ✅ If Graduation or other higher education, fetch course list
+        if (educationName && !['Upto 5th', '6th - 9th Class', '10th', '12th', 'ITI'].includes(educationName)) {
+          const courseRes = await fetchCoursesByEducation(edu.education);
+          if (courseRes.length > 0) {
+            setCoursesList(prev => ({
+              ...prev,
+              [index]: courseRes
+            }));
+          }
+
+          // ✅ Then fetch specialization
+          if (edu.course) {
+            const specRes = await fetchSpecializationsByCourse(edu.course);
+            if (specRes.length > 0) {
+              setSpecializationsList(prev => ({
+                ...prev,
+                [index]: specRes
+              }));
+            }
+          }
+        }
+
+        // ✅ If ITI, handle that case separately
+        if (educationName === 'ITI') {
+          const courseRes = await fetchCoursesByEducation(edu.education);
+          if (courseRes.length > 0) {
+            const itiCourseId = courseRes[0]._id;
+
+            // Update selected course ID if not already present
+            if (!edu.course) {
+              const updated = [...educations];
+              updated[index].course = itiCourseId;
+              setEducations(updated);
+            }
+
+            setCoursesList(prev => ({
+              ...prev,
+              [index]: courseRes
+            }));
+
+            const specRes = await fetchSpecializationsByCourse(itiCourseId);
+            if (specRes.length > 0) {
+              setSpecializationsList(prev => ({
+                ...prev,
+                [index]: specRes
+              }));
+            }
+          }
+        }
+      });
+    }
+  }, [educations, educationList]);
+
 
 
   // For creating editable content
@@ -375,35 +462,57 @@ const CandidateProfile = () => {
 
       if (!inputElement || !window.google || !window.google.maps || !window.google.maps.places) {
         console.log(`Input element ${inputId} not found or Google Maps not loaded`);
-        return; // Not ready yet
+        return;
       }
 
       try {
-        // Create the autocomplete instance
         const autocomplete = new window.google.maps.places.Autocomplete(inputElement, {
-          types: ['establishment'], // This ensures we only get establishments
+          types: ['establishment'],
           componentRestrictions: { country: 'in' }
         });
 
-        // Add styling to ensure visibility
         inputElement.style.backgroundColor = "#ffffff";
         inputElement.style.color = "#000000";
 
-        // When a place is selected
         autocomplete.addListener('place_changed', () => {
           const place = autocomplete.getPlace();
+          if (!place || !place.geometry || !place.geometry.location) return;
 
-          if (!place) {
-            return;
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const fullAddress = place.formatted_address || place.name || inputElement.value;
+
+          let city = '', state = '', pincode = '';
+
+          if (Array.isArray(place.address_components)) {
+            place.address_components.forEach((component) => {
+              const types = component.types.join(',');
+              if (types.includes("postal_code")) pincode = component.long_name;
+              if (types.includes("locality")) city = component.long_name;
+              if (types.includes("administrative_area_level_1")) state = component.long_name;
+              if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+            });
           }
 
-          // Get the name of the place
-          const placeName = place.name || '';
-
-          // Update the state using the provided updater function
+          // Set name and location
           stateUpdater(prev => {
             const updated = [...prev];
-            updated[index][propertyName] = placeName;
+            updated[index][propertyName] = place.name || '';
+
+            const locationKey = propertyName === 'schoolName' ? 'schoolLocation' :
+              propertyName === 'collegeName' ? 'collegeLocation' :
+                propertyName === 'universityName' ? 'universityLocation' : null;
+
+            if (locationKey) {
+              updated[index][locationKey] = {
+                type: 'Point',
+                coordinates: [lng, lat],
+                city,
+                state,
+                fullAddress
+              };
+            }
+
             return updated;
           });
         });
@@ -414,6 +523,7 @@ const CandidateProfile = () => {
       }
     }, 300);
   };
+
 
 
 
@@ -435,7 +545,7 @@ const CandidateProfile = () => {
         }
         else if (educationName && educationName !== 'Upto 5th' && educationName !== '6th - 9th Class') {
           // University autocomplete
-          initializeAutocomplete(`university-name-${index}`, setEducations, index, 'university');
+          initializeAutocomplete(`university-name-${index}`, setEducations, index, 'universityName');
           // College name autocomplete
           initializeAutocomplete(`college-name-${index}`, setEducations, index, 'collegeName');
         }
@@ -506,44 +616,44 @@ const CandidateProfile = () => {
 
 
   // certificat organization
-  
+
 
   const initializeCertificationOrgAutocomplete = (index) => {
     console.log("Initializing address autocomplete...");
     const input = document.getElementById(`issuing-organization-${index}`);
-  
+
     if (!input) {
       console.warn('Input element with ID "issuing-organization-{index}" not found. Retrying...');
       setTimeout(() => initializeCertificationOrgAutocomplete(index), 100);
       return;
     }
-  
+
     try {
       console.log("Setting up autocomplete for input:", input);
-  
+
       const autocomplete = new window.google.maps.places.Autocomplete(input, {
         types: ['establishment'],
         componentRestrictions: { country: 'in' }
       });
-  
+
       input.style.backgroundColor = "#ffffff";
       input.style.color = "#000000";
-  
+
       autocomplete.addListener('place_changed', () => {
         console.log("Place changed event fired");
         const place = autocomplete.getPlace();
-  
+
         if (!place || !place.geometry || !place.geometry.location) {
           console.warn('Invalid place data selected.');
           return;
         }
-  
+
         const lat = place.geometry.location.lat();
         const lng = place.geometry.location.lng();
         const fullAddress = place.formatted_address || place.name || input.value;
-  
+
         let city = '', state = '', pincode = '';
-  
+
         if (Array.isArray(place.address_components)) {
           place.address_components.forEach((component) => {
             const types = component.types.join(',');
@@ -553,9 +663,9 @@ const CandidateProfile = () => {
             if (!city && types.includes("sublocality_level_1")) city = component.long_name;
           });
         }
-  
+
         console.log("Extracted data:", { fullAddress, city, state, pincode, lat, lng });
-  
+
         // 👇 Set directly into certificates[index]
         setCertificates(prev => {
           const updated = [...prev];
@@ -572,17 +682,17 @@ const CandidateProfile = () => {
           };
           return updated;
         });
-  
+
         // 👇 Update input value too (optional visual update)
         input.value = place.name || '';
       });
-  
+
       console.log("Google Maps Places Autocomplete initialized successfully");
     } catch (error) {
       console.error("Error initializing autocomplete:", error);
     }
   };
-  
+
 
   // Address location autocomplete
   const initializeAddressAutocomplete = () => {
@@ -744,7 +854,7 @@ const CandidateProfile = () => {
 
     // Check sections
     if (experiences.some(exp => exp.jobTitle || exp.companyName)) strength += 15;
-    if (educations.some(edu => edu.degree || edu.university)) strength += 15;
+    if (educations.some(edu => edu.degree || edu.universityName)) strength += 15;
     if (skills.some(skill => skill.skillName)) strength += 15;
     if (languages.some(lang => lang.lname)) strength += 10;
     if (projects.some(proj => proj.projectName)) strength += 10;
@@ -941,7 +1051,7 @@ const CandidateProfile = () => {
           boardName: edu.boardName,
           schoolName: edu.schoolName,
           collegeName: edu.collegeName,
-          universityName: edu.university,
+          universityName: edu.universityName,
           passingYear: edu.passingYear,
           marks: edu.marks,
           course: edu.course,
@@ -1524,9 +1634,9 @@ const CandidateProfile = () => {
                           const updatedExperiences = [...experiences];
                           updatedExperiences[index].from = new Date(e.target.value); // <-- String नहीं, Date बनाकर दो
                           setExperiences(updatedExperiences);
-                          console.log('experiences',experiences)
+                          console.log('experiences', experiences)
                         }}
-                        
+
                         className="date-input"
                       />
 
@@ -1541,7 +1651,7 @@ const CandidateProfile = () => {
                             updatedExperiences[index].to = new Date(e.target.value); // <-- String नहीं, Date बनाकर दो
                             setExperiences(updatedExperiences);
                           }}
-                          
+
                           className="date-input"
                           disabled={experience.currentlyWorking}
                         />
@@ -1825,7 +1935,7 @@ const CandidateProfile = () => {
                           <input
                             type="text"
                             autoComplete="off"
-                            
+
                             className="form-control"
                             value={edu.passingYear || ''}
                             onChange={(e) => {
@@ -1987,13 +2097,15 @@ const CandidateProfile = () => {
                             type="text"
                             className="form-control"
                             placeholder="Search for university or board..."
-                            value={edu.university || ''}
+                            value={edu.universityName || ''}
                             onChange={(e) => {
                               const updated = [...educations];
-                              updated[index].university = e.target.value;
+                              updated[index].universityName = e.target.value;
                               setEducations(updated);
                             }}
+                            onFocus={() => initializeAutocomplete(`university-name-${index}`, setEducations, index, 'universityName')}
                           />
+
 
                         </div>
 
@@ -2643,7 +2755,7 @@ const CandidateProfile = () => {
                         {profileData?.personalInfo?.name || user?.name || 'Your Name'}
                       </h1>
                       <p className="resume-title">
-                        {profileData?.personalInfo?.professionalTitle  || 'Professional Title'}
+                        {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
                       </p>
                       <p className="resume-title">
                         {profileData?.sex || 'Sex'}
@@ -2662,12 +2774,22 @@ const CandidateProfile = () => {
                             <span>{profileData.email}</span>
                           </div>
                         )}
+                        {profileData?.dob && (
+                          <div className="resume-contact-item">
+                            <i className="bi bi-calendar-heart-fill"></i> 
+
+                            {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric'
+                            }) : ''}
+                          </div>
+                        )}
                         {profileData?.personalInfo?.currentAddress?.fullAddress && (
 
                           <div className="resume-contact-item">
                             <i className="bi bi-geo-alt-fill"></i>
-                            <span>{profileData.personalInfo.currentAddress.fullAddress}</span>
-                            <span>{profileData.personalInfo.currentAddress.fullAddress}</span>
+                            <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
                           </div>
                         )}
 
@@ -2727,9 +2849,19 @@ const CandidateProfile = () => {
                                   )}
                                   {(exp.from || exp.to || exp.currentlyWorking) && (
                                     <p className="resume-item-period">
-                                      {exp.from || 'Start Date'} - {exp.currentlyWorking ? 'Present' : (exp.to || 'End Date')}
+                                      {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                        year: 'numeric',
+                                        month: 'short',
+                                      }) : 'Start Date'}
+                                      {" - "}
+                                      {exp.currentlyWorking ? 'Present' :
+                                        exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                          year: 'numeric',
+                                          month: 'short',
+                                        }) : 'End Date'}
                                     </p>
                                   )}
+
                                 </div>
                                 {exp.jobDescription && (
                                   <div className="resume-item-content">
@@ -2744,13 +2876,13 @@ const CandidateProfile = () => {
                     )}
                     {/* Education Section */}
                     {educations.length > 0 && educations.some(edu =>
-                      edu.education || edu.course || edu.schoolName || edu.collegeName || edu.university || edu.passingYear
+                      edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
                     ) && (
                         <div className="resume-section">
                           <h2 className="resume-section-title">Education</h2>
 
                           {educations.map((edu, index) => (
-                            (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.university || edu.passingYear) && (
+                            (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
                               <div className="resume-education-item" key={`resume-edu-${index}`}>
                                 <div className="resume-item-header">
                                   {edu.education && (
@@ -2760,12 +2892,18 @@ const CandidateProfile = () => {
                                   )}
 
                                   {typeof edu.course === 'string' && edu.course && (
-                                    <h3 className="resume-item-title">{edu.course}</h3>
+                                    <h3 className="resume-item-title">
+                                      {
+                                        coursesList[index]?.find(course => course._id === edu.course)?.name
+                                        || edu.course  // fallback in case name not found
+                                      }
+                                    </h3>
                                   )}
-                                  {edu.university && (
-                                    <p className="resume-item-subtitle">{edu.university}</p>
+
+                                  {edu.universityName && (
+                                    <p className="resume-item-subtitle">{edu.universityName}</p>
                                   )}
-                                  {(edu.schoolName && !edu.university) && (
+                                  {(edu.schoolName && !edu.universityName) && (
                                     <p className="resume-item-subtitle">{edu.schoolName}</p>
                                   )}
                                   {edu.collegeName && (
