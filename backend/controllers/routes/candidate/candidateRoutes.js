@@ -4236,8 +4236,11 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
       personalInfo,
       experiences,
       qualifications,
-      declaration
+      declaration,
+      isExperienced
     } = req.body;
+
+    console.log('experiences from frontend',experiences)
 
     // Build dynamic update object
     const updatePayload = {
@@ -4248,6 +4251,7 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
     if (name) updatePayload.name = name;
     if (email) updatePayload.email = email;
     if (mobile) updatePayload.mobile = mobile;
+    if (isExperienced) updatePayload.isExperienced = isExperienced;
     if (sex) updatePayload.sex = sex;
     if (dob) updatePayload.dob = dob;
     if (whatsapp) updatePayload.whatsapp = whatsapp;
@@ -4283,10 +4287,26 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
 
     }
 
+   
     // Work experience
-    if (Array.isArray(experiences) && experiences.length > 0) {
-      updatePayload.experiences = experiences;
+if (Array.isArray(experiences) && experiences.length > 0) {
+  updatePayload.experiences = experiences.map(exp => ({
+    jobTitle: exp.jobTitle || '',
+    companyName: exp.companyName || '',
+    jobDescription: exp.jobDescription || '',
+    currentlyWorking: exp.currentlyWorking || false,
+    from: exp.from ? new Date(exp.from) : null,
+    to: exp.to ? new Date(exp.to) : null,
+    location: exp.location || {
+      type: 'Point',
+      coordinates: [0, 0],
+      city: '',
+      state: '',
+      fullAddress: ''
     }
+  }));
+}
+
 
     // Qualifications (sanitize and only if non-empty)
     if (Array.isArray(qualifications) && qualifications.length > 0) {
@@ -4400,7 +4420,6 @@ router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
       return res.status(404).json({ status: false, message: "Candidate not found" });
     }
 
-    console.log('candidate', candidate)
 
     res.status(200).json({
       status: true,

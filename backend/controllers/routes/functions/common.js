@@ -802,14 +802,16 @@ module.exports.courseSpecializationsList = async (req, res) => {
 
 module.exports.educationBoardList = async (req, res) => {
   try {  
-
+console.log('api hitting')
     const search = req.query.search || '';
+    console.log('search',search)
     const boards = await EducationBoard.find({
       name: { $regex: search, $options: 'i' },
       status: true
     }).limit(10);
   
     res.send(boards);
+    console.log('res',boards)
 
   } catch (err) {
     return req.errFunc(err);
