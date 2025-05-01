@@ -9,23 +9,20 @@ import { Pagination, Autoplay } from 'swiper/modules';
 import 'swiper/css/pagination';
 import { useLocation } from 'react-router-dom';
 
-
-
 const CandidateLogin = () => {
     const urlLocation = useLocation();
-
     const queryParams = new URLSearchParams(urlLocation.search);
-
 
     const user = sessionStorage.getItem('user');
     const returnUrl = queryParams.get('returnUrl');
     const refCode = queryParams.get("refCode");
     console.log('returnUrl', returnUrl)
 
-
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
     const [fullName, setFullName] = useState('');
+    const [Email, setEmail] = useState('');
+    const [dob, setDob] = useState('');
     const [gender, setGender] = useState('');
     const [address, setAddress] = useState('');
     const [city, setCity] = useState('');
@@ -50,10 +47,10 @@ const CandidateLogin = () => {
 
     const [permanentAddress, setPermanentAddress] = useState('');
     const [permanentLat, setPermanentLat] = useState('');
-const [permanentLng, setPermanentLng] = useState('');
-const [permanentCity, setPermanentCity] = useState('');
-const [permanentState, setPermanentState] = useState('');
-const [permanentPincode, setPermanentPincode] = useState('');
+    const [permanentLng, setPermanentLng] = useState('');
+    const [permanentCity, setPermanentCity] = useState('');
+    const [permanentState, setPermanentState] = useState('');
+    const [permanentPincode, setPermanentPincode] = useState('');
 
     const [sameAddress, setSameAddress] = useState(false);
     const [highestQualificationdata, sethighestQualificationdata] = useState([]);
@@ -62,22 +59,20 @@ const [permanentPincode, setPermanentPincode] = useState('');
     const otpRef = useRef(null);
     const generateOTPRef = useRef(null);
 
-
-
-    if (user) {
-        if (returnUrl) {
-
-            window.location.href = returnUrl
+    // Redirect if user is already logged in
+    useEffect(() => {
+        if (user) {
+            if (returnUrl) {
+                window.location.href = returnUrl;
+            } else {
+                window.location.href = '/candidate/dashboard';
+            }
         }
-        else {
-            window.location.href = '/candidate/dashboard';
-        }
-    }
-
+    }, [user, returnUrl]);
 
     useEffect(() => {
         if (!showExtraFields) return;
-    
+
         const waitForGoogle = () => {
             if (window.google && window.google.maps && window.google.maps.places) {
                 const input = document.getElementById('address-location');
@@ -86,15 +81,15 @@ const [permanentPincode, setPermanentPincode] = useState('');
                         types: ['geocode'],
                         componentRestrictions: { country: 'in' },
                     });
-    
+
                     autocomplete.addListener('place_changed', () => {
                         const place = autocomplete.getPlace();
                         if (!place || !place.geometry || !place.geometry.location) return;
-    
+
                         const lat = place.geometry.location.lat();
                         const lng = place.geometry.location.lng();
                         let fullAddress = place.formatted_address || place.name || input.value;
-    
+
                         let city = '', state = '', pincode = '';
                         place.address_components?.forEach((component) => {
                             const types = component.types.join(',');
@@ -103,7 +98,7 @@ const [permanentPincode, setPermanentPincode] = useState('');
                             if (types.includes("administrative_area_level_1")) state = component.long_name;
                             if (!city && types.includes("sublocality_level_1")) city = component.long_name;
                         });
-    
+
                         setAddress(fullAddress);
                         setCity(city);
                         setState(state);
@@ -111,26 +106,33 @@ const [permanentPincode, setPermanentPincode] = useState('');
                         setLatitude(lat);
                         setLongitude(lng);
                         setLocation({ place: place.name || '', lat, lng });
-    
-                        if (sameAddress) setPermanentAddress(fullAddress);
+
+                        if (sameAddress) {
+                            setPermanentAddress(fullAddress);
+                            setPermanentCity(city);
+                            setPermanentState(state);
+                            setPermanentPincode(pincode);
+                            setPermanentLat(lat);
+                            setPermanentLng(lng);
+                        }
                     });
                 }
-    
+
                 const permanentInput = document.getElementById('permanent-location');
                 if (permanentInput && !sameAddress) {
                     const autocompletePermanent = new window.google.maps.places.Autocomplete(permanentInput, {
                         types: ['geocode'],
                         componentRestrictions: { country: 'in' },
                     });
-                
+
                     autocompletePermanent.addListener('place_changed', () => {
                         const place = autocompletePermanent.getPlace();
                         if (!place || !place.geometry || !place.geometry.location) return;
-                
+
                         const lat = place.geometry.location.lat();
                         const lng = place.geometry.location.lng();
                         let fullAddress = place.formatted_address || place.name || permanentInput.value;
-                
+
                         let city = '', state = '', pincode = '';
                         place.address_components?.forEach((component) => {
                             const types = component.types.join(',');
@@ -139,7 +141,7 @@ const [permanentPincode, setPermanentPincode] = useState('');
                             if (types.includes("administrative_area_level_1")) state = component.long_name;
                             if (!city && types.includes("sublocality_level_1")) city = component.long_name;
                         });
-                
+
                         setPermanentAddress(fullAddress);
                         setPermanentLat(lat);
                         setPermanentLng(lng);
@@ -148,23 +150,19 @@ const [permanentPincode, setPermanentPincode] = useState('');
                         setPermanentPincode(pincode);
                     });
                 }
-                
             } else {
                 setTimeout(waitForGoogle, 100);
             }
         };
-    
+
         waitForGoogle();
     }, [showExtraFields, sameAddress]);
-    
-
 
     const validateMobile = () => {
         const phoneRegex = /^(\+91[\-\s]?)?[0]?(91)?[6789]\d{9}$/;
         return phoneRegex.test(mobileNumber);
     };
-    console.log('address', address)
-
+    
     const handleGenerateOTP = async () => {
         if (!validateMobile()) {
             setErrorMessage('Please enter the correct mobile number');
@@ -175,14 +173,12 @@ const [permanentPincode, setPermanentPincode] = useState('');
         setnumberDisable(true);
 
         try {
-            // const response = await axios.post('/api/sendCandidateOtp', { mobile: mobileNumber });
             const res = await axios.post(`${backendUrl}/api/sendCandidateOtp`, { mobile: mobileNumber });
             console.log("OTP Send API Response:", res.data);
-            setShowOtpField(true);
-            setShowLoginBtn(true);
+            
             setErrorMessage('');
             setSuccessMessage('OTP Sent Successfully');
-            console.log("otp send successfully", res);
+            
             if (res.data.newUser) {
                 setIsNewUser(true);
                 setShowExtraFields(true);
@@ -192,13 +188,12 @@ const [permanentPincode, setPermanentPincode] = useState('');
                 try {
                     const qualificationRes = await axios.get(`${backendUrl}/candidate/api/highestQualifications`);
                     if (qualificationRes.data.status) {
-                        sethighestQualificationdata(qualificationRes.data.data);
+                        sethighestQualificationdata(qualificationRes.data.data || []);
                     }
-                    console.log("higherQualificaitons :-", qualificationRes)
+                    console.log("higherQualificaitons :-", qualificationRes);
                 } catch (err) {
                     console.error("Error fetching qualifications:", err);
                 }
-
             } else {
                 setIsNewUser(false);
                 setShowOtpField(true);
@@ -208,6 +203,7 @@ const [permanentPincode, setPermanentPincode] = useState('');
             }
         } catch (err) {
             setErrorMessage('Error sending OTP');
+            console.error("Error sending OTP:", err);
         }
     };
 
@@ -215,18 +211,17 @@ const [permanentPincode, setPermanentPincode] = useState('');
         if (isResendDisabled || !validateMobile()) return;
         try {
             const res = await axios.post(`${backendUrl}/api/resendOTP`, { mobile: mobileNumber });
-            // const res = await axios.get(`${backendUrl}/api/api/resendOTP`, { mobile: mobileNumber });
             if (res.data.status) {
                 setSuccessMessage('OTP resent successfully');
                 startResendTimer();
-                console.log("response from backend", res)
+                console.log("response from backend", res);
             } else {
-                setErrorMessage(res.data.message);
-                console.log("response from backend", res)
-
+                setErrorMessage(res.data.message || 'Failed to resend OTP');
+                console.log("response from backend", res);
             }
         } catch (error) {
             setErrorMessage('Error resending OTP');
+            console.error("Error resending OTP:", error);
         }
     };
 
@@ -235,7 +230,7 @@ const [permanentPincode, setPermanentPincode] = useState('');
         let time = 20000;
         const interval = setInterval(() => {
             time -= 1000;
-            const timeLeft = (time / 1000) % 60;
+            const timeLeft = Math.floor(time / 1000);
             setResendBtnText(`Resend in ${timeLeft} secs`);
             if (time <= 0) {
                 clearInterval(interval);
@@ -244,6 +239,7 @@ const [permanentPincode, setPermanentPincode] = useState('');
             }
         }, 1000);
     };
+    
     const handleMobileNumberKeyPress = (e) => {
         const charCode = e.which ? e.which : e.keyCode;
         if (charCode < 48 || charCode > 57) {
@@ -251,51 +247,73 @@ const [permanentPincode, setPermanentPincode] = useState('');
         }
     };
 
-
     const handleVerifyLogin = async () => {
         setErrorMessage('');
+        setSuccessMessage('');
+        
         if (isNewUser) {
-            if (!fullName || !gender || !city || !location.lat || !location.lng) {
-                setErrorMessage('Please fill all details');
+            if (!fullName || !gender || !address || !latitude || !longitude) {
+                setErrorMessage('Please fill all required details');
                 return;
             }
-            const body = {
-                name: fullName,
-                mobile: mobileNumber,
-                sex: gender,
-                highestQualification,
-                personalInfo: {
-                    currentAddress: {
-                        type: "Point", // ✅ Always mention type also
-                        coordinates: [Number(longitude), Number(latitude)], // ✅ longitude first
-                        city,
-                        state,
-                        fullAddress: address,
-                        latitude: String(latitude),
-                        longitude: String(longitude)
-                    },
-                    permanentAddress: {
-                        type: "Point",
-                        coordinates: [Number(permanentLng), Number(permanentLat)],
-                        fullAddress: permanentAddress,
-                        latitude: String(permanentLat),
-                        longitude: String(permanentLng),
-                        city: permanentCity,
-                        state: permanentState
-                    }
-
-                }
-            };
-
-            if (refCode) {
-                body.refCode = refCode;
-            }
+            
             try {
-                // const registerRes = await axios.post('/candidate/register', body);
-                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
+                // First verify OTP
+                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { 
+                    mobile: mobileNumber, 
+                    otp 
+                });
+                
                 if (otpVerifyRes.data.status) {
+                    // Prepare registration body
+                    // Create the body object with required fields first
+                    const body = {
+                        name: fullName,
+                        mobile: mobileNumber,
+                        sex: gender,
+                        personalInfo: {
+                            currentAddress: {
+                                type: "Point",
+                                coordinates: [parseFloat(longitude) || 0, parseFloat(latitude) || 0],
+                                city,
+                                state,
+                                fullAddress: address,
+                                latitude: String(latitude),
+                                longitude: String(longitude)
+                            },
+                            permanentAddress: {
+                                type: "Point",
+                                coordinates: [parseFloat(permanentLng) || 0, parseFloat(permanentLat) || 0],
+                                fullAddress: permanentAddress,
+                                latitude: String(permanentLat),
+                                longitude: String(permanentLng),
+                                city: permanentCity,
+                                state: permanentState
+                            }
+                        }
+                    };
+                    
+                    // Only add email if it's not empty
+                    if (Email && Email.trim() !== '') {
+                        body.email = Email.trim();
+                    }
+                    
+                    // Only add dob if it's not empty
+                    if (dob && dob.trim() !== '') {
+                        body.dob = dob.trim();
+                    }
+                    
+                    // Only add highestQualification if it's not empty
+                    if (highestQualification && highestQualification.trim() !== '') {
+                        body.highestQualification = highestQualification.trim();
+                    }
+                    
+                    if (refCode) {
+                        body.refCode = refCode;
+                    }
+                    
+                    // Register the new user
                     const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
-                    console.log("OTP Verified, sending data to register API:", body);
                     console.log("Register API response:", registerRes.data);
                     
                     if (registerRes.data.status === "success") {
@@ -314,17 +332,15 @@ const [permanentPincode, setPermanentPincode] = useState('');
                               
 
                             if (returnUrl) {
-
-                                window.location.href = returnUrl
-                            }
-                            else {
+                                window.location.href = returnUrl;
+                            } else {
                                 window.location.href = '/candidate/dashboard';
                             }
                         } else {
                             setErrorMessage('Login failed after registration');
                         }
                     } else {
-                        setErrorMessage(registerRes.data.error);
+                        setErrorMessage(registerRes.data.error || 'Registration failed');
                     }
                 }
             } catch (err) {
@@ -380,13 +396,14 @@ const [permanentPincode, setPermanentPincode] = useState('');
                     setErrorMessage('Incorrect OTP');
                 }
             } catch (err) {
-                setErrorMessage('Error verifying OTP');
+                console.error("Registration error:", err);
+                setErrorMessage('Something went wrong during registration');
             }
-        }
+        } 
+        
     };
 
     return (
-
         <div className="app-content blank-page content">
             <div className="content-wrapper mt-4">
                 <section className="row flexbox-container">
@@ -434,7 +451,6 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                 </Swiper>
                             </div>
 
-
                             <div className="card-body">
                                 <h5 className="text-left mb-3 spanAfter">
                                     Candidate Login / Signup
@@ -445,7 +461,6 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                 {/* Mobile Number Input */}
                                 <div className="row mb-3">
                                     <div className={`${showSendBtn ? 'col-9' : 'col-12'} userMobile`}>
-
                                         <input
                                             type="tel"
                                             className="form-control"
@@ -462,9 +477,6 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                             ref={inputRef}
                                             disabled={numberDisable}
                                         />
-
-
-
                                     </div>
                                     {showSendBtn && (
                                         <div className="col-3">
@@ -473,7 +485,7 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                                 onClick={handleGenerateOTP}
                                                 ref={generateOTPRef}
                                             >
-                                                <img src="/Assets/images/login_arrow.png" alt="Focalyt logo" class="candid_arrow" />
+                                                <img src="/Assets/images/login_arrow.png" alt="Focalyt logo" className="candid_arrow" />
                                                 SEND
                                             </button>
                                         </div>
@@ -499,13 +511,18 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                     </div>
                                 )}
 
-
-                                {/* Full Name Input */}
-
-                                {/* Gender Select */}
-
+                                {/* Additional fields for new users */}
                                 {showExtraFields && (
                                     <div className='userMobile'>
+                                        <div className="mb-3">
+                                            <input 
+                                                type="email" 
+                                                className='form-control' 
+                                                placeholder='Enter Email' 
+                                                value={Email} 
+                                                onChange={(e) => setEmail(e.target.value)} 
+                                            />
+                                        </div>
                                         <div className="mb-3">
                                             <input
                                                 type="text"
@@ -513,6 +530,14 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                                 placeholder="Full Name / पूरा नाम"
                                                 value={fullName}
                                                 onChange={(e) => setFullName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="mb-3">
+                                            <input
+                                                type="date"
+                                                className="form-control"
+                                                value={dob}
+                                                onChange={(e) => setDob(e.target.value)}
                                             />
                                         </div>
                                         <div className="mb-3">
@@ -534,11 +559,12 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                                 placeholder="Current address/ वर्तमान पता"
                                                 value={address}
                                                 onChange={(e) => {
-                                                    setAddress(e.target.value)
+                                                    setAddress(e.target.value);
                                                     if (sameAddress) setPermanentAddress(e.target.value);
                                                 }}
-
                                             />
+                                        </div>
+                                        <div className="mb-3">
                                             <input
                                                 type="text"
                                                 className="form-control"
@@ -547,48 +573,37 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                                 value={permanentAddress}
                                                 onChange={(e) => setPermanentAddress(e.target.value)}
                                                 disabled={sameAddress}
-
                                             />
-                                            <label>
+                                            <div className="form-check mt-2">
                                                 <input
                                                     type="checkbox"
+                                                    className="form-check-input"
+                                                    id="sameAddressCheck"
                                                     checked={sameAddress}
                                                     onChange={(e) => {
                                                         setSameAddress(e.target.checked);
                                                         if (e.target.checked) {
                                                             setPermanentAddress(address);
+                                                            setPermanentCity(city);
+                                                            setPermanentState(state);
+                                                            setPermanentPincode(pincode);
+                                                            setPermanentLat(latitude);
+                                                            setPermanentLng(longitude);
                                                         }
-
                                                     }}
-
-
                                                 />
-                                                Same as Current Address
-                                            </label>
-                                            <input
-                                                type="hidden"
-                                                name="state"
-                                                placeholder='state'
-                                                className="form-control"
-                                                id="state-location"
-                                                value={state}
-
-                                            />
-                                            <input
-                                                type="hidden"
-                                                name='City'
-                                                className="form-control"
-                                                id="city-location"
-                                                value={city}
-                                            />
-
-                                            <input type="hidden" className="form-control" value={latitude} placeholder="Latitude" readOnly />
-                                            <input type="hidden" className="form-control" value={longitude} placeholder="Longitude" readOnly />
-
+                                                <label className="form-check-label" htmlFor="sameAddressCheck">
+                                                    Same as Current Address
+                                                </label>
+                                            </div>
                                         </div>
 
                                         <div className="mb-3">
-                                            <select onChange={(e) => setHighestQualification(e.target.value)} className="form-control" value={highestQualification} >
+                                            <select 
+                                                onChange={(e) => setHighestQualification(e.target.value)} 
+                                                className="form-control" 
+                                                value={highestQualification}
+                                            >
                                                 <option value="">Highest Qualification / उच्चतम योग्यता</option>
                                                 {Array.isArray(highestQualificationdata) &&
                                                     highestQualificationdata.map((q) => (
@@ -596,11 +611,8 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                                             {q.name}
                                                         </option>
                                                     ))}
-
                                             </select>
-
                                         </div>
-
 
                                         <div className="mb-3">
                                             <input
@@ -609,10 +621,9 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                                 placeholder="Enter OTP / अपना ओटीपी दर्ज करें"
                                                 value={otp}
                                                 onChange={(e) => setOtp(e.target.value)}
-                                                ref={otpRef}
                                                 onKeyDown={(e) => {
-                                                    if (e.key === 'enter') {
-                                                        handleVerifyLogin()
+                                                    if (e.key === 'Enter') {
+                                                        handleVerifyLogin();
                                                     }
                                                 }}
                                             />
@@ -623,7 +634,10 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                 {showLoginBtn && (
                                     <div className="row mb-3">
                                         <div className="col-6">
-                                            <button className="btn btn-primary w-100" onClick={handleVerifyLogin}>
+                                            <button 
+                                                className="btn btn-primary w-100" 
+                                                onClick={handleVerifyLogin}
+                                            >
                                                 Login / लॉगइन
                                             </button>
                                         </div>
@@ -652,78 +666,49 @@ const [permanentPincode, setPermanentPincode] = useState('');
                                 <div className="slider py-0">
                                     <div className="slide-track-1">
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/cashback-login.png" className="img-fluid login-border" alt="cashback" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/cashback-login.png" className="img-fluid login-border" alt="cashback" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/arms.png" alt="Focalyt partner" draggable="false" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/arms.png" alt="Focalyt partner" draggable="false" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/utl_solar.png" alt="Focalyt partner" draggable="false" /></SwiperSlide>
+                                            <img src="/Assets/images/logo/utl_solar.png" alt="Focalyt partner" draggable="false" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/dixon.png" alt="Focalyt partner" draggable="false" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/dixon.png" alt="Focalyt partner" draggable="false" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/quess.png" alt="Focalyt partner" draggable="false" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/quess.png" alt="Focalyt partner" draggable="false" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/mankind.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/mankind.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/methodex.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/methodex.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/bodycare.jpg" alt="Focalyt partner" draggable="false" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/bodycare.jpg" alt="Focalyt partner" draggable="false" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/htw.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/htw.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/maple.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/maple.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/satya.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/satya.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/arms.png" alt="Focalyt partner" draggable="false" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/arms.png" alt="Focalyt partner" draggable="false" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/dixon.png" alt="Focalyt partner" draggable="false" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/dixon.png" alt="Focalyt partner" draggable="false" />
                                         </div>
                                         <div className="slide">
-                                            <SwiperSlide>
-                                                <img src="/Assets/images/logo/quess.png" alt="Focalyt partner" draggable="false" />
-                                            </SwiperSlide>
+                                            <img src="/Assets/images/logo/quess.png" alt="Focalyt partner" draggable="false" />
                                         </div>
                                     </div>
                                 </div>
-
-
 
                                 {/* Terms Agreement */}
                                 <p className="mt-3">
@@ -737,75 +722,68 @@ const [permanentPincode, setPermanentPincode] = useState('');
                 </section>
             </div>
             <style>
-                {` .swiper-pagination-bullet{
-    width: 5px;
-    height: 5px;
-    background-color:#d63031;
-  }
-   .text-primary {
-    color: #FC2B5A!important;
-  }
-.spanAfter {
-  position: relative;
-  display: inline-block;
-}
-
-    .spanAfter::after {
-  content: attr(data-before);
-  height: 2px;
-  width: 100%;
-  left: 0;
-  position: absolute;
-  bottom: 0;
-  top: 100%;
-  background:
-linear-gradient(30deg, #FC2B5A, rgba(115, 103, 240, 0.5)) !important;
-  box-shadow: 0 0 8px 0 rgba(115, 103, 240, 0.5) !important;
-  transform: translateY(0px);
-  transition:
-all .2s linear;
-}  
-.btn-primary:hover {
-  border-color:
-#2e394b !important;
-  color: #fff !important;
-  box-shadow: 0 8px 25px -8px #FC2B5A;
-}
-  .btn-primary:hover {
-  color: #fff;
-  background-color: #5344ed!important;
-  border-color:#4839eb!important;
-}
-.btn-primary{
-border: 1px solid #FC2B5A;
-}
-.userMobile input.form-control:focus,
-.userMobile select.form-control:focus,
-.userMobile textarea.form-control:focus {
-  border: 1px solid #FC2B5A !important;
-  outline: none !important;
-  box-shadow: none !important;
-}
-.userMobile input.form-control,
-.userMobile select.form-control,
-.userMobile textarea.form-control {
-  transition: border 0.3s ease;
-}
-
-.candid_arrow {
-  width: 17%;
-  margin-right: 5px
-}
-  .sendBtnn{
-  display: flex
-;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-}
-  `
-
+                {`
+                .swiper-pagination-bullet{
+                    width: 5px;
+                    height: 5px;
+                    background-color:#d63031;
                 }
+                .text-primary {
+                    color: #FC2B5A!important;
+                }
+                .spanAfter {
+                    position: relative;
+                    display: inline-block;
+                }
+                .spanAfter::after {
+                    content: attr(data-before);
+                    height: 2px;
+                    width: 100%;
+                    left: 0;
+                    position: absolute;
+                    bottom: 0;
+                    top: 100%;
+                    background: linear-gradient(30deg, #FC2B5A, rgba(115, 103, 240, 0.5)) !important;
+                    box-shadow: 0 0 8px 0 rgba(115, 103, 240, 0.5) !important;
+                    transform: translateY(0px);
+                    transition: all .2s linear;
+                }  
+                .btn-primary:hover {
+                    border-color: #2e394b !important;
+                    color: #fff !important;
+                    box-shadow: 0 8px 25px -8px #FC2B5A;
+                }
+                .btn-primary:hover {
+                    color: #fff;
+                    background-color: #5344ed!important;
+                    border-color:#4839eb!important;
+                }
+                .btn-primary{
+                    border: 1px solid #FC2B5A;
+                }
+                .userMobile input.form-control:focus,
+                .userMobile select.form-control:focus,
+                .userMobile textarea.form-control:focus {
+                    border: 1px solid #FC2B5A !important;
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+                .userMobile input.form-control,
+                .userMobile select.form-control,
+                .userMobile textarea.form-control {
+                    transition: border 0.3s ease;
+                }
+                .candid_arrow {
+                    width: 17%;
+                    margin-right: 5px
+                }
+                .sendBtnn{
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    text-align: center;
+                }
+                `}
             </style>
         </div>
     );

@@ -13,4 +13,5 @@ module.exports.imageFunc = require('./images');
 module.exports.postFunc = require('./postGallery');
 module.exports.teamFunc = require('./team');
 module.exports.smsTemplateFunc = require('./smsTemplate');
+module.exports.educationlist = require('./educations');
 

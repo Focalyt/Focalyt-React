@@ -4,6 +4,7 @@ var multipleUpload = multer().array('file');
 const { authenti, authCollege, authCommon, isCandidate, isAdmin, authentiAdmin, auth1 } = require("../../helpers");
 const {
 	commonFunc,
+	educationlist,
 	imageFunc,
 	candidateFunc,
 	collegeTodoFunc,
@@ -34,6 +35,10 @@ const qualificationAdminRoutes = express.Router();
 const subQualificationAdminRoutes = express.Router();
 const referenceRoutes = express.Router();
 const smsTemplateRoutes = express.Router();
+const educationRoutes = express.Router();
+
+educationRoutes.get("/educationlist", educationlist.educationlist);
+
 
 commonRoutes.post("/sendCandidateOtp", commonFunc.sendCandidateOtp);
 commonRoutes.get("/boards", commonFunc.educationBoardList);
