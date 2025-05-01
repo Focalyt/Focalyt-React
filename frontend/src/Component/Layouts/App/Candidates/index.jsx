@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import CandidateHeader from './CandidateHeader/CandidateHeader'
 import CandidateFooter from './CandidateFooter/CandidateFooter'
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCalendarAlt } from "@fortawesome/free-solid-svg-icons";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -385,7 +386,7 @@ function CandidateLayout({ children }) {
 
               <li className={`nav-item has-sub ${openSubmenu.events ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('events')}>
-                  <FontAwesomeIcon icon={faWallet} />
+                <FontAwesomeIcon icon={faCalendarAlt} />
                   <span className="menu-title">Events</span>
                 </a>
                 {/* <ul className={`menu-content ${openSubmenu.wallet ? 'open' : ''}`}> */}
