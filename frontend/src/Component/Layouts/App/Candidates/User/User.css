@@ -1,0 +1,227 @@
+.user-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 20px;
+  }
+  
+  /* Step Progress Bar */
+  .step-progress-container {
+    margin-bottom: 40px;
+  }
+  
+  .loader {
+    position: relative;
+    background-color: #e5e7eb;
+    border-radius: 1em;
+    height: 0.8em;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto 15px;
+  }
+  
+  .bar {
+    position: relative;
+    background-color: #4ade80; /* Green progress bar */
+    height: 100%;
+    border-radius: 1em;
+    transition: width 0.5s ease;
+  }
+  
+  .check-bar-container {
+    position: absolute;
+    left: 0px;
+    top: -8px;
+    z-index: 10;
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    height: 0.5em;
+  }
+  
+  .check {
+    border-radius: 50%;
+    height: 24px;
+    width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #d1d5db;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    transition: transform 0.3s, background-color 0.3s;
+  }
+  
+  .check span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .check.active {
+    background-color: #60a5fa; /* Blue for active */
+    transform: scale(1.1);
+  }
+  
+  .check.completed {
+    background-color: #4ade80; /* Green for completed */
+    transform: scale(1.1);
+  }
+  
+  .check svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .step-labels {
+    display: flex;
+    justify-content: space-between;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 10px;
+  }
+  
+  .step-label {
+    font-size: 14px;
+    color: #6b7280;
+    text-align: center;
+    transition: color 0.3s;
+  }
+  
+  .step-label.active {
+    color: #111827;
+    font-weight: 500;
+  }
+  
+  /* Form Content */
+  .form-container {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  .step-content {
+    animation: fadeIn 0.3s ease;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 10px;
+  }
+  
+  .form-description {
+    color: #6b7280;
+    font-size: 14px;
+    margin-bottom: 25px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #374151;
+    font-size: 14px;
+  }
+  
+  .required {
+    color: #ef4444;
+    margin-left: 3px;
+  }
+  
+  .form-input, .form-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+  }
+  
+  .form-input:focus, .form-textarea:focus {
+    border-color: #60a5fa;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+  }
+  
+  .form-textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+  
+  .education-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 30px;
+  }
+  
+  .option-btn {
+    padding: 8px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 20px;
+    background-color: white;
+    color: #374151;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .option-btn:hover {
+    border-color: #60a5fa;
+  }
+  
+  .option-btn.selected {
+    background-color: #eff6ff;
+    border-color: #60a5fa;
+    color: #2563eb;
+  }
+  
+  .continue-btn {
+    background-color: #a5b4fc;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .continue-btn:hover {
+    background-color: #818cf8;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 640px) {
+    .step-labels {
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .check-bar-container {
+      top: -10px;
+    }
+    
+    .education-options {
+      justify-content: center;
+    }
+  }

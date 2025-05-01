@@ -303,7 +303,7 @@ router.get("/joblisting", async (req, res) => {
 	]
 
 	const countJobs = await Vacancy.find(filter).countDocuments()
-	const perPage = 9;
+	const perPage = 100;
 	const p = parseInt(req.query.page);
 	const page = p || 1;
 	const totalPages = Math.ceil(countJobs / perPage);

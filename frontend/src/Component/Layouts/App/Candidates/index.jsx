@@ -56,7 +56,8 @@ function CandidateLayout({ children }) {
     profile: false,
     courses: false,
     jobs: false,
-    wallet: false
+    wallet: false,
+    events: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
@@ -112,6 +113,7 @@ function CandidateLayout({ children }) {
     courses: useRef(null),
     jobs: useRef(null),
     wallet: useRef(null),
+    events: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -122,7 +124,8 @@ function CandidateLayout({ children }) {
     profile: '0px',
     courses: '0px',
     jobs: '0px',
-    wallet: '0px'
+    wallet: '0px',
+    events: '0px'
   });
 
   // useLayoutEffect(() => {
@@ -380,12 +383,38 @@ function CandidateLayout({ children }) {
 
               {/* Event page  */}
 
-              <li className={`nav-item ${activeItem === 'candidateevent' ? 'active' : ''}`}>
-                <Link to="/candidate/candidateevent" onClick={() => { handleItemClick('candidateevent'); handleSidebarClose(); }}>
-                  <FontAwesomeIcon icon={farCircle} />
-                  <span className="menu-title">Event</span>
-                </Link>
+              <li className={`nav-item has-sub ${openSubmenu.events ? 'open' : ''}`}>
+                <a href="#" onClick={() => toggleSubmenu('events')}>
+                  <FontAwesomeIcon icon={faWallet} />
+                  <span className="menu-title">Events</span>
+                </a>
+                {/* <ul className={`menu-content ${openSubmenu.wallet ? 'open' : ''}`}> */}
+                <ul
+                  ref={menuRefs.events}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.events,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out'
+                  }}
+                >
+
+                  <li className={`nav-item ${activeItem === 'candidateevent' ? 'active' : ''}`}>
+                    <Link to="/candidate/candidateevent" onClick={() => { handleItemClick('candidateevent'); handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farCircle} />
+                      <span className="menu-title">Event</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${activeItem === 'appliedevents' ? 'active' : ''}`}>
+                  <Link to="/candidate/appliedevents" onClick={() => { handleItemClick('appliedevents'); handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farCircle} />
+                      <span className="menu-title">Applied Event</span>
+                    </Link>
+                  </li>
+                </ul>
               </li>
+
+
 
               {/* Request Loan */}
               <li className={`nav-item ${activeItem === 'requestLoan' ? 'active' : ''}`}>

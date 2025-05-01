@@ -486,7 +486,7 @@ router
         return res.send({ status: "failure", error: value });
       }
       let formData = value;
-      const { name, mobile, sex, personalInfo ,highestQualification } = formData;
+      const { name, mobile, sex, personalInfo ,highestQualification , email, dob } = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
         let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
@@ -524,6 +524,7 @@ router
         name,
         sex,
         mobile,
+        email,
         role: 3,
       });
       if (!usr) {
@@ -534,6 +535,8 @@ router
       let coins = await CoinsAlgo.findOne();
       let candidateBody = {
         name,
+        email,
+        dob,
         sex,
         mobile,
         verified: true,

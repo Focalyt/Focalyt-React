@@ -52,6 +52,8 @@ import UploadCandidates from './Pages/App/College/UploadCandidates/UploadCandida
 import UploadTemplates from './Pages/App/College/UploadTemplates/UploadTemplates';
 import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
+import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
+import User from './Component/Layouts/App/Candidates/User/User'
 const Layout = () => {
   const location = useLocation();
 
@@ -77,6 +79,7 @@ const Layout = () => {
         {/* Candidate Parent Route */}
         <Route path="/candidate/login" element={<CandidateLogin />} />
         <Route path="/candidate" element={<CandidateLayout />}>
+        <Route path="user" element={<User/>}/>
           <Route path="dashboard" element={<CandidateDashboard />} />
           <Route path="myprofile" element={<CandidateProfile />} />
           <Route path="document" element={<CandidatesDocuments />} />
@@ -102,6 +105,7 @@ const Layout = () => {
           <Route path="reqDocs/:courseId" element={<RequiredDocuments />} />
           <Route path="pendingFee" element={<PaymentDetails />} />
           <Route path='candidateevent' element={<CandidatesEvents />} />
+          <Route path='appliedevents' element={<AppliedEvents/>}/>
         </Route>
         <Route path='/admin' element={<AdminLayout />}>
 
