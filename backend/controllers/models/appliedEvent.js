@@ -7,19 +7,18 @@ const appliedEventSchema = new Schema(
     _candidate: {
       type: ObjectId,
       ref: "Candidate",
-      description: "Reference to the Candidate who applied for the course",
+      description: "Reference to the Candidate who applied for the event",
     },
     _event: {
       type: ObjectId,
       ref: "Event",
-      description: "Reference to the specific course applied for",
+      description: "Reference to the specific event applied for",
     },
     registeredBy:{
       type: ObjectId,
       ref: "User",
-      description: "Reference to the specific course applied for"
-    },  
-    
+      description: "Reference to the specific event applied for"
+    },    
   
   },
   {

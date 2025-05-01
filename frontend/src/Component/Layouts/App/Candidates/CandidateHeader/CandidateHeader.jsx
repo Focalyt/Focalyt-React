@@ -176,7 +176,7 @@ function CandidateHeader({toggleSidebar, isSideBarOpen}) {
                         <i class="feather icon-user"></i>  Show Profile
                       </a>
                       <div className="dropdown-divider"></div>
-                      <a className="dropdown-item" onClick={handleLogout}>
+                      <a className="dropdown-item" onClick={handleLogout} style={{cursor: "pointer"}}>
                         <i className="feather icon-power"></i> Logout
                       </a>
                     </div>
