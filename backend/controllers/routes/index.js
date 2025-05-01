@@ -1,5 +1,9 @@
 const express = require('express');
+require('dotenv').config();
+const axios = require('axios');
+const crypto = require('crypto');
 const frontRoutes = require('./front');
+const conversionTrakingRoutes = require('./conversionTrackingAPI');
 const viewsRoutes = require('./views');
 const apiRoutes = require('./api');
 const chatRoutes = require('./chat');
@@ -19,6 +23,7 @@ const { updateSpreadSheetCarrerValues } = require("./services/googleservice");
 const moment = require("moment");
 
 router.use('/', frontRoutes);
+router.use('/', conversionTrakingRoutes);
 router.use('/candidate', candidateRoutes);
 router.use('/api', apiRoutes);
 router.use('/candidateForm', viewsRoutes);
@@ -47,8 +52,6 @@ router.post('/contact', async (req, res) => {
     const response_key = req.body["g-recaptcha-response"];
     // Put secret key here, which we get from google console
     const secret_key = "6Lej1gsqAAAAADDB6EA8QfiRcJdgESc4UBMqOXeq";
-
-
 
     const url =
       `https://www.google.com/recaptcha/api/siteverify?secret=${secret_key}&response=${response_key}`;
@@ -436,18 +439,18 @@ router.post('/callback', async (req, res) => {
 
     function capitalizeWords(str) {
       if (!str) return '';
-    
+
       // ✅ If str is an array, pick the first element
       if (Array.isArray(str)) {
         str = str[0] || '';
       }
-    
+
       // ✅ Ensure it's a string before proceeding
       if (typeof str !== 'string') return '';
-    
+
       return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
     }
-    
+
 
     const sheetData = [
       moment(new Date()).utcOffset('+05:30').format('DD/MM/YYYY'),
@@ -640,4 +643,13 @@ router.post('/career', async (req, res) => {
     return res.send({ status: "failure", error: "Something went wrong!" });
   }
 });
+
+
+
+
+
+
+
+
+
 module.exports = router;

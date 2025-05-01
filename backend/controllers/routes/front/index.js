@@ -522,10 +522,7 @@ router.get("/courses", async (req, res) => {
 
 router.get("/event", async (req, res) => {
 	let filter = { status: true }
-
-	const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
-
-	
+	const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;	
 
 	const countEvents = await Event.find(filter).countDocuments()
 	const events = await Event.find(filter)
@@ -534,12 +531,7 @@ router.get("/event", async (req, res) => {
 	const p = parseInt(req.query.page);
 	const page = p || 1;
 	const totalPages = Math.ceil(countEvents / perPage);
-
-
 	console.log("events",events)
-
-
-
 	// Use res.json() to send JSON data, not res.send.json()
 	return res.json({
 		events,
