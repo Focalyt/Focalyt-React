@@ -62,7 +62,7 @@ function CandidateLayout({ children }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
 
-  useEffect(() => {
+    useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth <= 1199;
       setIsMobile(mobile);
@@ -471,6 +471,10 @@ function CandidateLayout({ children }) {
             <div className="content-wrapper">
               <div className="content-body mb-4">
                 <Outlet />
+
+
+
+
               </div>
               <CandidateFooter />
             </div>

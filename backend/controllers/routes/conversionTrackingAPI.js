@@ -2,31 +2,19 @@ const express = require("express");
 const AWS = require("aws-sdk");
 const uuid = require("uuid/v1");
 const moment = require("moment");
+const crypto = require("crypto");
 require('dotenv').config();
-
+const axios = require('axios');
 
 const {
     CandidateProfile
-} = require("../../controllers/models");
-const Team = require('../../models/team'); // PostSchema import करें
+} = require("../../controllers/models");// PostSchema import करें
 const bcrypt = require("bcryptjs");
 const router = express.Router();
-const {
-    bucketName,
-    accessKeyId,
-    secretAccessKey,
-    region,
-    mimetypes,
-    bucketURL
-} = require("../../../config");
-const CompanyExecutive = require("../../models/companyExecutive");
-const collegeRepresentative = require("../../models/collegeRepresentative");
-const { generatePassword, sendMail,isCandidate } = require("../../helpers");
-const { Translate } = require('@google-cloud/translate').v2;
-const { translateProjectId, translateKey } = require('../../../config')
 
-AWS.config.update({ accessKeyId, secretAccessKey, region });
-const s3 = new AWS.S3({ region, signatureVersion: "v4" });
+
+const { generatePassword, sendMail, isCandidate } = require("../../helpers");
+
 
 const nodemailer = require("nodemailer");
 const { ObjectId } = require("mongoose").Types;
@@ -34,16 +22,19 @@ const { ObjectId } = require("mongoose").Types;
 
 // Hash helper
 function hash(value) {
+    if (typeof value !== 'string') value = String(value || '');
     return crypto.createHash('sha256').update(value.trim().toLowerCase()).digest('hex');
 }
 
+
 // POST /meta/track-conversion
-router.post('/meta/track-conversion',[isCandidate], async (req, res) => {
+router.post('/meta/track-conversion', [isCandidate], async (req, res) => {
     try {
+        console.log("Meta api triger")
         const {
-             // 📱 Only mobile is sent from frontend
+            // 📱 Only mobile is sent from frontend
             eventName,
-            eventSourceUrl, 
+            eventSourceUrl,
             value,          // 💰 optional
             currency,
             fbc,
@@ -59,6 +50,7 @@ router.post('/meta/track-conversion',[isCandidate], async (req, res) => {
 
         // 🔍 Find candidate
         const candidate = await CandidateProfile.findOne({ mobile }).lean();
+        console.log('candidate',candidate)
         if (!candidate) {
             return res.status(404).json({ status: false, message: "Candidate not found" });
         }
@@ -67,10 +59,12 @@ router.post('/meta/track-conversion',[isCandidate], async (req, res) => {
         const firstName = nameParts[0];
         const lastName = nameParts[1] || "";
 
-        const dob = candidate.dob; // ensure it's in "YYYY-MM-DD" format
+        const dob = candidate.dob;
         let doby, dobm, dobd;
-        if (dob && dob.includes("-")) {
-            [doby, dobm, dobd] = dob.split("-");
+
+        if (dob instanceof Date && !isNaN(dob)) {
+            const isoDob = dob.toISOString().split("T")[0];
+            [doby, dobm, dobd] = isoDob.split("-");
         }
 
         const accessToken = process.env.FB_CONVERSION_ACCESS_TOKEN;
@@ -107,8 +101,13 @@ router.post('/meta/track-conversion',[isCandidate], async (req, res) => {
             access_token: accessToken
         };
 
+        console.log("user_data", payload.data[0].user_data);
+        
+
+
         const cleanPayload = JSON.parse(JSON.stringify(payload)); // remove undefined
         const fbRes = await axios.post(`https://graph.facebook.com/v18.0/${pixelId}/events`, cleanPayload);
+        console.log("meta response", fbRes.data)
 
         return res.status(200).json({ status: true, message: "Conversion sent successfully", data: fbRes.data });
     } catch (error) {
