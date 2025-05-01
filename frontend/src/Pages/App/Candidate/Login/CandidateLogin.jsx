@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
 import "./CandidateLogin.css";
 
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -316,17 +317,20 @@ const CandidateLogin = () => {
                     console.log("Register API response:", registerRes.data);
                     
                     if (registerRes.data.status === "success") {
-                        // Login after successful registration
-                        const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { 
-                            mobile: mobileNumber 
-                        });
-                        
+                        await trackMetaConversion({
+                            eventName: isNewUser ? "Signup" : "Login",
+                            sourceUrl: window.location.href
+                          });
+                        const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
+                        // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                         if (loginRes.data.status) {
                             localStorage.setItem('name', loginRes.data.name);
                             localStorage.setItem('token', loginRes.data.token);
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
                             sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
                             
+                              
+
                             if (returnUrl) {
                                 window.location.href = returnUrl;
                             } else {
@@ -338,6 +342,56 @@ const CandidateLogin = () => {
                     } else {
                         setErrorMessage(registerRes.data.error || 'Registration failed');
                     }
+                }
+            } catch (err) {
+                setErrorMessage('Something went wrong during registration');
+            }
+        } else {
+            if (!otp || otp.length !== 4) {
+                setErrorMessage('Please enter valid OTP');
+                return;
+            }
+            try {
+                console.log('Verifing OTP')
+                // const verifyRes = await axios.post('/api/verifyOtp', { mobile: mobileNumber, otp });
+                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
+                if (otpVerifyRes.data.status) {
+                    // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
+                    const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
+                    if (loginRes.data.status) {
+                        const token = loginRes.data.token;
+                        const verificationBody = { mobile: mobileNumber, verified: true }
+                        const headers = { headers: { 'x-auth': token } };
+                        const verifyRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers);
+                        if (verifyRes.data.status) {
+                            localStorage.setItem('candidate', loginRes.data.name);
+                            localStorage.setItem('token', loginRes.data.token);
+                            sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
+
+                            await trackMetaConversion({
+                                eventName: isNewUser ? "Signup" : "Login",
+                                sourceUrl: window.location.href
+                              });
+
+
+
+                            if (returnUrl) {
+
+                                window.location.href = returnUrl
+                            }
+                            else {
+                                window.location.href = '/candidate/dashboard';
+                            }
+
+
+                            // const verificationRes = await axios.post('/candidate/verification', verificationBody, headers);
+                            // const verificationRes = await axios.post(`${backendUrl}/candidate/verification`, verificationBody, headers)
+                            // if (verificationRes.data.status) {
+                            // }
+                        } else {
+                            setErrorMessage('Login failed after OTP verification');
+                        }
+                    }
                 } else {
                     setErrorMessage('Incorrect OTP');
                 }
@@ -345,75 +399,8 @@ const CandidateLogin = () => {
                 console.error("Registration error:", err);
                 setErrorMessage('Something went wrong during registration');
             }
-        } else {
-            // Login flow for existing user
-            if (!otp || otp.length !== 4) {
-                setErrorMessage('Please enter valid OTP');
-                return;
-            }
-            
-            try {
-                // Verify OTP
-                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { 
-                    mobile: mobileNumber, 
-                    otp 
-                });
-                
-                if (otpVerifyRes.data.status) {
-                    // Login after OTP verification
-                    const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { 
-                        mobile: mobileNumber 
-                    });
-                    
-                    if (loginRes.data.status) {
-                        const token = loginRes.data.token;
-                        const verificationBody = { mobile: mobileNumber, verified: true };
-                        const headers = { headers: { 'x-auth': token } };
-                        
-                        try {
-                            const verifyRes = await axios.post(
-                                `${backendUrl}/candidate/verification`, 
-                                verificationBody, 
-                                headers
-                            );
-                            
-                            if (verifyRes.data.status) {
-                                localStorage.setItem('candidate', loginRes.data.name);
-                                localStorage.setItem('token', loginRes.data.token);
-                                sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
-                                
-                                if (returnUrl) {
-                                    window.location.href = returnUrl;
-                                } else {
-                                    window.location.href = '/candidate/dashboard';
-                                }
-                            } else {
-                                setErrorMessage('Verification failed');
-                            }
-                        } catch (verificationError) {
-                            console.error("Verification error:", verificationError);
-                            // Still proceed with login even if verification fails
-                            localStorage.setItem('candidate', loginRes.data.name);
-                            localStorage.setItem('token', loginRes.data.token);
-                            sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
-                            
-                            if (returnUrl) {
-                                window.location.href = returnUrl;
-                            } else {
-                                window.location.href = '/candidate/dashboard';
-                            }
-                        }
-                    } else {
-                        setErrorMessage('Login failed after OTP verification');
-                    }
-                } else {
-                    setErrorMessage('Incorrect OTP');
-                }
-            } catch (err) {
-                console.error("Login error:", err);
-                setErrorMessage('Error verifying OTP');
-            }
-        }
+        } 
+        
     };
 
     return (

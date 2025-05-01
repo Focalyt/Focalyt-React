@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
+
 import { useParams , Link } from 'react-router-dom';
 import moment from 'moment';
 import Swiper from 'swiper';
@@ -252,6 +254,10 @@ const CandidateViewJobs = () => {
       });
 
       if (response.data.status) {
+        await trackMetaConversion({
+          eventName: "JobApply",
+          sourceUrl: window.location.href,
+        });
         setIsApplied(true);
         setShowApplyModal(false);
         setShowAfterApplyModal(true);
@@ -270,6 +276,13 @@ const CandidateViewJobs = () => {
       });
 
       if (response.data.status) {
+
+        await trackMetaConversion({
+          eventName: "RegisterInterviews",
+          sourceUrl: window.location.href,
+          value: (response.data.coinsDeducted / 100).toFixed(2),               // 💰 amount of the transaction
+          currency: "INR"            // 🪙 currency in ISO format
+        });
         setIsRegisterInterview(true);
         setShowAfterApplyModal(false);
         setIsApplied(true);

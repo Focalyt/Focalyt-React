@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
 import moment from 'moment';
 import "./SearchCoursesDetail.css";
 import PopupModelApply from "../../../../Component/Layouts/App/Candidates/PopupModelApply/PopupModelApply"
@@ -167,6 +168,11 @@ const CourseDetails = () => {
           'x-auth': localStorage.getItem('token')
         }
       });
+      await trackMetaConversion({
+        eventName: "CourseApply",
+        sourceUrl: window.location.href,
+      });
+      
 
 
       // Close modal
@@ -230,7 +236,14 @@ const CourseDetails = () => {
             headers: {
               'x-auth': localStorage.getItem('token')
             }
-          }).then(res => {
+          }).then(async (res2)  => {
+            await trackMetaConversion({
+              eventName: "CoursePayment",
+              sourceUrl: window.location.href,
+              value: (paymentData.amount / 100).toFixed(2),               // 💰 amount of the transaction
+              currency: "INR"            // 🪙 currency in ISO format
+            });
+            
             document.getElementById('completeRegistration').classList.add('show');
             document.getElementById('completeRegistration').style.display = 'block';
             document.body.classList.add('modal-open');

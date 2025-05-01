@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import HomePage from '../src/Pages/Front/HomePage/HomePage';
 // import About from './Pages/Front/About/About';
@@ -56,6 +56,32 @@ import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import User from './Component/Layouts/App/Candidates/User/User'
 const Layout = () => {
   const location = useLocation();
+  useEffect(() => {
+    const getCookie = (name) => {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? match[2] : null;
+    };
+  
+    const getFbclid = () => {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('fbclid');
+    };
+  
+    const fbp = getCookie('_fbp');
+    const fbcCookie = getCookie('_fbc');
+    const fbclid = getFbclid();
+  
+    const fbcGenerated = fbclid ? `fb.1.${Date.now()}.${fbclid}` : null;
+  
+    if (fbp && !sessionStorage.getItem('_fbp')) {
+      sessionStorage.setItem('_fbp', fbp);
+    }
+  
+    if ((fbcCookie || fbcGenerated) && !sessionStorage.getItem('_fbc')) {
+      sessionStorage.setItem('_fbc', fbcCookie || fbcGenerated);
+    }
+  }, []);
+  
 
   return (
     <>
