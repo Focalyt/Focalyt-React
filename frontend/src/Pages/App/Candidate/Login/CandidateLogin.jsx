@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
 import "./CandidateLogin.css";
 
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -298,6 +299,10 @@ const [permanentPincode, setPermanentPincode] = useState('');
                     console.log("Register API response:", registerRes.data);
                     
                     if (registerRes.data.status === "success") {
+                        await trackMetaConversion({
+                            eventName: isNewUser ? "Signup" : "Login",
+                            sourceUrl: window.location.href
+                          });
                         const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                         // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                         if (loginRes.data.status) {
@@ -305,6 +310,8 @@ const [permanentPincode, setPermanentPincode] = useState('');
                             localStorage.setItem('token', loginRes.data.token);
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
                             sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
+                            
+                              
 
                             if (returnUrl) {
 
@@ -344,6 +351,11 @@ const [permanentPincode, setPermanentPincode] = useState('');
                             localStorage.setItem('candidate', loginRes.data.name);
                             localStorage.setItem('token', loginRes.data.token);
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
+
+                            await trackMetaConversion({
+                                eventName: isNewUser ? "Signup" : "Login",
+                                sourceUrl: window.location.href
+                              });
 
 
 

@@ -2634,7 +2634,7 @@ router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) =>
     await checkCandidateCashBack(candidate)
     await candidateApplyCashBack(candidate)
   }
-  res.status(200).send({ status: true, msg: "Success" });
+  res.status(200).send({ status: true, msg: "Success",coinsDeducted });
 });
 
 //list of register for interview
