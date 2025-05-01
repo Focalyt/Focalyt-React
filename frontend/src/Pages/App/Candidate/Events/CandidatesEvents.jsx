@@ -6,6 +6,9 @@ import axios from 'axios';
 const CandidatesEvents = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const [showCongratsModal, setShowCongratsModal] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState(null);
+
   const [events, setEvents] = useState([]);
   const [videoSrc, setVideoSrc] = useState("");
 
@@ -16,13 +19,19 @@ const CandidatesEvents = () => {
     // Fetch events data
     const fetchEvents = async () => {
       try {
-        const response = await axios.get(`${backendUrl}/event`);
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${backendUrl}/candidate/event`, {
+          headers: {
+            'x-auth': token
+          }
+        });
         console.log("events", response.data.events);
         setEvents(response.data.events);
       } catch (error) {
         console.error("Error fetching events data:", error);
       }
     };
+    
     fetchEvents();
   }, []);
 
@@ -76,6 +85,35 @@ const CandidatesEvents = () => {
       }
     };
   }, []);
+
+  const handleApplyClick = async (eventId) => {
+    const confirmApply = window.confirm("Do you really want to apply for this event?");
+    if (!confirmApply) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${backendUrl}/candidate/apply-event`, {
+        // or however you store it
+        eventId,
+        // assume admin/manager is logged in
+      }, {
+        headers: {
+          'x-auth': token
+        }
+      });
+
+      if (res.data.status) {
+        setShowCongratsModal(true);
+        setSelectedEventId(eventId);
+      } else {
+        alert(res.data.message || "Could not apply. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error applying:", error);
+      alert("An error occurred while applying.");
+    }
+  };
+
 
 
 
@@ -191,31 +229,37 @@ const CandidatesEvents = () => {
                                   </div>
 
                                   {/* Action Buttons */}
-                                  <div className="row mt-1">
+                                  <div className={`row mt-1 ${!event.guidelines ? 'justify-content-center' : ''}`}>
                                     <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
                                       <Link
                                         className={`apply-thisjob text-left px-1 apply-padding mb-0 mt-0 ${isRegistrationClosed ? 'disabled-btn' : ''}`}
-                                        to={`/candidate/event/${event._id}`}
+                                        to="#"
                                         title="Apply Now"
                                         onClick={(e) => {
-                                          if (isRegistrationClosed) {
-                                            e.preventDefault();
+                                          e.preventDefault();
+                                          if (!isRegistrationClosed) {
+                                            handleApplyClick(event._id);
                                           }
                                         }}
                                       >
                                         <i className="la la-paper-plane"></i> Apply Now
                                       </Link>
                                     </div>
-                                    <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                                      <a
-                                        className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
-                                        href="#"
-                                        title="Guidelines"
-                                      >
-                                        <i className="la la-info-circle"></i> Guidelines
-                                      </a>
-                                    </div>
+
+                                    {event.guidelines && (
+                                      <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
+                                        <a
+                                          className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
+                                          href="#"
+                                          title="Guidelines"
+                                        >
+                                          <i className="la la-info-circle"></i> Guidelines
+                                        </a>
+                                      </div>
+                                    )}
                                   </div>
+
+
                                 </div>
                               </div>
                             </div>
@@ -251,6 +295,18 @@ const CandidatesEvents = () => {
             </div>
           </div>
         </div>
+
+        <div className="modal fade show" tabIndex="-1" style={{ display: showCongratsModal ? 'block' : 'none', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content p-4 text-center">
+              <h4 className="mb-3 text-success">🎉 Congratulations!</h4>
+              <p>You have successfully applied for the event.</p>
+              <p>To increase your chances, strengthen your profile now!</p>
+              <Link to="/candidate/myProfile" className="btn btn-primary mt-3">Update My Profile</Link>
+            </div>
+          </div>
+        </div>
+
 
 
         {/* CSS Styles */}

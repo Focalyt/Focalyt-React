@@ -23,6 +23,8 @@ const UserData = bizSdk.UserData;
 const ServerEvent = bizSdk.ServerEvent;
 const {
   User,
+  AppliedEvent,
+  Event,
   CandidateRegister,
   Center,
   State,
@@ -4452,6 +4454,107 @@ router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
     res.status(500).json({ status: false, message: "Error fetching profile data" });
   }
 });
+
+
+
+
+router.route('/apply-event')
+.post(isCandidate, async (req, res) => {
+
+  try {
+    let { eventId } = req.body;
+
+    const mobile = req.user.mobile;
+ const candidate = await Candidate.findOne({mobile:mobile})
+ const candidateId = candidate._id
+    
+
+    if (!candidateId || !eventId ) {
+      return res.status(400).json({ status: false, message: "Missing required fields" });
+    }
+
+    // ✅ Step 1: Check if already applied
+    const alreadyApplied = await AppliedEvent.findOne({
+      _candidate: candidateId,
+      _event: eventId
+    });
+
+    if (alreadyApplied) {
+      return res.status(409).json({ status: false, message: "Already applied to this event" });
+    }
+
+    // ✅ Step 2: Create AppliedEvent
+    const applied = await AppliedEvent.create({
+      _candidate: candidateId,
+      _event: eventId,
+      
+    });
+
+    // ✅ Step 3: Update Candidate profile
+    await Candidate.findByIdAndUpdate(candidateId, {
+      $push: {
+        appliedEvents: {
+          EventId: eventId,
+          appliedEventId: applied._id
+        }
+      }
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: "Event applied successfully",
+      data: applied
+    });
+
+  } catch (error) {
+    console.error("Error in applyToEvent:", error);
+    return res.status(500).json({ status: false, message: "Server error" });
+  }
+});
+
+router.get("/event", [isCandidate, authenti], async (req, res) => {
+  try {
+    const mobile = req.user.mobile;
+    const candidate = await Candidate.findOne({ mobile });
+
+    if (!candidate) {
+      return res.status(404).json({ message: "Candidate not found" });
+    }
+
+    // Get all applied event IDs for this candidate
+    const appliedEvents = await AppliedEvent.find({ _candidate: candidate._id }).select("_event");
+    const appliedEventIds = appliedEvents.map(app => app._event.toString());
+
+    // Prepare filter to exclude already applied events
+    const filter = {
+      status: true,
+      _id: { $nin: appliedEventIds }
+    };
+
+    const perPage = 50;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * perPage;
+
+    const countEvents = await Event.countDocuments(filter);
+    const events = await Event.find(filter)
+      .skip(skip)
+      .limit(perPage)
+      .sort({ createdAt: -1 });
+
+    const totalPages = Math.ceil(countEvents / perPage);
+
+    return res.json({
+      events,
+      totalPages,
+      page
+    });
+  } catch (err) {
+    console.error("Error in /event route:", err);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+
 
 
 
