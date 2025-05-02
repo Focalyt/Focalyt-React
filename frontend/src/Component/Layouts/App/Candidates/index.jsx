@@ -56,13 +56,12 @@ function CandidateLayout({ children }) {
     profile: false,
     courses: false,
     jobs: false,
-    wallet: false,
-    events: false
+    wallet: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
 
-    useEffect(() => {
+  useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth <= 1199;
       setIsMobile(mobile);
@@ -113,7 +112,6 @@ function CandidateLayout({ children }) {
     courses: useRef(null),
     jobs: useRef(null),
     wallet: useRef(null),
-    events: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -124,10 +122,526 @@ function CandidateLayout({ children }) {
     profile: '0px',
     courses: '0px',
     jobs: '0px',
-    wallet: '0px',
-    events: '0px'
+    wallet: '0px'
   });
 
+  const [currentStep, setCurrentStep] = useState(1);
+
+// Static education options
+const educationList = [
+  { _id: "1", name: "10th" },
+  { _id: "2", name: "12th" },
+  { _id: "3", name: "ITI" },
+  { _id: "4", name: "Graduation/Diploma" },
+  { _id: "5", name: "Masters/Post-Graduation" },
+  { _id: "6", name: "Doctorate/PhD" }
+];
+
+   // Static courses and specializations for demo
+   
+      const sampleCourses = [
+          { _id: "c1", name: "B.Tech" },
+          { _id: "c2", name: "BCA" },
+          { _id: "c3", name: "B.Sc" }
+      ];
+      
+      const sampleSpecializations = [
+          { _id: "s1", name: "Computer Science" },
+          { _id: "s2", name: "Electronics" },
+          { _id: "s3", name: "Mechanical" }
+      ];
+  
+      const [educations, setEducations] = useState([{
+          education: '',
+          universityName: '',
+          boardName: '',
+          collegeName: '',
+          schoolName: '',
+          course: '',
+          specialization: '',
+          passingYear: '',
+          marks: ''
+      }]);
+  
+      const [formData, setFormData] = useState({
+          basicDetails: { completed: false },
+          education: { completed: false },
+          lastStep: { completed: false }
+      });
+      
+      // For board suggestions
+      const [boardSuggestions, setBoardSuggestions] = useState([]);
+      const [suggestionIndex, setSuggestionIndex] = useState(null);
+      const [coursesList, setCoursesList] = useState({});
+      const [specializationsList, setSpecializationsList] = useState({});
+  
+      // Handle education change
+      const handleEducationChange = (e, index) => {
+          const educationId = e.target.value;
+          const updated = [...educations];
+          updated[index].education = educationId;
+          updated[index].course = '';
+          updated[index].specialization = '';
+          setEducations(updated);
+          
+          // Add some sample courses based on education
+          if (educationId === "4" || educationId === "5") {
+              setCoursesList(prev => ({
+                  ...prev,
+                  [index]: sampleCourses
+              }));
+          }
+          
+          // Handle ITI case
+          if (educationId === "3") {
+              setCoursesList(prev => ({
+                  ...prev,
+                  [index]: [{ _id: "iti1", name: "ITI Course" }]
+              }));
+              
+              setSpecializationsList(prev => ({
+                  ...prev,
+                  [index]: [
+                      { _id: "itispec1", name: "Electrician" },
+                      { _id: "itispec2", name: "Plumber" },
+                      { _id: "itispec3", name: "Mechanic" }
+                  ]
+              }));
+          }
+      };
+      
+      // Handle course change
+      const handleCourseChange = (e, index) => {
+          const courseId = e.target.value;
+          const updated = [...educations];
+          updated[index].course = courseId;
+          updated[index].specialization = '';
+          setEducations(updated);
+          
+          // Show sample specializations
+          setSpecializationsList(prev => ({
+              ...prev,
+              [index]: sampleSpecializations
+          }));
+      };
+      
+      // Handle board input change with static suggestions
+      const handleBoardInputChange = (value, index) => {
+          const updated = [...educations];
+          updated[index].boardName = value;
+          setEducations(updated);
+          
+          if (value.length >= 2) {
+              // Static board suggestions
+              setBoardSuggestions([
+                  { _id: "b1", name: "CBSE", type: "Central" },
+                  { _id: "b2", name: "ICSE", type: "Central" },
+                  { _id: "b3", name: "State Board", type: "State" }
+              ]);
+              setSuggestionIndex(index);
+          } else {
+              setBoardSuggestions([]);
+          }
+      };
+      
+      // Handle continue button click
+      const handleContinue = () => {
+          if (currentStep === 1) {
+              // Set basic details as completed and move to next step
+              setFormData({
+                  ...formData,
+                  basicDetails: { completed: true }
+              });
+              setCurrentStep(2);
+          } else if (currentStep === 2) {
+              // Validate education
+              if (!educations[0].education) {
+                  alert('Please select your highest qualification');
+                  return;
+              }
+              
+              setFormData({
+                  ...formData,
+                  education: { completed: true }
+              });
+              setCurrentStep(3);
+          } else if (currentStep === 3) {
+              // Complete the form
+              setFormData({
+                  ...formData,
+                  lastStep: { completed: true }
+              });
+              alert('Form completed!');
+          }
+      };
+      
+      // Step navigation
+      const goToStep = (stepNumber) => {
+          if (stepNumber === 1 || 
+              (stepNumber === 2 && formData.basicDetails.completed) ||
+              (stepNumber === 3 && formData.education.completed)) {
+              setCurrentStep(stepNumber);
+          }
+      };
+      
+      // Render education fields based on type
+      const renderEducationFields = (edu, index) => {
+          // Get education name based on selected ID
+          const educationName = educationList.find(q => q._id === edu.education)?.name || '';
+  
+          // 10th Class
+          if (educationName === '10th') {
+              return (
+                  <>
+                      <div className="form-group">
+                          <label className="form-label">Board</label>
+                          <div className="board-autocomplete-wrapper">
+                              <input
+                                  type="text"
+                                  className="form-input"
+                                  value={edu.boardName || ''}
+                                  onChange={(e) => handleBoardInputChange(e.target.value, index)}
+                              />
+                              {suggestionIndex === index && boardSuggestions.length > 0 && (
+                                  <ul className="suggestion-list board-suggestion-list">
+                                      {boardSuggestions.map((b) => (
+                                          <li
+                                              key={b._id}
+                                              className='board-suggestion-item'
+                                              onClick={() => {
+                                                  const updated = [...educations];
+                                                  updated[index].boardName = b.name;
+                                                  setEducations(updated);
+                                                  setBoardSuggestions([]);
+                                                  setSuggestionIndex(null);
+                                              }}
+                                          >
+                                              {b.name} ({b.type})
+                                          </li>
+                                      ))}
+                                  </ul>
+                              )}
+                          </div>
+                      </div>
+  
+                      <div className="form-group">
+                          <label className="form-label">School Name</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.schoolName || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].schoolName = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+  
+                      <div className="form-group">
+                          <label className="form-label">Passing Year</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.passingYear || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].passingYear = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+                      
+                      <div className="form-group">
+                          <label className="form-label">Marks (%)</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.marks || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].marks = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+                  </>
+              );
+          }
+  
+          // 12th Class
+          else if (educationName === '12th') {
+              return (
+                  <>
+                      <div className="form-group">
+                          <label className="form-label">Board</label>
+                          <div className="board-autocomplete-wrapper">
+                              <input
+                                  type="text"
+                                  className="form-input"
+                                  value={edu.boardName || ''}
+                                  onChange={(e) => handleBoardInputChange(e.target.value, index)}
+                              />
+                              {suggestionIndex === index && boardSuggestions.length > 0 && (
+                                  <ul className="suggestion-list board-suggestion-list">
+                                      {boardSuggestions.map((b) => (
+                                          <li
+                                              key={b._id}
+                                              className='board-suggestion-item'
+                                              onClick={() => {
+                                                  const updated = [...educations];
+                                                  updated[index].boardName = b.name;
+                                                  setEducations(updated);
+                                                  setBoardSuggestions([]);
+                                                  setSuggestionIndex(null);
+                                              }}
+                                          >
+                                              {b.name} ({b.type})
+                                          </li>
+                                      ))}
+                                  </ul>
+                              )}
+                          </div>
+                      </div>
+  
+                      <div className="form-group">
+                          <label className="form-label">Specialization</label>
+                          <select
+                              className="form-input"
+                              value={edu.specialization || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].specialization = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          >
+                              <option value="">Select Specialization</option>
+                              <option value="Science (PCM)">Science (PCM)</option>
+                              <option value="Science (PCB)">Science (PCB)</option>
+                              <option value="Science (PCMB)">Science (PCMB)</option>
+                              <option value="Commerce">Commerce</option>
+                              <option value="Commerce with Maths">Commerce with Maths</option>
+                              <option value="Arts/Humanities">Arts/Humanities</option>
+                              <option value="Vocational">Vocational</option>
+                          </select>
+                      </div>
+  
+                      <div className="form-group">
+                          <label className="form-label">School Name</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.schoolName || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].schoolName = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+  
+                      <div className="form-group">
+                          <label className="form-label">Passing Year</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.passingYear || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].passingYear = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+                      
+                      <div className="form-group">
+                          <label className="form-label">Marks (%)</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.marks || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].marks = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+                  </>
+              );
+          }
+  
+          // ITI
+          else if (educationName === 'ITI') {
+              return (
+                  <>
+                      {specializationsList[index] && specializationsList[index].length > 0 && (
+                          <div className="form-group">
+                              <label className="form-label">Specialization</label>
+                              <select
+                                  className="form-input"
+                                  value={edu.specialization || ''}
+                                  onChange={(e) => {
+                                      const updated = [...educations];
+                                      updated[index].specialization = e.target.value;
+                                      setEducations(updated);
+                                  }}
+                              >
+                                  <option value="">Select Specialization</option>
+                                  {specializationsList[index].map((spec) => (
+                                      <option key={spec._id} value={spec.name}>{spec.name}</option>
+                                  ))}
+                              </select>
+                          </div>
+                      )}
+  
+                      <div className="form-group">
+                          <label className="form-label">ITI Name</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.collegeName || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].collegeName = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+  
+                      <div className="form-group">
+                          <label className="form-label">Passing Year</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.passingYear || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].passingYear = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+                      
+                      <div className="form-group">
+                          <label className="form-label">Marks (%)</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.marks || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].marks = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+                  </>
+              );
+          }
+  
+          // Graduation, Masters, PhD
+          else if (educationName === 'Graduation/Diploma' || educationName === 'Masters/Post-Graduation' || educationName === 'Doctorate/PhD') {
+              return (
+                  <>
+                      {coursesList[index] && coursesList[index].length > 0 && (
+                          <div className="form-group">
+                              <label className="form-label">Course</label>
+                              <select
+                                  className="form-input"
+                                  value={edu.course || ''}
+                                  onChange={(e) => handleCourseChange(e, index)}
+                              >
+                                  <option value="">Select Course</option>
+                                  {coursesList[index].map((course) => (
+                                      <option key={course._id} value={course._id}>{course.name}</option>
+                                  ))}
+                              </select>
+                          </div>
+                      )}
+  
+                      {specializationsList[index] && specializationsList[index].length > 0 && (
+                          <div className="form-group">
+                              <label className="form-label">Specialization</label>
+                              <select
+                                  className="form-input"
+                                  value={edu.specialization || ''}
+                                  onChange={(e) => {
+                                      const updated = [...educations];
+                                      updated[index].specialization = e.target.value;
+                                      setEducations(updated);
+                                  }}
+                              >
+                                  <option value="">Select Specialization</option>
+                                  {specializationsList[index].map((spec) => (
+                                      <option key={spec._id} value={spec.name}>{spec.name}</option>
+                                  ))}
+                              </select>
+                          </div>
+                      )}
+  
+                      <div className="form-group">
+                          <label className="form-label">University Name</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              placeholder="Enter university name"
+                              value={edu.universityName || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].universityName = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+  
+                      <div className="form-group">
+                          <label className="form-label">College Name</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.collegeName || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].collegeName = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+  
+                      <div className="form-group">
+                          <label className="form-label">Passing Year</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.passingYear || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].passingYear = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+                      
+                      <div className="form-group">
+                          <label className="form-label">Marks (%)</label>
+                          <input
+                              type="text"
+                              className="form-input"
+                              value={edu.marks || ''}
+                              onChange={(e) => {
+                                  const updated = [...educations];
+                                  updated[index].marks = e.target.value;
+                                  setEducations(updated);
+                              }}
+                          />
+                      </div>
+                  </>
+              );
+          }
+  
+          return null;
+      };
   // useLayoutEffect(() => {
   //   const newHeights = {};
   //   Object.keys(menuRefs).forEach((key) => {
@@ -383,38 +897,12 @@ function CandidateLayout({ children }) {
 
               {/* Event page  */}
 
-              <li className={`nav-item has-sub ${openSubmenu.events ? 'open' : ''}`}>
-                <a href="#" onClick={() => toggleSubmenu('events')}>
-                  <FontAwesomeIcon icon={faWallet} />
-                  <span className="menu-title">Events</span>
-                </a>
-                {/* <ul className={`menu-content ${openSubmenu.wallet ? 'open' : ''}`}> */}
-                <ul
-                  ref={menuRefs.events}
-                  className="menu-content"
-                  style={{
-                    maxHeight: submenuMaxHeight.events,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease-in-out'
-                  }}
-                >
-
-                  <li className={`nav-item ${activeItem === 'candidateevent' ? 'active' : ''}`}>
-                    <Link to="/candidate/candidateevent" onClick={() => { handleItemClick('candidateevent'); handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={farCircle} />
-                      <span className="menu-title">Event</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${activeItem === 'appliedevents' ? 'active' : ''}`}>
-                  <Link to="/candidate/appliedevents" onClick={() => { handleItemClick('appliedevents'); handleSidebarClose(); }}>
-                      <FontAwesomeIcon icon={farCircle} />
-                      <span className="menu-title">Applied Event</span>
-                    </Link>
-                  </li>
-                </ul>
+              <li className={`nav-item ${activeItem === 'candidateevent' ? 'active' : ''}`}>
+                <Link to="/candidate/candidateevent" onClick={() => { handleItemClick('candidateevent'); handleSidebarClose(); }}>
+                  <FontAwesomeIcon icon={farCircle} />
+                  <span className="menu-title">Event</span>
+                </Link>
               </li>
-
-
 
               {/* Request Loan */}
               <li className={`nav-item ${activeItem === 'requestLoan' ? 'active' : ''}`}>
@@ -472,8 +960,7 @@ function CandidateLayout({ children }) {
               <div className="content-body mb-4">
                 <Outlet />
 
-
-
+         
 
               </div>
               <CandidateFooter />

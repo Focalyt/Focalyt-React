@@ -634,7 +634,7 @@ function Jobs() {
                               <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
                                 <div className="row py-2">
                                   <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                    <a href={`${backendAppUrl}/jobdetailsmore/${course._id}`}>
+                                    <a href={`/candidate/login?returnUrl=/candidate/job/${course._id}`}>
                                       <span className="learnn pt-1 text-white">Learn More</span>
                                       <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
                                     </a>

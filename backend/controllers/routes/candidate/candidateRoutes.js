@@ -1024,7 +1024,7 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
   const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
 
   let canApply = false;
-  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.location && candidate.highestQualification) {
+  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.currentAddress && candidate.highestQualification) {
     if (candidate.isExperienced == false || candidate.isExperienced == true) {
       canApply = true;
     }

@@ -1,0 +1,807 @@
+/* Login Onboarding Modal Styles */
+.onboarding-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.onboarding-modal {
+  width: 95%;
+  max-width: 800px;
+  max-height: 90vh;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Modal Header */
+.modal-header {
+  padding: 20px 25px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.modal-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+  color: #333;
+  font-weight: 600;
+}
+
+.completion-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 40px;
+}
+
+.completion-bar {
+  width: 160px;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.completion-progress {
+  height: 100%;
+  background-color: #4caf50;
+  transition: width 0.3s ease;
+}
+
+.completion-text {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.close-button {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* Step Indicators */
+.step-indicators {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 40px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f9f9f9;
+}
+
+.step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  width: 25%;
+  cursor: pointer;
+}
+
+.step-indicator:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background-color: #e0e0e0;
+  top: 15px;
+  left: 50%;
+  z-index: 1;
+}
+
+.step-indicator.completed:not(:last-child)::after {
+  background-color: #4caf50;
+}
+
+.step-number {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 2;
+}
+
+.step-indicator.active .step-number {
+  background-color: #3f51b5;
+  color: white;
+}
+
+.step-indicator.completed .step-number {
+  background-color: #4caf50;
+  color: white;
+}
+
+.step-name {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.step-indicator.active .step-name {
+  color: #3f51b5;
+  font-weight: 600;
+}
+
+.step-indicator.completed .step-name {
+  color: #4caf50;
+}
+
+/* Modal Content */
+.modal-content {
+  padding: 25px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.step-content {
+  padding-bottom: 20px;
+}
+
+.step-content h3 {
+  font-size: 1.4rem;
+  margin: 0 0 5px 0;
+  color: #333;
+}
+
+.step-description {
+  color: #666;
+  margin-bottom: 25px;
+  font-size: 0.95rem;
+}
+
+/* Form Styles */
+.form-fields {
+  margin-bottom: 30px;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
+.form-group {
+  flex: 1;
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.form-control:focus {
+  border-color: #3f51b5;
+  outline: none;
+}
+
+textarea.form-control {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.required {
+  color: #f44336;
+}
+
+/* Work Experience Section */
+.work-experience-section {
+  margin-bottom: 25px;
+}
+
+.work-experience-section h4, 
+.skills-section h4, 
+.languages-section h4, 
+.interests-section h4 {
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  color: #333;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 10px;
+}
+
+.experience-type {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.experience-type label {
+  font-weight: 500;
+  margin-right: 15px;
+}
+
+.radio-group {
+  display: flex;
+  gap: 20px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.radio-option input {
+  margin-right: 8px;
+}
+
+.experience-item, 
+.education-item, 
+.certification-item {
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.fresher-section {
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.fresher-info {
+  margin: 0;
+  color: #666;
+  font-style: italic;
+}
+
+.remove-item-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.add-more-btn {
+  background-color: #f5f5f5;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+  padding: 10px 15px;
+  color: #3f51b5;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 10px;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+.add-more-btn:hover {
+  background-color: #e8e8e8;
+}
+
+/* Education Specific Styles */
+.board-autocomplete-wrapper {
+  position: relative;
+}
+
+.board-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  z-index: 10;
+  max-height: 150px;
+  overflow-y: auto;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.board-suggestions li {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.board-suggestions li:hover {
+  background-color: #f5f5f5;
+}
+
+/* Certificate Section */
+.no-certs-option {
+  margin-top: 15px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  margin-right: 10px;
+}
+
+/* Skills Section */
+.skill-row {
+  position: relative;
+  align-items: center;
+}
+
+.skill-name-group {
+  flex: 2;
+}
+
+.skill-level-group {
+  flex: 3;
+}
+
+.form-range {
+  width: 100%;
+  height: 6px;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  margin-top: 8px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.form-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3f51b5;
+  cursor: pointer;
+}
+
+.form-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3f51b5;
+  cursor: pointer;
+  border: none;
+}
+
+.remove-skill-btn, 
+.remove-language-btn {
+  background-color: #f44336;
+  border: none;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Language Section */
+.language-row {
+  position: relative;
+  align-items: center;
+}
+
+.language-name-group {
+  flex: 1;
+}
+
+.language-level-group {
+  flex: 1;
+}
+
+.proficiency-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.proficiency-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.proficiency-dot.active {
+  background-color: #3f51b5;
+}
+
+/* Interests Section */
+.section-info {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.interests-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.interest-tag {
+  display: flex;
+  align-items: center;
+  background-color: #f5f5f5;
+  border-radius: 20px;
+  padding: 5px 10px 5px 15px;
+  position: relative;
+}
+
+.interest-input {
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  outline: none;
+  width: 100px;
+}
+
+.remove-interest-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-left: 5px;
+}
+
+.add-interest-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: #f5f5f5;
+  border: 1px dashed #ccc;
+  color: #3f51b5;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 20px 25px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f9f9f9;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 15px;
+}
+
+.skip-btn {
+  border: 1px solid #ccc;
+  background-color: white;
+  color: #666;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.skip-btn:hover {
+  background-color: #f5f5f5;
+}
+
+.back-btn {
+  border: 1px solid #3f51b5;
+  background-color: white;
+  color: #3f51b5;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.back-btn:hover {
+  background-color: #f0f3ff;
+}
+
+.continue-btn {
+  background-color: #3f51b5;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.continue-btn:hover {
+  background-color: #303f9f;
+}
+
+.step-counter {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .onboarding-modal {
+    max-height: 95vh;
+  }
+  
+  .step-indicators {
+    padding: 15px;
+  }
+  
+  .step-name {
+    font-size: 0.75rem;
+  }
+  
+  .modal-content {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .completion-indicator {
+    margin: 15px 0 0 0;
+  }
+  
+  .close-button {
+    top: 10px;
+    right: 10px;
+  }
+  
+  .step-indicators {
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding: 15px 10px;
+  }
+  
+  .step-indicator {
+    min-width: 80px;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .modal-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+
+/* import React, { useState } from 'react';
+import './User.css';
+
+const User = () => {
+  const [currentStep, setCurrentStep] = useState(1);
+
+  const [formData, setFormData] = useState({
+    workExperience: { completed: false },
+    education: { completed: false },
+    certificate: { completed: false },
+    interest: { completed: false },
+  });
+
+  const [experience, setExperience] = useState({
+    jobTitle: '',
+    companyName: '',
+    from: '',
+    to: '',
+    jobDescription: '',
+  });
+
+  const [education, setEducation] = useState({
+    qualification: '',
+    institution: '',
+    passingYear: '',
+    marks: '',
+  });
+
+  const [certificate, setCertificate] = useState({
+    name: '',
+    issuedBy: '',
+    issueDate: '',
+  });
+
+  const [interest, setInterest] = useState('');
+
+  const handleContinue = () => {
+    if (currentStep === 1) {
+      setFormData(prev => ({ ...prev, workExperience: { completed: true } }));
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      if (!education.qualification) {
+        alert('Please enter qualification');
+        return;
+      }
+      setFormData(prev => ({ ...prev, education: { completed: true } }));
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
+      setFormData(prev => ({ ...prev, certificate: { completed: true } }));
+      setCurrentStep(4);
+    } else if (currentStep === 4) {
+      setFormData(prev => ({ ...prev, interest: { completed: true } }));
+      alert('Form Completed!');
+    }
+  };
+
+  const goToStep = (stepNumber) => {
+    if (
+      stepNumber === 1 ||
+      (stepNumber === 2 && formData.workExperience.completed) ||
+      (stepNumber === 3 && formData.education.completed) ||
+      (stepNumber === 4 && formData.certificate.completed)
+    ) {
+      setCurrentStep(stepNumber);
+    }
+  };
+
+  return (
+    <div className="user-container">
+      <div className="step-progress-container">
+        <div className="newloader">
+          <div
+            className="bar"
+            style={{
+              width:
+                currentStep === 1 ? '0%' :
+                  currentStep === 2 ? '33%' :
+                    currentStep === 3 ? '66%' : '100%'
+            }}
+          ></div>
+          <div className="check-bar-container">
+            {[1, 2, 3, 4].map(step => (
+              <div
+                key={step}
+                className={`check ${formData[
+                  step === 1 ? 'workExperience' :
+                  step === 2 ? 'education' :
+                  step === 3 ? 'certificate' : 'interest'
+                ].completed ? 'completed' : currentStep === step ? 'active' : ''}`}
+                onClick={() => goToStep(step)}
+              >
+                {formData[
+                  step === 1 ? 'workExperience' :
+                  step === 2 ? 'education' :
+                  step === 3 ? 'certificate' : 'interest'
+                ].completed ? (
+                  <svg stroke="white" strokeWidth="2" viewBox="0 0 24 24" fill="none">
+                    <path d="m4.5 12.75 6 6 9-13.5" strokeLinejoin="round" strokeLinecap="round"></path>
+                  </svg>
+                ) : (
+                  <span>{step}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="step-labels">
+          <div className={`step-label ${currentStep === 1 ? 'active' : ''}`}>Work Exp</div>
+          <div className={`step-label ${currentStep === 2 ? 'active' : ''}`}>Education</div>
+          <div className={`step-label ${currentStep === 3 ? 'active' : ''}`}>Certificate</div>
+          <div className={`step-label ${currentStep === 4 ? 'active' : ''}`}>Interest</div>
+        </div>
+      </div>
+
+      <div className="form-container">
+        {currentStep === 1 && (
+          <div className="step-content">
+            <h2>Work Experience</h2>
+            <input className="form-input" placeholder="Job Title" value={experience.jobTitle} onChange={(e) => setExperience({ ...experience, jobTitle: e.target.value })} />
+            <input className="form-input" placeholder="Company Name" value={experience.companyName} onChange={(e) => setExperience({ ...experience, companyName: e.target.value })} />
+            <input type="month" className="form-input" placeholder="From" value={experience.from} onChange={(e) => setExperience({ ...experience, from: e.target.value })} />
+            <input type="month" className="form-input" placeholder="To" value={experience.to} onChange={(e) => setExperience({ ...experience, to: e.target.value })} />
+            <textarea className="form-textarea" placeholder="Job Description" value={experience.jobDescription} onChange={(e) => setExperience({ ...experience, jobDescription: e.target.value })} />
+            <button className="continue-btn" onClick={handleContinue}>Continue</button>
+          </div>
+        )}
+
+        {currentStep === 2 && (
+          <div className="step-content">
+            <h2>Education</h2>
+            <input className="form-input" placeholder="Qualification" value={education.qualification} onChange={(e) => setEducation({ ...education, qualification: e.target.value })} />
+            <input className="form-input" placeholder="Institution" value={education.institution} onChange={(e) => setEducation({ ...education, institution: e.target.value })} />
+            <input className="form-input" placeholder="Year of Passing" value={education.passingYear} onChange={(e) => setEducation({ ...education, passingYear: e.target.value })} />
+            <input className="form-input" placeholder="Marks (%)" value={education.marks} onChange={(e) => setEducation({ ...education, marks: e.target.value })} />
+            <button className="continue-btn" onClick={handleContinue}>Continue</button>
+          </div>
+        )}
+
+        {currentStep === 3 && (
+          <div className="step-content">
+            <h2>Certificates</h2>
+            <input className="form-input" placeholder="Certificate Name" value={certificate.name} onChange={(e) => setCertificate({ ...certificate, name: e.target.value })} />
+            <input className="form-input" placeholder="Issued By" value={certificate.issuedBy} onChange={(e) => setCertificate({ ...certificate, issuedBy: e.target.value })} />
+            <input type="date" className="form-input" value={certificate.issueDate} onChange={(e) => setCertificate({ ...certificate, issueDate: e.target.value })} />
+            <button className="continue-btn" onClick={handleContinue}>Continue</button>
+          </div>
+        )}
+
+        {currentStep === 4 && (
+          <div className="step-content">
+            <h2>Interest</h2>
+            <input className="form-input" placeholder="e.g. AI, Music, Coding" value={interest} onChange={(e) => setInterest(e.target.value)} />
+            <button className="continue-btn" onClick={handleContinue}>Complete</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default User; */

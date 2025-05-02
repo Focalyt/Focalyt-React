@@ -11,7 +11,7 @@
                                 <div class="student_video">
                                     <a href="#"  data-bs-target="#videoModal" data-bs-toggle="modal" data-bs-link="<%= process.env.MIPIE_BUCKET_URL +'/' + job._company.mediaGalaryVideo %>"
                                         class="pointer img-fluid"><img src="<%= job._company.thumbnail ? process.env.MIPIE_BUCKET_URL +'/' + job._company.thumbnail : '/public_assets/images/newjoblisting/banner1.jpg' %>" class="digi img-fluid shadow rounded">
-                                        <img src="/public_assets/images/newjoblisting/play.svg" alt="" class="play__btn"></a>
+                                        <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="" class="play__btn"></a>
                                     <!-- <figure>
                                         <img src="/public_assets/images/newjoblisting/banner1.jpg" alt="" class="video">
                                     </figure> -->
@@ -36,34 +36,34 @@
                                             <% if(job._company.mediaGallery?.length>0) { %>
                                                 <%job._company.mediaGallery.forEach((photo, i)=>{%>
                                                 <div class="carousel-item active">
-                                                  <img src="<%=photo ? process.env.MIPIE_BUCKET_URL +'/' +photo : '/public_assets/images/newjoblisting/banner1.jpg'%>" class="d-block w-100 rounded shadow" alt="...">
+                                                  <img src="<%=photo ? process.env.MIPIE_BUCKET_URL +'/' +photo : '/Assets/public_assets/images/newjoblisting/banner1.jpg'%>" class="d-block w-100 rounded shadow" alt="...">
                                                 </div>
                                                 <%})%>
                                                 <% } else { %>
                                                     <div class="carousel-item active">
-                                                        <img src="/public_assets/images/newjoblisting/stu_img_one.svg"
+                                                        <img src="/Assets/public_assets/images/newjoblisting/stu_img_one.svg"
                                                             class="d-block mx-auto" alt="...">
                                                     </div>
                                                     <div class="carousel-item">
-                                                        <img src="/public_assets/images/newjoblisting/stu_img.svg"
+                                                        <img src="/Assets/public_assets/images/newjoblisting/stu_img.svg"
                                                             class="d-block mx-auto" alt="...">
                                                     </div>
                                                     <div class="carousel-item">
-                                                        <img src="/public_assets/images/newjoblisting/stu_img_one.svg"
+                                                        <img src="/Assets/public_assets/images/newjoblisting/stu_img_one.svg"
                                                             class="d-block mx-auto" alt="...">
                                                     </div>
                                                     <% } %>
 
                                             <!-- <div class="carousel-item active">
-                                                <img src="/public_assets/images/newjoblisting/stu_img_one.svg"
+                                                <img src="/Assets/public_assets/images/newjoblisting/stu_img_one.svg"
                                                     class="d-block mx-auto" alt="...">
                                             </div>
                                             <div class="carousel-item">
-                                                <img src="/public_assets/images/newjoblisting/stu_img.svg"
+                                                <img src="/Assets/public_assets/images/newjoblisting/stu_img.svg"
                                                     class="d-block mx-auto" alt="...">
                                             </div>
                                             <div class="carousel-item">
-                                                <img src="/public_assets/images/newjoblisting/stu_img_one.svg"
+                                                <img src="/Assets/public_assets/images/newjoblisting/stu_img_one.svg"
                                                     class="d-block mx-auto" alt="...">
                                             </div> -->
                                         </div>
@@ -130,7 +130,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/education.png"
+                                                            src="/Assets/public_assets/images/purple/education.png"
                                                             class="img-fluid" draggable="false">Education</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body">
@@ -142,7 +142,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/age.png"
+                                                            src="/Assets/public_assets/images/purple/age.png"
                                                             class="img-fluid" draggable="false">Age</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body">
@@ -154,7 +154,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/location.png"
+                                                            src="/Assets/public_assets/images/purple/location.png"
                                                             class="img-fluid" draggable="false">Location</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body text-truncate text-end">
@@ -167,7 +167,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/experience.png"
+                                                            src="/Assets/public_assets/images/purple/experience.png"
                                                             class="img-fluid" draggable="false">Experience</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body">
@@ -179,7 +179,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/job-mode.png"
+                                                            src="/Assets/public_assets/images/purple/job-mode.png"
                                                             class="img-fluid" draggable="false">Job Mode</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body">
@@ -191,7 +191,7 @@
                                             <div class=" feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/shifts.png"
+                                                            src="/Assets/public_assets/images/purple/shifts.png"
                                                             class="img-fluid" draggable="false">Shift</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body">
@@ -207,7 +207,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/gender.png"
+                                                            src="/Assets/public_assets/images/purple/gender.png"
                                                             class="img-fluid" draggable="false">Gender</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body">
@@ -219,7 +219,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/experience.png"
+                                                            src="/Assets/public_assets/images/purple/experience.png"
                                                             class="img-fluid" draggable="false">Required Skills</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body required_skills text-end">
@@ -237,7 +237,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/English_level.png"
+                                                            src="/Assets/public_assets/images/purple/English_level.png"
                                                             class="img-fluid" draggable="false">Requirement</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body">
@@ -251,7 +251,7 @@
                                             <div class="feature-widget-7 border-bottom">
                                                 <div class="feature-widget-7__icon-wrapper my-auto">
                                                     <h5 class="fw-normal"><img
-                                                            src="/public_assets/images/purple/English_level.png"
+                                                            src="/Assets/public_assets/images/purple/English_level.png"
                                                             class="img-fluid" draggable="false">Payout</h5>
                                                 </div>
                                                 <div class="feature-widget-7__body">
@@ -276,22 +276,22 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto mx-auto">
                                                             <h5 class="fw-normal"><img
-                                                                    src="/public_assets/images/purple/reg_fee.png"
+                                                                    src="/Assets/public_assets/images/purple/reg_fee.png"
                                                                     class="img-fluid" draggable="false">Salary <%=job.isFixed? ' ₹ ' + job.amount||'NA' : 'Range ₹ ' + (job.min||'NA') + ' - ' +job.max||'NA' %></h5>  
                                                         </div>
                                                     </div>
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Health Insurance</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Health Insurance')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Health Insurance')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                     draggable="false">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Health Insurance')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Health Insurance')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                     draggable="false">
                                                             </p>
                                                         </div>
@@ -300,15 +300,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Overtime</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Overtime')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Overtime')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Overtime')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Overtime')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -316,15 +316,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Accomodation</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Accomodation')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Accomodation')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Accomodation')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Accomodation')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -332,15 +332,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Transport</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Transport')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Transport')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Transport')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Transport')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -348,15 +348,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Provident Fund</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('PF')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('PF')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('PF')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('PF')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -364,15 +364,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Joining Bonus</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Joining Bonus')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Joining Bonus')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Joining Bonus')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Joining Bonus')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -380,15 +380,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Fuel Allowance</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Fuel Allowance')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Fuel Allowance')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Fuel Allowance')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Fuel Allowance')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -396,15 +396,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Travel Allowance</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Travel Allowance')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Travel Allowance')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Travel Allowance')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Travel Allowance')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -412,15 +412,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Laptop</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Laptop')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Laptop')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Laptop')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Laptop')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -428,15 +428,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Mobile</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Mobile')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Mobile')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Mobile')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Mobile')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -444,15 +444,15 @@
                                                     <div class="feature-widget-7 border-bottom">
                                                         <div class="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 class="fw-normal bullet"><img
-                                                                    src="/public_assets/images/purple/ul_li_shape.svg"
+                                                                    src="/Assets/public_assets/images/purple/ul_li_shape.svg"
                                                                     draggable="false">Others</h5>
                                                         </div>
                                                         <div class="feature-widget-7__body">
                                                             <p
                                                                 class="feature-widget-7__title mb-0 text-white fw-normal">
-                                                                <img src="/public_assets/images/icons/<%=job.benifits?.includes('Others')? 'active_tick.svg' :'dis_tick.svg'%>"
+                                                                <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Others')? 'active_tick.svg' :'dis_tick.svg'%>"
                                                                 draggable="false">
-                                                            <img src="/public_assets/images/icons/<%=job.benifits?.includes('Others')? 'dis_cross.svg' :'active_cross.svg'%>"
+                                                            <img src="/Assets/public_assets/images/icons/<%=job.benifits?.includes('Others')? 'dis_cross.svg' :'active_cross.svg'%>"
                                                                 draggable="false">
                                                             </p>
                                                         </div>
@@ -514,14 +514,14 @@
                                     <div class="row">
                                         <div
                                             class="col-xl-6 col-lg-6 col-md-8 col-sm-12 col-12 position-relative my-md-2 my-3 mx-auto">
-                                            <img src="/public_assets/images/resource/job-1.jpg"
+                                            <img src="/Assets/public_assets/images/resource/job-1.jpg"
                                                 class="free-pick img-fluid rounded shadow mt-2" alt="">
                                             <a target="_blank"
                                                 href="<%= process.env.MIPIE_BUCKET_URL+'/'+job?.jobVideo%>"
                                                 class="glightbox play-btn">
                                                 <div class="video-icon-pic">
                                                     <div class="pulse">
-                                                        <img src="/public_assets/images/resource/ytplay.png"
+                                                        <img src="/Assets/public_assets/images/resource/ytplay.png"
                                                             class="uplay-job">
                                                     </div>
                                                 </div>
@@ -565,7 +565,7 @@
                             <ul class="contact-info">
                                 <%job.jobDescription.split('\n').forEach((description, i)=>{%>
                                 <li >
-                                    <img src="/public_assets/images/purple/ul_li_shape.svg" draggable="false">
+                                    <img src="/Assets/public_assets/images/purple/ul_li_shape.svg" draggable="false">
                                     <%=description%>
                                 </li> 
                                 <% })%>
@@ -581,7 +581,7 @@
                             <ul class="contact-info">
                                 <%job.duties.split('\n').forEach((duty, i)=>{%>
                                 <li >
-                                    <img src="/public_assets/images/purple/ul_li_shape.svg" draggable="false">
+                                    <img src="/Assets/public_assets/images/purple/ul_li_shape.svg" draggable="false">
                                     <%=duty%>
                                 </li>
                                 <% })%>
@@ -598,7 +598,7 @@
                             <ul class="contact-info">
                                 <%job.remarks.split('\n').forEach((remark, i)=>{%>
                                 <li >
-                                    <img src="/public_assets/images/purple/ul_li_shape.svg" draggable="false">
+                                    <img src="/Assets/public_assets/images/purple/ul_li_shape.svg" draggable="false">
                                     <%=remark%>
                                 </li>
                                 <% })%>
@@ -626,7 +626,7 @@
                                             <a href="#"  data-bs-target="#videoModal" data-bs-toggle="modal" data-bs-link="<%= process.env.MIPIE_BUCKET_URL +'/' + course.videos[0] %>"
                                                 class="pointer img-fluid"><img src="<%= course.thumbnail ? process.env.MIPIE_BUCKET_URL +'/' + course.thumbnail : '/public_assets/images/newjoblisting/digital-marketting.png' %>" class="digi" alt="">
                                             </a>
-                                            <img src="/public_assets/images/newjoblisting/playy.svg" alt=""
+                                            <img src="/Assets/public_assets/images/newjoblisting/playy.svg" alt=""
                                                 class="group1">
                                             <!-- <div id="base">
                                                 <p class="text-center p-0 match_card fw-bolder">Now At</p>
@@ -672,7 +672,7 @@
                                                                     <div
                                                                         class="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
                                                                         <figure class="text-end">
-                                                                            <img src="/public_assets/images/icons/eligibility.png"
+                                                                            <img src="/Assets/public_assets/images/icons/eligibility.png"
                                                                                 class="img-fluid p-0" draggable="false">
                                                                         </figure>
                                                                     </div>
@@ -691,7 +691,7 @@
                                                                     <div
                                                                         class="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
                                                                         <figure class="text-end">
-                                                                            <img src="/public_assets/images/icons/duration.png"
+                                                                            <img src="/Assets/public_assets/images/icons/duration.png"
                                                                                 class="img-fluid p-0" draggable="false">
                                                                         </figure>
                                                                     </div>
@@ -710,7 +710,7 @@
                                                                     <div
                                                                         class="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
                                                                         <figure class="text-end">
-                                                                            <img src="/public_assets/images/icons/location-pin.png"
+                                                                            <img src="/Assets/public_assets/images/icons/location-pin.png"
                                                                                 class="img-fluid p-0" draggable="false">
                                                                         </figure>
                                                                     </div>
@@ -729,7 +729,7 @@
                                                                     <div
                                                                         class="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
                                                                         <figure class="text-end">
-                                                                            <img src="/public_assets/images/icons/job-mode.png"
+                                                                            <img src="/Assets/public_assets/images/icons/job-mode.png"
                                                                                 class="img-fluid p-0" draggable="false">
                                                                         </figure>
                                                                     </div>
@@ -759,7 +759,7 @@
                                                         class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
                                                         <a href="/coursedetails/<%=course._id%>"><span
                                                                 class="learnn pt-1 text-white">Learn More</span> <img
-                                                                src="/public_assets/images/link.png"
+                                                                src="/Assets/public_assets/images/link.png"
                                                                 class="align-text-top"></a>
                                                     </div>
 

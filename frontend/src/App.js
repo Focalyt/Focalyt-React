@@ -53,7 +53,7 @@ import UploadTemplates from './Pages/App/College/UploadTemplates/UploadTemplates
 import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
-import User from './Component/Layouts/App/Candidates/User/User'
+import User from './Component/Layouts/App/Candidates/StepContainer/StepContainer'
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
