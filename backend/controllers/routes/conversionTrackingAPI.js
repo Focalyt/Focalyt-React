@@ -50,7 +50,7 @@ router.post('/meta/track-conversion', [isCandidate], async (req, res) => {
 
         // 🔍 Find candidate
         const candidate = await CandidateProfile.findOne({ mobile }).lean();
-        console.log('candidate',candidate)
+        console.log('candidate', candidate)
         if (!candidate) {
             return res.status(404).json({ status: false, message: "Candidate not found" });
         }
@@ -60,12 +60,13 @@ router.post('/meta/track-conversion', [isCandidate], async (req, res) => {
         const lastName = nameParts[1] || "";
 
         const dob = candidate.dob;
-        let doby, dobm, dobd;
-
+        // Format DOB correctly
+        let normalizedDob;
         if (dob instanceof Date && !isNaN(dob)) {
-            const isoDob = dob.toISOString().split("T")[0];
-            [doby, dobm, dobd] = isoDob.split("-");
+            const isoDob = dob.toISOString().split("T")[0]; // "1997-02-16"
+            normalizedDob = isoDob.replace(/-/g, ""); // "19970216"
         }
+
 
         const accessToken = process.env.FB_CONVERSION_ACCESS_TOKEN;
         const pixelId = process.env.FB_CONVERSION_PIXEL_ID;
@@ -88,13 +89,11 @@ router.post('/meta/track-conversion', [isCandidate], async (req, res) => {
                         ct: candidate?.personalInfo?.currentAddress?.city ? hash(candidate.personalInfo.currentAddress.city) : undefined,
                         st: candidate?.personalInfo?.currentAddress?.state ? hash(candidate.personalInfo.currentAddress.state) : undefined,
                         country: hash("IN"),
-                        doby: doby ? hash(doby) : undefined,
-                        dobm: dobm ? hash(dobm) : undefined,
-                        dobd: dobd ? hash(dobd) : undefined,
+                        db: normalizedDob ? hash(normalizedDob) : undefined, // ✅ Updated DOB
                         client_user_agent: userAgent,
                         client_ip_address: ip,
-                        fbp: req.body.fbp || undefined,
-                        fbc: req.body.fbc || undefined
+                        fbp: fbp || undefined,
+                        fbc: fbc || undefined
                     }
                 }
             ],
@@ -102,7 +101,7 @@ router.post('/meta/track-conversion', [isCandidate], async (req, res) => {
         };
 
         console.log("user_data", payload.data[0].user_data);
-        
+
 
 
         const cleanPayload = JSON.parse(JSON.stringify(payload)); // remove undefined

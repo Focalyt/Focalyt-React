@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import CandidateHeader from './CandidateHeader/CandidateHeader'
 import CandidateFooter from './CandidateFooter/CandidateFooter'
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCalendarAlt } from "@fortawesome/free-solid-svg-icons";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -897,11 +898,35 @@ const educationList = [
 
               {/* Event page  */}
 
-              <li className={`nav-item ${activeItem === 'candidateevent' ? 'active' : ''}`}>
-                <Link to="/candidate/candidateevent" onClick={() => { handleItemClick('candidateevent'); handleSidebarClose(); }}>
-                  <FontAwesomeIcon icon={farCircle} />
-                  <span className="menu-title">Event</span>
-                </Link>
+              <li className={`nav-item has-sub ${openSubmenu.events ? 'open' : ''}`}>
+                <a href="#" onClick={() => toggleSubmenu('events')}>
+                <FontAwesomeIcon icon={faCalendarAlt} />
+                  <span className="menu-title">Events</span>
+                </a>
+                {/* <ul className={`menu-content ${openSubmenu.wallet ? 'open' : ''}`}> */}
+                <ul
+                  ref={menuRefs.events}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.events,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out'
+                  }}
+                >
+
+                  <li className={`nav-item ${activeItem === 'candidateevent' ? 'active' : ''}`}>
+                    <Link to="/candidate/candidateevent" onClick={() => { handleItemClick('candidateevent'); handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farCircle} />
+                      <span className="menu-title">Event</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${activeItem === 'appliedevents' ? 'active' : ''}`}>
+                  <Link to="/candidate/appliedevents" onClick={() => { handleItemClick('appliedevents'); handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farCircle} />
+                      <span className="menu-title">Applied Event</span>
+                    </Link>
+                  </li>
+                </ul>
               </li>
 
               {/* Request Loan */}

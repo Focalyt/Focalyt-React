@@ -98,12 +98,12 @@ const CandidateProfile = () => {
     try {
       // Get the resume URL from local storage or from your state
       const resumeKey = localStorage.getItem('resume');
-      
+
       if (!resumeKey) {
         alert("Resume not found. Please upload it again.");
         return;
       }
-      
+
       // Construct the URL to view the resume
       // This assumes your bucket URL is already set in environment variables
       const url = `${bucketUrl}/${resumeKey}`;
@@ -126,10 +126,10 @@ const CandidateProfile = () => {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-  
+
     const fileType = file.name;
     const fileSize = file.size;
-  
+
     if (!checkCvValidation(fileType) && !checkCVSize(fileSize)) {
       alert("Upload the CV in .docx, .doc, .jpg, .jpeg, .png or pdf format and size should be less than 5MB");
       e.target.value = '';
@@ -143,32 +143,32 @@ const CandidateProfile = () => {
       e.target.value = '';
       return;
     }
-  
+
     const formData = new FormData();
     formData.append("file", file);
-  
+
     const headers = {
       headers: {
         'x-auth': localStorage.getItem('token'),
         'Content-Type': 'multipart/form-data'
       }
     };
-  
+
     try {
       const result = await axios.post(`${backendUrl}/api/uploadSingleFile`, formData, headers);
       console.log("📦 Upload response:", result.data);
-  
+
       if (result.data.status) {
         localStorage.setItem("resume", result.data.data.Key); // Saving key like original
-        
+
         // Store file info in localStorage
         const currentDate = new Date().toLocaleDateString('en-GB', {
           day: 'numeric', month: 'short', year: 'numeric'
         }).replace(/ /g, ' ');
-        
+
         localStorage.setItem('resumeFileName', file.name);
         localStorage.setItem('resumeUploadDate', currentDate);
-        
+
         setFileName(file.name);
         setUploadDate(currentDate);
       }
@@ -249,7 +249,7 @@ const CandidateProfile = () => {
       });
 
       if (res.data.status && res.data.data.Location) {
-// Store file info in localStorage before updating profile
+        // Store file info in localStorage before updating profile
         const currentDate = new Date().toLocaleDateString('en-GB', {
           day: 'numeric', month: 'short', year: 'numeric'
         }).replace(/ /g, ' ');
@@ -257,8 +257,8 @@ const CandidateProfile = () => {
         localStorage.setItem('resumeUploadDate', currentDate)
 
         // Set the state values
-      setFileName(file.name);
-      setUploadDate(currentDate);
+        setFileName(file.name);
+        setUploadDate(currentDate);
 
 
         // ✅ Resume uploaded, now update profile
@@ -311,11 +311,11 @@ const CandidateProfile = () => {
   useEffect(() => {
     const savedFileName = localStorage.getItem('resumeFileName');
     const savedUploadDate = localStorage.getItem('resumeUploadDate');
-    
+
     if (savedFileName) {
       setFileName(savedFileName);
     }
-    
+
     if (savedUploadDate) {
       setUploadDate(savedUploadDate);
     }
@@ -1420,24 +1420,25 @@ const CandidateProfile = () => {
                       <i className="bi bi-person"></i>
                     </div>
                   )}
-                  <div className="image-upload-overlay">
-                    <label>
-                      <i className="bi bi-camera"></i>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            uploadCV(file, 'image');
-                            e.target.value = null; // Direct upload on file selection
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
+
+                  {/* Wrap the entire overlay in <label> */}
+                  <label className="image-upload-overlay" style={{ cursor: 'pointer' }}>
+                    <i className="bi bi-camera"></i>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          uploadCV(file, 'image');
+                          e.target.value = null;
+                        }
+                      }}
+                    />
+                  </label>
                 </div>
+
               </div>
 
               <div className="profile-info">
@@ -2793,115 +2794,115 @@ const CandidateProfile = () => {
       </div>
 
       <div className="section-order">
-  <div className="section fadeInUp resume">
-    <div className="heading-container">
-      <div className="text-emoji-container">
-        <div className="text-container">
-          <h1 className="section-heading title-16-bold">Uploaded Resume</h1>
-          <h2 className="section-sub-heading title-14-medium">
-            Your resume is the first impression you make on potential employers. Craft it carefully to secure your desired job or internship.
-          </h2>
+        <div className="section fadeInUp resume">
+          <div className="heading-container">
+            <div className="text-emoji-container">
+              <div className="text-container">
+                <h1 className="section-heading title-16-bold">Uploaded Resume</h1>
+                <h2 className="section-sub-heading title-14-medium">
+                  Your resume is the first impression you make on potential employers. Craft it carefully to secure your desired job or internship.
+                </h2>
+              </div>
+            </div>
+          </div>
+
+          <div className="uploaded-container">
+            <div className="file-details">
+              <div className="file-name title-14-bold">{fileName}</div>
+              <div className="uploaded-date title-14-regular">Uploaded on {uploadDate}</div>
+            </div>
+
+            <div className="action-container">
+              {/* View button */}
+              <div className="border-box view"
+                onClick={viewResume}
+                style={{ cursor: 'pointer' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 2.625C3.5 2.625 1.1375 7 1.1375 7C1.1375 7 3.5 11.375 7 11.375C10.5 11.375 12.8625 7 12.8625 7C12.8625 7 10.5 2.625 7 2.625Z"
+                    stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M7 9.1875C8.2426 9.1875 9.25 8.18008 9.25 6.9375C9.25 5.69492 8.2426 4.6875 7 4.6875C5.75736 4.6875 4.75 5.69492 4.75 6.9375C4.75 8.18008 5.75736 9.1875 7 9.1875Z"
+                    stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+
+              <div className="border-box delete"
+                onClick={() => {
+                  setFileName("");
+                  setUploadDate("");
+                  localStorage.removeItem('resumeFileName');
+                  localStorage.removeItem('resumeUploadDate');
+                  localStorage.removeItem('resume');
+                  alert('Resume deleted');
+                  // You may want to call a function to delete from backend as well
+                }}
+                style={{ cursor: 'pointer' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <g clipPath="url(#clip0_2370_12506)">
+                    <path d="M1.52734 3.35156H2.74333H12.4712"
+                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M4.56812 3.35189V2.1359C4.56812 1.81341 4.69623 1.50412 4.92427 1.27608C5.15231 1.04803 5.4616 0.919922 5.7841 0.919922H8.21606C8.53856 0.919922 8.84785 1.04803 9.07589 1.27608C9.30393 1.50412 9.43205 1.81341 9.43205 2.1359V3.35189"
+                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M11.256 3.35189V11.8638C11.256 12.1863 11.1279 12.4956 10.8999 12.7236C10.6718 12.9516 10.3625 13.0798 10.04 13.0798H3.96012C3.63762 13.0798 3.32833 12.9516 3.10029 12.7236C2.87225 12.4956 2.74414 12.1863 2.74414 11.8638V3.35189H11.256Z"
+                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5.7832 6.39258V10.0405"
+                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M8.21484 6.39258V10.0405"
+                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </g>
+                  <defs>
+                    <clipPath id="clip0_2370_12506">
+                      <rect width="14" height="14" fill="white" />
+                    </clipPath>
+                  </defs>
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+      {showResumeViewer && (
+        <div className="resume-viewer-overlay">
+          <div className="resume-viewer-modal">
+            <div className="modal-header">
+              <h5>Resume: {fileName}</h5>
+              <button className="close-modal" onClick={() => setShowResumeViewer(false)}>
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
 
-    <div className="uploaded-container">
-  <div className="file-details">
-    <div className="file-name title-14-bold">{fileName}</div>
-    <div className="uploaded-date title-14-regular">Uploaded on {uploadDate}</div>
-  </div>
-
-  <div className="action-container">
-    {/* View button */}
-    <div className="border-box view" 
-         onClick={viewResume}
-         style={{ cursor: 'pointer' }}>
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <path d="M7 2.625C3.5 2.625 1.1375 7 1.1375 7C1.1375 7 3.5 11.375 7 11.375C10.5 11.375 12.8625 7 12.8625 7C12.8625 7 10.5 2.625 7 2.625Z" 
-              stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M7 9.1875C8.2426 9.1875 9.25 8.18008 9.25 6.9375C9.25 5.69492 8.2426 4.6875 7 4.6875C5.75736 4.6875 4.75 5.69492 4.75 6.9375C4.75 8.18008 5.75736 9.1875 7 9.1875Z" 
-              stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    </div>
-
-    <div className="border-box delete" 
-         onClick={() => {
-           setFileName("");
-           setUploadDate("");
-           localStorage.removeItem('resumeFileName');
-           localStorage.removeItem('resumeUploadDate');
-           localStorage.removeItem('resume');
-           alert('Resume deleted');
-           // You may want to call a function to delete from backend as well
-         }}
-         style={{ cursor: 'pointer' }}>
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <g clipPath="url(#clip0_2370_12506)">
-          <path d="M1.52734 3.35156H2.74333H12.4712"
-            stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M4.56812 3.35189V2.1359C4.56812 1.81341 4.69623 1.50412 4.92427 1.27608C5.15231 1.04803 5.4616 0.919922 5.7841 0.919922H8.21606C8.53856 0.919922 8.84785 1.04803 9.07589 1.27608C9.30393 1.50412 9.43205 1.81341 9.43205 2.1359V3.35189"
-            stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M11.256 3.35189V11.8638C11.256 12.1863 11.1279 12.4956 10.8999 12.7236C10.6718 12.9516 10.3625 13.0798 10.04 13.0798H3.96012C3.63762 13.0798 3.32833 12.9516 3.10029 12.7236C2.87225 12.4956 2.74414 12.1863 2.74414 11.8638V3.35189H11.256Z"
-            stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M5.7832 6.39258V10.0405"
-            stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M8.21484 6.39258V10.0405"
-            stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-        </g>
-        <defs>
-          <clipPath id="clip0_2370_12506">
-            <rect width="14" height="14" fill="white" />
-          </clipPath>
-        </defs>
-      </svg>
-    </div>
-  </div>
-</div>
-  </div>
-</div>
-{showResumeViewer && (
-  <div className="resume-viewer-overlay">
-    <div className="resume-viewer-modal">
-      <div className="modal-header">
-        <h5>Resume: {fileName}</h5>
-        <button className="close-modal" onClick={() => setShowResumeViewer(false)}>
-          <i className="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div className="modal-body">
-        {resumeUrl.endsWith('.pdf') ? (
-          // For PDF files
-          <iframe 
-            src={`${resumeUrl}#toolbar=0`} 
-            className="resume-iframe" 
-            title="Resume Viewer"
-          ></iframe>
-        ) : resumeUrl.endsWith('.doc') || resumeUrl.endsWith('.docx') ? (
-          // For Word documents - using Google Docs Viewer
-          <iframe 
-            src={`https://docs.google.com/viewer?url=${encodeURIComponent(resumeUrl)}&embedded=true`} 
-            className="resume-iframe" 
-            title="Resume Viewer"
-          ></iframe>
-        ) : (
-          // For other formats or fallback
-          <div className="resume-fallback">
-            <p>This resume format cannot be directly viewed in the browser.</p>
-            <a 
-              href={resumeUrl} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="download-link"
-            >
-              <i className="bi bi-download me-2"></i> Download to view
-            </a>
+            <div className="modal-body">
+              {resumeUrl.endsWith('.pdf') ? (
+                // For PDF files
+                <iframe
+                  src={`${resumeUrl}#toolbar=0`}
+                  className="resume-iframe"
+                  title="Resume Viewer"
+                ></iframe>
+              ) : resumeUrl.endsWith('.doc') || resumeUrl.endsWith('.docx') ? (
+                // For Word documents - using Google Docs Viewer
+                <iframe
+                  src={`https://docs.google.com/viewer?url=${encodeURIComponent(resumeUrl)}&embedded=true`}
+                  className="resume-iframe"
+                  title="Resume Viewer"
+                ></iframe>
+              ) : (
+                // For other formats or fallback
+                <div className="resume-fallback">
+                  <p>This resume format cannot be directly viewed in the browser.</p>
+                  <a
+                    href={resumeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="download-link"
+                  >
+                    <i className="bi bi-download me-2"></i> Download to view
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
       {/* <div className="section-order">
         <div className="section fadeInUp resume">
           <div className="heading-container">
