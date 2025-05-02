@@ -4394,6 +4394,8 @@ if (Array.isArray(experiences) && experiences.length > 0) {
 router.patch('/updatefiles', [isCandidate, authenti], async (req, res) => {
   try {
     // Step 1: Find dynamic key (should be only 1 key in body)
+
+    console.log('updatefiles')
     const keys = Object.keys(req.body);
     if (keys.length !== 1) {
       return res.send({ status: false, message: 'Invalid request structure' });
@@ -4402,9 +4404,11 @@ router.patch('/updatefiles', [isCandidate, authenti], async (req, res) => {
     const fieldName = keys[0];
     const fileData = req.body[fieldName];
 
+    console.log('fieldName',fieldName,'fileData',fileData)
+
     // Step 2: Validate allowed fields
     const arrayFields = ['resume', 'voiceIntro'];
-    const singleFields = ['profilevideo', 'image'];
+    const singleFields = ['profilevideo', 'image','focalytProfile'];
 
     if (![...arrayFields, ...singleFields].includes(fieldName)) {
       return res.send({ status: false, message: 'Unauthorized field update' });
@@ -4414,12 +4418,14 @@ router.patch('/updatefiles', [isCandidate, authenti], async (req, res) => {
     const updateQuery = arrayFields.includes(fieldName)
       ? { $push: { [`personalInfo.${fieldName}`]: fileData } }
       : { [`personalInfo.${fieldName}`]: fileData.url }; // Assuming single fields hold only URL
-
+console.log('updateQuery',updateQuery)
     // Step 4: Execute update
-    await Candidate.findOneAndUpdate(
+    const candidate = await Candidate.findOneAndUpdate(
       { mobile: req.user.mobile },
       updateQuery
     );
+
+    console.log('candidate',candidate)
 
     return res.send({ status: true, message: `${fieldName} updated successfully` });
 

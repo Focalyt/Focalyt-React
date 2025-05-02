@@ -34,6 +34,7 @@ const candidateProfileSchema = new Schema(
         url: { type: String },
         uploadedAt: { type: Date, default: Date.now }
       }],
+      focalytProfile: { type: String },
       linkedInUrl: { type: String },
       facebookUrl: { type: String },
       twitterUrl: { type: String },

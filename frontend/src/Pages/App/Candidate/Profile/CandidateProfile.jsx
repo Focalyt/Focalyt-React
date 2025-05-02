@@ -267,8 +267,11 @@ const CandidateProfile = () => {
           url: res.data.data.Location,
           uploadedAt: new Date()
         };
+        console.log('file uploaded on s3')
 
-        updateFileInProfile(uploadeddata, filename);
+        await updateFileInProfile(uploadeddata, filename);
+
+        
       }
     } catch (err) {
       console.error("Upload failed:", err);
@@ -279,6 +282,7 @@ const CandidateProfile = () => {
   const updateFileInProfile = async (dataObject, schemaFieldName) => {
     try {
       const token = localStorage.getItem('token');
+      console.log('updateFileInProfile hitting')
 
       const res = await axios.patch(`${backendUrl}/candidate/updatefiles`, {
         [schemaFieldName]: dataObject
@@ -1205,7 +1209,7 @@ const CandidateProfile = () => {
 
       if (res.data.status) {
         alert('CV Saved Successfully!');
-        window.location.reload();
+        // window.location.reload();
 
       } else {
         alert('Failed to save CV!');
@@ -2778,9 +2782,70 @@ const CandidateProfile = () => {
           />
         </label>
 
-        <button className="save-resume" onClick={handleSaveCV}>
+        {/* <button className="save-resume" onClick={handleSaveCV}>
           <i className="bi bi-save me-2"></i> Save Resume
-        </button>
+        </button> */}
+
+<button 
+  className="save-resume" 
+  onClick={async () => {
+    // First check if declaration is checked
+    if (!declaration?.isChecked) {
+      alert("Please accept the declaration before saving your resume.");
+      return;
+    }
+    
+    // First save the resume data
+    await handleSaveCV();
+    
+    // Then open the preview to access the element
+    setShowPreview(true);
+    
+    // Need to wait for the preview to render
+    setTimeout(async () => {
+      try {
+        // Now try to get the element
+        const element = document.getElementById('resume-download');
+        
+        if (!element) {
+          console.error("Resume element still not found after showing preview");
+          alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
+          return;
+        }
+        
+        const opt = {
+          margin: 0.5,
+          filename: 'resume.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Generate blob
+        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+        
+        // Create a file object from the blob
+        const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
+          type: 'application/pdf'
+        });
+        
+        // Upload to focalytProfile
+        await uploadCV(pdfFile, 'focalytProfile');
+        
+        // Close the preview
+        setShowPreview(false);
+        
+        alert('Resume has been saved successfully, including the PDF for your profile!');
+      } catch (err) {
+        console.error("PDF generation error:", err);
+        alert('Resume data saved, but there was an error generating the PDF profile.');
+        setShowPreview(false); // Close preview on error
+      }
+    }, 1000); // Wait 1 second for preview to render
+  }}
+>
+  <i className="bi bi-save me-2"></i> Save Resume
+</button>
 
         <button className="preview-resume" onClick={() => {
           if (!declaration?.isChecked) {
@@ -3422,6 +3487,46 @@ const CandidateProfile = () => {
               >
                 <i className="bi bi-download"></i> Download PDF
               </button>
+
+{/* <button
+  className="download-resume-btn"
+  onClick={() => {
+    const element = document.getElementById('resume-download');
+    const opt = {
+      margin: 0.5,
+      filename: 'resume.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+
+    // First generate a blob instead of directly saving
+    html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+      // Create a file object from the blob
+      const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
+        type: 'application/pdf'
+      });
+      
+      // Upload this file to your backend using your existing uploadCV function
+      uploadCV(pdfFile, 'focalytProfile');
+      
+      // Also let the user download the PDF if they want
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = pdfUrl;
+      a.download = 'resume.pdf';
+      a.click();
+      URL.revokeObjectURL(pdfUrl);
+      
+      alert('Resume has been downloaded and saved to your profile!');
+    }).catch(err => {
+      console.error("PDF generation error:", err);
+      alert('Error generating PDF. Please try again.');
+    });
+  }}
+>
+  <i className="bi bi-download"></i> Download & Save PDF
+</button> */}
               <button
                 className="close-preview-btn"
                 onClick={() => setShowPreview(false)}
