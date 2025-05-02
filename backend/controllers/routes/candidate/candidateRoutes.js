@@ -4534,7 +4534,51 @@ router.get("/event", [isCandidate, authenti], async (req, res) => {
       _id: { $nin: appliedEventIds }
     };
 
-    const perPage = 50;
+    const perPage = 100;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * perPage;
+
+    const countEvents = await Event.countDocuments(filter);
+    const events = await Event.find(filter)
+      .skip(skip)
+      .limit(perPage)
+      .sort({ createdAt: -1 });
+
+    const totalPages = Math.ceil(countEvents / perPage);
+
+    console.log('events',events.length)
+
+    return res.json({
+      events,
+      totalPages,
+      page
+    });
+  } catch (err) {
+    console.error("Error in /event route:", err);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.get("/applied-events", [isCandidate, authenti], async (req, res) => {
+  try {
+    const mobile = req.user.mobile;
+    const candidate = await Candidate.findOne({ mobile });
+
+    if (!candidate) {
+      return res.status(404).json({ message: "Candidate not found" });
+    }
+
+    // Get all applied event IDs for this candidate
+    const appliedEvents = await AppliedEvent.find({ _candidate: candidate._id }).select("_event");
+    const appliedEventIds = appliedEvents.map(app => app._event.toString());
+
+    // Prepare filter to exclude already applied events
+    const filter = {
+      status: true,
+      _id: { $in: appliedEventIds }
+    };
+
+    const perPage = 100;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * perPage;
 

@@ -321,7 +321,7 @@ function Event() {
                                         <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
                                           <a
                                             className={`btn cta-callnow btn-bg-color shr--width w-100 ${isRegistrationClosed ? 'disabled opacity-50 cursor-not-allowed' : ''}`}
-                                            href={`/candidate/login?returnUrl=/candidate/event/${event._id}`} 
+                                            href={`/candidate/login?returnUrl=/candidate/candidateevent`} 
                                             onClick={(e) => {
                                               if (isRegistrationClosed) e.preventDefault();
                                             }}

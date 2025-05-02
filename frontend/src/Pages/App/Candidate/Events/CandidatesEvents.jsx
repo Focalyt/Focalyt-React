@@ -242,7 +242,7 @@ const CandidatesEvents = () => {
                                           }
                                         }}
                                       >
-                                        <i className="la la-paper-plane"></i> Apply Now
+                                        <i className="la la-paper-plane"></i> {isRegistrationClosed ? "Registration Closed" : "Apply Now"}
                                       </Link>
                                     </div>
 
