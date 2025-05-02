@@ -172,7 +172,7 @@ const CourseDetails = () => {
         eventName: "CourseApply",
         sourceUrl: window.location.href,
       });
-      
+
 
 
       // Close modal
@@ -236,14 +236,14 @@ const CourseDetails = () => {
             headers: {
               'x-auth': localStorage.getItem('token')
             }
-          }).then(async (res2)  => {
+          }).then(async (res2) => {
             await trackMetaConversion({
               eventName: "CoursePayment",
               sourceUrl: window.location.href,
               value: (paymentData.amount / 100).toFixed(2),               // 💰 amount of the transaction
               currency: "INR"            // 🪙 currency in ISO format
             });
-            
+
             document.getElementById('completeRegistration').classList.add('show');
             document.getElementById('completeRegistration').style.display = 'block';
             document.body.classList.add('modal-open');
@@ -338,7 +338,7 @@ const CourseDetails = () => {
 
 
       },
-      
+
       isExperienced: totalExperience == 0 ? false : true
     }
 
@@ -494,7 +494,7 @@ const CourseDetails = () => {
                             </>
                           )}
                         </div> */}
-                         <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
+                        <div id="carouselExampleIndicators" className="carousel slide" data-ride="carousel">
                           {course.photos && course.photos.length > 0 && (
                             <>
                               <div className="carousel-indicators">
@@ -1362,7 +1362,9 @@ const CourseDetails = () => {
                 Congratulations!
               </h5>
               {!docsRequired && (
-                <span>You have successfully registered for this course.<br /> Our team will contact you shortly.</span>)}
+                
+                <> <p>You have successfully registered for this course. <br/> Our team will contact you shortly</p>
+              <p>To increase your chances, strengthen your profile now!</p></>)}
               {docsRequired && (
                 <span>
                   You have successfully registered for this course. Please upload the required documents to proceed further.<br />
@@ -1372,20 +1374,11 @@ const CourseDetails = () => {
             <div className="modal-footer">
               {!docsRequired && (
 
-                <button
-                  type="button"
+                <Link to="/candidate/myProfile"
                   className="btn btn-primary"
-                  id="close"
-                  onClick={() => {
-                    document.getElementById('completeRegistration').classList.remove('show');
-                    document.getElementById('completeRegistration').style.display = 'none';
-                    document.body.classList.remove('modal-open');
-                    document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                    window.location.reload();
-                  }}
                 >
-                  Close
-                </button>)}
+                  Update Profile
+                </Link>)}
               {docsRequired && (
                 <button
                   type="button"
@@ -1426,9 +1419,9 @@ const CourseDetails = () => {
           </div>
         </div>
       </div>
-<style>
-  {
-    `
+      <style>
+        {
+          `
     .contact-info {
     display: inline-block}
     
@@ -1442,8 +1435,8 @@ const CourseDetails = () => {
            transform: translate(10px, 10px);
     }
     `
-  }
-</style>
+        }
+      </style>
 
     </>
   );
