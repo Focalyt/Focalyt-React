@@ -51,7 +51,7 @@ const CandidateLogin = () => {
     const [permanentCity, setPermanentCity] = useState('');
     const [permanentState, setPermanentState] = useState('');
     const [permanentPincode, setPermanentPincode] = useState('');
-
+    const [totalExperience, setTotalExperience] = useState('');
     const [sameAddress, setSameAddress] = useState(false);
     const [highestQualificationdata, sethighestQualificationdata] = useState([]);
     const [highestQualification, setHighestQualification] = useState('');
@@ -162,7 +162,7 @@ const CandidateLogin = () => {
         const phoneRegex = /^(\+91[\-\s]?)?[0]?(91)?[6789]\d{9}$/;
         return phoneRegex.test(mobileNumber);
     };
-    
+
     const handleGenerateOTP = async () => {
         if (!validateMobile()) {
             setErrorMessage('Please enter the correct mobile number');
@@ -175,10 +175,10 @@ const CandidateLogin = () => {
         try {
             const res = await axios.post(`${backendUrl}/api/sendCandidateOtp`, { mobile: mobileNumber });
             console.log("OTP Send API Response:", res.data);
-            
+
             setErrorMessage('');
             setSuccessMessage('OTP Sent Successfully');
-            
+
             if (res.data.newUser) {
                 setIsNewUser(true);
                 setShowExtraFields(true);
@@ -239,7 +239,7 @@ const CandidateLogin = () => {
             }
         }, 1000);
     };
-    
+
     const handleMobileNumberKeyPress = (e) => {
         const charCode = e.which ? e.which : e.keyCode;
         if (charCode < 48 || charCode > 57) {
@@ -250,20 +250,20 @@ const CandidateLogin = () => {
     const handleVerifyLogin = async () => {
         setErrorMessage('');
         setSuccessMessage('');
-        
+
         if (isNewUser) {
             if (!fullName || !gender || !address || !latitude || !longitude) {
                 setErrorMessage('Please fill all required details');
                 return;
             }
-            
+
             try {
                 // First verify OTP
-                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { 
-                    mobile: mobileNumber, 
-                    otp 
+                const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, {
+                    mobile: mobileNumber,
+                    otp
                 });
-                
+
                 if (otpVerifyRes.data.status) {
                     // Prepare registration body
                     // Create the body object with required fields first
@@ -292,35 +292,39 @@ const CandidateLogin = () => {
                             }
                         }
                     };
-                    
+
                     // Only add email if it's not empty
                     if (Email && Email.trim() !== '') {
                         body.email = Email.trim();
                     }
-                    
+
                     // Only add dob if it's not empty
                     if (dob && dob.trim() !== '') {
                         body.dob = dob.trim();
                     }
-                    
+
                     // Only add highestQualification if it's not empty
                     if (highestQualification && highestQualification.trim() !== '') {
                         body.highestQualification = highestQualification.trim();
                     }
+                    if (totalExperience && totalExperience.trim() !== '') {
+                        body.totalExperience = totalExperience.trim();
+                    }
                     
+
                     if (refCode) {
                         body.refCode = refCode;
                     }
-                    
+
                     // Register the new user
                     const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
                     console.log("Register API response:", registerRes.data);
-                    
+
                     if (registerRes.data.status === "success") {
                         await trackMetaConversion({
                             eventName: isNewUser ? "Signup" : "Login",
                             sourceUrl: window.location.href
-                          });
+                        });
                         const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                         // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                         if (loginRes.data.status) {
@@ -328,8 +332,8 @@ const CandidateLogin = () => {
                             localStorage.setItem('token', loginRes.data.token);
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
                             sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
-                            
-                              
+
+
 
                             if (returnUrl) {
                                 window.location.href = returnUrl;
@@ -371,7 +375,7 @@ const CandidateLogin = () => {
                             await trackMetaConversion({
                                 eventName: isNewUser ? "Signup" : "Login",
                                 sourceUrl: window.location.href
-                              });
+                            });
 
 
 
@@ -399,8 +403,8 @@ const CandidateLogin = () => {
                 console.error("Registration error:", err);
                 setErrorMessage('Something went wrong during registration');
             }
-        } 
-        
+        }
+
     };
 
     return (
@@ -515,12 +519,12 @@ const CandidateLogin = () => {
                                 {showExtraFields && (
                                     <div className='userMobile'>
                                         <div className="mb-3">
-                                            <input 
-                                                type="email" 
-                                                className='form-control' 
-                                                placeholder='Enter Email' 
-                                                value={Email} 
-                                                onChange={(e) => setEmail(e.target.value)} 
+                                            <input
+                                                type="email"
+                                                className='form-control'
+                                                placeholder='Enter Email'
+                                                value={Email}
+                                                onChange={(e) => setEmail(e.target.value)}
                                             />
                                         </div>
                                         <div className="mb-3">
@@ -599,9 +603,9 @@ const CandidateLogin = () => {
                                         </div>
 
                                         <div className="mb-3">
-                                            <select 
-                                                onChange={(e) => setHighestQualification(e.target.value)} 
-                                                className="form-control" 
+                                            <select
+                                                onChange={(e) => setHighestQualification(e.target.value)}
+                                                className="form-control"
                                                 value={highestQualification}
                                             >
                                                 <option value="">Highest Qualification / उच्चतम योग्यता</option>
@@ -611,6 +615,28 @@ const CandidateLogin = () => {
                                                             {q.name}
                                                         </option>
                                                     ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group mb-2">
+                                            <select onChange={(e) => setTotalExperience(e.target.value)} className="form-control" value={totalExperience}>
+                                                <option value="">Experience / अनुभव</option>
+                                                <option value="0">Fresher</option>
+                                                <option value="1">1</option>
+                                                <option value="2">2</option>
+                                                <option value="3">3</option>
+                                                <option value="4">4</option>
+                                                <option value="5">5</option>
+                                                <option value="6">6</option>
+                                                <option value="7">7</option>
+                                                <option value="8">8</option>
+                                                <option value="9">9</option>
+                                                <option value="10">10</option>
+                                                <option value="11">11</option>
+                                                <option value="12">12</option>
+                                                <option value="13">13</option>
+                                                <option value="14">14</option>
+                                                <option value="15">15</option>
+
                                             </select>
                                         </div>
 
@@ -634,8 +660,8 @@ const CandidateLogin = () => {
                                 {showLoginBtn && (
                                     <div className="row mb-3">
                                         <div className="col-6">
-                                            <button 
-                                                className="btn btn-primary w-100" 
+                                            <button
+                                                className="btn btn-primary w-100"
                                                 onClick={handleVerifyLogin}
                                             >
                                                 Login / लॉगइन

@@ -21,6 +21,7 @@ const CourseDetails = () => {
   const [canApply, setCanApply] = useState(true);
   const [mobileNumber, setMobileNumber] = useState('');
   const [showProfileForm, setShowProfileForm] = useState(false);
+  const [showCongratulationModal, setShowCongratulationModal] = useState(false);
 
 
 
@@ -149,7 +150,7 @@ const CourseDetails = () => {
     if (candidate) {
       setSex(candidate.sex || '');
       setDob(candidate.dob ? moment(candidate.dob).format("YYYY-MM-DD") : '');
-      setTotalExperience(candidate.totalExperience || '');
+      setTotalExperience(candidate?.personalInfo?.totalExperience || '');
       setHighestQualification(candidate.highestQualification?._id || '');
       setAddress(candidate.personalInfo.location?.fullAddress || '');
     }
@@ -353,7 +354,14 @@ const CourseDetails = () => {
         headers: { 'x-auth': localStorage.getItem('token') }
       });
 
-      window.location.reload();
+      // ⛔️ CLOSE the complete profile modal
+      document.getElementById('apply').classList.remove('show');
+      document.getElementById('apply').style.display = 'none';
+      document.body.classList.remove('modal-open');
+      document.getElementsByClassName('modal-backdrop')[0]?.remove();
+
+      setShowCongratulationModal(true);
+      // window.location.reload();
     } catch (err) {
       console.error("Profile update or apply failed:", err);
     }
@@ -382,7 +390,7 @@ const CourseDetails = () => {
                             <div className="col-md-4 col-lg-4 col-sm-6 col-6">
                               <div className="course_spec">
                                 <div className="spe_icon">
-                                  <i className="la la-money"></i>
+                                  <i className="la la-rupee-sign"></i>
                                 </div>
                                 <div className="spe_detail">
                                   <h3 className="jobDetails-wrap">
@@ -400,7 +408,7 @@ const CourseDetails = () => {
                             <div className="col-md-4 col-lg-4 col-sm-6 col-6">
                               <div className="course_spec">
                                 <div className="spe_icon">
-                                  <i className="la la-money"></i>
+                                  <i className="la la-layer-group"></i>
                                 </div>
                                 <div className="spe_detail">
                                   <h3 className="jobDetails-wrap">{course.courseLevel ? course.courseLevel : 'N/A'}</h3>
@@ -412,7 +420,7 @@ const CourseDetails = () => {
                             <div className="col-md-4 col-lg-4 col-sm-6 col-6">
                               <div className="course_spec">
                                 <div className="spe_icon">
-                                  <i className="la la-money"></i>
+                                  <i className="la la-certificate"></i>
                                 </div>
                                 <div className="spe_detail">
                                   <h3 className="jobDetails-wrap">{course?.certifyingAgency ? course.certifyingAgency : 'N/A'}</h3>
@@ -1250,13 +1258,37 @@ const CourseDetails = () => {
                 <button
                   type="button"
                   className="close"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                  
+                    // ✅ Check if profile is already complete
+                    const isProfileComplete =
+                      sex &&
+                      dob &&
+                      totalExperience !== '' &&
+                      highestQualification &&
+                      (candidate?.personalInfo?.location?.fullAddress || address);
+                  
+                    if (isProfileComplete) {
+                      // Show direct apply modal
+                      setCanApply(true); // ⬅️ will show center/proceed modal
+                    } else {
+                      // Show complete profile modal
+                      setCanApply(false); // ⬅️ will show "COMPLETE PROFILE" form
+                    }
+                  
+                    document.getElementById('apply').classList.add('show');
+                    document.getElementById('apply').style.display = 'block';
+                    document.body.classList.add('modal-open');
+                  }}
+                  
+                >
+                   {/* onClick={() => {
                     document.getElementById('apply').classList.remove('show');
                     document.getElementById('apply').style.display = 'none';
                     document.body.classList.remove('modal-open');
                     document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                  }}
-                >
+                  }} */}
                   <span aria-hidden="true">&times;</span>
                 </button>
               </div>
@@ -1318,7 +1350,7 @@ const CourseDetails = () => {
                     className="form-control"
                     id="address-location"
                     placeholder="City/ शहर"
-                    value={candidate?.personalInfo.location?.fullAddress || address}
+                    value={candidate.personalInfo.currentAddress.fullAddress}
 
                     onChange={(e) => setAddress(e.target.value)}
 
@@ -1337,68 +1369,68 @@ const CourseDetails = () => {
           )}
         </div>
       </div>
-
-      <div className="modal fade" id="completeRegistration" tabIndex="-1" role="dialog" aria-labelledby="completeRegistrationTitle" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title text-white text-uppercase" id="completeRegistrationTitle">REGISTRATION DONE</h5>
-              <button
-                type="button"
-                className="close"
-                onClick={() => {
-                  document.getElementById('completeRegistration').classList.remove('show');
-                  document.getElementById('completeRegistration').style.display = 'none';
-                  document.body.classList.remove('modal-open');
-                  document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                  window.location.reload();
-                }}
-              >
-                <span aria-hidden="true">&times;</span>
-              </button>
-            </div>
-            <div className="modal-body pt-1" id="popup-body">
-              <h5 className="pb-1 mb-0">
-                Congratulations!
-              </h5>
-              {!docsRequired && (
-                
-                <> <p>You have successfully registered for this course. <br/> Our team will contact you shortly</p>
-              <p>To increase your chances, strengthen your profile now!</p></>)}
-              {docsRequired && (
-                <span>
-                  You have successfully registered for this course. Please upload the required documents to proceed further.<br />
-                  Our team will reach out to you shortly.
-                </span>)}
-            </div>
-            <div className="modal-footer">
-              {!docsRequired && (
-
-                <Link to="/candidate/myProfile"
-                  className="btn btn-primary"
-                >
-                  Update Profile
-                </Link>)}
-              {docsRequired && (
+      {showCongratulationModal && (
+        <div className="modal fade show" style={{ display: 'block' }} id="completeRegistration" tabIndex="-1" role="dialog" aria-labelledby="completeRegistrationTitle" aria-hidden="true">
+          <div className="modal-dialog modal-dialog-centered" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title text-white text-uppercase" id="completeRegistrationTitle">REGISTRATION DONE</h5>
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  id="addDocs"
+                  className="close"
                   onClick={() => {
                     document.getElementById('completeRegistration').classList.remove('show');
                     document.getElementById('completeRegistration').style.display = 'none';
                     document.body.classList.remove('modal-open');
                     document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                    window.location.href = `/candidate/reqDocs/${courseId}`;
+                    window.location.reload();
                   }}
                 >
-                  Upload Documents
-                </button>)}
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div className="modal-body pt-1" id="popup-body">
+                <h5 className="pb-1 mb-0">
+                  Congratulations!
+                </h5>
+                {!docsRequired && (
+
+                  <> <p>You have successfully registered for this course. <br /> Our team will contact you shortly</p>
+                    <p>To increase your chances, strengthen your profile now!</p></>)}
+                {docsRequired && (
+                  <span>
+                    You have successfully registered for this course. Please upload the required documents to proceed further.<br />
+                    Our team will reach out to you shortly.
+                  </span>)}
+              </div>
+              <div className="modal-footer">
+                {!docsRequired && (
+
+                  <Link to="/candidate/myProfile"
+                    className="btn btn-primary"
+                  >
+                    Update Profile
+                  </Link>)}
+                {docsRequired && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    id="addDocs"
+                    onClick={() => {
+                      document.getElementById('completeRegistration').classList.remove('show');
+                      document.getElementById('completeRegistration').style.display = 'none';
+                      document.body.classList.remove('modal-open');
+                      document.getElementsByClassName('modal-backdrop')[0]?.remove();
+                      window.location.href = `/candidate/reqDocs/${courseId}`;
+                    }}
+                  >
+                    Upload Documents
+                  </button>)}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
+      )}
 
       <div className="modal fade" id="videoModal" tabIndex="-1" role="dialog" aria-labelledby="videoModalTitle" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered" role="document">
