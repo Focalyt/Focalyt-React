@@ -474,10 +474,10 @@ const NearByJobs = () => {
               </div>
               <div className="modal-footer">
                 <a href="/candidate/myProfile">
-                  <button type="submit" className="btn btn-primary">Complete Profile</button>
+                  <button type="submit" className="btn btn-primary text-white">Complete Profile</button>
                 </a>
                 <button type="button" className="btn btn-outline-light" onClick={() => setShowProfileModal(false)}>
-                  <i className="feather icon-x d-block d-lg-none"></i>
+                <i class="fas fa-times d-block d-lg-none"></i>
                   <span className="d-none d-lg-block">Cancel</span>
                 </button>
               </div>
@@ -520,7 +520,12 @@ const NearByJobs = () => {
     background-color: #ea5455 !important;
     color: #fff !important;
 }
-        
+       @media(max-width:768px){
+       .job-single-sec a{
+          width:100%
+          }
+       
+       } 
         `}
       </style>
     </div>
