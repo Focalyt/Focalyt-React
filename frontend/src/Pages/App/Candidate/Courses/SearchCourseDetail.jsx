@@ -42,6 +42,26 @@ const CourseDetails = () => {
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
+  
+  useEffect(() => {
+    if (candidate) {
+      const isProfileComplete = 
+        candidate.sex && 
+        candidate.dob && 
+        candidate.highestQualification && 
+        candidate.personalInfo && 
+        (candidate.personalInfo.totalExperience !== undefined && 
+         candidate.personalInfo.totalExperience !== '') &&
+        ((candidate.personalInfo.location && 
+          candidate.personalInfo.location.fullAddress) || 
+         (candidate.personalInfo.currentAddress && 
+          candidate.personalInfo.currentAddress.fullAddress));
+      
+      setCanApply(isProfileComplete);
+    }
+  }, [candidate]);
+  
+
   useEffect(() => {
 
 
@@ -362,7 +382,7 @@ const CourseDetails = () => {
       document.getElementsByClassName('modal-backdrop')[0]?.remove();
 
       setShowCongratulationModal(true);
-      // window.location.reload();
+      window.location.reload();
     } catch (err) {
       console.error("Profile update or apply failed:", err);
     }
@@ -1259,35 +1279,17 @@ const CourseDetails = () => {
                 <button
                   type="button"
                   className="close"
-                  onClick={(e) => {
-                    e.preventDefault();
-
-                    const isProfileComplete =
-                      sex &&
-                      dob &&
-                      totalExperience !== '' &&
-                      highestQualification &&
-                      (candidate?.personalInfo?.location?.fullAddress || address);
-
-                    setCanApply(isProfileComplete); // this will render either REGISTRATION or COMPLETE PROFILE
-
-                    // Show modal
-                    const modal = document.getElementById('apply');
-                    if (modal) {
-                      modal.classList.add('show');
-                      modal.style.display = 'block';
-                      document.body.classList.add('modal-open');
-                    }
-                  }}
-
-
-                >
-                  {/* onClick={() => {
+                  onClick={() => {
                     document.getElementById('apply').classList.remove('show');
                     document.getElementById('apply').style.display = 'none';
                     document.body.classList.remove('modal-open');
                     document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                  }} */}
+                  }}
+                  
+
+
+                >
+                  {/* */}
                   <span aria-hidden="true">&times;</span>
                 </button>
               </div>
