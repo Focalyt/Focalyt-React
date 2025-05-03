@@ -895,7 +895,7 @@ const CandidatesJobs = () => {
 
       {/* Jobs listing section */}
       <section className="searchjobspage" style={{ display: isMapView ? 'none' : 'block' }}>
-        <div className="forlrgscreen">
+        <div className="">
           <div className="pt-xl-2 pt-lg-0 pt-md-0 pt-sm-5 pt-0">
             <div className="course_nw mb-3">
               <div className="row justify-content-sm-center justify-content-md-start">

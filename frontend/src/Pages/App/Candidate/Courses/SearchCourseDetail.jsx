@@ -147,12 +147,13 @@ const CourseDetails = () => {
   // }, [courseId]);
 
   useEffect(() => {
-    if (candidate) {
+    if (candidate) {   
       setSex(candidate.sex || '');
       setDob(candidate.dob ? moment(candidate.dob).format("YYYY-MM-DD") : '');
       setTotalExperience(candidate?.personalInfo?.totalExperience || '');
       setHighestQualification(candidate.highestQualification?._id || '');
-      setAddress(candidate.personalInfo.location?.fullAddress || '');
+      setAddress(candidate?.personalInfo?.location?.fullAddress || '');
+
     }
   }, [candidate]);
   const applyCourse = async (courseId) => {
@@ -1260,30 +1261,28 @@ const CourseDetails = () => {
                   className="close"
                   onClick={(e) => {
                     e.preventDefault();
-                  
-                    // ✅ Check if profile is already complete
+
                     const isProfileComplete =
                       sex &&
                       dob &&
                       totalExperience !== '' &&
                       highestQualification &&
                       (candidate?.personalInfo?.location?.fullAddress || address);
-                  
-                    if (isProfileComplete) {
-                      // Show direct apply modal
-                      setCanApply(true); // ⬅️ will show center/proceed modal
-                    } else {
-                      // Show complete profile modal
-                      setCanApply(false); // ⬅️ will show "COMPLETE PROFILE" form
+
+                    setCanApply(isProfileComplete); // this will render either REGISTRATION or COMPLETE PROFILE
+
+                    // Show modal
+                    const modal = document.getElementById('apply');
+                    if (modal) {
+                      modal.classList.add('show');
+                      modal.style.display = 'block';
+                      document.body.classList.add('modal-open');
                     }
-                  
-                    document.getElementById('apply').classList.add('show');
-                    document.getElementById('apply').style.display = 'block';
-                    document.body.classList.add('modal-open');
                   }}
-                  
+
+
                 >
-                   {/* onClick={() => {
+                  {/* onClick={() => {
                     document.getElementById('apply').classList.remove('show');
                     document.getElementById('apply').style.display = 'none';
                     document.body.classList.remove('modal-open');

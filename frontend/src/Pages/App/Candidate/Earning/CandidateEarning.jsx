@@ -95,6 +95,22 @@ const CandidateEarning = ({
     }
   };
 
+  const closeKycModal = () => {
+    const kycModal = document.getElementById('kyc');
+    if (kycModal) {
+      kycModal.classList.remove('show');
+      kycModal.style.display = 'none';
+      document.body.classList.remove('modal-open');
+
+      // remove backdrop
+      const backdrop = document.querySelector('.modal-backdrop');
+      if (backdrop) {
+        backdrop.remove();
+      }
+    }
+  };
+
+
   const removeImage = (type) => {
     const key = type === 'aadhar' ? formData.aadharCardImage : formData.panCardImage;
 
@@ -136,7 +152,7 @@ const CandidateEarning = ({
   useEffect(() => {
     if (typeof window !== 'undefined' && window.document) {
       const kycModal = document.getElementById('kyc');
-      
+
       if (kycModal) {
         // Initialize with Bootstrap if available
         if (window.bootstrap && window.bootstrap.Modal) {
@@ -146,7 +162,7 @@ const CandidateEarning = ({
             focus: true
           });
           setModalInstance(modalObj);
-        } 
+        }
         // Initialize with jQuery if available
         else if (window.jQuery) {
           window.jQuery(kycModal).modal({
@@ -429,9 +445,14 @@ const CandidateEarning = ({
               <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">
                 Upload KYC Document
               </h5>
-              <button type="button" className="close" data-dismiss="modal" aria-label="Close">
+              {/* <button type="button" className="close" data-dismiss="modal" aria-label="Close">
                 <span aria-hidden="true">×</span>
+              </button> */}
+              <button type="button" className="btn btn-outline-light waves-effect waves-danger close" onClick={closeKycModal}>
+                <i className="fas fa-times d-block d-lg-none"></i>
+                <span className="d-none d-lg-block">Cancel</span>
               </button>
+
             </div>
             <div className="modal-body pt-1" id="popup-body">
               <form method="post" action="/candidate/kycDocument" onSubmit={validations}>
@@ -597,9 +618,13 @@ const CandidateEarning = ({
                   >
                     Upload
                   </button>
-                  <button type="button" className="btn btn-outline-light waves-effect waves-danger" data-dismiss="modal">
-                    <i className="feather icon-x d-block d-lg-none"></i>
+                  {/* <button type="button" className="btn btn-outline-light waves-effect waves-danger" data-dismiss="modal">
+                  <i class="fas fa-times d-block d-lg-none"></i>
                     <span className="d-none d-lg-block">Cancel</span>
+                  </button> */}
+                  <button type="button" className="btn btn-outline-light waves-effect waves-danger" onClick={closeKycModal}>
+                  <i class="fas fa-times d-block d-lg-none text-black"></i>
+                  <span className="d-none d-lg-block">Cancel</span>
                   </button>
                 </div>
               </form>
