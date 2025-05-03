@@ -203,11 +203,21 @@ const HomePage = () => {
                   </h2>
                 </div>
                 <div className="images">
+                <a href="/candidate/login">
                   <img src="/Assets/public_assets/images/icons/drone.png" alt="drone" className="img1" />
-                  <img src="/Assets/public_assets/images/icons/ai.png" alt="ai" className="img1" />
+                  </a>
+                  <a href="/candidate/login">
+                  <img src="/Assets/public_assets/images/icons/ai.png" alt="ai" className="img1" /></a>
+                  
+                  <a href="/candidate/login">
                   <img src="/Assets/public_assets/images/icons/robotic.png" alt="robotic" className="img1" />
+                  </a>
+                  <a href="/candidate/login">
                   <img src="/Assets/public_assets/images/icons/iot.png" alt="iot" className="img1" />
+                  </a>
+                  <a href="/candidate/login">
                   <img src="/Assets/public_assets/images/icons/ar_vr.png" alt="ar vr" className="img1" />
+                  </a>
                 </div>
               </div>
 

@@ -87,7 +87,7 @@ const TechnologySlider = () => {
               <div key={index} className="slide-wrapper">
                 <div className="technology-slide">
                   <div className="image-container">
-                    <a href="https://app.focalyt.com/candidate/login">
+                    <a href="/candidate/login">
                     <img
                       src={item.image}
                       alt={item.title}
