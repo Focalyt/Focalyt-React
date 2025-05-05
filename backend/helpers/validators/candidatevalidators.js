@@ -8,8 +8,9 @@ module.exports = {
             email: Joi.string().trim().required(),
             dob: Joi.string().trim().required(),
             highestQualification: Joi.string().trim().required(),
-            totalExperience: Joi.string().trim().required(),
+            
             personalInfo: Joi.object({
+                totalExperience: Joi.string().trim().required(),
                 currentAddress: Joi.object({
                     type: Joi.string().valid('Point').required(), // ✅ add kar diya
                     coordinates: Joi.array().items(Joi.number()).length(2).required(), // ✅ add kar diya
