@@ -543,7 +543,8 @@ router
         availableCredit: coins?.candidateCoins,
         creditLeft: coins?.candidateCoins,
         personalInfo,
-        highestQualification 
+        highestQualification,
+        
       };
 
       console.log("Candidate Data", candidateBody)

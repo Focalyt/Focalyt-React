@@ -308,7 +308,7 @@ const CandidateLogin = () => {
                         body.highestQualification = highestQualification.trim();
                     }
                     if (totalExperience && totalExperience.trim() !== '') {
-                        body.totalExperience = totalExperience.trim();
+                        body.personalInfo.totalExperience = totalExperience.trim();
                     }
                     
 
