@@ -48,3 +48,6 @@ frontend/.env
 
 /frontend/src/Pages/App/Candidate/Courses/SearchCourseDetail.jsx.txt
 /frontend/src/Pages/App/Candidate/Profile/CandidateProfile_video-copy.jsx
+/frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader copy.jsx
+/frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader copy.css
+/frontend/src/Pages/Front/HomePage/HomePage copy.css

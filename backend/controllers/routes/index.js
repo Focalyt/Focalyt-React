@@ -548,7 +548,6 @@ router.post('/career', async (req, res) => {
 
     if (!name || !number || !location || !email || !position || !experience || !cv || !info || !termsAccepted) {
       req.flash("error", "Please fill all fields");
-      return res.redirect("/courses");
     }
 
     function capitalizeWords(str) {
