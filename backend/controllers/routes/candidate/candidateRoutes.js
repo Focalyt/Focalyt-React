@@ -1025,10 +1025,18 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
   const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
 
   let canApply = false;
-  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.location && candidate.highestQualification) {
+  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.currentAddress && candidate.highestQualification) {
     canApply = true;
   
 }
+
+console.log('candidate.name',candidate.name)
+console.log('candidate.highestQualification',candidate.highestQualification)
+console.log('candidate.sex',candidate.sex)
+console.log('candidate.personalInfo.totalExperience',candidate.personalInfo.totalExperience)
+console.log('candidate.personalInfo.location',candidate.personalInfo.location)
+console.log('canApply',canApply)
+
   let isRegisterInterview = false;
   const checkJobRegister = await AppliedJobs.findOne({
     _candidate: candidate._id,
@@ -1447,7 +1455,7 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
 
 
     let canApply = false;
-    if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.location && candidate.highestQualification) {
+    if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.currentAddress && candidate.highestQualification) {
         canApply = true;
       
     }
