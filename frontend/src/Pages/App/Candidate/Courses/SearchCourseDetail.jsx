@@ -171,7 +171,7 @@ const CourseDetails = () => {
       setSex(candidate.sex || '');
       setDob(candidate.dob ? moment(candidate.dob).format("YYYY-MM-DD") : '');
       setTotalExperience(candidate?.personalInfo?.totalExperience || '');
-      setHighestQualification(candidate.highestQualification?._id || '');
+      setHighestQualification(candidate.highestQualification|| '');
       setAddress(candidate?.personalInfo?.location?.fullAddress || '');
 
     }
