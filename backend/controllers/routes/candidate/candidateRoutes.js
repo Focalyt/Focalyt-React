@@ -486,7 +486,7 @@ router
         return res.send({ status: "failure", error: value });
       }
       let formData = value;
-      const { name, mobile, sex, personalInfo ,highestQualification , email, dob , totalExperience} = formData;
+      const { name, mobile, sex, personalInfo ,highestQualification , email, dob} = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
         let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
@@ -543,7 +543,8 @@ router
         availableCredit: coins?.candidateCoins,
         creditLeft: coins?.candidateCoins,
         personalInfo,
-        highestQualification 
+        highestQualification,
+        
       };
 
       console.log("Candidate Data", candidateBody)
@@ -1024,11 +1025,18 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
   const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
 
   let canApply = false;
-  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.currentAddress && candidate.highestQualification) {
-    if (candidate.isExperienced == false || candidate.isExperienced == true) {
-      canApply = true;
-    }
-  }
+  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.currentAddress && candidate.highestQualification) {
+    canApply = true;
+  
+}
+
+console.log('candidate.name',candidate.name)
+console.log('candidate.highestQualification',candidate.highestQualification)
+console.log('candidate.sex',candidate.sex)
+console.log('candidate.personalInfo.totalExperience',candidate.personalInfo.totalExperience)
+console.log('candidate.personalInfo.location',candidate.personalInfo.location)
+console.log('canApply',canApply)
+
   let isRegisterInterview = false;
   const checkJobRegister = await AppliedJobs.findOne({
     _candidate: candidate._id,
@@ -1447,10 +1455,9 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
 
 
     let canApply = false;
-    if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.location && candidate.highestQualification) {
-      if (candidate.isExperienced == false || candidate.isExperienced == true) {
+    if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.currentAddress && candidate.highestQualification) {
         canApply = true;
-      }
+      
     }
 
     let isApplied = false;
