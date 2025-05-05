@@ -15,7 +15,7 @@ import {
   UserPlus
 } from 'lucide-react';
 
-const CandidateManagementUI = () => {
+const CandidateManagementPortal = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -369,7 +369,7 @@ const CandidateManagementUI = () => {
   );
 };
 
-export default CandidateManagementUI;
+export default CandidateManagementPortal;
 
 
 
