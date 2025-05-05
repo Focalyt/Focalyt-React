@@ -1092,7 +1092,7 @@ const CandidateViewJobs = () => {
                       className="form-control"
                       id="address-location"
                       placeholder="City/ शहर"
-                      value={address}
+                      value={candidate.personalInfo.currentAddress.fullAddress}
 
                       onChange={(e) => setAddress(e.target.value)}
 
