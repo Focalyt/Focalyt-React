@@ -6,8 +6,21 @@ import 'slick-carousel';
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import FrontLayout from "../../../Component/Layouts/Front";
+import { useLocation } from "react-router-dom";
 function About() {
+    const location = useLocation();
 
+    useEffect(() => {
+      if (location.hash) {
+        const id = location.hash.replace("#", "");
+        const element = document.getElementById(id);
+        if (element) {
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 100);
+        }
+      }
+    }, [location]);
     const [seniorManagement, setSeniorManagement] = useState([]);
     const [management, setManagement] = useState([]);
     const [staff, setStaff] = useState([]);
@@ -278,7 +291,7 @@ function About() {
                 {/* <!-- vision --> */}
                 <section id="vision">
                     <div className="container-fluid">
-                        <div className="row justify-content-center align-items-center g-3 py-5" id="mission">
+                        <div className="row justify-content-center align-items-center g-3 py-5" id="vission">
                             <div className="col-md-6">
                                 <div className="vision">
                                     <h3 className="v_header">Our Vision</h3>
@@ -324,7 +337,7 @@ function About() {
                     </div>
                 </section>
                 {/* <!-- focalyt Team  --> */}
-                <section className="bg-black">
+                <section className="bg-black" id="focalytTeam">
                     <div className="container-fluid">
                         <div className="FSD" id="fsd">
                             <div className="row g-3">

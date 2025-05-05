@@ -290,7 +290,7 @@ const AppliedJobs = () => {
                                   </span>
                                 </div>
                               </div>
-                              <Link to={`/candidate/job/${vacancy._id}`}>
+                              <Link to={`/candidate/job/${vacancy._id}`} className='smallScreen'>
                                 <div className="job-overview mt-1">
                                   <ul className="mb-xl-2 mb-lg-2 mb-md-2 mb-sm-0 mb-0 list-unstyled">
                                     <li className="jobdetails-li">
@@ -540,6 +540,12 @@ const AppliedJobs = () => {
     .job-single-sec{
     background-color:transparent;
     }
+@media(max-width:768px){
+.smallScreen{
+width:100%;
+}
+}
+
           `
         }
       </style>

@@ -528,8 +528,11 @@ function Jobs() {
                                           </div>
                                           <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
                                             <p className="mb-0 text-white">
-                                              {course.experience == 0 ? "Fresher" : `${course.experience}`}
+                                              {(course.experience == 0 && course.experienceMonths == 0) || (course.experience == 0 && !course.experienceMonths )
+                                                ? "Fresher"
+                                                : `${course.experience > 0 ? `${course.experience} ${course.experience === 1 ? 'Year' : 'Years'}` : ''} ${course.experienceMonths > 0 ? `${course.experienceMonths} ${course.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim()}
                                             </p>
+
                                           </div>
                                         </div>
                                       </div>

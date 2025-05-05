@@ -1,8 +1,12 @@
 import React, { useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {Link } from 'react-router-dom';
 import { faFacebookF, faLinkedinIn, faYoutube } from '@fortawesome/free-brands-svg-icons';
 import "./FrontFooter.css";
+import axios from 'axios'
 function Footer() {
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [formData, setFormData] = useState({
     name: "",
     number: "",
@@ -29,22 +33,45 @@ function Footer() {
   };
 
   // ✅ Fix: Handle form submission properly
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
+  
     if (!formData.cv) {
       alert("Please upload your CV before submitting the form.");
       return;
     }
-
+  
     if (!formData.termsAccepted) {
       alert("Please agree to the terms and conditions.");
       return;
     }
-
-    console.log("Form Data Submitted:", formData);
-
-    // Here, send formData to your backend (if required)
+  
+    try {
+      const submissionData = new FormData();
+      submissionData.append("name", formData.name);
+      submissionData.append("email", formData.email);
+      submissionData.append("number", formData.number);
+      submissionData.append("location", formData.location);
+      submissionData.append("position", formData.position);
+      submissionData.append("experience", formData.experience);
+      submissionData.append("cv", formData.cv); // File
+      submissionData.append("info", formData.info);
+      submissionData.append("termsAccepted", formData.termsAccepted);
+  
+      // const response = await axios.post("/career", submissionData, {
+        const response = await axios.post(`${backendUrl}/career`, submissionData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        console.log("response from carrer" , response)
+  
+        alert("Application submitted successfully!");
+        // window.location.reload(); 
+    } catch (error) {
+      console.error("Career form error:", error);
+      alert("Something went wrong while submitting.");
+    }
   };
   return (
     <>
@@ -143,13 +170,13 @@ function Footer() {
                 <h4 className="color-pink fw-bold pb-xxl-4 pb-xp-4 pb-lg-3 pb-md-2 sm-1 pb-1">About Us</h4>
                 <ul className="footer-list p-0">
                   <li>
-                    <a href="https://app.focalyt.com/about_us#fsd">Our Team</a>
+                  <Link to="/about#focalytTeam">Our Team</Link>
                   </li>
                   <li>
-                    <a href="https://app.focalyt.com/about_us#vision">Mission</a>
+                  <Link to="/about#vision">Mission</Link>
                   </li>
                   <li>
-                    <a href="https://app.focalyt.com/about_us#vision">Vision</a>
+                  <Link to="/about#vision">Vision</Link>
                   </li>
                   {/* <!-- <li>
               <a href="#">Blog &amp; Articles</a>
@@ -325,13 +352,14 @@ function Footer() {
 
                               <div className="col-12">
                                 <label htmlFor="position" className="form-label required-field">Position Applied For</label>
-                                <select className="form-select" name="position" value={formData.position} onChange={handleChange} required>
+                                <input type="text" className="form-control" name="position" value={formData.position} onChange={handleChange} required/>
+                                {/* <select className="form-select" name="position" value={formData.position} onChange={handleChange} required>
                                   <option value="">Select Position</option>
                                   <option value="software-engineer">Software Engineer</option>
                                   <option value="product-designer">Product Designer</option>
                                   <option value="marketing-specialist">Marketing Specialist</option>
                                   <option value="other">Other</option>
-                                </select>
+                                </select> */}
                               </div>
 
 

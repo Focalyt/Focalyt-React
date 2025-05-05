@@ -525,11 +525,12 @@ const CandidateViewJobs = () => {
                             <div className="col-md-4">
                               <div className="course_spec">
                                 <div className="spe_icon" style={{ backgroundColor: "transparent" }}>
-                                  <i className="la la-money"></i>
+                                <i className="la la-briefcase"></i>
                                 </div>
                                 <div className="spe_detail">
                                   <h3 className="jobDetails-wrap">
                                     {jobDetails.experience === 0 ? 'Fresher' : `${jobDetails.experience} Years`}
+                                    
                                   </h3>
                                   <span className="text-capitalize jobDetails-wrap" style={{ whiteSpace: "normal" }}>Experience / अनुभव</span>
                                 </div>
@@ -539,7 +540,7 @@ const CandidateViewJobs = () => {
                             <div className="col-md-4">
                               <div className="course_spec">
                                 <div className="spe_icon" style={{ backgroundColor: "transparent" }}>
-                                  <i className="la la-money"></i>
+                                <i className="la la-graduation-cap"></i>
                                 </div>
                                 <div className="spe_detail">
                                   <h3 className="jobDetails-wrap">{jobDetails._qualification?.name}</h3>
@@ -1023,7 +1024,7 @@ const CandidateViewJobs = () => {
                     className="btn btn-danger"
                     onClick={() => setShowApplyModal(false)}
                   >
-                    <i className="feather icon-x d-block d-lg-none"></i>
+                    <i className="fas fa-times d-block d-lg-none"></i>
                     <span className="d-none d-lg-block">Cancel</span>
                   </button>
                 </div>
@@ -1150,7 +1151,7 @@ const CandidateViewJobs = () => {
                     className="btn btn-danger"
                     onClick={() => setShowRegisterModal(false)}
                   >
-                    <i className="feather icon-x d-block d-lg-none"></i>
+                    <i className="fas fa-times d-block d-lg-none"></i>
                     <span className="d-none d-lg-block">Cancel</span>
                   </button>
                 </div>
@@ -1192,7 +1193,7 @@ const CandidateViewJobs = () => {
                     className="btn btn-cancel"
                     onClick={() => setShowRegisterModal(false)}
                   >
-                    <i className="feather icon-x d-block d-lg-none"></i>
+                    <i className="fas fa-times d-block d-lg-none"></i>
                     <span className="d-none d-lg-block">Cancel</span>
                   </button>
                 </div>
@@ -1285,7 +1286,7 @@ const CandidateViewJobs = () => {
                   className="btn btn-outline-light waves-effect waves-danger"
                   onClick={() => setShowCoinOfferModal(false)}
                 >
-                  <i className="feather icon-x d-block d-lg-none"></i>
+                  <i className="fas fa-times d-block d-lg-none"></i>
                   <span className="d-none d-lg-block">Cancel</span>
                 </button>
               </div>
@@ -1390,7 +1391,7 @@ const CandidateViewJobs = () => {
 
                   }}
                 >
-                  <i className="feather icon-x d-block d-lg-none"></i>
+                  <i className="fas fa-times d-block d-lg-none"></i>
                   <span className="d-none d-lg-block">Register for Interview</span>
                 </button>
               </div>
@@ -1497,7 +1498,7 @@ const CandidateViewJobs = () => {
                   className="btn btn-danger py-2"
                   onClick={() => setShowFeedbackModal(false)}
                 >
-                  <i className="feather icon-x d-block d-lg-none"></i>
+                  <i className="fas fa-times d-block d-lg-none"></i>
                   <span className="d-none d-lg-block">Cancel</span>
                 </button>
               </div>

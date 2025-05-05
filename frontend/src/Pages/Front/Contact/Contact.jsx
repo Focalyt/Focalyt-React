@@ -1,10 +1,63 @@
-import React from 'react'
+import React , {useState} from 'react'
 import "./Contact.css"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHome, faPhone, faEnvelope } from '@fortawesome/free-solid-svg-icons';
 import { faFacebook, faInstagram, faYoutube, faLinkedin } from '@fortawesome/free-brands-svg-icons';
 import FrontLayout from '../../../Component/Layouts/Front';
+import axios from 'axios';
 function Contact() {
+
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  const [formData, setFormData] = useState({
+    name: '',
+    mobile: '',
+    email: '',
+    message: ''
+  });
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Get reCAPTCHA response
+    const recaptchaResponse = window.grecaptcha.getResponse();
+    
+    if (!recaptchaResponse) {
+      alert('Please complete the reCAPTCHA');
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${backendUrl}/contact`, {
+        ...formData,
+        'g-recaptcha-response': recaptchaResponse
+      });
+
+      // Clear form on success
+      setFormData({
+        name: '',
+        mobile: '',
+        email: '',
+        message: ''
+      });
+      window.grecaptcha.reset();
+      
+      alert('Message sent successfully!');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error sending message. Please try again.');
+    }
+  };
+
   return (
     <>
       <FrontLayout>

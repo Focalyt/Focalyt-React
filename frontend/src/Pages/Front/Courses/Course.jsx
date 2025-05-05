@@ -105,7 +105,7 @@ function Course() {
       }, {
         headers: { "Content-Type": "application/json" }
       });
-
+console.log( "response callback" , response )
       if (response.status === 200 || response.status === 201) {
         alert("Form submitted successfully!"); // ✅ Alert दिखाएगा
         window.location.reload(); // ✅ Page Refresh करेगा

@@ -953,7 +953,9 @@ const CandidatesJobs = () => {
                                   </div>
                                   <div className="spe_detail">
                                     <h3 className="jobDetails-wrap">
-                                      {job.experience === 0 ? 'Fresher' : `${job.experience} Years`}
+                                    {(job.experience == 0 && job.experienceMonths == 0) || (job.experience == 0 && !job.experienceMonths )
+                                                ? "Fresher"
+                                                : `${job.experience > 0 ? `${job.experience} ${job.experience === 1 ? 'Year' : 'Years'}` : ''} ${job.experienceMonths > 0 ? `${job.experienceMonths} ${job.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim()}
                                     </h3>
                                     <span className="jobDetails-wrap">
                                       Experience / अनुभव
@@ -1065,7 +1067,10 @@ const CandidatesJobs = () => {
                               <li>
                                 <i className="la la-shield"></i>
                                 <h3 className="jobDetails-wrap">
-                                  {job.experience === 0 ? 'Fresher' : `${job.experience} Years`}
+                                {(job.experience == 0 && job.experienceMonths == 0) || (job.experience == 0 && !job.experienceMonths )
+                                                ? "Fresher"
+                                                : `${job.experience > 0 ? `${job.experience} ${job.experience === 1 ? 'Year' : 'Years'}` : ''} ${job.experienceMonths > 0 ? `${job.experienceMonths} ${job.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim()}
+                                  
                                 </h3>
                                 <span className="jobDetails-wrap">
                                   Experience / अनुभव

@@ -54,6 +54,7 @@ import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import User from './Component/Layouts/App/Candidates/StepContainer/StepContainer'
+import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -137,6 +138,8 @@ const Layout = () => {
 
         </Route>
 
+        {/*  college views  */}
+
         <Route path="/college/login" element={<CollegeLogin />} />
         <Route path="/college/register" element={<CollegeRegister />} />
 
@@ -148,6 +151,7 @@ const Layout = () => {
           <Route path="uploadTemplates" element={<UploadTemplates/>}/>
           <Route path="myStudents" element={<MyStudents/>}/>
           <Route path="availablejobs" element={<AvailableJobs/>}/>
+          <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
         </Route>
 
 
