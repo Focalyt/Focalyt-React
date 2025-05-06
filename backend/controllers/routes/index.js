@@ -17,11 +17,9 @@ const { baseUrl } = require("../../config");
 const router = express.Router();
 const fetch = require("cross-fetch");
 const { authChat } = require("../../helpers");
-const { updateSpreadSheetLabLeadsValues } = require("./services/googleservice");
-const { updateSpreadSheetRequestCallValues } = require("./services/googleservice");
-const { updateSpreadSheetCarrerValues } = require("./services/googleservice");
+const { updateSpreadSheetRequestCallValues,updateSpreadSheetCarrerValues,updateSpreadSheetLabLeadsValues } = require("./services/googleservice");
 const moment = require("moment");
-
+const {uploadSinglefile} = require('./functions/images')
 router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);
 router.use('/candidate', candidateRoutes);
@@ -44,12 +42,18 @@ router.get('/policy', async (req, res) => {
 router.post('/contact', async (req, res) => {
   try {
 
+    console.log('api hitting')
     const { name, mobile, email, message } = req.body;
     if (!name || !mobile || !email || !message) {
       req.flash("success", "Please fill all fields");
       return res.redirect("/contact");
     }
-    const response_key = req.body["g-recaptcha-response"];
+    let response_key = req.body["g-recaptcha-response"];
+    if (Array.isArray(response_key)) {
+      response_key = response_key[0];
+    }
+
+    console.log('response_key',response_key)
     // Put secret key here, which we get from google console
     const secret_key = "6Lej1gsqAAAAADDB6EA8QfiRcJdgESc4UBMqOXeq";
 
@@ -264,7 +268,7 @@ router.post('/labs', async (req, res) => {
           </html>
           
                 `;
-    sendMail(subject, msg, 'info@focalyt.com');
+    sendMail(subject, msg, 'b2gfieldsales@focalyt.com');
 
     req.flash("success", "Message sent successfully!");
     // return res.redirect("/futureTechnologyLabs");
@@ -543,12 +547,18 @@ router.post('/callback', async (req, res) => {
 });
 router.post('/career', async (req, res) => {
   try {
-    const { name, number, location, email, position, experience, cv, info, termsAccepted } = req.body;
+    console.log('api hitting')
+    const { name, number, location, email, position, experience,  info, termsAccepted } = req.body;
     console.log("Form Data:", req.body);
 
-    if (!name || !number || !location || !email || !position || !experience || !cv || !info || !termsAccepted) {
+
+    if (!name || !number || !location || !email || !position || !experience ||  !info || !termsAccepted) {
       req.flash("error", "Please fill all fields");
     }
+    const cvFile = req.files?.cv;
+    if (!cvFile) return res.status(400).send("CV file missing");
+
+    const cvUrl = await uploadSinglefile(cvFile); // 👈 Here is the S3 upload
 
     function capitalizeWords(str) {
       if (!str) return '';
@@ -563,7 +573,7 @@ router.post('/career', async (req, res) => {
       email,
       experience,
       position,
-      cv,
+      cvUrl,
       info,
       termsAccepted
     ];
@@ -606,7 +616,7 @@ router.post('/career', async (req, res) => {
                                     <li><span style="line-height:32px;font-size:18px!important;">Email: ${email}</span></li>
                                     <li><span style="line-height:32px;font-size:18px!important;">Position: ${position}</span></li>
                                     <li><span style="line-height:32px;font-size:18px!important;">Experience: ${experience}</span></li>
-                                    <li><span style="line-height:32px;font-size:18px!important;">CV: ${cv}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">CV: ${cvUrl}</span></li>
                                     <li><span style="line-height:32px;font-size:18px!important;">Additional Information: ${info}</span></li>
                                   </ul>
                                 </td>
@@ -626,7 +636,13 @@ router.post('/career', async (req, res) => {
     </html>
     `;
 
-    sendMail(subject, msg, 'info@focalyt.com');
+    await sendMail(subject, msg, "hrm@focalyt.com", [
+      {
+        filename: cvFile.name,  // e.g. "Resume.pdf"
+        path: cvUrl      // e.g. "https://s3-bucket-url/resume.pdf"
+      }
+    ]);
+    
 
     req.flash("success", "Message sent successfully!");
     res.send(`

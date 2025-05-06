@@ -332,9 +332,6 @@ const CandidateLogin = () => {
                             localStorage.setItem('token', loginRes.data.token);
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
                             sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
-
-
-
                             if (returnUrl) {
                                 window.location.href = returnUrl;
                             } else {

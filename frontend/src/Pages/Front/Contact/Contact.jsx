@@ -1,4 +1,4 @@
-import React , {useState} from 'react'
+import React , {useState,useEffect} from 'react'
 import "./Contact.css"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHome, faPhone, faEnvelope } from '@fortawesome/free-solid-svg-icons';
@@ -10,54 +10,38 @@ function Contact() {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-  const [formData, setFormData] = useState({
-    name: '',
-    mobile: '',
-    email: '',
-    message: ''
-  });
+  useEffect(() => {
+    // reCAPTCHA load
+    const script = document.createElement("script");
+    script.src = "https://www.google.com/recaptcha/api.js";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+  
+    // define global function that recaptcha expects
+    window.onSubmit = function (token) {
+      handleSubmit(token);
+    };
+  }, []);
+  
+ 
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Get reCAPTCHA response
-    const recaptchaResponse = window.grecaptcha.getResponse();
-    
-    if (!recaptchaResponse) {
-      alert('Please complete the reCAPTCHA');
-      return;
-    }
-
+  const handleSubmit = async (recaptchaToken) => {
+    const form = document.getElementById("contactform");
+    const formDataObj = new FormData(form);
+    formDataObj.append("g-recaptcha-response", recaptchaToken);
+  
     try {
-      const response = await axios.post(`${backendUrl}/contact`, {
-        ...formData,
-        'g-recaptcha-response': recaptchaResponse
-      });
-
-      // Clear form on success
-      setFormData({
-        name: '',
-        mobile: '',
-        email: '',
-        message: ''
-      });
+      await axios.post(`${backendUrl}/contact`, formDataObj);
+      alert("Message sent successfully!");
+      form.reset();
       window.grecaptcha.reset();
-      
-      alert('Message sent successfully!');
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Error sending message. Please try again.');
+    } catch (err) {
+      console.error("Error:", err);
+      alert("Something went wrong!");
     }
   };
-
+  
   return (
     <>
       <FrontLayout>
@@ -84,7 +68,7 @@ function Contact() {
     
             </div>
             <div className="col-xl-6 mt-xl-5 mt-lg-2 mt-md-2 mt-sm-0 mt-0">
-              <form method="post" id="contactform">
+              <form onSubmit={handleSubmit} id="contactform">
               <div className="contact-form">
                 <div className="form-group form-primary">
                   <input type="text" name="name"  color="#FC2B5A" className="form-contro  mt-xl-5 mt-lg-2 mt-md-2 mt-sm-0 mt-0"
