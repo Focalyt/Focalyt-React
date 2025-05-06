@@ -322,7 +322,7 @@ const CandidateLogin = () => {
 
                     if (registerRes.data.status === "success") {
                         await trackMetaConversion({
-                            eventName: isNewUser ? "Signup" : "Login",
+                            eventName: "Signup",
                             sourceUrl: window.location.href
                         });
                         const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
@@ -373,7 +373,7 @@ const CandidateLogin = () => {
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
 
                             await trackMetaConversion({
-                                eventName: isNewUser ? "Signup" : "Login",
+                                eventName:  "Login",
                                 sourceUrl: window.location.href
                             });
 
