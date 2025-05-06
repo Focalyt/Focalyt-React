@@ -4267,7 +4267,7 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
       experiences,
       qualifications,
       declaration,
-      isExperienced
+      isExperienced,showProfileForm
     } = req.body;
 
     console.log('experiences from frontend',experiences)
@@ -4278,6 +4278,7 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
     };
 
     // Root level fields (only if present)
+    if (showProfileForm) updatePayload.showProfileForm = showProfileForm;
     if (name) updatePayload.name = name;
     if (email) updatePayload.email = email;
     if (mobile) updatePayload.mobile = mobile;

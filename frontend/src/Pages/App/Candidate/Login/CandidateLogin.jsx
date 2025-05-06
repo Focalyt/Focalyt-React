@@ -65,7 +65,7 @@ const CandidateLogin = () => {
             if (returnUrl) {
                 window.location.href = returnUrl;
             } else {
-                window.location.href = '/candidate/dashboard';
+                window.location.href = '/candidate/searchjob';
             }
         }
     }, [user, returnUrl]);
@@ -338,7 +338,7 @@ const CandidateLogin = () => {
                             if (returnUrl) {
                                 window.location.href = returnUrl;
                             } else {
-                                window.location.href = '/candidate/dashboard';
+                                window.location.href = '/candidate/searchjob';
                             }
                         } else {
                             setErrorMessage('Login failed after registration');
@@ -384,7 +384,7 @@ const CandidateLogin = () => {
                                 window.location.href = returnUrl
                             }
                             else {
-                                window.location.href = '/candidate/dashboard';
+                                window.location.href = '/candidate/searchjob';
                             }
 
 

@@ -25,6 +25,7 @@ const candidateProfileSchema = new Schema(
     sex: { type: String },
     dob: { type: Date },
     whatsapp: { type: Number },
+    showProfileForm:{type:Boolean, default: false},
     personalInfo: {
       totalExperience: Number,
 

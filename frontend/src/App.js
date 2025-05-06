@@ -53,7 +53,6 @@ import UploadTemplates from './Pages/App/College/UploadTemplates/UploadTemplates
 import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
-import User from './Component/Layouts/App/Candidates/StepContainer/StepContainer'
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 const Layout = () => {
   const location = useLocation();
@@ -106,7 +105,7 @@ const Layout = () => {
         {/* Candidate Parent Route */}
         <Route path="/candidate/login" element={<CandidateLogin />} />
         <Route path="/candidate" element={<CandidateLayout />}>
-        <Route path="user" element={<User/>}/>
+
           <Route path="dashboard" element={<CandidateDashboard />} />
           <Route path="myprofile" element={<CandidateProfile />} />
           <Route path="document" element={<CandidatesDocuments />} />

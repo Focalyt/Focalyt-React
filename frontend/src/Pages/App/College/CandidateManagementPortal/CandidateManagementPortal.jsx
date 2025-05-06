@@ -74,76 +74,100 @@ const CandidateManagementPortal = () => {
   ];
   
   const statusFilters = [
-    { value: 'all', label: 'All', count: 3, color: 'bg-gray-100 text-gray-800' },
-    { value: 'pursuing', label: 'Pursuing', count: 1, color: 'bg-blue-100 text-blue-800' },
-    { value: 'completed', label: 'Completed', count: 1, color: 'bg-green-100 text-green-800' },
-    { value: 'dropout', label: 'Dropout', count: 1, color: 'bg-red-100 text-red-800' }
+    { value: 'all', label: 'All', count: 3, color: 'bg-secondary text-dark' },
+    { value: 'pursuing', label: 'Pursuing', count: 1, color: 'bg-info text-dark' },
+    { value: 'completed', label: 'Completed', count: 1, color: 'bg-success text-white' },
+    { value: 'dropout', label: 'Dropout', count: 1, color: 'bg-danger text-white' }
   ];
 
+  const statusClasses = {
+    pursuing: 'bg-info text-dark',
+    completed: 'bg-success text-white',
+    dropout: 'bg-danger text-white'
+  };
+
   const Dashboard = () => (
-    <div className="space-y-6">
+    <div className="mb-4">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-              <Users size={24} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500">Total Candidates</p>
-              <h3 className="text-2xl font-bold">605</h3>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100 text-green-600">
-              <Building2 size={24} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500">Active Centers</p>
-              <h3 className="text-2xl font-bold">{centers.length}</h3>
+      <div className="row g-4 mb-4">
+        <div className="col-md-3">
+          <div className="card h-100">
+            <div className="card-body">
+              <div className="d-flex align-items-center">
+                <div className="p-3 rounded-circle bg-primary bg-opacity-10 text-primary">
+                  <Users size={24} />
+                </div>
+                <div className="ms-3">
+                  <p className="text-muted mb-0 small">Total Candidates</p>
+                  <h3 className="fw-bold">605</h3>
+                </div>
+              </div>
             </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-yellow-100 text-yellow-600">
-              <BookOpen size={24} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500">Active Courses</p>
-              <h3 className="text-2xl font-bold">{courses.length}</h3>
+        <div className="col-md-3">
+          <div className="card h-100">
+            <div className="card-body">
+              <div className="d-flex align-items-center">
+                <div className="p-3 rounded-circle bg-success bg-opacity-10 text-success">
+                  <Building2 size={24} />
+                </div>
+                <div className="ms-3">
+                  <p className="text-muted mb-0 small">Active Centers</p>
+                  <h3 className="fw-bold">{centers.length}</h3>
+                </div>
+              </div>
             </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-purple-100 text-purple-600">
-              <GraduationCap size={24} />
+        <div className="col-md-3">
+          <div className="card h-100">
+            <div className="card-body">
+              <div className="d-flex align-items-center">
+                <div className="p-3 rounded-circle bg-warning bg-opacity-10 text-warning">
+                  <BookOpen size={24} />
+                </div>
+                <div className="ms-3">
+                  <p className="text-muted mb-0 small">Active Courses</p>
+                  <h3 className="fw-bold">{courses.length}</h3>
+                </div>
+              </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500">Active Batches</p>
-              <h3 className="text-2xl font-bold">{batches.filter(b => b.status === 'active').length}</h3>
+          </div>
+        </div>
+        
+        <div className="col-md-3">
+          <div className="card h-100">
+            <div className="card-body">
+              <div className="d-flex align-items-center">
+                <div className="p-3 rounded-circle bg-info bg-opacity-10 text-info">
+                  <GraduationCap size={24} />
+                </div>
+                <div className="ms-3">
+                  <p className="text-muted mb-0 small">Active Projects</p>
+                  <h3 className="fw-bold">{batches.filter(b => b.status === 'active').length}</h3>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
       
       {/* Centers Overview */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold">Center Wise Distribution</h2>
+      <div className="card">
+        <div className="card-header">
+          <h5 className="card-title mb-0">Center Wise Distribution</h5>
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card-body">
+          <div className="row g-3">
             {centers.map(center => (
-              <div key={center.id} className="border rounded-lg p-4">
-                <h3 className="font-semibold">{center.name}</h3>
-                <p className="text-gray-600">{center.candidates} Candidates</p>
+              <div key={center.id} className="col-md-6 col-lg-3">
+                <div className="border rounded p-3">
+                  <h6 className="fw-semibold">{center.name}</h6>
+                  <p className="text-muted mb-0">{center.candidates} Candidates</p>
+                </div>
               </div>
             ))}
           </div>
@@ -153,21 +177,23 @@ const CandidateManagementPortal = () => {
   );
 
   const CandidateList = () => (
-    <div className="bg-white rounded-lg shadow">
+    <div className="card">
       {/* Filters */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex gap-4 items-center">
-            <h2 className="text-lg font-semibold">Candidates</h2>
-            <div className="flex gap-2">
+      <div className="card-header">
+        <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div className="d-flex align-items-center gap-3">
+            <h5 className="card-title mb-0">Candidates</h5>
+            <div className="d-flex flex-wrap gap-2">
               {statusFilters.map(filter => (
                 <button
                   key={filter.value}
                   onClick={() => setSelectedStatus(filter.value)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  className={`btn btn-sm rounded-pill ${
                     selectedStatus === filter.value 
-                      ? filter.color 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? filter.value === 'all' ? 'btn-secondary' :
+                        filter.value === 'pursuing' ? 'btn-info' :
+                        filter.value === 'completed' ? 'btn-success' : 'btn-danger'
+                      : 'btn-outline-secondary'
                   }`}
                 >
                   {filter.label} ({filter.count})
@@ -176,24 +202,26 @@ const CandidateManagementPortal = () => {
             </div>
           </div>
           
-          <div className="flex gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+          <div className="d-flex gap-2">
+            <div className="position-relative">
+              <span className="position-absolute top-50 start-0 translate-middle-y ms-3 text-muted">
+                <Search size={18} />
+              </span>
               <input
                 type="text"
                 placeholder="Search candidates..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="form-control ps-5"
               />
             </div>
-            <button className="p-2 border rounded-lg hover:bg-gray-50">
+            <button className="btn btn-outline-secondary">
               <Filter size={18} />
             </button>
-            <button className="p-2 border rounded-lg hover:bg-gray-50">
+            <button className="btn btn-outline-secondary">
               <Download size={18} />
             </button>
-            <button className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-2">
+            <button className="btn btn-warning d-flex align-items-center gap-2">
               <UserPlus size={18} />
               Add Candidate
             </button>
@@ -202,20 +230,20 @@ const CandidateManagementPortal = () => {
       </div>
       
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
+      <div className="table-responsive">
+        <table className="table table-hover align-middle">
+          <thead className="table-light">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Center</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enrollment Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th>Candidate</th>
+              <th>Center</th>
+              <th>Course</th>
+              <th>Batch</th>
+              <th>Status</th>
+              <th>Enrollment Date</th>
+              <th>Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {candidates
               .filter(candidate => selectedStatus === 'all' || candidate.status === selectedStatus)
               .filter(candidate => 
@@ -223,28 +251,20 @@ const CandidateManagementPortal = () => {
                 candidate.phone.includes(searchQuery)
               )
               .map(candidate => (
-                <tr key={candidate.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
+                <tr key={candidate.id}>
+                  <td>
                     <div>
-                      <div className="font-medium text-gray-900">{candidate.name}</div>
-                      <div className="text-sm text-gray-500">{candidate.phone}</div>
+                      <div className="fw-medium">{candidate.name}</div>
+                      <div className="small text-muted">{candidate.phone}</div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{candidate.center}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{candidate.course}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{candidate.batch}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      candidate.status === 'pursuing' ? 'bg-blue-100 text-blue-800' :
-                      candidate.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {candidate.status.charAt(0).toUpperCase() + candidate.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{candidate.enrollmentDate}</td>
-                  <td className="px-6 py-4 text-sm font-medium">
-                    <button className="text-indigo-600 hover:text-indigo-900 mr-3">
+                  <td className="text-muted">{candidate.center}</td>
+                  <td className="text-muted">{candidate.course}</td>
+                  <td className="text-muted">{candidate.batch}</td>
+                  
+                  <td className="text-muted">{candidate.enrollmentDate}</td>
+                  <td>
+                    <button className="btn btn-sm btn-outline-primary">
                       <Eye size={18} />
                     </button>
                   </td>
@@ -257,34 +277,36 @@ const CandidateManagementPortal = () => {
   );
 
   const BatchManagement = () => (
-    <div className="bg-white rounded-lg shadow">
-      <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Batch Management</h2>
-        <button className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-2">
+    <div className="card">
+      <div className="card-header d-flex justify-content-between align-items-center">
+        <h5 className="card-title mb-0">Project Name: <span className="fw-normal">Amber</span></h5>
+        <button className="btn btn-warning d-flex align-items-center gap-2">
           <Calendar size={18} />
-          Create Batch
+          Create Project
         </button>
       </div>
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="card-body">
+        <div className="row g-4">
           {batches.map(batch => (
-            <div key={batch.id} className="border rounded-lg p-4">
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="font-semibold">{batch.name}</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  batch.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {batch.status}
-                </span>
+            <div key={batch.id} className="col-md-4">
+              <div className="border rounded p-3">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <h6 className="fw-semibold mb-0">{batch.name}</h6>
+                  <span className={`badge ${
+                    batch.status === 'active' ? 'bg-success' : 'bg-secondary'
+                  }`}>
+                    {batch.status}
+                  </span>
+                </div>
+                <div className="small text-muted">
+                  <p className="mb-1">Start: {batch.startDate}</p>
+                  <p className="mb-1">End: {batch.endDate}</p>
+                  <p className="mb-0">{batch.students} Students</p>
+                </div>
+                <button className="btn btn-outline-secondary w-100 mt-3">
+                  View Details
+                </button>
               </div>
-              <div className="space-y-2 text-sm text-gray-600">
-                <p>Start: {batch.startDate}</p>
-                <p>End: {batch.endDate}</p>
-                <p>{batch.students} Students</p>
-              </div>
-              <button className="mt-4 w-full px-4 py-2 border rounded-lg hover:bg-gray-50">
-                View Details
-              </button>
             </div>
           ))}
         </div>
@@ -293,27 +315,18 @@ const CandidateManagementPortal = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="bg-light min-vh-100">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-semibold text-gray-900">Candidate Management Portal</h1>
-            </div>
-            <div className="flex items-center">
-              <div className="ml-4 flex items-center md:ml-6">
-                <button className="relative p-1 text-gray-400 hover:text-gray-500">
-                  {/* <Bell size={20} /> */}
-                </button>
-                <div className="ml-3 relative">
-                  <div className="relative inline-block text-left">
-                    <div className="flex items-center">
-                      <button className="flex items-center text-sm rounded-full">
-                        <img className="h-8 w-8 rounded-full" src="/api/placeholder/32/32" alt="User" />
-                      </button>
-                    </div>
-                  </div>
+      <header className="bg-white shadow-sm sticky-top">
+        <div className="container-fluid py-3">
+          <div className="d-flex justify-content-between align-items-center">
+            <h1 className="h4 mb-0">Our Students</h1>
+            <div className="d-flex align-items-center">
+              <div className="ms-3 position-relative">
+                <div className="d-flex align-items-center">
+                  <button className="btn p-0 d-flex align-items-center">
+                    <img className="rounded-circle" width="32" height="32" src="" alt="User" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -322,48 +335,48 @@ const CandidateManagementPortal = () => {
       </header>
 
       {/* Navigation */}
-      <nav className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
+      <nav className="bg-white border-bottom">
+        <div className="container-fluid">
+          <div className="d-flex gap-4">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`py-4 px-1 inline-flex items-center border-b-2 text-sm font-medium ${
+              className={`btn btn-link text-decoration-none px-0 py-3 border-bottom border-3 rounded-0 ${
                 activeTab === 'overview'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'text-warning border-warning'
+                  : 'text-secondary border-transparent'
               }`}
             >
               Overview
             </button>
             <button
               onClick={() => setActiveTab('candidates')}
-              className={`py-4 px-1 inline-flex items-center border-b-2 text-sm font-medium ${
+              className={`btn btn-link text-decoration-none px-0 py-3 border-bottom border-3 rounded-0 ${
                 activeTab === 'candidates'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'text-warning border-warning'
+                  : 'text-secondary border-transparent'
               }`}
             >
               Candidates
             </button>
             <button
-              onClick={() => setActiveTab('batches')}
-              className={`py-4 px-1 inline-flex items-center border-b-2 text-sm font-medium ${
-                activeTab === 'batches'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              onClick={() => setActiveTab('Project')}
+              className={`btn btn-link text-decoration-none px-0 py-3 border-bottom border-3 rounded-0 ${
+                activeTab === 'Project'
+                  ? 'text-warning border-warning'
+                  : 'text-secondary border-transparent'
               }`}
             >
-              Batches
+              Projects
             </button>
           </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="container-fluid py-4">
         {activeTab === 'overview' && <Dashboard />}
         {activeTab === 'candidates' && <CandidateList />}
-        {activeTab === 'batches' && <BatchManagement />}
+        {activeTab === 'Project' && <BatchManagement />}
       </main>
     </div>
   );
