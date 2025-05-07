@@ -447,3 +447,8 @@ button.close span {
     width: 100%!important;
   }
 }
+@media(max-width:768px){
+  .mobileJobs{
+    justify-content: center;
+  }
+}

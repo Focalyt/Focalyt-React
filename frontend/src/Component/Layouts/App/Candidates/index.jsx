@@ -25,8 +25,8 @@ function CandidateLayout({ children }) {
   // popup model 
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
-    // Backend URL
-    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  // Backend URL
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   // Add this function to toggle the popup visibility
 
   useEffect(() => {
@@ -48,12 +48,12 @@ function CandidateLayout({ children }) {
           const data = response.data.data;
           const candidate = data.candidate;
 
-          
+
           if (candidate.showProfileForm) {
             setShowProfileForm(candidate.showProfileForm);
             // Map backend data to frontend state
-            
-           
+
+
           } else {
             setShowProfileForm(false)
           }
@@ -77,7 +77,7 @@ function CandidateLayout({ children }) {
     }
   }, []);
 
- 
+
 
 
 
@@ -97,9 +97,9 @@ function CandidateLayout({ children }) {
     });
   };
 
-  
-  
- 
+
+
+
   const [expanded, setExpanded] = useState(true);
   const [activeItem, setActiveItem] = useState('dashboard');
   const [openSubmenu, setOpenSubmenu] = useState({
@@ -324,9 +324,9 @@ function CandidateLayout({ children }) {
       setFormData(prev => ({ ...prev, certificates: { completed: true } }));
       setCurrentStep(4);
       // alert('Form completed!');
-    } else if(currentStep ===4){
+    } else if (currentStep === 4) {
       setFormData(prev => ({ ...prev, additional: { completed: true } }));
-    
+
     }
   };
 
@@ -1039,13 +1039,41 @@ function CandidateLayout({ children }) {
               <div className="mt-2 mb-2">
 
                 {!showProfileForm && (
-                  <div className="profile-form-popup">
-                    <div className="popup-overlay" ></div>
-                    <div className="popup-content">
-                     
-                      <User />
+                  <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static"
+                  data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" id="inner_job_page">
+        
+                  <div className="">
+                    <CandidateHeader toggleSidebar={handleSidebarToggle} isSideBarOpen={isSidebarOpen} />
+                    <div className="content-wrapper">
+                      <div className="mt-2 mb-2">
+        
+                      
+                          <div className="modal fade show popmodel"
+                            style={{ display: 'block' }}
+                            tabIndex="-1"
+                            aria-modal="true"
+                            role="dialog"
+                            data-bs-backdrop="static"
+                            data-bs-keyboard="false">
+                            <div className="fade show"></div>
+                            <div className="modal-dialog modal-dialog-centered modal-lg">
+                              <div className="modal-content">
+                                
+                                <div className="modal-body">
+                                  <User />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                      
+                      </div>
+                      <div className="content-body mb-4">
+                        <Outlet />
+                      </div>
+                      <CandidateFooter />
                     </div>
                   </div>
+                </div>
                 )}
               </div>
               <div className="content-body mb-4">
@@ -1121,6 +1149,9 @@ function CandidateLayout({ children }) {
           .close-popup:hover {
             color: #FC2B5A;
           }
+            .popmodel{
+            overflow-y: scroll!important;
+            }
 `
         }
       </style>
