@@ -1026,7 +1026,7 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
   const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
 
   let canApply = false;
-  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.currentAddress && candidate.highestQualification) {
+  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.currentAddress && candidate.highestQualification) {
     canApply = true;
   
 }
@@ -1456,7 +1456,7 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
 
 
     let canApply = false;
-    if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.currentAddress && candidate.highestQualification) {
+    if (candidate.name && candidate.mobile && candidate.sex &&  candidate.personalInfo.currentAddress && candidate.highestQualification) {
         canApply = true;
       
     }
