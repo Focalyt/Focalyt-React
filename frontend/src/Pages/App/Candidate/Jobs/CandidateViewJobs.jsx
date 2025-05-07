@@ -19,7 +19,7 @@ const CandidateViewJobs = () => {
   const [address, setAddress] = useState('');
   const [highestQualificationdata, sethighestQualificationdata] = useState([]);
 
-  const [totalExperience, setTotalExperience] = useState('');
+  const [totalExperience, setTotalExperience] = useState(null);;
   const [highestQualification, setHighestQualification] = useState('');
   const [city, setCity] = useState('');
   const [dob, setDob] = useState('');

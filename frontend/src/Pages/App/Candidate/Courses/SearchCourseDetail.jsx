@@ -194,9 +194,6 @@ const CourseDetails = () => {
         eventName: "CourseApply",
         sourceUrl: window.location.href,
       });
-
-
-
       // Close modal
       document.getElementById('apply').classList.remove('show');
       document.getElementsByClassName('modal-backdrop')[0]?.remove();

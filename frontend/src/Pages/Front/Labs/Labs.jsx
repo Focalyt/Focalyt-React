@@ -217,20 +217,16 @@ function Labs() {
 
                                           <div className="form_name">
                                             <div className="designation select-container">
-                                              <select
+                                              <input
                                                 name="designation"
-                                                className="form_designation_input"
-                                                id="designation"
+                                                className="form_input"
                                                 required
+                                                placeholder=""
+                                                type="text"
+                                                id="designation"
                                                 value={formData.designation}
                                                 onChange={handleInputChange}
-                                              >
-                                                <option value="" disabled>Select your designation</option>
-                                                <option value="manager">Manager</option>
-                                                <option value="developer">Developer</option>
-                                                <option value="designer">Designer</option>
-                                                <option value="tester">Tester</option>
-                                              </select>
+                                              />
                                               <label className="label" htmlFor="Designation">Designation <span className="imp">*</span></label>
                                             </div>
                                             <div className="state">
@@ -779,14 +775,16 @@ useful in their future prospect.
                       </div>
                       <div className="form_name">
                         <div className="designation select-container">
-                          <select name="designation" className="form_designation_input" id="designation" required value={formData.designation}
-                            onChange={handleInputChange}>
-                            <option value="" disabled selected>Select your designation</option>
-                            <option value="manager">Manager</option>
-                            <option value="developer">Developer</option>
-                            <option value="designer">Designer</option>
-                            <option value="tester">Tester</option>
-                          </select>
+                          <input
+                            name="designation"
+                            className="form_input"
+                            required
+                            placeholder=""
+                            type="text"
+                            id="designation"
+                            value={formData.designation}
+                            onChange={handleInputChange}
+                          />
                           <label className="label" for="Designation"> Designation <span className="imp">*</span></label>
                         </div>
                         <div className="state">
