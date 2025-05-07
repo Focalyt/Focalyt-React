@@ -268,7 +268,7 @@ console.log( "response callback" , response )
           <div className="container">
             <div className="row">
               <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mx-auto mt-xxl-5 mt-xl-3 mt-lg-3 mt-md-3 mt-sm-3 mt-3">
-                <div className="row my-xl-5 my-lg-5 my-md-3 my-sm-3 my-5">
+                <div className="row my-xl-5 my-lg-5 my-md-3 my-sm-3 my-5 mobileJobs">
                   <h1 className="text-center text-uppercase jobs-heading pb-4">Select course for your career</h1>
 
 

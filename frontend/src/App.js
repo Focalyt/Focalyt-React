@@ -54,6 +54,10 @@ import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
+import AddCourse from './Pages/App/College/Course/AddCourse';
+import ViewCourses from './Pages/App/College/Course/ViewCourse';
+import Registrations from './Pages/App/College/Course/Registrations';
+import AccessManagement from './Pages/App/College/Settings/AccessManagement';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -139,11 +143,11 @@ const Layout = () => {
 
         {/*  college views  */}
 
-        <Route path="/college/login" element={<CollegeLogin />} />
-        <Route path="/college/register" element={<CollegeRegister />} />
+        <Route path="/institute/login" element={<CollegeLogin />} />
+        <Route path="/institute/register" element={<CollegeRegister />} />
 
         {/* CollegeLayout will wrap only protected pages */}
-        <Route path="/college" element={<CollegeLayout  />}>
+        <Route path="/institute" element={<CollegeLayout  />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="myprofile" element={<Profile/>}/>
           <Route path="uploadCandidates" element={<UploadCandidates/>}/>
@@ -151,6 +155,10 @@ const Layout = () => {
           <Route path="myStudents" element={<MyStudents/>}/>
           <Route path="availablejobs" element={<AvailableJobs/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
+          <Route path='addcourse' element={<AddCourse/>}/>
+          <Route path='viewcourse' element={<ViewCourses/>}/>
+          <Route path='registration' element={<Registrations/>}/>
+          <Route path='accessManagement' element={<AccessManagement/>}/>
         </Route>
 
 

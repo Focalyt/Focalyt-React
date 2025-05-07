@@ -32,11 +32,11 @@ function CollegeLayout({ children }) {
 
   const [openDropdown, setOpenDropdown] = useState(null);
   const profileMenuRef = useRef(null);
-  
+
   const toggleDropdown = (menu) => {
     setOpenDropdown((prev) => (prev === menu ? null : menu));
   };
-  
+
   const toggleSubmenu = (menu) => {
     setOpenSubmenu(prev => {
       const newState = { ...prev, [menu]: !prev[menu] };
@@ -50,7 +50,8 @@ function CollegeLayout({ children }) {
     profile: false,
     students: false,
     jobs: false,
-    courses: false
+    courses: false,
+    settings: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
@@ -99,6 +100,7 @@ function CollegeLayout({ children }) {
     students: useRef(null),
     jobs: useRef(null),
     courses: useRef(null),
+    settings: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -109,7 +111,8 @@ function CollegeLayout({ children }) {
     profile: '0px',
     students: '0px',
     jobs: '0px',
-    courses: '0px'
+    courses: '0px',
+    settings: '0px'
   });
 
   useLayoutEffect(() => {
@@ -129,7 +132,7 @@ function CollegeLayout({ children }) {
               ...prev,
               [key]: '0px'
             }));
-          }, 5); 
+          }, 5);
         }
       }
     });
@@ -143,12 +146,12 @@ function CollegeLayout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-   <main className="flex flex-1">
+      <main className="flex flex-1">
         <div className={`main-menu menu-fixed menu-light menu-accordion menu-shadow ${isSidebarOpen ? 'expanded' : 'collapsed'}`}>
           <div className={`navbar-header ${expanded ? 'expanded' : ''}`}>
             <ul className="nav navbar-nav flex-row">
               <li className="nav-item mr-auto">
-                <Link to="/college/myprofile" className="navbar-brand">
+                <Link to="/institute/myprofile" className="navbar-brand">
                   <img className="img-fluid logocs" src="/Assets/images/logo/logo.png" alt="Logo" />
                 </Link>
               </li>
@@ -164,8 +167,8 @@ function CollegeLayout({ children }) {
           <div className="main-menu-content border border-left-0 border-right-0 border-bottom-0">
             <ul className="navigation navigation-main" id="main-menu-navigation">
               {/* Dashboard */}
-              <li className={`nav-item ${location.pathname === '/college/dashboard' ? 'active' : ''}`}>
-                <Link to="/college/dashboard" onClick={() => {
+              <li className={`nav-item ${location.pathname === '/institute/dashboard' ? 'active' : ''}`}>
+                <Link to="/institute/dashboard" onClick={() => {
                   handleSidebarClose();
                 }} >
                   {/* <FontAwesomeIcon icon={faHouse} /> */}
@@ -174,8 +177,8 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Your Profile */}
-              <li className={`nav-item ${location.pathname === '/college/myProfile' ? 'active' : ''}`}>
-                <Link to="/college/myProfile" onClick={() => {
+              <li className={`nav-item ${location.pathname === '/institute/myProfile' ? 'active' : ''}`}>
+                <Link to="/institute/myProfile" onClick={() => {
                   handleSidebarClose();
                 }} >
                   <FontAwesomeIcon icon={faUser} />
@@ -184,8 +187,8 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Upload Candidates */}
-              <li className={`nav-item ${location.pathname === '/college/uploadCandidates' ? 'active' : ''}`}>
-                <Link to="/college/uploadCandidates" onClick={() => {
+              <li className={`nav-item ${location.pathname === '/institute/uploadCandidates' ? 'active' : ''}`}>
+                <Link to="/institute/uploadCandidates" onClick={() => {
                   handleSidebarClose();
                 }} >
                   {/* <FontAwesomeIcon icon={faUserDoctor} /> */}
@@ -194,8 +197,8 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Upload Templates */}
-              <li className={`nav-item ${location.pathname === '/college/uploadTemplates' ? 'active' : ''}`}>
-                <Link to="/college/uploadTemplates" onClick={() => {
+              <li className={`nav-item ${location.pathname === '/institute/uploadTemplates' ? 'active' : ''}`}>
+                <Link to="/institute/uploadTemplates" onClick={() => {
                   handleSidebarClose();
                 }} >
                   {/* <FontAwesomeIcon icon={faPenToSquare} /> */}
@@ -204,8 +207,8 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* My Students */}
-              <li className={`nav-item ${location.pathname === '/college/myStudents' ? 'active' : ''}`}>
-                <Link to="/college/myStudents" onClick={() => {
+              <li className={`nav-item ${location.pathname === '/institute/myStudents' ? 'active' : ''}`}>
+                <Link to="/institute/myStudents" onClick={() => {
                   handleSidebarClose();
                 }} >
                   <FontAwesomeIcon icon={faGraduationCap} />
@@ -214,8 +217,8 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Available Jobs */}
-              <li className={`nav-item ${location.pathname === '/college/availablejobs' ? 'active' : ''}`}>
-                <Link to="/college/availablejobs" onClick={() => {
+              <li className={`nav-item ${location.pathname === '/institute/availablejobs' ? 'active' : ''}`}>
+                <Link to="/institute/availablejobs" onClick={() => {
                   handleSidebarClose();
                 }} >
                   {/* <FontAwesomeIcon icon={faBriefcase} /> */}
@@ -238,14 +241,46 @@ function CollegeLayout({ children }) {
                     transition: 'max-height 0.3s ease-in-out'
                   }}
                 >
-                  <li className={`nav-item ${location.pathname === '/college/viewEvent' ? 'active' : ''}`}>
-                    <Link to="/college/viewEvent" onClick={() => { handleSidebarClose(); }}>
+                  <li className={`nav-item ${location.pathname === '/institute/viewEvent' ? 'active' : ''}`}>
+                    <Link to="/institute/viewEvent" onClick={() => { handleSidebarClose(); }}>
                       <FontAwesomeIcon icon={farFile} />
                       <span className="menu-title">View Events</span>
                     </Link>
                   </li>
                 </ul>
               </li>
+
+              {/* settings  */}
+
+              <li className={`nav-item has-sub ${openSubmenu.settings ? 'open' : ''}`}>
+                <a href="#" onClick={() => toggleSubmenu('settings')}>
+                  <FontAwesomeIcon icon={farUser} />
+                  <span className="menu-title">Settings</span>
+                </a>
+                <ul
+                  ref={menuRefs.settings}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.settings,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.3s ease-in-out'
+                  }}
+                >
+                  <li className={`nav-item ${location.pathname === '/institute/adduser' ? 'active' : ''}`}>
+                    <Link to="/institute/accessManagement" onClick={() => { handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farFile} />
+                      <span className="menu-title">Access Management</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/assignmentrule' ? 'active' : ''}`}>
+                    <Link to="/institute/" onClick={() => { handleSidebarClose(); }}>
+                      <FontAwesomeIcon icon={farFile} />
+                      <span className="menu-title">Assignment Rule</span>
+                    </Link>
+                  </li>
+                </ul>
+              </li>
+
             </ul>
           </div>
         </div>
@@ -256,18 +291,18 @@ function CollegeLayout({ children }) {
           <div className="app-content content">
             <div className="content-overlay"></div>
             <div className="header-navbar-shadow"></div>
-            <CollegeHeader/>
+            <CollegeHeader />
             <div className="content-wrapper">
               <div className="content-body mb-4">
                 <Outlet />
               </div>
-             <CollegeFooter/>
+              <CollegeFooter />
             </div>
           </div>
         </div>
       </main>
-    
-    
+
+
       <style>
         {`
         .menu-content {

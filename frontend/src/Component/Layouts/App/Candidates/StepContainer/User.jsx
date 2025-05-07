@@ -1241,7 +1241,7 @@ const User = () => {
               ))}
 
               <button
-                className="add-button"
+                className="add-button me-3"
                 onClick={() => setEducations([...educations, {
                   education: '',
                   universityName: '',
@@ -2062,6 +2062,10 @@ const User = () => {
         .form-row {
           flex-direction: column;
           gap: 10px;
+          width:100%
+        }
+        .project-item{
+        flex-direction: column;
         }
         
         .half-width {
@@ -2099,6 +2103,13 @@ const User = () => {
           width: auto !important;
         }
       }
+
+@media(max-width:768px){
+.certificate-item {
+flex-direction: column;
+        }
+}
+
     `}</style>
       </div>
 

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import "./CollegeHeader.css";
 const CollegeHeader = () => {
   const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -27,7 +27,7 @@ const CollegeHeader = () => {
       });
       localStorage.clear();
       sessionStorage.clear();
-      navigate('/college/login');
+      navigate('/institute/login');
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -108,12 +108,12 @@ const CollegeHeader = () => {
                     </div>
                     <span>
                       {/* <img src={`${bucketUrl}/images/loader.png`} alt="avatar" height="40" width="40" /> */}
-                      <img src="" alt="" />
+                      <img src="/Assets/images/confirm.png" alt="" style={{width:'35px'}}/>
                     </span>
                   </a>
 
                   <div className="dropdown-menu dropdown-menu-right" id="logout-div">
-                    <a className="dropdown-item" href="/college/myProfile">
+                    <a className="dropdown-item" href="/institute/myProfile">
                       <i className="feather icon-user"></i> Edit Profile
                     </a>
                     <div className="dropdown-divider"></div>
@@ -128,6 +128,26 @@ const CollegeHeader = () => {
           </div>
         </div>
       </nav>
+
+      <style>
+        {
+          `
+          .user-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    float: left;
+    margin-right: 0.8rem;
+}
+    .nav-item > a::after {
+    content:''
+    position: absolute;
+    top:0;
+    visibility: hidden;
+    }
+          `
+        }
+      </style>
     </>
   );
 };
