@@ -107,6 +107,8 @@ router.post('/meta/track-conversion', [isCandidate], async (req, res) => {
         const cleanPayload = JSON.parse(JSON.stringify(payload)); // remove undefined
         const fbRes = await axios.post(`https://graph.facebook.com/v18.0/${pixelId}/events`, cleanPayload);
         console.log("meta response", fbRes.data)
+        console.log(`${eventName} event tracked successfully`);
+   
 
         return res.status(200).json({ status: true, message: "Conversion sent successfully", data: fbRes.data });
     } catch (error) {

@@ -51,7 +51,7 @@ const CandidateLogin = () => {
     const [permanentCity, setPermanentCity] = useState('');
     const [permanentState, setPermanentState] = useState('');
     const [permanentPincode, setPermanentPincode] = useState('');
-    const [totalExperience, setTotalExperience] = useState('');
+    const [isExperienced, setIsExperience] = useState(null);
     const [sameAddress, setSameAddress] = useState(false);
     const [highestQualificationdata, sethighestQualificationdata] = useState([]);
     const [highestQualification, setHighestQualification] = useState('');
@@ -307,9 +307,15 @@ const CandidateLogin = () => {
                     if (highestQualification && highestQualification.trim() !== '') {
                         body.highestQualification = highestQualification.trim();
                     }
-                    if (totalExperience && totalExperience.trim() !== '') {
-                        body.personalInfo.totalExperience = totalExperience.trim();
-                    }
+                    
+                    if (isExperienced !== undefined && isExperienced !== null) {
+                        if (typeof isExperienced === 'string') {
+                          body.isExperienced = isExperienced === 'true';
+                        } else if (typeof isExperienced === 'boolean') {
+                          body.isExperienced = isExperienced;
+                        }
+                      }
+                      
                     
 
                     if (refCode) {
@@ -321,10 +327,7 @@ const CandidateLogin = () => {
                     console.log("Register API response:", registerRes.data);
 
                     if (registerRes.data.status === "success") {
-                        await trackMetaConversion({
-                            eventName: "Signup",
-                            sourceUrl: window.location.href
-                        });
+                       
                         const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                         // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                         if (loginRes.data.status) {
@@ -332,11 +335,17 @@ const CandidateLogin = () => {
                             localStorage.setItem('token', loginRes.data.token);
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
                             sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
+
+                           
                             if (returnUrl) {
                                 window.location.href = returnUrl;
                             } else {
                                 window.location.href = '/candidate/searchjob';
                             }
+                             await trackMetaConversion({
+                            eventName: "Signup",
+                            sourceUrl: window.location.href
+                        });
                         } else {
                             setErrorMessage('Login failed after registration');
                         }
@@ -615,24 +624,11 @@ const CandidateLogin = () => {
                                             </select>
                                         </div>
                                         <div className="form-group mb-2">
-                                            <select onChange={(e) => setTotalExperience(e.target.value)} className="form-control" value={totalExperience}>
+                                            <select onChange={(e) => setIsExperience(e.target.value)} className="form-control" value={isExperienced}>
                                                 <option value="">Experience / अनुभव</option>
-                                                <option value="0">Fresher</option>
-                                                <option value="1">1</option>
-                                                <option value="2">2</option>
-                                                <option value="3">3</option>
-                                                <option value="4">4</option>
-                                                <option value="5">5</option>
-                                                <option value="6">6</option>
-                                                <option value="7">7</option>
-                                                <option value="8">8</option>
-                                                <option value="9">9</option>
-                                                <option value="10">10</option>
-                                                <option value="11">11</option>
-                                                <option value="12">12</option>
-                                                <option value="13">13</option>
-                                                <option value="14">14</option>
-                                                <option value="15">15</option>
+                                                <option value='false'>Fresher</option>
+                                                <option value='true'>Experienced</option>
+                                               
 
                                             </select>
                                         </div>

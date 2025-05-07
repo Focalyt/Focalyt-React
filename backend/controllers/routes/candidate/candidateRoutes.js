@@ -486,7 +486,7 @@ router
         return res.send({ status: "failure", error: value });
       }
       let formData = value;
-      const { name, mobile, sex, personalInfo ,highestQualification , email, dob} = formData;
+      const { name, mobile, sex, personalInfo ,highestQualification , email, dob, isExperienced} = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
         let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
@@ -544,6 +544,7 @@ router
         creditLeft: coins?.candidateCoins,
         personalInfo,
         highestQualification,
+        isExperienced
         
       };
 
@@ -4296,6 +4297,7 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
 
       if (personalInfo.professionalTitle) updatePayload.personalInfo.professionalTitle = personalInfo.professionalTitle;
       if (personalInfo.declaration) updatePayload.personalInfo.declaration = personalInfo.declaration;
+      if (personalInfo.totalExperience) updatePayload.personalInfo.totalExperience = personalInfo.totalExperience;
       if (personalInfo.professionalSummary) updatePayload.personalInfo.professionalSummary = personalInfo.professionalSummary;
       if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
       if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;
