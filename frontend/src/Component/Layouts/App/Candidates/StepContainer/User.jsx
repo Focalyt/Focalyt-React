@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import html2pdf from 'html2pdf.js';
+
 
 const User = () => {
   // Current step state
   const [currentStep, setCurrentStep] = useState(1);
+  const [showPreview, setShowPreview] = useState(false);
+    const [fileName, setFileName] = useState("");
+      const [uploadDate, setUploadDate] = useState("");
+    
+  
 
   // For tracking form completion status
   const [formData, setFormData] = useState({
@@ -88,6 +95,11 @@ const User = () => {
   const [profileData, setProfileData] = useState({});
   const [educationList, setEducationList] = useState([]);
   const [isExperienced, setIsExperienced] = useState(true);
+  const [declaration, setDeclaration] = useState({
+      isChecked: false,
+      text: 'I hereby declare that all the information provided above is true to the best of my knowledge.'
+    });
+  
 
   // States for autocomplete and suggestions
   const [boardSuggestions, setBoardSuggestions] = useState([]);
@@ -97,6 +109,8 @@ const User = () => {
 
   // Backend URL
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+
 
   // Fetch educational options on component mount
   useEffect(() => {
@@ -115,6 +129,238 @@ const User = () => {
 
     fetchEducationOptions();
   }, [backendUrl]);
+
+  const initializeCertificationOrgAutocomplete = (index) => {
+    console.log("Initializing address autocomplete...");
+    const input = document.getElementById(`issuing-organization-${index}`);
+
+    if (!input) {
+      console.warn('Input element with ID "issuing-organization-{index}" not found. Retrying...');
+      setTimeout(() => initializeCertificationOrgAutocomplete(index), 100);
+      return;
+    }
+
+    try {
+      console.log("Setting up autocomplete for input:", input);
+
+      const autocomplete = new window.google.maps.places.Autocomplete(input, {
+        types: ['establishment'],
+        componentRestrictions: { country: 'in' }
+      });
+
+      input.style.backgroundColor = "#ffffff";
+      input.style.color = "#000000";
+
+      autocomplete.addListener('place_changed', () => {
+        console.log("Place changed event fired");
+        const place = autocomplete.getPlace();
+
+        if (!place || !place.geometry || !place.geometry.location) {
+          console.warn('Invalid place data selected.');
+          return;
+        }
+
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        const fullAddress = place.formatted_address || place.name || input.value;
+
+        let city = '', state = '', pincode = '';
+
+        if (Array.isArray(place.address_components)) {
+          place.address_components.forEach((component) => {
+            const types = component.types.join(',');
+            if (types.includes("postal_code")) pincode = component.long_name;
+            if (types.includes("locality")) city = component.long_name;
+            if (types.includes("administrative_area_level_1")) state = component.long_name;
+            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+          });
+        }
+
+        console.log("Extracted data:", { fullAddress, city, state, pincode, lat, lng });
+
+        // 👇 Set directly into certificates[index]
+        setCertificates(prev => {
+          const updated = [...prev];
+          updated[index] = {
+            ...updated[index],
+            orgName: place.name || '', // ✅ Set orgName
+            orgLocation: {
+              type: 'Point',
+              coordinates: [lng, lat],
+              city,
+              state,
+              fullAddress
+            }
+          };
+          return updated;
+        });
+
+        // 👇 Update input value too (optional visual update)
+        input.value = place.name || '';
+      });
+
+      console.log("Google Maps Places Autocomplete initialized successfully");
+    } catch (error) {
+      console.error("Error initializing autocomplete:", error);
+    }
+  };
+
+  
+   
+
+     useEffect(() => {
+        if (!window.google || !window.google.maps || !window.google.maps.places) {
+          // If not loaded, load the script
+          if (!document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
+            const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+            if (!apiKey) {
+              console.error("Missing Google Maps API key!");
+              return;
+            }
+    
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+            script.async = true;
+            script.defer = true;
+            script.onload = () => {
+              // Set a flag to indicate Google Maps is loaded
+              window.googleMapsLoaded = true;
+              // Trigger a state update to force re-render and initialize autocompletes
+              setProfileData(prev => ({ ...prev }));
+            };
+            document.head.appendChild(script);
+          }
+        } else {
+          window.googleMapsLoaded = true;
+        }
+      }, []); // Empty dependency array - run once on mount
+       // Initialize address autocomplete separately
+    useEffect(() => {
+      if (window.googleMapsLoaded) {
+        
+        initializeCompanyAutocomplete()
+      }
+    }, [window.googleMapsLoaded]);
+    
+
+  const initializeCompanyAutocomplete = (index) => {
+    setTimeout(() => {
+      const companyInput = document.getElementById(`company-name-${index}`);
+      if (!companyInput || !window.google || !window.google.maps || !window.google.maps.places) {
+        return; // Not ready yet
+      }
+
+      try {
+        // Create the autocomplete instance
+        const autocomplete = new window.google.maps.places.Autocomplete(companyInput, {
+          types: ['establishment'], // This ensures we only get businesses/establishments
+          componentRestrictions: { country: 'in' }
+        });
+
+        // Add styling to ensure visibility
+        companyInput.style.backgroundColor = "#ffffff";
+        companyInput.style.color = "#000000";
+
+        // When a place is selected
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+
+          if (!place) {
+            return;
+          }
+
+          // Get just the company name
+          const companyName = place.name || '';
+
+          // Update the experiences state
+          const updatedExperiences = [...experiences];
+          updatedExperiences[index].companyName = companyName;
+          setExperiences(updatedExperiences);
+        });
+
+        console.log(`Company autocomplete initialized for index ${index}`);
+      } catch (error) {
+        console.error("Error initializing company autocomplete:", error);
+      }
+    }, 100);
+  };
+
+  const updateFileInProfile = async (dataObject, schemaFieldName) => {
+      try {
+        const token = localStorage.getItem('token');
+        console.log('updateFileInProfile hitting')
+  
+        const res = await axios.patch(`${backendUrl}/candidate/updatefiles`, {
+          [schemaFieldName]: dataObject
+        }, {
+          headers: { 'x-auth': token }
+        });
+  
+        if (res.data.status) {
+          alert(`${schemaFieldName} updated successfully!`);
+  
+          // Dynamically update in local state too
+          setProfileData(prev => ({
+            ...prev,
+            personalInfo: {
+              ...(prev.personalInfo || {}),
+              [schemaFieldName]: [
+                ...(prev.personalInfo?.[schemaFieldName] || []),
+                dataObject
+              ]
+            }
+          }));
+  
+          window.location.reload();
+  
+        }
+      } catch (err) {
+        console.error(`${schemaFieldName} update failed:`, err);
+      }
+    };
+
+  const uploadCV = async (file, filename) => {
+      try {
+        const token = localStorage.getItem('token');
+        const formData = new FormData();
+        formData.append('file', file);
+  
+        const res = await axios.post(`${backendUrl}/api/uploadSingleFile/${filename}`, formData, {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+  
+        if (res.data.status && res.data.data.Location) {
+          // Store file info in localStorage before updating profile
+          const currentDate = new Date().toLocaleDateString('en-GB', {
+            day: 'numeric', month: 'short', year: 'numeric'
+          }).replace(/ /g, ' ');
+          localStorage.setItem('resumeFileName', file.name);
+          localStorage.setItem('resumeUploadDate', currentDate)
+  
+          // Set the state values
+          setFileName(file.name);
+          setUploadDate(currentDate);
+  
+  
+          // ✅ Resume uploaded, now update profile
+          const uploadeddata = {
+            name: file.name,
+            url: res.data.data.Location,
+            uploadedAt: new Date()
+          };
+          console.log('file uploaded on s3')
+  
+          await updateFileInProfile(uploadeddata, filename);
+  
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error("Upload failed:", err);
+      }
+    };
 
   // Handle board input change
   const handleBoardInputChange = async (value, index) => {
@@ -177,9 +423,7 @@ const User = () => {
 
   // Handle education change
   const handleEducationChange = async (e, index) => {
-    const educationId = e.target.value;
-
-    const updated = [...educations];
+    const educationId = e.target.value;const updated = [...educations];
     updated[index].education = educationId;
     updated[index].course = '';
     updated[index].specialization = '';
@@ -802,7 +1046,7 @@ const User = () => {
       if (res.data.status) {
         alert('Profile saved successfully!');
         
-        window.location.reload();
+        // window.location.reload();
 
       } else {
         alert('Failed to save CV!');
@@ -1646,10 +1890,519 @@ const User = () => {
                 </button>
               </div>
 
-              <button className="submit-btn" onClick={handleContinue}>Save Profile</button>
+              <button className="submit-btn" onClick={async () => {
+                await handleContinue();
+                setShowPreview(true);
+                    
+                    // Need to wait for the preview to render
+                    setTimeout(async () => {
+                      try {
+                        // Now try to get the element
+                        const element = document.getElementById('resume-download');
+                        
+                        if (!element) {
+                          console.error("Resume element still not found after showing preview");
+                          alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
+                          return;
+                        }
+                        
+                        const opt = {
+                          margin: 0.5,
+                          filename: 'resume.pdf',
+                          image: { type: 'jpeg', quality: 0.98 },
+                          html2canvas: { scale: 2 },
+                          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                        };
+                
+                        // Generate blob
+                        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+                        
+                        // Create a file object from the blob
+                        const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
+                          type: 'application/pdf'
+                        });
+                        
+                        // Upload to focalytProfile
+                        await uploadCV(pdfFile, 'focalytProfile');
+                        
+                        // Close the preview
+                        setShowPreview(false);
+                        
+                        alert('Resume has been saved successfully, including the PDF for your profile!');
+                      } catch (err) {
+                        console.error("PDF generation error:", err);
+                        alert('Resume data saved, but there was an error generating the PDF profile.');
+                        setShowPreview(false); // Close preview on error
+                      }
+                    }, 1000);
+
+
+                }}>Save Profile</button>
             </div>
           )}
         </div>
+
+        {/* Resume Preview Modal */}
+              {showPreview && (
+                <div className="resume-preview-modal">
+                  <div className="resume-preview-content">
+                    <div className="resume-preview-header">
+                      <h2>Resume Preview</h2>
+                      <button className="close-preview" onClick={() => setShowPreview(false)}>
+                        <i className="bi bi-x-lg"></i>
+                      </button>
+                    </div>
+        
+                    <div className="resume-preview-body">
+                      <div id="resume-download" className="resume-document">
+                        {/* Header Section */}
+                        <div className="resume-document-header">
+                          <div className="resume-profile-section">
+                            {user?.image ? (
+                              <img
+                                src={`${bucketUrl}/${user.image}`}
+                                alt="Profile"
+                                className="resume-profile-image"
+                              />
+                            ) : (
+                              <div className="resume-profile-placeholder">
+                                <i className="bi bi-person-circle"></i>
+                              </div>
+                            )}
+        
+                            <div className="resume-header-content">
+                              <h1 className="resume-name">
+                                {profileData?.personalInfo?.name || user?.name || 'Your Name'}
+                              </h1>
+                              <p className="resume-title">
+                                {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
+                              </p>
+                              <p className="resume-title">
+                                {profileData?.sex || 'Sex'}
+                              </p>
+        
+                              <div className="resume-contact-details">
+                                {profileData?.mobile && (
+                                  <div className="resume-contact-item">
+                                    <i className="bi bi-telephone-fill"></i>
+                                    <span>{profileData.mobile}</span>
+                                  </div>
+                                )}
+                                {profileData?.email && (
+                                  <div className="resume-contact-item">
+                                    <i className="bi bi-envelope-fill"></i>
+                                    <span>{profileData.email}</span>
+                                  </div>
+                                )}
+                                {profileData?.dob && (
+                                  <div className="resume-contact-item">
+                                    <i className="bi bi-calendar-heart-fill"></i>
+        
+                                    {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
+                                      day: '2-digit',
+                                      month: 'long',
+                                      year: 'numeric'
+                                    }) : ''}
+                                  </div>
+                                )}
+                                {profileData?.personalInfo?.currentAddress?.fullAddress && (
+        
+                                  <div className="resume-contact-item">
+                                    <i className="bi bi-geo-alt-fill"></i>
+                                    <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
+                                  </div>
+                                )}
+        
+                                {/* Add permanent address */}
+                                {profileData?.personalInfo?.permanentAddress && (
+                                  <div className="resume-contact-item">
+                                    <i className="bi bi-house-fill"></i>
+                                    <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
+                                  </div>
+                                )}
+        
+                              </div>
+                            </div>
+                          </div>
+        
+                          <div className="resume-summary">
+                            <h2 className="resume-section-title">Professional Summary</h2>
+                            <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
+                          </div>
+                        </div>
+        
+                        {/* Two Column Layout */}
+                        <div className="resume-document-body">
+                          {/* Left Column */}
+                          <div className="resume-column resume-left-column">
+                            {/* Experience Section */}
+                            {profileData?.experienceType === 'fresher' ? (
+                              /* Fresher Preview */
+                              <div className="resume-section">
+                                <h2 className="resume-section-title">Work Experience</h2>
+                                <div className="resume-experience-item">
+                                  <div className="resume-item-header">
+                                    <h3 className="resume-item-title">Fresher</h3>
+                                  </div>
+                                  {profileData?.fresherDetails && (
+                                    <div className="resume-item-content">
+                                      <p>{profileData.isExperienced}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              /* Experienced Preview */
+                              experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                <div className="resume-section">
+                                  <h2 className="resume-section-title">Work Experience</h2>
+        
+                                  {experiences.map((exp, index) => (
+                                    (exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                      <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                        <div className="resume-item-header">
+                                          {exp.jobTitle && (
+                                            <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                          )}
+                                          {exp.companyName && (
+                                            <p className="resume-item-subtitle">{exp.companyName}</p>
+                                          )}
+                                          {(exp.from || exp.to || exp.currentlyWorking) && (
+                                            <p className="resume-item-period">
+                                              {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                year: 'numeric',
+                                                month: 'short',
+                                              }) : 'Start Date'}
+                                              {" - "}
+                                              {exp.currentlyWorking ? 'Present' :
+                                                exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                  year: 'numeric',
+                                                  month: 'short',
+                                                }) : 'End Date'}
+                                            </p>
+                                          )}
+        
+                                        </div>
+                                        {exp.jobDescription && (
+                                          <div className="resume-item-content">
+                                            <p>{exp.jobDescription}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  ))}
+                                </div>
+                              )
+                            )}
+                            {/* Education Section */}
+                            {educations.length > 0 && educations.some(edu =>
+                              edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
+                            ) && (
+                                <div className="resume-section">
+                                  <h2 className="resume-section-title">Education</h2>
+        
+                                  {educations.map((edu, index) => (
+                                    (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
+                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                        <div className="resume-item-header">
+                                          {edu.education && (
+                                            <h3 className="resume-item-title">
+                                              {educationList.find(e => e._id === edu.education)?.name || 'Education'}
+                                            </h3>
+                                          )}
+        
+                                          {typeof edu.course === 'string' && edu.course && (
+                                            <h3 className="resume-item-title">
+                                              {
+                                                coursesList[index]?.find(course => course._id === edu.course)?.name
+                                                || edu.course  // fallback in case name not found
+                                              }
+                                            </h3>
+                                          )}
+        
+                                          {edu.universityName && (
+                                            <p className="resume-item-subtitle">{edu.universityName}</p>
+                                          )}
+                                          {(edu.schoolName && !edu.universityName) && (
+                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                          )}
+                                          {edu.collegeName && (
+                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                          )}
+                                          {edu.passingYear && (
+                                            <p className="resume-item-period">{edu.passingYear}</p>
+                                          )}
+                                        </div>
+                                        <div className="resume-item-content">
+                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                          {edu.specialization && <p>Specialization: {typeof edu.specialization === 'string' ? edu.specialization : 'Specialization'}</p>}
+                                        </div>
+                                      </div>
+                                    )
+                                  ))}
+                                </div>
+                              )}
+        
+                          </div>
+        
+                          {/* Right Column */}
+                          <div className="resume-column resume-right-column">
+                            {/* Skills Section */}
+                            {skills.length > 0 && skills.some(skill => skill.skillName) && (
+                              <div className="resume-section">
+                                <h2 className="resume-section-title">Skills</h2>
+        
+                                <div className="resume-skills-list">
+                                  {skills.map((skill, index) => (
+                                    skill.skillName && (
+                                      <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                        <div className="resume-skill-name">
+                                          {skill.skillName}
+                                        </div>
+                                        <div className="resume-skill-bar-container">
+                                          <div
+                                            className="resume-skill-bar"
+                                            style={{ width: `${skill.skillPercent || 0}%` }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                    )
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+        
+                            {/* Languages Section */}
+                            {languages.length > 0 && languages.some(lang => lang.lname) && (
+                              <div className="resume-section">
+                                <h2 className="resume-section-title">Languages</h2>
+        
+                                <div className="resume-languages-list">
+                                  {languages.map((lang, index) => (
+                                    lang.lname && (
+                                      <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                        <div className="resume-language-name">{lang.lname}</div>
+                                        <div className="resume-language-level">
+                                          {[1, 2, 3, 4, 5].map(dot => (
+                                            <span
+                                              key={`resume-lang-dot-${index}-${dot}`}
+                                              className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                            ></span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+        
+                            {/* Certifications Section */}
+                            {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
+                              <div className="resume-section">
+                                <h2 className="resume-section-title">Certifications</h2>
+        
+                                <ul className="resume-certifications-list">
+                                  {certificates.map((cert, index) => (
+                                    (cert.certificateName || cert.orgName) && (
+                                      <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                        {cert.certificateName && (
+                                          <strong>{cert.certificateName}</strong>
+                                        )}
+        
+                                        {cert.orgName && (
+                                          <span className="resume-cert-org"> - {cert.orgName}</span>
+                                        )}
+        
+                                        {(cert.month || cert.year) && (
+                                          <span className="resume-cert-date">
+                                            {cert.month && cert.year ?
+                                              ` (${cert.month}/${cert.year})` :
+                                              cert.month ?
+                                                ` (${cert.month})` :
+                                                cert.year ?
+                                                  ` (${cert.year})` :
+                                                  ''}
+                                          </span>
+                                        )}
+                                      </li>
+                                    )
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+        
+                            {/* Projects Section */}
+                            {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                              <div className="resume-section">
+                                <h2 className="resume-section-title">Projects</h2>
+                                {projects.map((proj, index) => (
+                                  (proj.projectName || proj.proDescription) && (
+                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                      <div className="resume-item-header">
+                                        <h3 className="resume-project-title">
+                                          {proj.projectName || 'Project'}
+                                          {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
+                                        </h3>
+                                      </div>
+                                      {proj.proDescription && (
+                                        <div className="resume-item-content">
+                                          <p>{proj.proDescription}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                ))}
+                              </div>
+                            )}
+                            {/* {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                              <div className="resume-section">
+                                <h2 className="resume-section-title">Projects</h2>
+                                {projects.map((proj, index) => (
+                                  (proj.projectName || proj.proDescription) && (
+                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                      <div className="resume-item-header">
+                                        <h3 className="resume-project-title">
+                                          {proj.projectName || 'Project'}
+                                          {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
+                                        </h3>
+                                      </div>
+        
+                                      {proj.projectUrl && (
+                                        <div className="resume-project-url">
+                                          <a href={proj.projectUrl} target="_blank" rel="noopener noreferrer">
+                                            <i className="bi bi-link-45deg"></i> {proj.projectUrl}
+                                          </a>
+                                        </div>
+                                      )}
+        
+                                      {proj.proDescription && (
+                                        <div className="resume-item-content">
+                                          <p>{proj.proDescription}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                ))}
+                              </div>
+                            )} */}
+                            {/* Interests Section */}
+                            {interests.filter(i => i.trim() !== '').length > 0 && (
+                              <div className="resume-section">
+                                <h2 className="resume-section-title">Interests</h2>
+        
+                                <div className="resume-interests-tags">
+                                  {interests.filter(i => i.trim() !== '').map((interest, index) => (
+                                    <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                      {interest}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+        
+                        {/* Declaration */}
+                        <div className="extra-category">
+              <div className="category-title">
+                <i className="bi bi-file-text me-2"></i>
+                Declaration
+              </div>
+
+              <div className="declaration-container">
+                <div
+                  className="d-flex align-items-center declaration-content"
+                >
+                  <input
+                    type="checkbox"
+                    id="declaration-check"
+                    checked={declaration.isChecked}
+                    onChange={(e) => setDeclaration({
+                      ...declaration,
+                      isChecked: e.target.checked
+
+                    },
+                      console.log('Is Declaration Checked:', declaration.isChecked)
+                    )}
+                  />
+
+                  <p className='ms-2'>I hereby declare that all the information provided above is true to the best of my knowledge.</p>
+                </div>
+              </div>
+            </div>
+        
+                      </div>
+                    </div>
+        
+                    <div className="resume-preview-actions">
+                      <button
+                        className="download-resume-btn"
+                        onClick={() => {
+                          const element = document.getElementById('resume-download');
+                          const opt = {
+                            margin: 0.5,
+                            filename: 'resume.pdf',
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2 },
+                            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                          };
+        
+                          html2pdf().set(opt).from(element).save();
+                        }}
+                      >
+                        <i className="bi bi-download"></i> Download PDF
+                      </button>
+        
+        {/* <button
+          className="download-resume-btn"
+          onClick={() => {
+            const element = document.getElementById('resume-download');
+            const opt = {
+              margin: 0.5,
+              filename: 'resume.pdf',
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2 },
+              jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+        
+            // First generate a blob instead of directly saving
+            html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+              // Create a file object from the blob
+              const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
+                type: 'application/pdf'
+              });
+              
+              // Upload this file to your backend using your existing uploadCV function
+              uploadCV(pdfFile, 'focalytProfile');
+              
+              // Also let the user download the PDF if they want
+              const pdfUrl = URL.createObjectURL(pdfBlob);
+              const a = document.createElement('a');
+              a.href = pdfUrl;
+              a.download = 'resume.pdf';
+              a.click();
+              URL.revokeObjectURL(pdfUrl);
+              
+              alert('Resume has been downloaded and saved to your profile!');
+            }).catch(err => {
+              console.error("PDF generation error:", err);
+              alert('Error generating PDF. Please try again.');
+            });
+          }}
+        >
+          <i className="bi bi-download"></i> Download & Save PDF
+        </button> */}
+                      <button
+                        className="close-preview-btn"
+                        onClick={() => setShowPreview(false)}
+                      >
+                        Close Preview
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
         <style>{`
         .user-container {

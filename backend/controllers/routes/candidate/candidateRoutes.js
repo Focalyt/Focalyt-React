@@ -1982,11 +1982,30 @@ router
 
     const updatedFields = {
       isProfileCompleted: true,
-      highestQualification,
+      
 
       isExperienced,
       yearOfPassing
     };
+    
+    if (highestQualification) {
+      // If it's an empty string, set it to null
+      if (highestQualification === "") {
+          highestQualification = null;
+      }
+      // If it's a valid ObjectId string, convert it to ObjectId
+      else if (typeof highestQualification === 'string' && mongoose.Types.ObjectId.isValid(highestQualification)) {
+          highestQualification = mongoose.Types.ObjectId(highestQualification);
+      } else {
+          highestQualification = null; // Invalid value, set to null
+      }
+
+      // Only add to updatedFields if it's valid (not null)
+      if (highestQualification) {
+          updatedFields.highestQualification = highestQualification;
+      }
+  }
+
 
     // ✅ Add root-level fields
     if (sex) updatedFields.sex = sex;
