@@ -1038,7 +1038,7 @@ function CandidateLayout({ children }) {
             <div className="content-wrapper">
               <div className="mt-2 mb-2">
 
-                {!showProfileForm && (
+                {/* {!showProfileForm && ( */}
                   <div className="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static"
                   data-open="click" data-menu="vertical-menu-modern" data-col="2-columns" id="inner_job_page">
         
@@ -1074,7 +1074,7 @@ function CandidateLayout({ children }) {
                     </div>
                   </div>
                 </div>
-                )}
+                 {/* )}  */}
               </div>
               <div className="content-body mb-4">
                 <Outlet />

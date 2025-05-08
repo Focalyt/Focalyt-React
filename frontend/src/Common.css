@@ -4733,6 +4733,18 @@ li.nav-item-has-children.child-item:hover .fa-angle-right {
   /* background-color: #121212!important; */
 }
 /*responsive*/
+@media(max-width:1199px){
+  .site-header .mobile-menu-trigger {
+    display: flex;
+    height: 30px;
+    width: 30px;
+    margin-left: 15px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+  
+}
 @media (max-width: 991px) {
   .site-header .mobile-menu-trigger {
     display: flex;

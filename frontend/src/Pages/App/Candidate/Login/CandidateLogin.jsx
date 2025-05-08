@@ -542,6 +542,7 @@ const CandidateLogin = () => {
                                                 className="form-control"
                                                 value={dob}
                                                 onChange={(e) => setDob(e.target.value)}
+                                                 placeholder="mm/dd/yyyy"
                                             />
                                         </div>
                                         <div className="mb-3">

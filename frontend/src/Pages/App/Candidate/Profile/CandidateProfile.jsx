@@ -271,7 +271,7 @@ const CandidateProfile = () => {
 
         await updateFileInProfile(uploadeddata, filename);
 
-        
+
       }
     } catch (err) {
       console.error("Upload failed:", err);
@@ -1073,11 +1073,22 @@ const CandidateProfile = () => {
   // Save resume function
   const handleSaveCV = async () => {
     try {
+     let certificatesValid = true;
+      certificates.forEach(cert => {
+        if ((cert.month || cert.year || cert.currentlypursuing) && 
+            (!cert.certificateName || !cert.orgName)) {
+          certificatesValid = false;
+        }
+      });
+
+      if (!certificatesValid) {
+        alert("Please complete all required certificate fields (name and organization) for certificates with dates or marked as 'Currently Pursuing'");
+        return;
+      }
       if (!declaration?.isChecked) {
         alert("Please accept the declaration before saving your resume.");
         return;
       }
-
       const token = localStorage.getItem('token');
       const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
       const monthNames = {
@@ -1239,7 +1250,7 @@ const CandidateProfile = () => {
         if (response.data.status) {
           console.log("Profile data fetched:", response.data.data);
           const data = response.data.data;
-
+          console.log("Candidate Profile Data: ", data);
           // Set education options
           setEducationList(data.educations || []);
 
@@ -1858,7 +1869,6 @@ const CandidateProfile = () => {
                         updated.splice(index, 1);
                         setEducations(updated);
                       }}
-
                     >
                       <i className="bi bi-trash"></i>
                     </button>
@@ -1944,19 +1954,59 @@ const CandidateProfile = () => {
                           />
                         </div>
 
-                        <div className="form-group mb-2">
-                          <label>Passing Year</label>
+                        {/* Currently Pursuing Checkbox */}
+                        <div className="form-check mb-2">
                           <input
-                            type="text"
-                            className="form-control"
-                            value={edu.passingYear || ''}
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`currently-pursuing-${index}`}
+                            checked={edu.currentlyPursuing || false}
                             onChange={(e) => {
                               const updated = [...educations];
-                              updated[index].passingYear = e.target.value;
+                              updated[index].currentlyPursuing = e.target.checked;
+                              if (e.target.checked) {
+                                updated[index].passingYear = '';
+                              }
                               setEducations(updated);
                             }}
                           />
+                          <label
+                            className="form-check-label"
+                            htmlFor={`currently-pursuing-${index}`}
+                            onClick={(e) => {
+                              e.preventDefault(); // Prevent default label behavior
+                              const updated = [...educations];
+                              updated[index].currentlyPursuing = !updated[index].currentlyPursuing;
+                              if (updated[index].currentlyPursuing) {
+                                updated[index].passingYear = '';
+                              }
+                              setEducations(updated);
+                            }}
+                          >
+                            Currently Pursuing
+                          </label>
                         </div>
+
+                        <div className="form-group mb-2">
+                          <label>Passing Year</label>
+                          {!edu.currentlyPursuing ? (
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={edu.passingYear || ''}
+                              onChange={(e) => {
+                                const updated = [...educations];
+                                updated[index].passingYear = e.target.value;
+                                setEducations(updated);
+                              }}
+                            />
+                          ) : (
+                            <div className="form-control disabled">
+                              Present
+                            </div>
+                          )}
+                        </div>
+
                         <div className="form-group mb-2">
                           <label>Marks (%)</label>
                           <input
@@ -1970,7 +2020,6 @@ const CandidateProfile = () => {
                             }}
                           />
                         </div>
-
                       </>
                     );
                   }
@@ -2046,23 +2095,60 @@ const CandidateProfile = () => {
                           />
                         </div>
 
-
-                        <div className="form-group mb-2">
-                          <label>Passing Year</label>
+                        {/* Currently Pursuing Checkbox */}
+                        <div className="form-check mb-2">
                           <input
-                            type="text"
-                            autoComplete="off"
-
-                            className="form-control"
-                            value={edu.passingYear || ''}
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`currently-pursuing-${index}`}
+                            checked={edu.currentlypursuing || false}
                             onChange={(e) => {
                               const updated = [...educations];
-                              updated[index].passingYear = e.target.value;
+                              updated[index].currentlypursuing = e.target.checked;
+                              if (e.target.checked) {
+                                updated[index].passingYear = '';
+                              }
                               setEducations(updated);
                             }}
                           />
-
+                          <label
+                            className="form-check-label"
+                            htmlFor={`currently-pursuing-${index}`}
+                            onClick={(e) => {
+                              e.preventDefault(); // Prevent default label behavior
+                              const updated = [...educations];
+                              updated[index].currentlypursuing = !updated[index].currentlypursuing;
+                              if (updated[index].currentlypursuing) {
+                                updated[index].passingYear = '';
+                              }
+                              setEducations(updated);
+                            }}
+                          >
+                            Currently Pursuing
+                          </label>
                         </div>
+
+                        <div className="form-group mb-2">
+                          <label>Passing Year</label>
+                          {!edu.currentlyPursuing ? (
+                            <input
+                              type="text"
+                              autoComplete="off"
+                              className="form-control"
+                              value={edu.passingYear || ''}
+                              onChange={(e) => {
+                                const updated = [...educations];
+                                updated[index].passingYear = e.target.value;
+                                setEducations(updated);
+                              }}
+                            />
+                          ) : (
+                            <div className="form-control disabled">
+                              Present
+                            </div>
+                          )}
+                        </div>
+
                         <div className="form-group mb-2">
                           <label>Marks (%)</label>
                           <input
@@ -2076,7 +2162,6 @@ const CandidateProfile = () => {
                             }}
                           />
                         </div>
-
                       </>
                     );
                   }
@@ -2085,19 +2170,6 @@ const CandidateProfile = () => {
                   else if (educationName === 'ITI') {
                     return (
                       <>
-                        {/* <div className="form-group mb-2">
-                          <label>Specialization</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            value={edu.specialization.name || ''}
-                            onChange={(e) => {
-                              const updated = [...educations];
-                              updated[index].specialization = e.target.value;
-                              setEducations(updated);
-                            }}
-                          />
-                        </div> */}
                         {specializationsList[index] && specializationsList[index].length > 0 && (
                           <div className="form-group mb-2">
                             <label>Specialization</label>
@@ -2133,19 +2205,59 @@ const CandidateProfile = () => {
                           />
                         </div>
 
-                        <div className="form-group mb-2">
-                          <label>Passing Year</label>
+                        {/* Currently Pursuing Checkbox */}
+                        <div className="form-check mb-2">
                           <input
-                            type="text"
-                            className="form-control"
-                            value={edu.passingYear || ''}
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`currently-pursuing-${index}`}
+                            checked={edu.currentlyPursuing || false}
                             onChange={(e) => {
                               const updated = [...educations];
-                              updated[index].passingYear = e.target.value;
+                              updated[index].currentlyPursuing = e.target.checked;
+                              if (e.target.checked) {
+                                updated[index].passingYear = '';
+                              }
                               setEducations(updated);
                             }}
                           />
+                          <label
+                            className="form-check-label"
+                            htmlFor={`currently-pursuing-${index}`}
+                            onClick={(e) => {
+                              e.preventDefault(); // Prevent default label behavior
+                              const updated = [...educations];
+                              updated[index].currentlyPursuing = !updated[index].currentlyPursuing;
+                              if (updated[index].currentlyPursuing) {
+                                updated[index].passingYear = '';
+                              }
+                              setEducations(updated);
+                            }}
+                          >
+                            Currently Pursuing
+                          </label>
                         </div>
+
+                        <div className="form-group mb-2">
+                          <label>Passing Year</label>
+                          {!edu.currentlyPursuing ? (
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={edu.passingYear || ''}
+                              onChange={(e) => {
+                                const updated = [...educations];
+                                updated[index].passingYear = e.target.value;
+                                setEducations(updated);
+                              }}
+                            />
+                          ) : (
+                            <div className="form-control disabled">
+                              Present
+                            </div>
+                          )}
+                        </div>
+
                         <div className="form-group mb-2">
                           <label>Marks (%)</label>
                           <input
@@ -2159,7 +2271,6 @@ const CandidateProfile = () => {
                             }}
                           />
                         </div>
-
                       </>
                     );
                   }
@@ -2173,7 +2284,6 @@ const CandidateProfile = () => {
                             <label>Course</label>
                             <select
                               className="form-select"
-
                               value={edu.course || ''}
                               onChange={(e) => {
                                 handleCourseChange(e, index)
@@ -2222,8 +2332,6 @@ const CandidateProfile = () => {
                             }}
                             onFocus={() => initializeAutocomplete(`university-name-${index}`, setEducations, index, 'universityName')}
                           />
-
-
                         </div>
 
                         <div className="form-group mb-2">
@@ -2241,19 +2349,59 @@ const CandidateProfile = () => {
                           />
                         </div>
 
-                        <div className="form-group mb-2">
-                          <label>Passing Year</label>
+                        {/* Currently Pursuing Checkbox */}
+                        <div className="form-check mb-2">
                           <input
-                            type="text"
-                            className="form-control"
-                            value={edu.passingYear || ''}
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`currently-pursuing-${index}`}
+                            checked={edu.currentlyPursuing || false}
                             onChange={(e) => {
                               const updated = [...educations];
-                              updated[index].passingYear = e.target.value;
+                              updated[index].currentlyPursuing = e.target.checked;
+                              if (e.target.checked) {
+                                updated[index].passingYear = '';
+                              }
                               setEducations(updated);
                             }}
                           />
+                          <label
+                            className="form-check-label"
+                            htmlFor={`currently-pursuing-${index}`}
+                            onClick={(e) => {
+                              e.preventDefault(); // Prevent default label behavior
+                              const updated = [...educations];
+                              updated[index].currentlyPursuing = !updated[index].currentlyPursuing;
+                              if (updated[index].currentlyPursuing) {
+                                updated[index].passingYear = '';
+                              }
+                              setEducations(updated);
+                            }}
+                          >
+                            Currently Pursuing
+                          </label>
                         </div>
+
+                        <div className="form-group mb-2">
+                          <label>Passing Year</label>
+                          {!edu.currentlyPursuing ? (
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={edu.passingYear || ''}
+                              onChange={(e) => {
+                                const updated = [...educations];
+                                updated[index].passingYear = e.target.value;
+                                setEducations(updated);
+                              }}
+                            />
+                          ) : (
+                            <div className="form-control disabled">
+                              Present
+                            </div>
+                          )}
+                        </div>
+
                         <div className="form-group mb-2">
                           <label>Marks (%)</label>
                           <input
@@ -2267,7 +2415,6 @@ const CandidateProfile = () => {
                             }}
                           />
                         </div>
-
                       </>
                     );
                   }
@@ -2432,72 +2579,151 @@ const CandidateProfile = () => {
                       <div className="certificate-item" key={`certificate-${index}`}>
                         <div className="certificate-details">
                           <div className="certificate-name">
-                            {createEditable(certificate.certificateName || '', 'Certificate Name', (val) => {
-                              const updated = [...certificates];
-                              updated[index].certificateName = val;
-                              setCertificates(updated);
-                            })}
+                            {/* Certificate Name field with validation */}
+                            <div className="form-group w-50">
+                              <label className="form-label">
+                                Certificate Name
+                                {(certificate.month || certificate.year || certificate.currentlypursuing) && (
+                                  <span className="text-danger">*</span>
+                                )}
+                              </label>
+                              <input
+                                type="text"
+                                className={`form-control ${(certificate.month || certificate.year || certificate.currentlypursuing) && !certificate.certificateName ? "is-invalid" : ""}`}
+                                placeholder="Certificate Name"
+                                value={certificate.certificateName || ''}
+                                onChange={(e) => {
+                                  const updated = [...certificates];
+                                  updated[index].certificateName = e.target.value;
+                                  setCertificates(updated);
+                                }}
+                                required={(certificate.month || certificate.year || certificate.currentlypursuing)}
+                              />
+                              {(certificate.month || certificate.year || certificate.currentlypursuing) && !certificate.certificateName && (
+                                <div className="invalid-feedback">
+                                  Certificate name is required
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="certificate-org">
+                            {/* Issuing Organization field with validation */}
+                            <div className="form-group w-100">
+                              <label className="form-label">
+                                Issuing Organization
+                                {(certificate.month || certificate.year || certificate.currentlypursuing) && (
+                                  <span className="text-danger">*</span>
+                                )}
+                              </label>
+                              <input
+                                type="text"
+                                id={`issuing-organization-${index}`}
+                                className={`form-control ${(certificate.month || certificate.year || certificate.currentlypursuing) && !certificate.orgName ? "is-invalid" : ""}`}
+                                placeholder="Issuing Organization"
+                                value={certificate.orgName || ''}
+                                onChange={(e) => {
+                                  const updated = [...certificates];
+                                  updated[index].orgName = e.target.value;
+                                  setCertificates(updated);
+                                }}
+                                required={(certificate.month || certificate.year || certificate.currentlypursuing)}
+                              />
+                              {(certificate.month || certificate.year || certificate.currentlypursuing) && !certificate.orgName && (
+                                <div className="invalid-feedback">
+                                  Issuing organization is required
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Currently Pursuing Checkbox */}
+                          <div className="form-check mb-3 mt-2">
                             <input
-                              type="text"
-                              id={`issuing-organization-${index}`}
-                              className="form-control"
-                              placeholder="Issuing Organization"
-                              value={certificate.orgName || ''}
+                              className="form-check-input"
+                              type="checkbox"
+                              id={`currently-pursuing-cert-${index}`}
+                              checked={certificate.currentlypursuing || false}
                               onChange={(e) => {
                                 const updated = [...certificates];
-                                updated[index].orgName = e.target.value;
+                                updated[index].currentlypursuing = e.target.checked;
+                                if (e.target.checked) {
+                                  updated[index].month = '';
+                                  updated[index].year = '';
+                                }
                                 setCertificates(updated);
                               }}
                             />
+                            <label
+                              className="form-check-label"
+                              htmlFor={`currently-pursuing-cert-${index}`}
+                              onClick={(e) => {
+                                e.preventDefault(); // Prevent default label behavior
+                                const updated = [...certificates];
+                                updated[index].currentlypursuing = !updated[index].currentlypursuing;
+                                if (!updated[index].currentlypursuing === false) {
+                                  updated[index].month = '';
+                                  updated[index].year = '';
+                                }
+                                setCertificates(updated);
+                              }}
+                            >
+                              Currently Pursuing
+                            </label>
                           </div>
 
-                          <div className="certificate-date-fields">
-                            <div className="cert-month">
-                              <select
-                                className="form-select"
-                                value={certificate.month || ''}
-                                onChange={(e) => {
-                                  const updated = [...certificates];
-                                  updated[index].month = e.target.value;
-                                  setCertificates(updated);
-                                }}
-                              >
-                                <option value="">Month</option>
-                                <option value="01">January</option>
-                                <option value="02">February</option>
-                                <option value="03">March</option>
-                                <option value="04">April</option>
-                                <option value="05">May</option>
-                                <option value="06">June</option>
-                                <option value="07">July</option>
-                                <option value="08">August</option>
-                                <option value="09">September</option>
-                                <option value="10">October</option>
-                                <option value="11">November</option>
-                                <option value="12">December</option>
-                              </select>
-                            </div>
+                          {!certificate.currentlyPursuing ? (
+                            <div className="certificate-date-fields">
+                              <div className="cert-month">
+                                <select
+                                  className="form-select"
+                                  value={certificate.month || ''}
+                                  onChange={(e) => {
+                                    const updated = [...certificates];
+                                    updated[index].month = e.target.value;
+                                    setCertificates(updated);
+                                  }}
+                                >
+                                  <option value="">Month</option>
+                                  <option value="01">January</option>
+                                  <option value="02">February</option>
+                                  <option value="03">March</option>
+                                  <option value="04">April</option>
+                                  <option value="05">May</option>
+                                  <option value="06">June</option>
+                                  <option value="07">July</option>
+                                  <option value="08">August</option>
+                                  <option value="09">September</option>
+                                  <option value="10">October</option>
+                                  <option value="11">November</option>
+                                  <option value="12">December</option>
+                                </select>
+                              </div>
 
-                            <div className="cert-year">
-                              <select
-                                className="form-select"
-                                value={certificate.year || ''}
-                                onChange={(e) => {
-                                  const updated = [...certificates];
-                                  updated[index].year = e.target.value;
-                                  setCertificates(updated);
-                                }}
-                              >
-                                <option value="">Year</option>
-                                {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                                  <option key={year} value={year}>{year}</option>
-                                ))}
-                              </select>
+                              <div className="cert-year">
+                                <select
+                                  className="form-select"
+                                  value={certificate.year || ''}
+                                  onChange={(e) => {
+                                    const updated = [...certificates];
+                                    updated[index].year = e.target.value;
+                                    setCertificates(updated);
+                                  }}
+                                >
+                                  <option value="">Year</option>
+                                  {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                                    <option key={year} value={year}>{year}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="expected-completion">
+                              <div className="form-control disabled text-muted">
+                                In Progress
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <button
@@ -2505,7 +2731,7 @@ const CandidateProfile = () => {
                           onClick={() => {
                             const updated = [...certificates];
                             if (certificates.length === 1) {
-                              updated[0] = { certificateName: '', orgName: '', month: '', year: '' };
+                              updated[0] = { certificateName: '', orgName: '', month: '', year: '', currentlyPursuing: false };
                             } else {
                               updated.splice(index, 1);
                             }
@@ -2519,7 +2745,7 @@ const CandidateProfile = () => {
 
                     <button
                       className="add-button add-certificate"
-                      onClick={() => setCertificates([...certificates, { certificateName: '', orgName: '', month: '', year: '' }])}
+                      onClick={() => setCertificates([...certificates, { certificateName: '', orgName: '', month: '', year: '', currentlyPursuing: false }])}
                     >
                       <i className="bi bi-plus"></i> Add Certificate
                     </button>
@@ -2786,66 +3012,66 @@ const CandidateProfile = () => {
           <i className="bi bi-save me-2"></i> Save Resume
         </button> */}
 
-<button 
-  className="save-resume" 
-  onClick={async () => {
-    // First check if declaration is checked
-    if (!declaration?.isChecked) {
-      alert("Please accept the declaration before saving your resume.");
-      return;
-    }
-    
-    // First save the resume data
-    await handleSaveCV();
-    
-    // Then open the preview to access the element
-    setShowPreview(true);
-    
-    // Need to wait for the preview to render
-    setTimeout(async () => {
-      try {
-        // Now try to get the element
-        const element = document.getElementById('resume-download');
-        
-        if (!element) {
-          console.error("Resume element still not found after showing preview");
-          alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
-          return;
-        }
-        
-        const opt = {
-          margin: 0.5,
-          filename: 'resume.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        };
+        <button
+          className="save-resume"
+          onClick={async () => {
+            // First check if declaration is checked
+            if (!declaration?.isChecked) {
+              alert("Please accept the declaration before saving your resume.");
+              return;
+            }
 
-        // Generate blob
-        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
-        
-        // Create a file object from the blob
-        const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
-          type: 'application/pdf'
-        });
-        
-        // Upload to focalytProfile
-        await uploadCV(pdfFile, 'focalytProfile');
-        
-        // Close the preview
-        setShowPreview(false);
-        
-        alert('Resume has been saved successfully, including the PDF for your profile!');
-      } catch (err) {
-        console.error("PDF generation error:", err);
-        alert('Resume data saved, but there was an error generating the PDF profile.');
-        setShowPreview(false); // Close preview on error
-      }
-    }, 1000); // Wait 1 second for preview to render
-  }}
->
-  <i className="bi bi-save me-2"></i> Save Resume
-</button>
+            // First save the resume data
+            await handleSaveCV();
+
+            // Then open the preview to access the element
+            setShowPreview(true);
+
+            // Need to wait for the preview to render
+            setTimeout(async () => {
+              try {
+                // Now try to get the element
+                const element = document.getElementById('resume-download');
+
+                if (!element) {
+                  console.error("Resume element still not found after showing preview");
+                  alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
+                  return;
+                }
+
+                const opt = {
+                  margin: 0.5,
+                  filename: 'resume.pdf',
+                  image: { type: 'jpeg', quality: 0.98 },
+                  html2canvas: { scale: 2 },
+                  jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                };
+
+                // Generate blob
+                const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+
+                // Create a file object from the blob
+                const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
+                  type: 'application/pdf'
+                });
+
+                // Upload to focalytProfile
+                await uploadCV(pdfFile, 'focalytProfile');
+
+                // Close the preview
+                setShowPreview(false);
+
+                alert('Resume has been saved successfully, including the PDF for your profile!');
+              } catch (err) {
+                console.error("PDF generation error:", err);
+                alert('Resume data saved, but there was an error generating the PDF profile.');
+                setShowPreview(false); // Close preview on error
+              }
+            }, 1000); // Wait 1 second for preview to render
+          }}
+        >
+          <i className="bi bi-save me-2"></i> Save Resume
+        </button>
 
         <button className="preview-resume" onClick={() => {
           if (!declaration?.isChecked) {
@@ -2857,74 +3083,74 @@ const CandidateProfile = () => {
           <i className="bi bi-eye me-2"></i> Preview Resume
         </button>
       </div>
+      {fileName && (
+        <div className="section-order">
+          <div className="section fadeInUp resume">
+            <div className="heading-container">
+              <div className="text-emoji-container">
+                <div className="text-container">
+                  <h1 className="section-heading title-16-bold">Uploaded Resume</h1>
+                  <h2 className="section-sub-heading title-14-medium">
+                    Your resume is the first impression you make on potential employers. Craft it carefully to secure your desired job or internship.
+                  </h2>
+                </div>
+              </div>
+            </div>
 
-      <div className="section-order">
-        <div className="section fadeInUp resume">
-          <div className="heading-container">
-            <div className="text-emoji-container">
-              <div className="text-container">
-                <h1 className="section-heading title-16-bold">Uploaded Resume</h1>
-                <h2 className="section-sub-heading title-14-medium">
-                  Your resume is the first impression you make on potential employers. Craft it carefully to secure your desired job or internship.
-                </h2>
+            <div className="uploaded-container">
+              <div className="file-details">
+                <div className="file-name title-14-bold">{fileName}</div>
+                <div className="uploaded-date title-14-regular">Uploaded on {uploadDate}</div>
+              </div>
+
+              <div className="action-container">
+                {/* View button */}
+                <div className="border-box view"
+                  onClick={viewResume}
+                  style={{ cursor: 'pointer' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 2.625C3.5 2.625 1.1375 7 1.1375 7C1.1375 7 3.5 11.375 7 11.375C10.5 11.375 12.8625 7 12.8625 7C12.8625 7 10.5 2.625 7 2.625Z"
+                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M7 9.1875C8.2426 9.1875 9.25 8.18008 9.25 6.9375C9.25 5.69492 8.2426 4.6875 7 4.6875C5.75736 4.6875 4.75 5.69492 4.75 6.9375C4.75 8.18008 5.75736 9.1875 7 9.1875Z"
+                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+
+                <div className="border-box delete"
+                  onClick={() => {
+                    setFileName("");
+                    setUploadDate("");
+                    localStorage.removeItem('resumeFileName');
+                    localStorage.removeItem('resumeUploadDate');
+                    localStorage.removeItem('resume');
+                    alert('Resume deleted');
+                    // You may want to call a function to delete from backend as well
+                  }}
+                  style={{ cursor: 'pointer' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <g clipPath="url(#clip0_2370_12506)">
+                      <path d="M1.52734 3.35156H2.74333H12.4712"
+                        stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M4.56812 3.35189V2.1359C4.56812 1.81341 4.69623 1.50412 4.92427 1.27608C5.15231 1.04803 5.4616 0.919922 5.7841 0.919922H8.21606C8.53856 0.919922 8.84785 1.04803 9.07589 1.27608C9.30393 1.50412 9.43205 1.81341 9.43205 2.1359V3.35189"
+                        stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M11.256 3.35189V11.8638C11.256 12.1863 11.1279 12.4956 10.8999 12.7236C10.6718 12.9516 10.3625 13.0798 10.04 13.0798H3.96012C3.63762 13.0798 3.32833 12.9516 3.10029 12.7236C2.87225 12.4956 2.74414 12.1863 2.74414 11.8638V3.35189H11.256Z"
+                        stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M5.7832 6.39258V10.0405"
+                        stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M8.21484 6.39258V10.0405"
+                        stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    </g>
+                    <defs>
+                      <clipPath id="clip0_2370_12506">
+                        <rect width="14" height="14" fill="white" />
+                      </clipPath>
+                    </defs>
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
-
-          <div className="uploaded-container">
-            <div className="file-details">
-              <div className="file-name title-14-bold">{fileName}</div>
-              <div className="uploaded-date title-14-regular">Uploaded on {uploadDate}</div>
-            </div>
-
-            <div className="action-container">
-              {/* View button */}
-              <div className="border-box view"
-                onClick={viewResume}
-                style={{ cursor: 'pointer' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M7 2.625C3.5 2.625 1.1375 7 1.1375 7C1.1375 7 3.5 11.375 7 11.375C10.5 11.375 12.8625 7 12.8625 7C12.8625 7 10.5 2.625 7 2.625Z"
-                    stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M7 9.1875C8.2426 9.1875 9.25 8.18008 9.25 6.9375C9.25 5.69492 8.2426 4.6875 7 4.6875C5.75736 4.6875 4.75 5.69492 4.75 6.9375C4.75 8.18008 5.75736 9.1875 7 9.1875Z"
-                    stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              <div className="border-box delete"
-                onClick={() => {
-                  setFileName("");
-                  setUploadDate("");
-                  localStorage.removeItem('resumeFileName');
-                  localStorage.removeItem('resumeUploadDate');
-                  localStorage.removeItem('resume');
-                  alert('Resume deleted');
-                  // You may want to call a function to delete from backend as well
-                }}
-                style={{ cursor: 'pointer' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <g clipPath="url(#clip0_2370_12506)">
-                    <path d="M1.52734 3.35156H2.74333H12.4712"
-                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M4.56812 3.35189V2.1359C4.56812 1.81341 4.69623 1.50412 4.92427 1.27608C5.15231 1.04803 5.4616 0.919922 5.7841 0.919922H8.21606C8.53856 0.919922 8.84785 1.04803 9.07589 1.27608C9.30393 1.50412 9.43205 1.81341 9.43205 2.1359V3.35189"
-                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M11.256 3.35189V11.8638C11.256 12.1863 11.1279 12.4956 10.8999 12.7236C10.6718 12.9516 10.3625 13.0798 10.04 13.0798H3.96012C3.63762 13.0798 3.32833 12.9516 3.10029 12.7236C2.87225 12.4956 2.74414 12.1863 2.74414 11.8638V3.35189H11.256Z"
-                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M5.7832 6.39258V10.0405"
-                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M8.21484 6.39258V10.0405"
-                      stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                  </g>
-                  <defs>
-                    <clipPath id="clip0_2370_12506">
-                      <rect width="14" height="14" fill="white" />
-                    </clipPath>
-                  </defs>
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+        </div>)}
       {showResumeViewer && (
         <div className="resume-viewer-overlay">
           <div className="resume-viewer-modal">
@@ -3284,9 +3510,11 @@ const CandidateProfile = () => {
                                   {edu.collegeName && (
                                     <p className="resume-item-subtitle">{edu.collegeName}</p>
                                   )}
-                                  {edu.passingYear && (
+                                  {edu.currentlypursuing ? (
+                                    <p className="resume-item-period highlight-text">Currently Pursuing</p>
+                                  ) : edu.passingYear ? (
                                     <p className="resume-item-period">{edu.passingYear}</p>
-                                  )}
+                                  ) : null}
                                 </div>
                                 <div className="resume-item-content">
                                   {edu.marks && <p>Marks: {edu.marks}%</p>}
@@ -3369,7 +3597,9 @@ const CandidateProfile = () => {
                                   <span className="resume-cert-org"> - {cert.orgName}</span>
                                 )}
 
-                                {(cert.month || cert.year) && (
+                                {cert.currentlypursuing ? (
+                                  <span className="resume-cert-date highlight-text"> (Currently Pursuing)</span>
+                                ) : (cert.month || cert.year) && (
                                   <span className="resume-cert-date">
                                     {cert.month && cert.year ?
                                       ` (${cert.month}/${cert.year})` :
@@ -3488,7 +3718,7 @@ const CandidateProfile = () => {
                 <i className="bi bi-download"></i> Download PDF
               </button>
 
-{/* <button
+              {/* <button
   className="download-resume-btn"
   onClick={() => {
     const element = document.getElementById('resume-download');
@@ -3937,6 +4167,13 @@ width: 100%;
     overflow: hidden;
     position: relative;
   }
+    .certificate-item{
+    width:100%;
+    gap:5px;
+    }
+    .certificate-item > .form-group:nth-child(2){
+    width:100%;
+    }
 
   .resume-iframe {
     width: 100%;

@@ -12,6 +12,8 @@ const User = () => {
     certificates: { completed: false },
     additional: { completed: false }
   });
+  const [fileName, setFileName] = useState("");
+  const [uploadDate, setUploadDate] = useState("");
 
   // State for resume data
   const [user, setUser] = useState({});
@@ -34,6 +36,7 @@ const User = () => {
       course: '',             // ObjectId of QualificationCourse
       specialization: '',
       passingYear: '',
+      currentlypursuing: '',
       marks: '',
       universityLocation: {
         type: 'Point',
@@ -68,7 +71,8 @@ const User = () => {
     certificateName: '',
     orgName: '',
     month: '',
-    year: ''
+    year: '',
+    currentlypursuing: ''
   }]);
 
   const [projects, setProjects] = useState([{
@@ -385,6 +389,32 @@ const User = () => {
               }}
             />
           </div>
+
+          <div className="form-group">
+            <div className="form-check mb-3">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id={`currently-pursuing-edu-${index}`}
+                checked={edu.currentlypursuing || false}
+                onChange={(e) => {
+                  const updated = [...educations];
+                  updated[index].currentlypursuing = e.target.checked;
+                  if (e.target.checked) {
+                    updated[index].passingYear = '';
+                  }
+                  setEducations(updated);
+                }}
+              />
+              <label
+                className="form-check-label"
+                htmlFor={`currently-pursuing-edu-${index}`}
+              >
+                Currently Pursuing
+              </label>
+            </div>
+          </div>
+
           <div className="form-group">
             <label className="form-label">Marks (%)</label>
             <input
@@ -473,7 +503,30 @@ const User = () => {
               }}
             />
           </div>
-
+          <div className="form-group">
+          <div className="form-check mb-3">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id={`currently-pursuing-edu-${index}`}
+              checked={edu.currentlypursuing || false}
+              onChange={(e) => {
+                const updated = [...educations];
+                updated[index].currentlypursuing = e.target.checked;
+                if (e.target.checked) {
+                  updated[index].passingYear = '';
+                }
+                setEducations(updated);
+              }}
+            />
+            <label
+              className="form-check-label"
+              htmlFor={`currently-pursuing-edu-${index}`}
+            >
+              Currently Pursuing
+            </label>
+          </div>
+        </div> 
           <div className="form-group">
             <label className="form-label">Passing Year</label>
             <input
@@ -487,6 +540,8 @@ const User = () => {
               }}
             />
           </div>
+
+          
           <div className="form-group">
             <label className="form-label">Marks (%)</label>
             <input
@@ -542,7 +597,30 @@ const User = () => {
               }}
             />
           </div>
-
+          <div className="form-group">
+          <div className="form-check mb-3">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id={`currently-pursuing-edu-${index}`}
+              checked={edu.currentlypursuing || false}
+              onChange={(e) => {
+                const updated = [...educations];
+                updated[index].currentlypursuing = e.target.checked;
+                if (e.target.checked) {
+                  updated[index].passingYear = '';
+                }
+                setEducations(updated);
+              }}
+            />
+            <label
+              className="form-check-label"
+              htmlFor={`currently-pursuing-edu-${index}`}
+            >
+              Currently Pursuing
+            </label>
+          </div>
+        </div>
           <div className="form-group">
             <label className="form-label">Passing Year</label>
             <input
@@ -556,6 +634,7 @@ const User = () => {
               }}
             />
           </div>
+      
           <div className="form-group">
             <label className="form-label">Marks (%)</label>
             <input
@@ -643,7 +722,30 @@ const User = () => {
               }}
             />
           </div>
-
+          <div className="form-group">
+          <div className="form-check mb-3">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id={`currently-pursuing-edu-${index}`}
+              checked={edu.currentlypursuing || false}
+              onChange={(e) => {
+                const updated = [...educations];
+                updated[index].currentlypursuing = e.target.checked;
+                if (e.target.checked) {
+                  updated[index].passingYear = '';
+                }
+                setEducations(updated);
+              }}
+            />
+            <label
+              className="form-check-label"
+              htmlFor={`currently-pursuing-edu-${index}`}
+            >
+              Currently Pursuing
+            </label>
+          </div>
+        </div>
           <div className="form-group">
             <label className="form-label">Passing Year</label>
             <input
@@ -657,6 +759,7 @@ const User = () => {
               }}
             />
           </div>
+         
           <div className="form-group">
             <label className="form-label">Marks (%)</label>
             <input
@@ -801,7 +904,7 @@ const User = () => {
 
       if (res.data.status) {
         alert('Profile saved successfully!');
-        
+
         window.location.reload();
 
       } else {
@@ -1180,7 +1283,7 @@ const User = () => {
 
               {isExperienced && (
                 <button
-                  className="add-button"
+                  className="add-button me-3"
                   onClick={() => setExperiences([...experiences, {
                     jobTitle: '',
                     companyName: '',
@@ -1198,6 +1301,89 @@ const User = () => {
             </div>
           )}
 
+          {/* Education Step */}
+          {/* {currentStep === 2 && (
+            <div className="step-content">
+              <h2>Education</h2>
+              <p className="form-description">Tell us about your educational background</p>
+
+              {educations.map((edu, index) => (
+                <div className="education-item" key={`education-${index}`}>
+                  {educations.length > 1 && (
+                    <button
+                      className="remove-button"
+                      onClick={() => {
+                        const updated = [...educations];
+                        updated.splice(index, 1);
+                        setEducations(updated);
+                      }}
+                    >
+                      <i className="bi bi-trash"></i> Remove
+                    </button>
+                  )}
+
+                  <div className="form-group">
+                    <label className="form-label">Education Level <span className="required">*</span></label>
+                    <select
+                      className="form-input"
+                      value={edu.education || ''}
+                      onChange={(e) => handleEducationChange(e, index)}
+                    >
+                      <option value="">Select Education Level</option>
+                      {Array.isArray(educationList) && educationList.map((e) => (
+                        <option key={e._id} value={e._id}>{e.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {renderEducationFields(edu, index)}
+
+                  {index < educations.length - 1 && <hr className="education-divider" />}
+                </div>
+              ))}
+
+              <button
+                className="add-button me-3"
+                onClick={() => setEducations([...educations, {
+                  education: '',
+                  universityName: '',
+                  boardName: '',
+                  collegeName: '',
+                  schoolName: '',
+                  course: '',
+                  specialization: '',
+                  passingYear: '',
+                  marks: '',
+                  currentlypursuing: '', // Added the currentlyPursuing field with default value false
+                  universityLocation: {
+                    type: 'Point',
+                    coordinates: [0, 0],
+                    city: '',
+                    state: '',
+                    fullAddress: ''
+                  },
+                  collegeLocation: {
+                    type: 'Point',
+                    coordinates: [0, 0],
+                    city: '',
+                    state: '',
+                    fullAddress: ''
+                  },
+                  schoolLocation: {
+                    type: 'Point',
+                    coordinates: [0, 0],
+                    city: '',
+                    state: '',
+                    fullAddress: ''
+                  }
+                }])}
+              >
+                + Add Another Education
+              </button>
+
+              <button className="continue-btn" onClick={handleContinue}>Continue to Certificates</button>
+            </div>
+          )} */}
           {/* Education Step */}
           {currentStep === 2 && (
             <div className="step-content">
@@ -1233,6 +1419,9 @@ const User = () => {
                     </select>
                   </div>
 
+
+
+
                   {/* Render additional fields based on selected education type */}
                   {renderEducationFields(edu, index)}
 
@@ -1252,6 +1441,7 @@ const User = () => {
                   specialization: '',
                   passingYear: '',
                   marks: '',
+                  currentlypursuing: '', // Include this field
                   universityLocation: {
                     type: 'Point',
                     coordinates: [0, 0],
@@ -1284,111 +1474,316 @@ const User = () => {
 
           {/* Certificates Step */}
           {currentStep === 3 && (
+            // <div className="step-content">
+            //   <h2>Certifications</h2>
+            //   <p className="form-description">Add your certifications and professional qualifications</p>
+
+            //   <div className="certifications-container">
+            //     {certificates.map((cert, index) => (
+            //       <div className='mainCertificate'>
+            //       <div className="certificate-item" key={`certificate-${index}`}>
+            //         <div className="form-group">
+            //           <label className="form-label">Certificate Name</label>
+            //           <input
+            //             type="text"
+            //             className="form-input"
+            //             value={cert.certificateName || ''}
+            //             onChange={(e) => {
+            //               const updated = [...certificates];
+            //               updated[index].certificateName = e.target.value;
+            //               setCertificates(updated);
+            //             }}
+            //             placeholder="Certificate name"
+            //           />
+            //         </div>
+
+            //         <div className="form-group">
+            //           <label className="form-label">Issuing Organization</label>
+            //           <input
+            //             type="text"
+            //             id={`issuing-organization-${index}`}
+            //             className="form-input"
+            //             value={cert.orgName || ''}
+            //             onChange={(e) => {
+            //               const updated = [...certificates];
+            //               updated[index].orgName = e.target.value;
+            //               setCertificates(updated);
+            //             }}
+            //             placeholder="Issuing organization"
+            //           />
+            //         </div>
+
+            //         {/* <div className="form-row">
+            //           <div className="form-group half-width">
+            //             <label className="form-label">Month</label>
+            //             <select
+            //               className="form-input"
+            //               value={cert.month || ''}
+            //               onChange={(e) => {
+            //                 const updated = [...certificates];
+            //                 updated[index].month = e.target.value;
+            //                 setCertificates(updated);
+            //               }}
+            //             >
+            //               <option value="">Month</option>
+            //               <option value="01">January</option>
+            //               <option value="02">February</option>
+            //               <option value="03">March</option>
+            //               <option value="04">April</option>
+            //               <option value="05">May</option>
+            //               <option value="06">June</option>
+            //               <option value="07">July</option>
+            //               <option value="08">August</option>
+            //               <option value="09">September</option>
+            //               <option value="10">October</option>
+            //               <option value="11">November</option>
+            //               <option value="12">December</option>
+            //             </select>
+            //           </div>
+
+            //           <div className="form-group half-width">
+            //             <label className="form-label">Year</label>
+            //             <select
+            //               className="form-input"
+            //               value={cert.year || ''}
+            //               onChange={(e) => {
+            //                 const updated = [...certificates];
+            //                 updated[index].year = e.target.value;
+            //                 setCertificates(updated);
+            //               }}
+            //             >
+            //               <option value="">Year</option>
+            //               {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
+            //                 <option key={year} value={year}>{year}</option>
+            //               ))}
+            //             </select>
+            //           </div>
+            //         </div> */}
+
+            //         {certificates.length > 1 && (
+            //           <button
+            //             className="remove-button"
+            //             onClick={() => {
+            //               const updated = [...certificates];
+            //               updated.splice(index, 1);
+            //               setCertificates(updated);
+            //             }}
+            //           >
+            //             <i className="bi bi-trash"></i> Remove
+            //           </button>
+            //         )}
+
+            //         {index < certificates.length - 1 && <hr className="certificate-divider" />}
+            //       </div>
+            //       <div className='certificate-item'>
+
+            //       <div className="form-row">
+            //           <div className="form-group half-width">
+            //             <label className="form-label">Month</label>
+            //             <select
+            //               className="form-input"
+            //               value={cert.month || ''}
+            //               onChange={(e) => {
+            //                 const updated = [...certificates];
+            //                 updated[index].month = e.target.value;
+            //                 setCertificates(updated);
+            //               }}
+            //             >
+            //               <option value="">Month</option>
+            //               <option value="01">January</option>
+            //               <option value="02">February</option>
+            //               <option value="03">March</option>
+            //               <option value="04">April</option>
+            //               <option value="05">May</option>
+            //               <option value="06">June</option>
+            //               <option value="07">July</option>
+            //               <option value="08">August</option>
+            //               <option value="09">September</option>
+            //               <option value="10">October</option>
+            //               <option value="11">November</option>
+            //               <option value="12">December</option>
+            //             </select>
+            //           </div>
+
+            //           <div className="form-group half-width">
+            //             <label className="form-label">Year</label>
+            //             <select
+            //               className="form-input"
+            //               value={cert.year || ''}
+            //               onChange={(e) => {
+            //                 const updated = [...certificates];
+            //                 updated[index].year = e.target.value;
+            //                 setCertificates(updated);
+            //               }}
+            //             >
+            //               <option value="">Year</option>
+            //               {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
+            //                 <option key={year} value={year}>{year}</option>
+            //               ))}
+            //             </select>
+            //           </div>
+            //         </div>
+            //       </div>
+            //       </div>
+
+            //     ))}
+
+            //     <button
+            //       className="add-button small-add-button"
+            //       onClick={() => setCertificates([...certificates, { certificateName: '', orgName: '', month: '', year: '' }])}
+            //     >
+            //       + Add Certificate
+            //     </button>
+            //   </div>
+
+            //   <button className="continue-btn" onClick={handleContinue}>Continue to Additional Info</button>
+            // </div>
             <div className="step-content">
               <h2>Certifications</h2>
               <p className="form-description">Add your certifications and professional qualifications</p>
 
               <div className="certifications-container">
                 {certificates.map((cert, index) => (
-                  <div className="certificate-item" key={`certificate-${index}`}>
-                    <div className="form-group">
-                      <label className="form-label">Certificate Name</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={cert.certificateName || ''}
-                        onChange={(e) => {
-                          const updated = [...certificates];
-                          updated[index].certificateName = e.target.value;
-                          setCertificates(updated);
-                        }}
-                        placeholder="Certificate name"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Issuing Organization</label>
-                      <input
-                        type="text"
-                        id={`issuing-organization-${index}`}
-                        className="form-input"
-                        value={cert.orgName || ''}
-                        onChange={(e) => {
-                          const updated = [...certificates];
-                          updated[index].orgName = e.target.value;
-                          setCertificates(updated);
-                        }}
-                        placeholder="Issuing organization"
-                      />
-                    </div>
-
-                    <div className="form-row">
-                      <div className="form-group half-width">
-                        <label className="form-label">Month</label>
-                        <select
+                  <div className="mainCertificate" key={`certificate-${index}`}>
+                    <div className="certificate-item">
+                      <div className="form-group">
+                        <label className="form-label">Certificate Name <span className="required">*</span></label>
+                        <input
+                          type="text"
                           className="form-input"
-                          value={cert.month || ''}
+                          value={cert.certificateName || ''}
                           onChange={(e) => {
                             const updated = [...certificates];
-                            updated[index].month = e.target.value;
+                            updated[index].certificateName = e.target.value;
+                            setCertificates(updated);
+                          }}
+                          placeholder="Certificate name"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Issuing Organization <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`issuing-organization-${index}`}
+                          className="form-input"
+                          value={cert.orgName || ''}
+                          onChange={(e) => {
+                            const updated = [...certificates];
+                            updated[index].orgName = e.target.value;
+                            setCertificates(updated);
+                          }}
+                          placeholder="Issuing organization"
+                        />
+                      </div>
+
+                      {/* Currently Pursuing Checkbox */}
+                      <div className="form-check mb-3">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id={`currently-pursuing-cert-${index}`}
+                          checked={cert.currentlypursuing || false}
+                          onChange={(e) => {
+                            const updated = [...certificates];
+                            updated[index].currentlypursuing = e.target.checked;
+                            if (e.target.checked) {
+                              updated[index].month = '';
+                              updated[index].year = '';
+                            }
+                            setCertificates(updated);
+                          }}
+                        />
+                        <label
+                          className="form-check-label"
+                          htmlFor={`currently-pursuing-cert-${index}`}
+                        >
+                          Currently Pursuing
+                        </label>
+                      </div>
+
+                      {certificates.length > 1 && (
+                        <button
+                          className="remove-button"
+                          onClick={() => {
+                            const updated = [...certificates];
+                            updated.splice(index, 1);
                             setCertificates(updated);
                           }}
                         >
-                          <option value="">Month</option>
-                          <option value="01">January</option>
-                          <option value="02">February</option>
-                          <option value="03">March</option>
-                          <option value="04">April</option>
-                          <option value="05">May</option>
-                          <option value="06">June</option>
-                          <option value="07">July</option>
-                          <option value="08">August</option>
-                          <option value="09">September</option>
-                          <option value="10">October</option>
-                          <option value="11">November</option>
-                          <option value="12">December</option>
-                        </select>
-                      </div>
-
-                      <div className="form-group half-width">
-                        <label className="form-label">Year</label>
-                        <select
-                          className="form-input"
-                          value={cert.year || ''}
-                          onChange={(e) => {
-                            const updated = [...certificates];
-                            updated[index].year = e.target.value;
-                            setCertificates(updated);
-                          }}
-                        >
-                          <option value="">Year</option>
-                          {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                            <option key={year} value={year}>{year}</option>
-                          ))}
-                        </select>
-                      </div>
+                          <i className="bi bi-trash"></i> Remove
+                        </button>
+                      )}
                     </div>
 
-                    {certificates.length > 1 && (
-                      <button
-                        className="remove-button"
-                        onClick={() => {
-                          const updated = [...certificates];
-                          updated.splice(index, 1);
-                          setCertificates(updated);
-                        }}
-                      >
-                        <i className="bi bi-trash"></i> Remove
-                      </button>
-                    )}
+                    <div className="certificate-item">
+                      {!cert.currentlypursuing ? (
+                        <div className="form-row">
+                          <div className="form-group half-width">
+                            <label className="form-label">Month</label>
+                            <select
+                              className="form-input"
+                              value={cert.month || ''}
+                              onChange={(e) => {
+                                const updated = [...certificates];
+                                updated[index].month = e.target.value;
+                                setCertificates(updated);
+                              }}
+                            >
+                              <option value="">Month</option>
+                              <option value="01">January</option>
+                              <option value="02">February</option>
+                              <option value="03">March</option>
+                              <option value="04">April</option>
+                              <option value="05">May</option>
+                              <option value="06">June</option>
+                              <option value="07">July</option>
+                              <option value="08">August</option>
+                              <option value="09">September</option>
+                              <option value="10">October</option>
+                              <option value="11">November</option>
+                              <option value="12">December</option>
+                            </select>
+                          </div>
 
-                    {index < certificates.length - 1 && <hr className="certificate-divider" />}
+                          <div className="form-group half-width">
+                            <label className="form-label">Year</label>
+                            <select
+                              className="form-input"
+                              value={cert.year || ''}
+                              onChange={(e) => {
+                                const updated = [...certificates];
+                                updated[index].year = e.target.value;
+                                setCertificates(updated);
+                              }}
+                            >
+                              <option value="">Year</option>
+                              {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                                <option key={year} value={year}>{year}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="expected-completion">
+                          <div className="form-control disabled text-muted">
+                            In Progress
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
 
                 <button
                   className="add-button small-add-button"
-                  onClick={() => setCertificates([...certificates, { certificateName: '', orgName: '', month: '', year: '' }])}
+                  onClick={() => setCertificates([...certificates, {
+                    certificateName: '',
+                    orgName: '',
+                    month: '',
+                    year: '',
+                    currentlypursuing: ''
+                  }])}
                 >
                   + Add Certificate
                 </button>
@@ -1646,6 +2041,79 @@ const User = () => {
                 </button>
               </div>
 
+              {/* resume upload  */}
+              <div className="section-header">
+                <h3>Resume Upload</h3>
+              </div>
+
+              <div className="resume-upload-container">
+                <div className="form-group">
+                  <label className="form-label">Upload Resume</label>
+                  <div className="file-upload-wrapper">
+                    <input
+                      type="file"
+                      id="resume-upload"
+                      className="file-upload-input"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          // Validate file type
+                          if (!file.name.match(/\.(pdf|doc|docx)$/i)) {
+                            alert("Please upload a PDF or Word document");
+                            e.target.value = null;
+                            return;
+                          }
+
+                          // Validate file size (5MB limit)
+                          if (file.size > 5 * 1024 * 1024) {
+                            alert("File size should be less than 5MB");
+                            e.target.value = null;
+                            return;
+                          }
+
+                          // Here you would normally call a function to handle the upload
+                          // For example: handleFileUpload(file);
+
+                          // Update state to show file details
+                          setFileName(file.name);
+                          const currentDate = new Date().toLocaleDateString('en-GB', {
+                            day: 'numeric', month: 'short', year: 'numeric'
+                          }).replace(/ /g, ' ');
+                          setUploadDate(currentDate);
+                        }
+                      }}
+                    />
+                    <label htmlFor="resume-upload" className="file-upload-label">
+                      <i className="bi bi-upload"></i> Choose File
+                    </label>
+                  </div>
+                  <p className="file-upload-note">Upload PDF or Word document (Max 5MB)</p>
+                </div>
+
+                {/* Display uploaded file info if available */}
+                {fileName && (
+                  <div className="uploaded-file-info">
+                    <div className="file-details">
+                      <i className="bi bi-file-earmark-text"></i>
+                      <div>
+                        <div className="file-name">{fileName}</div>
+                        <div className="upload-date">Uploaded on {uploadDate}</div>
+                      </div>
+                    </div>
+                    <button
+                      className="remove-file-btn"
+                      onClick={() => {
+                        setFileName("");
+                        setUploadDate("");
+                        // Reset any file-related state here
+                      }}
+                    >
+                      <i className="bi bi-trash"></i>
+                    </button>
+                  </div>
+                )}
+              </div>
               <button className="submit-btn" onClick={handleContinue}>Save Profile</button>
             </div>
           )}
@@ -1841,11 +2309,17 @@ const User = () => {
         
         .experience-item, .education-item, .certificate-item, .project-item {
           position: relative;
-          padding: 15px;
-          border: 1px solid #eee;
-          border-radius: 6px;
+          // padding: 15px;
+          // border: 1px solid #eee;
+          // border-radius: 6px;
           margin-bottom: 15px;
         }
+        .mainCertificate{
+      border: 1px solid #eee;
+      background: #f9f9f9;
+       border-radius: 6px;
+       margin-bottom:15px;
+      }
         
         .experience-divider, .education-divider, .certificate-divider, .project-divider {
           margin: 20px 0;
