@@ -307,16 +307,16 @@ const CandidateLogin = () => {
                     if (highestQualification && highestQualification.trim() !== '') {
                         body.highestQualification = highestQualification.trim();
                     }
-                    
+
                     if (isExperienced !== undefined && isExperienced !== null) {
                         if (typeof isExperienced === 'string') {
-                          body.isExperienced = isExperienced === 'true';
+                            body.isExperienced = isExperienced === 'true';
                         } else if (typeof isExperienced === 'boolean') {
-                          body.isExperienced = isExperienced;
+                            body.isExperienced = isExperienced;
                         }
-                      }
-                      
-                    
+                    }
+
+
 
                     if (refCode) {
                         body.refCode = refCode;
@@ -327,7 +327,7 @@ const CandidateLogin = () => {
                     console.log("Register API response:", registerRes.data);
 
                     if (registerRes.data.status === "success") {
-                       
+
                         const loginRes = await axios.post(`${backendUrl}/api/otpCandidateLogin`, { mobile: mobileNumber });
                         // const loginRes = await axios.post('/api/otpCandidateLogin', { mobile: mobileNumber });
                         if (loginRes.data.status) {
@@ -336,16 +336,21 @@ const CandidateLogin = () => {
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
                             sessionStorage.setItem('candidate', JSON.stringify(loginRes.data.candidate));
 
-                           
+
                             if (returnUrl) {
                                 window.location.href = returnUrl;
                             } else {
                                 window.location.href = '/candidate/searchjob';
                             }
-                             await trackMetaConversion({
-                            eventName: "Signup",
-                            sourceUrl: window.location.href
-                        });
+                            await trackMetaConversion({
+                                eventName: "Signup",
+                                sourceUrl: window.location.href
+
+                            });
+                            await trackMetaConversion({
+                                eventName:  "Login",
+                                sourceUrl: window.location.href
+                            });
                         } else {
                             setErrorMessage('Login failed after registration');
                         }
@@ -379,7 +384,7 @@ const CandidateLogin = () => {
                             sessionStorage.setItem('user', JSON.stringify(loginRes.data.user));
 
                             await trackMetaConversion({
-                                eventName:  "Login",
+                                eventName: "Login",
                                 sourceUrl: window.location.href
                             });
 
@@ -628,7 +633,7 @@ const CandidateLogin = () => {
                                                 <option value="">Experience / अनुभव</option>
                                                 <option value='false'>Fresher</option>
                                                 <option value='true'>Experienced</option>
-                                               
+
 
                                             </select>
                                         </div>
