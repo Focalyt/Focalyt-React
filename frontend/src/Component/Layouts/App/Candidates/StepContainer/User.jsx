@@ -75,7 +75,14 @@ const User = () => {
     certificateName: '',
     orgName: '',
     month: '',
-    year: ''
+    year: '',
+    orgLocation: {
+      type: 'Point',
+      coordinates: [0,0],
+      city: '',
+      state: '',
+      fullAddress: ''
+    }
   }]);
 
   const [projects, setProjects] = useState([{
@@ -205,6 +212,81 @@ const User = () => {
     }
   };
 
+ // useEffect में आप निम्न प्रकार से इसे कॉल कर सकते हैं
+ 
+  // सामान्य ऑटोकम्पलीट इनिशियलाइज़ फंक्शन
+  const initializeAutocomplete = (inputId, stateUpdater, index, propertyName) => {
+    setTimeout(() => {
+      const inputElement = document.getElementById(inputId);
+      console.log(`Trying to initialize autocomplete for ${inputId}`);
+
+      if (!inputElement || !window.google || !window.google.maps || !window.google.maps.places) {
+        console.log(`Input element ${inputId} not found or Google Maps not loaded`);
+        return;
+      }
+
+      try {
+        const autocomplete = new window.google.maps.places.Autocomplete(inputElement, {
+          types: ['establishment'],
+          componentRestrictions: { country: 'in' }
+        });
+
+        inputElement.style.backgroundColor = "#ffffff";
+        inputElement.style.color = "#000000";
+
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+          if (!place || !place.geometry || !place.geometry.location) return;
+
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const fullAddress = place.formatted_address || place.name || inputElement.value;
+
+          let city = '', state = '', pincode = '';
+
+          if (Array.isArray(place.address_components)) {
+            place.address_components.forEach((component) => {
+              const types = component.types.join(',');
+              if (types.includes("postal_code")) pincode = component.long_name;
+              if (types.includes("locality")) city = component.long_name;
+              if (types.includes("administrative_area_level_1")) state = component.long_name;
+              if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+            });
+          }
+
+          // Set name and location
+          stateUpdater(prev => {
+            const updated = [...prev];
+            updated[index][propertyName] = place.name || '';
+
+            const locationKey = propertyName === 'schoolName' ? 'schoolLocation' :
+              propertyName === 'collegeName' ? 'collegeLocation' :
+                propertyName === 'universityName' ? 'universityLocation' : 
+                propertyName === 'orgName' ? 'orgLocation' : null;
+
+            if (locationKey) {
+              updated[index][locationKey] = {
+                type: 'Point',
+                coordinates: [lng, lat],
+                city,
+                state,
+                fullAddress
+              };
+            }
+
+            return updated;
+          });
+        });
+
+        console.log(`Autocomplete initialized for ${inputId}`);
+      } catch (error) {
+        console.error(`Error initializing autocomplete for ${inputId}:`, error);
+      }
+    }, 300);
+  };
+
+
+
   
    
 
@@ -235,17 +317,12 @@ const User = () => {
         }
       }, []); // Empty dependency array - run once on mount
        // Initialize address autocomplete separately
-    useEffect(() => {
-      if (window.googleMapsLoaded) {
-        
-        initializeCompanyAutocomplete()
-      }
-    }, [window.googleMapsLoaded]);
-    
+    // useEffect में ऐसा करें
 
-  const initializeCompanyAutocomplete = (index) => {
+
+  const initializeCompanyAutocomplete = (inputId,index) => {
     setTimeout(() => {
-      const companyInput = document.getElementById(`company-name-${index}`);
+      const companyInput = document.getElementById(inputId);
       if (!companyInput || !window.google || !window.google.maps || !window.google.maps.places) {
         return; // Not ready yet
       }
@@ -870,6 +947,8 @@ const User = () => {
                 updated[index].universityName = e.target.value;
                 setEducations(updated);
               }}
+              onFocus={() => initializeAutocomplete(`university-name-${index}`, setEducations, index, 'universityName')}
+              
             />
           </div>
 
@@ -885,12 +964,15 @@ const User = () => {
                 updated[index].collegeName = e.target.value;
                 setEducations(updated);
               }}
+              onFocus={() => initializeAutocomplete(`college-name-${index}`, setEducations, index, 'collegeName')}
+
             />
           </div>
 
           <div className="form-group">
             <label className="form-label">Passing Year</label>
             <input
+            id={`passing-year-${index}`}
               type="text"
               className="form-input"
               value={edu.passingYear || ''}
@@ -1351,6 +1433,8 @@ const User = () => {
                           setExperiences(updated);
                         }}
                         placeholder="e.g. XYZ Technologies"
+              onFocus={() => initializeCompanyAutocomplete(`company-name-${index}`,index)}
+
                       />
                     </div>
 
@@ -1547,6 +1631,7 @@ const User = () => {
                           setCertificates(updated);
                         }}
                         placeholder="Certificate name"
+
                       />
                     </div>
 
@@ -1563,6 +1648,8 @@ const User = () => {
                           setCertificates(updated);
                         }}
                         placeholder="Issuing organization"
+                        onFocus={() => initializeAutocomplete(`issuing-organization-${index}`, setCertificates, index, 'orgName')}
+
                       />
                     </div>
 
