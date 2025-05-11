@@ -28,7 +28,6 @@ const candidateProfileSchema = new Schema(
     showProfileForm:{type:Boolean, default: false},
     personalInfo: {
       totalExperience: Number,
-
       profilevideo: { type: String },
       resume: [{
         name: { type: String },

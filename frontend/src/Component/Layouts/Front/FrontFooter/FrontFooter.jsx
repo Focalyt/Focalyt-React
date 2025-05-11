@@ -67,7 +67,7 @@ function Footer() {
         console.log("response from carrer" , response)
   
         alert("Application submitted successfully!");
-        // window.location.reload(); 
+        window.location.reload(); 
     } catch (error) {
       console.error("Career form error:", error);
       alert("Something went wrong while submitting.");

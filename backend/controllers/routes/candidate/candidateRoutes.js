@@ -486,7 +486,7 @@ router
         return res.send({ status: "failure", error: value });
       }
       let formData = value;
-      const { name, mobile, sex, personalInfo ,highestQualification , email, dob} = formData;
+      const { name, mobile, sex, personalInfo ,highestQualification , email, dob, isExperienced} = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
         let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
@@ -544,6 +544,7 @@ router
         creditLeft: coins?.candidateCoins,
         personalInfo,
         highestQualification,
+        isExperienced
         
       };
 
@@ -1025,7 +1026,7 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
   const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
 
   let canApply = false;
-  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.currentAddress && candidate.highestQualification) {
+  if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.currentAddress && candidate.highestQualification) {
     canApply = true;
   
 }
@@ -1455,7 +1456,7 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
 
 
     let canApply = false;
-    if (candidate.name && candidate.mobile && candidate.sex && candidate.personalInfo.totalExperience && candidate.personalInfo.currentAddress && candidate.highestQualification) {
+    if (candidate.name && candidate.mobile && candidate.sex &&  candidate.personalInfo.currentAddress && candidate.highestQualification) {
         canApply = true;
       
     }
@@ -1981,11 +1982,30 @@ router
 
     const updatedFields = {
       isProfileCompleted: true,
-      highestQualification,
+      
 
       isExperienced,
       yearOfPassing
     };
+    
+    if (highestQualification) {
+      // If it's an empty string, set it to null
+      if (highestQualification === "") {
+          highestQualification = null;
+      }
+      // If it's a valid ObjectId string, convert it to ObjectId
+      else if (typeof highestQualification === 'string' && mongoose.Types.ObjectId.isValid(highestQualification)) {
+          highestQualification = mongoose.Types.ObjectId(highestQualification);
+      } else {
+          highestQualification = null; // Invalid value, set to null
+      }
+
+      // Only add to updatedFields if it's valid (not null)
+      if (highestQualification) {
+          updatedFields.highestQualification = highestQualification;
+      }
+  }
+
 
     // ✅ Add root-level fields
     if (sex) updatedFields.sex = sex;
@@ -4296,6 +4316,7 @@ router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
 
       if (personalInfo.professionalTitle) updatePayload.personalInfo.professionalTitle = personalInfo.professionalTitle;
       if (personalInfo.declaration) updatePayload.personalInfo.declaration = personalInfo.declaration;
+      if (personalInfo.totalExperience) updatePayload.personalInfo.totalExperience = personalInfo.totalExperience;
       if (personalInfo.professionalSummary) updatePayload.personalInfo.professionalSummary = personalInfo.professionalSummary;
       if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
       if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;

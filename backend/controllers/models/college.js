@@ -3,7 +3,9 @@ const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
 
 const collegeSchema = new Schema({
-  _concernPerson: { type: ObjectId, ref: 'User' },
+  _concernPerson: [{ type: ObjectId, ref: 'User' }],
+  _courses: [{ type: ObjectId, ref: 'courses' }],
+  _branches: [{ type: ObjectId, ref: 'Center' }],
   _qualification: [{ type: ObjectId, ref: 'Qualification' }],
   _university: { type: ObjectId, ref: 'University' },
   name: { type: String, lowercase: false, trim: true },

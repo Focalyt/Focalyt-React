@@ -63,7 +63,14 @@ const CandidateProfile = () => {
     certificateName: '',
     orgName: '',
     month: '',
-    year: ''
+    year: '',
+    orgLocation:{
+      type: 'Point',
+      coordinates: [],
+      city: '',
+      state: '',
+      fullAddress: ''
+    }
   }]);
   const [projects, setProjects] = useState([{
     projectName: '',

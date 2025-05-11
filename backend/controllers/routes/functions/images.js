@@ -56,8 +56,8 @@ module.exports.uploadSingleImage = async (req, res) => {
     console.log('api hiting upload file')
     const { name, mimetype: ContentType } = req.files.file;
     const ext = name.split('.').pop();
-    const {filename} = req.params
-    let userId =  req.user?._id || req.session.user?._id
+    const { filename } = req.params
+    let userId = req.user?._id || req.session.user?._id
     const key = `uploads/${userId}/${filename}/${uuid()}.${ext}`;
     if (!mimetypes.includes(ext.toLowerCase())) throw new InvalidParameterError('File type not supported!');
 
@@ -67,15 +67,40 @@ module.exports.uploadSingleImage = async (req, res) => {
     };
 
     s3.upload(params, function (err, data) {
-      if(err){
+      if (err) {
         return res.send({ status: false, err });
       }
-      console.log('file uploaded',data)
+      console.log('file uploaded', data)
       return res.send({ status: true, data });
     });
 
   } catch (err) { return req.errFunc(err); }
 };
+module.exports.uploadSinglefile = async (file, folder = "cv") => {
+
+ 
+    console.log('api hiting upload file')
+    const { name, mimetype: ContentType, data } = file;
+    const ext = name.split('.').pop().toLowerCase();
+
+    if (!mimetypes.includes(ext)) {
+      throw new Error("File type not supported!");
+    }
+
+
+    const key = `uploads/${folder}/${uuid()}.${ext}`;
+
+    
+    const params = {
+      Bucket: bucketName, Body: data, Key: key, ContentType,
+    };
+
+    const result = await s3.upload(params).promise(); // 👈 using promise
+  return result.Location;
+
+  
+};
+
 
 module.exports.deleteSingleFile = async (req, res) => {
   try {
@@ -85,9 +110,9 @@ module.exports.deleteSingleFile = async (req, res) => {
     };
 
     s3.deleteObject(params, function (err, data) {
-      if(err) {
+      if (err) {
         console.log(err, '<<<<<<<<<<<<<error')
-        return res.send({status: false, error: err})
+        return res.send({ status: false, error: err })
       }
       console.log('============> ', data)
       return res.send({ status: true, data });
@@ -99,7 +124,7 @@ module.exports.deleteSingleFile = async (req, res) => {
 
 module.exports.uploadMultipleFiles = async (req, res) => {
   try {
-    let userId =  req.user?._id || req.session.user?._id
+    let userId = req.user?._id || req.session.user?._id
     const files = req.files.files
     let ResponseData = []
     let filesArray = []
@@ -141,7 +166,7 @@ module.exports.uploadMultipleFiles = async (req, res) => {
 
 module.exports.uploadAdminMultipleFiles = async (req, res) => {
   try {
-    let userId =  req.user?._id || req.session.user?._id
+    let userId = req.user?._id || req.session.user?._id
     const files = req.files.files
     let ResponseData = []
     let filesArray = []
@@ -155,7 +180,7 @@ module.exports.uploadAdminMultipleFiles = async (req, res) => {
       const { name, mimetype: ContentType } = item;
       const ext = name?.split('.').pop();
       const key = `uploads/${userId}/${uuid()}.${ext}`;
-      
+
       var params = {
         Bucket: bucketName,
         Key: key,
@@ -235,7 +260,7 @@ module.exports.uploadJd = async (req, res) => {
     const { name, mimetype: ContentType } = req.files.file;
     const ext = name.split(".").pop();
     let key = `uploads/${req.user._id}/${uuid()}.${ext}`;
-    if(req.body.path){
+    if (req.body.path) {
       key = `uploads/${req.body.path}/${req.user._id}/${uuid()}.${ext}`;
     }
     const data = req.files.file.data;
@@ -246,8 +271,8 @@ module.exports.uploadJd = async (req, res) => {
       ContentType
     };
     s3.upload(params, function (err, data) {
-      if(err) {
-        return res.send({status: false, error: err})
+      if (err) {
+        return res.send({ status: false, error: err })
       }
       return res.send({ status: true, data });
     })
