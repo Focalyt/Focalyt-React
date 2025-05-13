@@ -1547,4 +1547,30 @@ router.route("/single").get(auth1, function (req, res) {
 		}
 	});
 });
+router.post("/courses/add", async (req, res) => {
+  try {
+    const body = req.body;
+ console.log("Incoming course data:", req.body);
+
+ const newCourse = new Course(req.body);
+    await newCourse.save();
+
+    // set creator
+    body.createdBy = "college";
+
+    // convert string to array
+    body.photos = body.photos ? body.photos.split(",") : [];
+    body.videos = body.videos ? body.videos.split(",") : [];
+    body.testimonialvideos = body.testimonialvideos ? body.testimonialvideos.split(",") : [];
+
+    const course = await Courses.create(body);
+
+    return res.json({ status: true, message: "Course added", data: course });
+  } catch (err) {
+    console.error("❌ Course Add Error:", err.message);
+    return res.status(500).json({ status: false, message: err.message || "Failed to add course" });
+  }
+});
+
+
 module.exports = router;

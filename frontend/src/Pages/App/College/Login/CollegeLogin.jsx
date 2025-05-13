@@ -53,7 +53,7 @@ const CollegeLogin = () => {
                     if (returnUrl) {
                         window.location.href = decodeURIComponent(returnUrl);
                     } else {
-                        window.location.href = '/college/dashboard';
+                        window.location.href = '/institute/dashboard';
                     }
                 } else {
                     setSuccessMessage('');
@@ -145,7 +145,7 @@ const CollegeLogin = () => {
                                                                     className={`nav-link ${activeTab === 'signup' ? 'active' : ''}`}
                                                                     id="home-tab-center"
                                                                     data-toggle="tab"
-                                                                    href={`/college/register${window.location.search}`}
+                                                                    href={`/institute/register${window.location.search}`}
                                                                     aria-controls="home-center"
                                                                     role="tab"
                                                                     aria-selected={activeTab === 'signup' ? 'true' : 'false'}

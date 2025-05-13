@@ -179,6 +179,8 @@ router
 			body.videos = videos
 
 			const addRecord = await Courses.create(body);
+			body.createdBy = 'admin';
+			
 			console.log(JSON.stringify(addRecord), "create coursessssssss")
 			if (addRecord) {
 				return res.json({ status: true, message: "Record added!" })

@@ -110,6 +110,16 @@ const courseSchema = new Schema({
         type: Boolean,
         default: false,
     },
+    createdBy: {
+    type: String,
+    enum: ['admin', 'college'],
+    default: 'admin'
+  },
+  college: {
+    type: ObjectId,
+    ref: 'College',
+    default: null
+  },
 }, { timestamps: true });
 
 module.exports = model('courses', courseSchema);
