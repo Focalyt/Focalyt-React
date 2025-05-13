@@ -10,11 +10,11 @@ function CandidateFooter() {
     window.addEventListener("resize", handleResize);
     return () => window.addEventListener("resize", handleResize)
   }, [])
-
+ const currentYear = new Date().getFullYear();
   return (
     <>
 
-      COPYRIGHT © 2025 Focalyt,All rights Reserved
+      COPYRIGHT © {currentYear} Focalyt,All rights Reserved
       {isMobile && (
         <section>
           <div className="container">

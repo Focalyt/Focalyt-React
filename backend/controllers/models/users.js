@@ -40,11 +40,19 @@ const userSchema = new Schema(
 			default: false,
 		},
 		role: { type: Number, trim: true }, // 0-admin, 1-company, 2-college, 3-student, 10-admin view
-		access:{
-			roleName:{type:String},
-			courseAccess:[{type:ObjectId, ref:"course"}],
-			centerAccess:[{type:ObjectId, ref:"Center"}],
-		} , 
+		access: {
+			roleName: { type: String },
+			courseAccess: [{ type: ObjectId, ref: "course" }],
+			centerAccess: [{ type: ObjectId, ref: "Center" }],
+			rolePermissions: [{ type: String }], // Standard permissions from the role
+			contextPermissions: [
+				{
+					permKey: { type: String }, // e.g. "MANAGE_COURSE_CONTENT"
+					contextType: { type: String, enum: ["center", "course"] },
+					contextId: { type: ObjectId },
+				},
+			],
+		},
 		status: {
 			type: Boolean,
 			default: true,

@@ -1618,7 +1618,8 @@ const User = () => {
 
               <div className="certifications-container">
                 {certificates.map((cert, index) => (
-                  <div className="certificate-item" key={`certificate-${index}`}>
+                  <div className="certificate-item" key={`certificate-${index}`} style={{flexDirection: 'column'}}>
+                    <div className ='certificateFieldMobile' style={{display:'flex' , gap: '15px' , width: '100%'}}>
                     <div className="form-group">
                       <label className="form-label">Certificate Name</label>
                       <input
@@ -1635,7 +1636,7 @@ const User = () => {
                       />
                     </div>
 
-                    <div className="form-group">
+                    <div className="form-group w-100">
                       <label className="form-label">Issuing Organization</label>
                       <input
                         type="text"
@@ -1652,7 +1653,7 @@ const User = () => {
 
                       />
                     </div>
-
+                    </div>
                     <div className="form-row">
                       <div className="form-group half-width">
                         <label className="form-label">Month</label>
@@ -2899,6 +2900,9 @@ const User = () => {
       
       /* Responsive styles */
       @media (max-width: 768px) {
+      .certificateFieldMobile{
+      flex-direction: column;
+      }
         .form-row {
           flex-direction: column;
           gap: 10px;

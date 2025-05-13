@@ -1,9 +1,12 @@
 import React from 'react'
 
 const CollegeFooter = () => {
+  
+  const currentYear = new Date().getFullYear();
+  
   return (
     <>
-    College Footer 
+      COPYRIGHT © {currentYear} Focalyt,All rights Reserved
     </>
   )
 }

@@ -379,7 +379,7 @@ const Profile = () => {
                         <div className="input-group mb-2">
                           <div className="input-group-prepend bg-locat">
                             <div className="input-group-text bg-intext">
-                              <img src="/images/isist.png" id="siteforcomp" alt="location" />
+                              <img src="/Assets/images/isist.png" id="siteforcomp" alt="location" />
                             </div>
                           </div>
                           <input
