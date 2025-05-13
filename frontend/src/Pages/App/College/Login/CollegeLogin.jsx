@@ -7,7 +7,7 @@ const CollegeLogin = () => {
     const queryParams = new URLSearchParams(urlLocation.search);
     const returnUrl = queryParams.get('returnUrl');
 
-    const [mobileNumber, setMobileNumber] = useState('');
+    const [userInput, setUserInput] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -30,39 +30,28 @@ const CollegeLogin = () => {
 
     const handleLogin = async () => {
         const body = {
-            mobile: mobileNumber,
-            pass: password,
+            userInput,
+            password,
             module: 'college'
         };
 
         try {
-            const verifyRes = await axios.post(`${backendUrl}/api/verifyPass`, body);
+            const verifyRes = await axios.post(`${backendUrl}/college/login`, body);
 
             if (verifyRes.data.status === true) {
                 setErrorMessage('');
                 setSuccessMessage('Password verified');
-
-                const loginRes = await axios.post(`${backendUrl}/api/otpLogin`, body);
-
-                if (loginRes.data.status === true) {
-                    localStorage.setItem("collegeName", loginRes.data.collegeName);
-                    localStorage.setItem("collegeId", loginRes.data.collegeId);
-                    localStorage.setItem("name", loginRes.data.name);
-                    localStorage.setItem("token", loginRes.data.token);
-
-                    if (returnUrl) {
-                        window.location.href = decodeURIComponent(returnUrl);
-                    } else {
-                        window.location.href = '/institute/dashboard';
-                    }
+                sessionStorage.setItem("user",JSON.stringify(verifyRes.data.userData));
+                if (returnUrl) {
+                    window.location.href = decodeURIComponent(returnUrl);
                 } else {
-                    setSuccessMessage('');
-                    setErrorMessage('Login failed !!!');
+                    window.location.href = '/institute/dashboard';
                 }
             } else {
                 setSuccessMessage('');
-                setErrorMessage('Incorrect Password');
+                setErrorMessage('Login failed !!!');
             }
+
         } catch (err) {
             console.error("Error in login:", err);
             setErrorMessage('Login failed !!!');
@@ -171,17 +160,10 @@ const CollegeLogin = () => {
                                                                                     className="form-control"
                                                                                     maxLength="10"
                                                                                     id="user-input"
-                                                                                    placeholder="Mobile / मोबाइल"
-                                                                                    pattern="[0-9]{10}"
-                                                                                    value={mobileNumber}
-                                                                                    onChange={(e) => setMobileNumber(e.target.value)}
-                                                                                    onKeyPress={(e) => {
-                                                                                        if (e.target.value.length === 10) {
-                                                                                            e.preventDefault();
-                                                                                            return false;
-                                                                                        }
-                                                                                        handleMobileNumberKeyPress(e);
-                                                                                    }}
+                                                                                    placeholder="Mobile / Email"
+                                                                                    value={userInput}
+                                                                                    onChange={(e) => setUserInput(e.target.value)}
+
                                                                                     aria-label="Mobile Number"
                                                                                     aria-describedby="basic-addon2"
                                                                                 />

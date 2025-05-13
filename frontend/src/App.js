@@ -1,7 +1,12 @@
 
-import React, { useState,useEffect } from 'react';
+import React from 'react';  // This must be first
+import { useState,useEffect } from 'react';
+
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import HomePage from '../src/Pages/Front/HomePage/HomePage';
+
 // import About from './Pages/Front/About/About';
 import About from './Pages/Front/About/About';
 import Labs from "./Pages/Front/Labs/Labs";
@@ -58,6 +63,9 @@ import AddCourse from './Pages/App/College/Course/AddCourse';
 import ViewCourses from './Pages/App/College/Course/ViewCourse';
 import Registrations from './Pages/App/College/Course/Registrations';
 import AccessManagement from './Pages/App/College/Settings/AccessManagement';
+
+
+
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -85,6 +93,7 @@ const Layout = () => {
       sessionStorage.setItem('_fbc', fbcCookie || fbcGenerated);
     }
   }, []);
+
   
 
   return (
@@ -163,16 +172,22 @@ const Layout = () => {
 
 
       </Routes>
+      
 
 
     </>
   );
 };
 
+
+
 const App = () => {
   return (
     <Router>
+      
       <Layout />
+      
+      
     </Router>
   );
 };
