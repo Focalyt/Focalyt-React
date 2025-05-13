@@ -49,8 +49,11 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
+    console.log('userData',userData)
       const response = await axios.get(`${backendUrl}/college/dashboard`, {
-        headers: { 'x-auth': localStorage.getItem('token') }
+        headers: { 'x-auth': token }
       });
       if (response.data) {
         setDashboardData(response.data);

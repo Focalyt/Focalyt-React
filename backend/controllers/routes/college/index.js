@@ -39,10 +39,64 @@ router.route('/')
 			res.redirect("/college/dashboard");
 		}
 	})
+router.route("/login")
+	.get(async (req, res) => {
+		res.render(`${req.vPath}/app/college/login`);
+	})
+	.post(async (req, res) => {
+		try {
+			console.log('body data', req.body)
 
-router.get("/login", async (req, res) => {
-	res.render(`${req.vPath}/app/college/login`);
-});
+			const { userInput, password } = req.body;
+
+			let query = {
+				$or: []
+			};
+
+			const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInput);
+
+			// If it's email
+			if (isEmail) {
+				query.$or.push({ email: userInput, role: 2 });
+			} else {
+				// Assume it's mobile — convert to number
+				const mobileNumber = Number(userInput);
+				query.$or.push({ mobile: mobileNumber,  role: 2 });
+			}
+
+			console.log('query', query)
+
+			const user = await User.findOne(query);
+
+			if (!user) {
+				return res.json({ status: false, error: "User not found" });
+			}
+
+			const isMatch = user.validPassword(password);
+
+			if (!isMatch) {
+				return res.json({ status: false, error: "Wrong password" });
+			}
+
+			const college = await College.findOne({ _concernPerson: user._id }, "name")
+			if (!college || college === null) {
+				return res.json({ status: false, message: 'Missing College!' });
+
+			};
+			const token = await user.generateAuthToken();
+
+
+			userData = {
+				_id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token
+			};
+			console.log('userData login',userData)
+			return res.json({ status: true, message: "Login successful", userData });
+
+		} catch (err) {
+			console.log('====================>!err ', err.message)
+			return res.send({ status: false, error: err.message });
+		}
+	});
 
 router.route("/register")
 	.get(async (req, res) => {
@@ -50,14 +104,13 @@ router.route("/register")
 	})
 	.post(async (req, res) => {
 		try {
-			const { collegeName, concernedPerson, email, mobile,type,password,confirmPassword } = req.body;
-			const hashPass = await bcrypt.hash(password, 10);
-			const hashConPass = await bcrypt.hash(confirmPassword, 10);
+			console.log('recieved data', req.body)
+			const { collegeName, concernedPerson, email, mobile, type, password, confirmPassword, location } = req.body;
 
-			const { value, error } = await CollegeValidators.register({ collegeName, concernedPerson, email, mobile })
+			const { value, error } = await CollegeValidators.register(req.body)
 			if (error) {
 				console.log('====== register error ', error, value)
-				return res.send({ status: "failure", error: "Something went wrong!" });
+				return res.send({ status: false, error: error.message });
 			}
 			let checkEmail = await User.findOne({
 				email: email,
@@ -77,43 +130,48 @@ router.route("/register")
 			}
 
 			if (!checkEmail && !checkNumber) {
-				const user = await User.create({
-					name: concernedPerson,
-					email,
-					mobile,
-					role: 2,
-				});
-				if (!user) {
-					return res.send({
-						status: "failure",
-						error: "College user not created!",
+				if (password === confirmPassword) {
+					const user = await User.create({
+						name: concernedPerson,
+						email,
+						mobile,
+						role: 2,
+						password
 					});
+					if (!user) {
+						return res.send({
+							status: "failure",
+							error: "College user not created!",
+						});
+					}
+					let college = await College.create({
+						_concernPerson: user._id,
+						name: collegeName,
+						type: type,
+						location
+					});
+					if (!college) {
+						return res.send({ status: "failure", error: "College not created!" });
+					}
+					return res.send({
+						status: "success",
+						message: "College registered successfully",
+					})
 				}
-				let college = await College.create({
-					_concernPerson: user._id,
-					name: collegeName,
-					type:type,
-					password:hashPass,
-					confirmPassword:hashConPass
-				});
-				if (!college) {
-					return res.send({ status: "failure", error: "College not created!" });
-				}
+				else {
+					return res.send({ status: false, error: "Password and Confirm Password not matched" });
 
-				return res.send({
-					status: "success",
-					message: "College registered successfully",
-				});
+				}
 			}
 		} catch (err) {
-			console.log('====================>!err ', err)
-			req.flash("error", err.message || "Something went wrong!");
-			return res.send({ status: "failure", error: "Something went wrong!" });
+			console.log('====================>!err ', err.message)
+			return res.send({ status: false, error: err.message });
 		}
 	});
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
-	let college = await College.findOne({ _id: req.session.user.collegeId, status: true })
+	console.log('User', req.user)
+	let college = await College.findOne({ _concernPerson: req.user._id, status: true })
 
 	let totalShortlisted
 	let monthShortlisted
@@ -1215,7 +1273,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 router.get("/uploadcandidates", async (req, res) => {
 	const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
 	console.log('======================> 1', ipAddress, req.session.user)
-		
+
 	if (req.session && req.session.user && req.session.user._id) {
 		const perPage = 5;
 		const p = parseInt(req.query.page, 10);

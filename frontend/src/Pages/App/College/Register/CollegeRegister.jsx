@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
+import { toast } from 'react-toastify';
+
 import './CollegeRegister.css';
 
 const CollegeRegister = () => {
@@ -12,6 +14,11 @@ const CollegeRegister = () => {
     const [concernedPerson, setConcernedPerson] = useState('');
     const [email, setEmail] = useState('');
     const [instituteType, setInstituteType] = useState('');
+    const [address, setAddress] = useState('');
+    const [city, setCity] = useState('');
+    const [state, setState] = useState('');
+    const [latitude, setLatitude] = useState('');
+    const [longitude, setLongitude] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -33,7 +40,57 @@ const CollegeRegister = () => {
     const signupBtnRef = useRef(null);
     const otpInputRef = useRef(null);
     const generateOTPRef = useRef(null);
+    useEffect(() => {
 
+
+        const waitForGoogle = () => {
+            if (window.google && window.google.maps && window.google.maps.places) {
+                const input = document.getElementById('collegeName');
+                if (input) {
+                    const autocomplete = new window.google.maps.places.Autocomplete(input, {
+                        types: ['establishment'],
+                        componentRestrictions: { country: 'in' },
+                    });
+
+                    autocomplete.addListener('place_changed', () => {
+                        const place = autocomplete.getPlace();
+                        if (!place || !place.geometry || !place.geometry.location) return;
+
+                        const lat = place.geometry.location.lat();
+                        const lng = place.geometry.location.lng();
+
+                        const placeNameOnly = place.name || input.value;
+
+                        // Only set the name, not the full address
+                        setCollegeName(placeNameOnly);
+
+                        let city = '', state = '';
+                        place.address_components?.forEach((component) => {
+                            const types = component.types.join(',');
+                            if (types.includes("locality")) city = component.long_name;
+                            if (types.includes("administrative_area_level_1")) state = component.long_name;
+                            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+                        });
+
+                        setCity(city);
+                        setState(state);
+                        setLatitude(lat);
+                        setLongitude(lng);
+
+                        // Optionally save full address in another state
+                        setAddress(place.formatted_address || '');
+                    });
+
+                }
+
+
+            } else {
+                setTimeout(waitForGoogle, 100);
+            }
+        };
+
+        waitForGoogle();
+    }, []);
     const checkEmail = (email) => {
         let emailReg = /^([\w-\.]+@([\w-]+\.)+[\w-]{2,4})?$/;
         return emailReg.test(email);
@@ -203,34 +260,43 @@ const CollegeRegister = () => {
                         mobile: phoneNumber,
                         password,
                         confirmPassword,
-                        type: instituteType
+                        type: instituteType,
+                        location: {
+                            type: "Point",
+                            coordinates: [parseFloat(longitude) || 0, parseFloat(latitude) || 0],
+                            city,
+                            state,
+                            fullAddress: address,
+
+                        }
                     };
 
                     const registerRes = await axios.post(`${backendUrl}/college/register`, body);
 
                     if (registerRes.data.status) {
-                        body = { mobile: phoneNumber, module: 'college' };
-                        const loginRes = await axios.post(`${backendUrl}/api/otpLogin`, body);
+                        body = { userInput: phoneNumber, password  };
+                        const loginRes = await axios.post(`${backendUrl}/college/login`, );
 
                         if (loginRes.data.status === true) {
-                            localStorage.setItem("collegeName", loginRes.data.collegeName);
-                            localStorage.setItem("collegeId", loginRes.data.collegeId);
-                            localStorage.setItem("name", loginRes.data.name);
-                            localStorage.setItem("token", loginRes.data.token);
-
+                            sessionStorage.setItem("user", JSON.stringify(loginRes.data.userData));
+                            
                             if (returnUrl) {
                                 window.location.href = decodeURIComponent(returnUrl);
                             } else {
                                 window.location.href = "/college/dashboard";
                             }
+                            
                         } else {
                             setSuccessMessage('');
                             setErrorMessage('Login failed !!!');
                             window.location.href = "/college/login";
                         }
                     } else {
+                        console.log('error',registerRes.data)
                         setSuccessMessage('');
                         setErrorMessage(registerRes.data.error);
+                        toast.error(registerRes.data.error);
+
                     }
                 } else {
                     setSuccessMessage('');
@@ -309,7 +375,7 @@ const CollegeRegister = () => {
                                                                     className="nav-link"
                                                                     id="service-tab-center"
                                                                     data-toggle="tab"
-                                                                    href={`/college/login${window.location.search}`}
+                                                                    href={`/institute/login${window.location.search}`}
                                                                     aria-controls="service-center"
                                                                     role="tab"
                                                                     aria-selected="false"
@@ -357,7 +423,7 @@ const CollegeRegister = () => {
                                                                         <div className="card-body p-0">
                                                                             <form onSubmit={(e) => e.preventDefault()} className='collegeRegistration'>
                                                                                 <div className="row">
-                                                                                    <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12">
+                                                                                    <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
                                                                                         <input
                                                                                             type="text"
                                                                                             className="form-control"
@@ -378,7 +444,7 @@ const CollegeRegister = () => {
                                                                                         <label htmlFor="user-name"></label>
                                                                                     </fieldset>
 
-                                                                                    <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12">
+                                                                                    <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
                                                                                         <input
                                                                                             type="text"
                                                                                             className="form-control"
@@ -422,7 +488,7 @@ const CollegeRegister = () => {
                                                                                     </fieldset>
 
                                                                                     <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        
+
                                                                                         <select
                                                                                             className="form-control"
                                                                                             id="select"
@@ -536,7 +602,7 @@ const CollegeRegister = () => {
                                                                                         <div className="form-control-position">
                                                                                             <i className="fa-solid fa-lock"></i>
                                                                                         </div>
-                                                                                        
+
                                                                                     </fieldset>
 
                                                                                     <p className="pt-0 px-1">

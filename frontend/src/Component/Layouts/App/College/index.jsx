@@ -20,15 +20,16 @@ function CollegeLayout({ children }) {
   const [user, setUser] = useState();
   const location = useLocation();
 
-  // useEffect(() => {
-  //   const token = localStorage.getItem('token');
-  //   const collegeData = localStorage.getItem('collegeName');
-  //   if (token && collegeData) {
-  //     setUser({ token, collegeName: collegeData });
-  //   } else {
-  //     navigate('/college/login');
-  //   }
-  // }, []);
+ 
+  useEffect(() => {
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        setUser(parsed);
+      } else {
+        navigate('/institute/login');
+      }
+    }, []);
 
   const [openDropdown, setOpenDropdown] = useState(null);
   const profileMenuRef = useRef(null);

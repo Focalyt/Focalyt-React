@@ -642,48 +642,7 @@ router.get("/login", async (req, res) => {
   console.log(fullUrl);
 
   // Modify script to run after DOM is loaded and escape quotes properly
-  const storageScript = `
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        try {
-        const storedurl = localStorage.getItem('entryUrl');
-        if(!storedurl){
-
-
-          // Store current URL immediately
-          const data = {
-            url: '${fullUrl.replace(/'/g, "\\'")}',
-            timestamp: new Date().getTime()
-          };
-          localStorage.setItem('entryUrl', JSON.stringify(data));
-          
-          // Verify it was stored
-          console.log('URL stored:', localStorage.getItem('entryUrl'))};
-          
-          // Function to check and clean expired URL
-          function cleanExpiredUrl() {
-            const stored = localStorage.getItem('entryUrl');
-            if (stored) {
-              const data = JSON.parse(stored);
-              const now = new Date().getTime();
-              const hours24 = 24 * 60 * 60 * 1000;
-              
-              if (now - data.timestamp > hours24) {
-                localStorage.removeItem('entryUrl');
-                console.log('Expired URL removed');
-              }
-            }
-          }
-          
-          // Check for expired URLs
-          cleanExpiredUrl();
-          
-        } catch (error) {
-          console.error('Error storing URL:', error);
-        }
-      });
-    </script>
-  `;
+ 
 
   if (user && user.role == 3 && returnUrl && returnUrl.trim() !== '') {
     return res.redirect(returnUrl)
@@ -691,7 +650,7 @@ router.get("/login", async (req, res) => {
   else if (user && user.role == 3) {
     return res.redirect("/candidate/dashboard");
   }
-  return res.render(`${req.vPath}/app/candidate/login`, { apikey: process.env.AUTH_KEY_GOOGLE, storageScript: storageScript });
+  return res.render(`${req.vPath}/app/candidate/login`, { apikey: process.env.AUTH_KEY_GOOGLE });
 });
 // router.get("/searchjob", [isCandidate], async (req, res) => {
 //   const data = req.query;
