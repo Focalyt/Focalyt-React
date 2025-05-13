@@ -117,22 +117,36 @@ module.exports.sendCompanyOtp = async (req, res) => {
 module.exports.sendOtp = async (req, res) => {
   try {
 
-    const { mobile, module } = req.body;
-    let role = 3
+   const { userInput, module } = req.body;
+
+    let role = 3;
     if (module === 'college') {
-      role = 2
+      role = 2;
     } else if (module === 'candidate') {
-      role = 3
+      role = 3;
     } else if (module === 'company') {
-      role = 1
+      role = 1;
     }
-    const user = await User.findOne({ mobile, role });
+
+    console.log('userInput',userInput, 'module',module)
+    let user = null;
+    const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
+
+    if (isMobile) {
+      user = await User.findOne({ mobile: parseInt(userInput), role });
+    } else {
+      user = await User.findOne({ email: userInput.toLowerCase(), role });
+    }
+
     if (!user) {
       return res.send({ status: false, message: 'User not found, please signup' });
     }
     if (user.status === false) {
       return res.send({ status: false, message: 'User disabled' });
     }
+
+    // Now we have user, and we can access user.mobile to send OTP
+    const mobile = user.mobile;
 
 
     const auth = authKey;
