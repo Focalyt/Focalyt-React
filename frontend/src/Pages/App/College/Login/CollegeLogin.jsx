@@ -90,7 +90,7 @@ const CollegeLogin = () => {
                     module: 'college'
                 };
                 
-                const verifyRes = await axios.post(`${backendUrl}/college/verify-otp`, body);
+                const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, body);
                 
                 if (verifyRes.data.status === true) {
                     setErrorMessage('');

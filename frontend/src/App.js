@@ -61,6 +61,7 @@ import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 import AddCourse from './Pages/App/College/Course/AddCourse';
 import ViewCourses from './Pages/App/College/Course/ViewCourse';
+import EditCourse from './Pages/App/College/Course/EditCourse';
 import Registrations from './Pages/App/College/Course/Registrations';
 import AccessManagement from './Pages/App/College/Settings/AccessManagement';
 
@@ -167,6 +168,9 @@ const Layout = () => {
           <Route path='addcourse' element={<AddCourse/>}/>
           <Route path='viewcourse' element={<ViewCourses/>}/>
           <Route path='registration' element={<Registrations/>}/>
+          {/* <Route path='editcourse' element={<EditCourse/>}/> */}
+          <Route path="institute/courses/edit/:id" element={<EditCourse />} />
+          <Route path="courses/edit/:id" element={<EditCourse />} />
           <Route path='accessManagement' element={<AccessManagement/>}/>
         </Route>
 

@@ -109,6 +109,16 @@ const AccessManagementSystem = () => {
         { key: 'VIEW_LEADS_ANALYTICS', description: 'Can view Leads analytics', contextRequired: true },
         { key: 'APPROVE_CENTER', description: 'Can approve center for operations', contextRequired: true },
       ]
+    },{
+      name: 'Add Center',
+      permissions: [
+        { key: 'VIEW_CENTERS', description: 'Can view centers' },
+        { key: 'CREATE_CENTER', description: 'Can create centers' },
+        { key: 'MANAGE_CENTER', description: 'Can manage center operations', contextRequired: true },
+        { key: 'VIEW_CENTER_ANALYTICS', description: 'Can view center analytics', contextRequired: true },
+        { key: 'VIEW_LEADS_ANALYTICS', description: 'Can view Leads analytics', contextRequired: true },
+        { key: 'APPROVE_CENTER', description: 'Can approve center for operations', contextRequired: true },
+      ]
     }
   ];
   
@@ -743,7 +753,7 @@ const AccessManagementSystem = () => {
                   </td>
                   <td className="text-secondary">{user.email}</td>
                   <td>
-                    <div className="d-flex align-items-center">
+                    <div className="d-flex align-items-center position-relative">
                       <select 
                         className="form-select form-select-sm"
                         value={user.role}
@@ -751,12 +761,13 @@ const AccessManagementSystem = () => {
                       >
                         <option value="">No Role</option>
                         {roles.map(role => (
-                          <option key={role.id} value={role.name}>{role.name}</option>
+                          <option key={role.id} value={role.name} disabled>{role.name}</option>
                         ))}
                       </select>
+                  
                       {user.hasCustomPerms && (
-                        <span className="ms-2 badge bg-warning bg-opacity-10 text-warning">
-                          Custom
+                        <span className="ms-2 badge bg-warning bg-opacity-10 text-warning border-0 bg-transparent" style={{top: '-6px'}}>
+                          <Shield size={16} />
                         </span>
                       )}
                     </div>
@@ -832,7 +843,7 @@ const AccessManagementSystem = () => {
                       <td className="text-secondary">
                         {permission.description}
                         {permission.contextRequired && (
-                          <span className="ms-2 badge bg-info bg-opacity-10 text-info">
+                          <span className="ms-2 bg-info bg-opacity-10 text-info">
                             Context Required
                           </span>
                         )}
@@ -901,9 +912,9 @@ const AccessManagementSystem = () => {
                       <td>{getContextName(cp.contextType, cp.contextId)}</td>
                       <td>
                         {rolePermissions[user?.role]?.includes(cp.permKey) ? (
-                          <span className="badge bg-success bg-opacity-10 text-success">Same as role</span>
+                          <span className=" bg-success bg-opacity-10 text-success">Same as role</span>
                         ) : (
-                          <span className="badge bg-warning bg-opacity-10 text-warning">Custom override</span>
+                          <span className=" bg-warning bg-opacity-10 text-warning">Custom override</span>
                         )}
                       </td>
                     </tr>
@@ -987,7 +998,7 @@ const AccessManagementSystem = () => {
                         <label className="form-check-label" htmlFor={permission.key}>
                           {permission.description}
                           {permission.contextRequired && (
-                            <span className="ms-2 badge bg-info bg-opacity-10 text-info">
+                            <span className="ms-2  bg-info bg-opacity-10 text-info">
                               Context Required
                             </span>
                           )}

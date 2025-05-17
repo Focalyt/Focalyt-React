@@ -36,10 +36,16 @@ select {
 .float-left {
     float: left !important;
 }
-.breadcrumb .breadcrumb-item+.breadcrumb-item:before {
+/* .breadcrumb .breadcrumb-item+.breadcrumb-item:before {
     content: "\e847";
     font-family: 'feather';
     color: #626262;
+} */
+.breadcrumb .breadcrumb-item+.breadcrumb-item:before {
+    content: "\f105"; /* Arrow Right */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900; /* Solid icons = 900, Regular = 400 */
+  color: #626262;
 }
 .breadcrumb-item+.breadcrumb-item::before {
     display: inline-block;

@@ -17,6 +17,7 @@ const todoRoutes = require("./todo");
 const smsRoutes = require("./sms");
 const coverLetterRoutes = require("./coverLetter");
 const mockInterviewRoutes = require("./mockInterview");
+const coursesRoutes = require("./courses");
 const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
@@ -27,6 +28,7 @@ router.use("/careerObjective", isCollege, careerObjectiveRoutes);
 // router.use(isCollege);
 router.use("/coverLetter", isCollege, coverLetterRoutes);
 router.use("/mockInterview", isCollege, mockInterviewRoutes);
+router.use("/courses", isCollege, coursesRoutes);
 const readXlsxFile = require("read-excel-file/node");
 
 router.route('/')

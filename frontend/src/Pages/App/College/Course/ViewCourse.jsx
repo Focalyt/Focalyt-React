@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { 
-  Container, 
-  Row, 
-  Col, 
-  Card, 
-  Table, 
-  Form, 
-  Button, 
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Table,
+  Form,
+  Button,
   Breadcrumb
 } from 'react-bootstrap';
 import { Edit } from 'react-feather';
@@ -23,7 +23,6 @@ const ViewCourses = () => {
   // State variables
   const [courses, setCourses] = useState([]);
   const [isArchived, setIsArchived] = useState(false);
-  const [canEdit, setCanEdit] = useState(false);
   const [filterData, setFilterData] = useState({
     name: '',
     FromDate: '',
@@ -54,17 +53,21 @@ const ViewCourses = () => {
   // Fetch courses data
   const fetchCourses = async (params) => {
     try {
+      const user = JSON.parse(sessionStorage.getItem('user'));
       const headers = {
-        'x-auth': localStorage.getItem('token')
+        'x-auth': user.token,
       };
 
       // Build query string from params
       const queryString = qs.stringify(params);
-      const response = await axios.get(`${backendUrl}/admin/courses?${queryString}`, { headers });
+      const response = await axios.get(`${backendUrl}/college/courses?${queryString}`, { headers });
+
+      console.log("Fetched courses:", response.data.course);
+      console.log(" Response :", response);
+
 
       if (response.data) {
         setCourses(response.data.courses || []);
-        setCanEdit(response.data.canEdit || false);
       }
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -75,7 +78,7 @@ const ViewCourses = () => {
   const handleArchivedChange = () => {
     const newArchived = !isArchived;
     setIsArchived(newArchived);
-    navigate(`/admin/courses?status=${!newArchived}`);
+    navigate(`/college/courses?status=${!newArchived}`);
   };
 
   // Handle toggle status
@@ -83,8 +86,8 @@ const ViewCourses = () => {
     try {
       const data = { id, status: !(status === 'true') };
       const headers = { 'x-auth': localStorage.getItem('token') };
-      
-      await axios.patch(`${backendUrl}/admin/courses/changeStatus`, data, { headers });
+
+      await axios.patch(`${backendUrl}/college/courses/changeStatus`, data, { headers });
       // Reload data after status change
       fetchCourses(qs.parse(location.search));
     } catch (error) {
@@ -109,26 +112,26 @@ const ViewCourses = () => {
   // Handle filter form submit
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-    
+
     if (!validateFilters()) {
       return;
     }
 
     // Build query string for navigation
     const queryParams = {};
-    
+
     Object.keys(filterData).forEach(key => {
       if (filterData[key]) {
         queryParams[key] = filterData[key];
       }
     });
 
-    navigate(`/admin/courses?${qs.stringify(queryParams)}`);
+    navigate(`/college/courses?${qs.stringify(queryParams)}`);
   };
 
   // Handle reset filters
   const handleResetFilters = () => {
-    navigate('/admin/courses');
+    navigate('/college/courses');
   };
 
   return (
@@ -140,7 +143,7 @@ const ViewCourses = () => {
             <div className="col-12">
               <h3 className="content-header-title float-left mb-0">All Courses</h3>
               <Breadcrumb>
-                <Breadcrumb.Item href="/admin">Home</Breadcrumb.Item>
+                <Breadcrumb.Item href="/">Home</Breadcrumb.Item>
                 <Breadcrumb.Item active>All Courses</Breadcrumb.Item>
               </Breadcrumb>
             </div>
@@ -268,18 +271,15 @@ const ViewCourses = () => {
                           <th>Course Name</th>
                           <th>Duration</th>
                           <th>Add Leads</th>
-                          {canEdit && (
-                            <>
-                              <th>Status</th>
-                              <th>Action</th>
-                            </>
-                          )}
+                          <th>Status</th>
+                          <th>Action</th>
+
                         </tr>
                       </thead>
                       <tbody>
                         {courses.map((course, i) => (
                           <tr key={course._id}>
-                            <td>
+                            <td style={{padding: '14px'}}>
                               {course.sectors?.map((sector, i) => (
                                 <div key={sector._id}>{sector.name}</div>
                               ))}
@@ -289,34 +289,26 @@ const ViewCourses = () => {
                             <td>{course.duration}</td>
                             <td className="text-capitalize text-nowrap">
                               <Link
-                                to={`/admin/courses/${course._id}/candidate/addleads`}
+                                to={`/college/courses/${course._id}/candidate/addleads`}
                                 className="btn btn-danger waves-effect waves-light text-white d-inline btn-sm"
-                                style={{ padding: '8px' }}
+                                style={{ padding: '7px' }}
                               >
                                 Add leads
                               </Link>
                             </td>
-                            {canEdit && (
-                              <>
-                                <td>
-                                  <div className="custom-control custom-switch custom-control-inline">
-                                    <input
-                                      type="checkbox"
-                                      className="custom-control-input"
-                                      id={`customSwitch${i}`}
-                                      checked={course.status}
-                                      onChange={() => handleToggleStatus(course._id, String(course.status))}
-                                    />
-                                    <label className="custom-control-label" htmlFor={`customSwitch${i}`}></label>
-                                  </div>
-                                </td>
-                                <td valign="middle" className="qualification-action-custom-class d-flex justify-content-center">
-                                  <Link to={`/admin/courses/edit/${course._id}`}>
-                                    <Edit size={20} className="text-primary" />
-                                  </Link>
-                                </td>
-                              </>
-                            )}
+                            <td >
+                              
+                              <div className="custom-control custom-switch custom-control-inline p-0">
+                                <input type="checkbox" id="customSwitch1" className="custom-control-input" onChange={() => handleToggleStatus(course._id, String(course.status))} checked={course.status} />
+                                <label for="customSwitch1" class="toggleSwitch"></label>
+                              </div>
+                            </td>
+                            <td valign="middle" className="qualification-action-custom-class d-flex justify-content-center border-0" style={{padding: "14px"}}>
+                              <Link to={`/institute/courses/edit/${course._id}`}>
+                                <Edit size={20} className="primary" />
+                              </Link>
+                            </td>
+
                           </tr>
                         ))}
                       </tbody>
@@ -328,6 +320,74 @@ const ViewCourses = () => {
           </Row>
         </section>
       </div>
+
+      <style>
+        {
+          `
+          tbody tr{
+          border-bottom: 1px solid ;
+          }
+          .primary {
+    color: #FC2B5A!important;
+}
+  /* To hide the checkbox */
+ .custom-table td{
+  padding: 14px!important;
+  font-size: 12.5px!important;
+  }
+#customSwitch1 {
+  display: none;
+}
+
+.toggleSwitch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 50px;
+  height: 30px;
+  background-color: rgb(82, 82, 82);
+  border-radius: 20px;
+  cursor: pointer;
+  transition-duration: .2s;
+}
+
+.toggleSwitch::after {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 5px;
+  background-color: transparent;
+  border-radius: 50%;
+  transition-duration: .2s;
+  box-shadow: 5px 2px 7px rgba(8, 8, 8, 0.26);
+  border: 5px solid white;
+}
+
+/* Fixed translation to move toggle all the way to the right */
+#customSwitch1:checked+.toggleSwitch::after {
+  transform: translateX(25px); /* Fixed value instead of percentage */
+  transition-duration: .2s;
+  background-color: white;
+}
+
+/* Changed background color to pink */
+#customSwitch1:checked+.toggleSwitch {
+  background-color: #FC2B5A; /* Pink color to match your code */
+  transition-duration: .2s;
+  height: 1.671rem;
+}
+
+/* Bootstrap custom switch styles if needed */
+.custom-control-input:checked~.custom-control-label::before {
+  color: #fff;
+  border-color: #FC2B5A;
+  background-color: #FC2B5A;
+}
+          `
+        }
+      </style>
     </div>
   );
 };

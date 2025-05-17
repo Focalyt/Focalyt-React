@@ -1,42 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import Choices from 'choices.js';
 import 'choices.js/public/assets/styles/choices.min.css';
 
-// Custom styles to match the original application
-const styles = {
-  errorField: {
-    borderColor: '#dc3545'
-  },
-  errorText: {
-    color: '#dc3545',
-    fontSize: '0.875em',
-    marginTop: '0.25rem'
-  },
-  ckEditor: {
-    '& .ck-editor__editable': {
-      minHeight: '200px',
-      maxHeight: '400px'
-    },
-    '& .ck.ck-editor': {
-      width: '100%'
-    },
-    '& .ck.ck-content': {
-      fontSize: '1rem',
-      lineHeight: '1.5'
-    }
-  }
-};
-
-const AddCourse = () => {
+const EditCourse = () => {
+  const { id } = useParams(); // Get course ID from URL
   const navigate = useNavigate();
   const trainingCenterRef = useRef(null);
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
- 
 
   // State for data from API
   const [sectors, setSectors] = useState([]);
@@ -47,7 +22,8 @@ const AddCourse = () => {
   const [selectedThumbnail, setSelectedThumbnail] = useState(null);
   const [selectedTestimonialVideos, setSelectedTestimonialVideos] = useState([]);
 
-const choicesInstance = useRef(null);
+  const choicesInstance = useRef(null);
+
   // Basic form state
   const [formData, setFormData] = useState({
     sector: '',
@@ -90,17 +66,19 @@ const choicesInstance = useRef(null);
     counslerphonenumber: '',
     counslerwhatsappnumber: '',
     counsleremail: '',
+    brochure: '',
+    thumbnail: '',
+    photos: [],
+    videos: [],
+    testimonialvideos: [],
   });
-
-  // File upload state
-
 
   // Document requirements
   const [docsRequired, setDocsRequired] = useState([{ name: '' }]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
-    { question: '<p>Do you offer a safe working environment?</p>', answer: '<p>Do you offer a safe working environment?</p>' }
+    { question: '', answer: '' }
   ]);
 
   // UI control states
@@ -121,35 +99,117 @@ const choicesInstance = useRef(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  // Fetch sectors and centers data on component mount
+  // Fetch course, sectors and centers data on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Replace these URLs with your actual API endpoints
-        const sectorsResponse = await axios.get(`${backendUrl}/api/sectorList`);
-        const centersResponse = await axios.get(`${backendUrl}/api/centerList`);
-
-        console.log('Sectors response:', sectorsResponse.data);
-        console.log('Centers response:', centersResponse.data);
-
-        setSectors(Array.isArray(sectorsResponse.data) ? sectorsResponse.data : []);
-        setCenters(Array.isArray(centersResponse.data) ? centersResponse.data : []);
+        // Fetch course data
+        const courseRes = await axios.get(`${backendUrl}/college/courses/edit/${id}`);
+        console.log('courseRes' , courseRes)
+        // Fetch sectors and centers data
+        const sectorsRes = await axios.get(`${backendUrl}/api/sectorList`);
+        const centersRes = await axios.get(`${backendUrl}/api/centerList`);
+        
+        console.log('Course data:', courseRes.data);
+        console.log('Sectors data:', sectorsRes.data);
+        console.log('Centers data:', centersRes.data);
+        
+        // Set sectors and centers
+        setSectors(Array.isArray(sectorsRes.data) ? sectorsRes.data : []);
+        setCenters(Array.isArray(centersRes.data) ? centersRes.data : []);
+        
+        
+        // Format the course data
+        const course = courseRes.data.course;
+        console.log('course...', courseRes.data.course );
+        // Initialize form data with course data
+        setFormData({
+          sector: course.sectors?.[0]?._id || '',
+          courseLevel: course.courseLevel || '',
+          courseFeeType: course.courseFeeType || '',
+          projectName: course.projectName || '',
+          typeOfProject: course.typeOfProject || '',
+          courseType: course.courseType || '',
+          name: course.name || '',
+          duration: course.duration || '',
+          certifyingAgency: course.certifyingAgency || '',
+          certifyingAgencyWebsite: course.certifyingAgencyWebsite || '',
+          qualification: course.qualification || '',
+          age: course.age || '',
+          experience: course.experience || '',
+          trainingMode: course.trainingMode || '',
+          onlineTrainingTiming: course.onlineTrainingTiming || '',
+          offlineTrainingTiming: course.offlineTrainingTiming || '',
+          trainingCenter: course.center ? course.center.map(c => c._id) : [],
+          address: course.address || '',
+          city: course.city || '',
+          state: course.state || '',
+          appLink: course.appLink || '',
+          addressInput: course.Address || '',
+          ojt: course.ojt || '',
+          registrationCharges: course.registrationCharges || '',
+          courseFee: course.courseFee || '',
+          cutPrice: course.cutPrice || '',
+          examFee: course.examFee || '',
+          otherFee: course.otherFee || '',
+          emiOptionAvailable: course.emiOptionAvailable || '',
+          maxEMITenure: course.maxEMITenure || '',
+          stipendDuringTraining: course.stipendDuringTraining || '',
+          lastDateForApply: course.lastDateForApply ? new Date(course.lastDateForApply).toISOString().split('T')[0] : '',
+          youtubeURL: course.youtubeURL || '',
+          courseFeatures: course.courseFeatures || '',
+          importantTerms: course.importantTerms || '',
+          brochure: course.brochure || '',
+          thumbnail: course.thumbnail || '',
+          photos: course.photos || [],
+          videos: course.videos || [],
+          testimonialvideos: course.testimonialvideos || [],
+          isContact: !!course.counslername || !!course.counslerphonenumber,
+          counslername: course.counslername || '',
+          counslerphonenumber: course.counslerphonenumber || '',
+          counslerwhatsappnumber: course.counslerwhatsappnumber || '',
+          counsleremail: course.counsleremail || '',
+        });
+        
+        // Set docs required
+        if (course.docsRequired && course.docsRequired.length > 0) {
+          setDocsRequired(course.docsRequired.map(doc => ({ 
+            _id: doc._id, 
+            name: doc.Name 
+          })));
+        }
+        
+        // Set question answers
+        if (course.questionAnswers && course.questionAnswers.length > 0) {
+          setQuestionAnswers(course.questionAnswers.map(qa => ({ 
+            question: qa.Question || '', 
+            answer: qa.Answer || '' 
+          })));
+        }
+        
+        // Set UI state based on course data
+        setShowProjectFields(course.courseFeeType === 'Free');
+        setShowContactInfo(!!course.counslername || !!course.counslerphonenumber);
+        handleTrainingModeChange(course.trainingMode);
+        handleAddressChange(course.address);
+        
       } catch (error) {
-        console.error('Error fetching initial data:', error);
-        // Set empty arrays as fallback
-        setSectors([]);
-        setCenters([]);
+        console.error('Error fetching data:', error);
+        alert('Error loading course data. Please try again.');
       }
     };
-
+    
     fetchData();
-  }, []);
+  }, [id, backendUrl]);
 
-  // Initialize Choices.js for multi-select fields
+  // Initialize Choices.js for multi-select fields when training center is visible
   useEffect(() => {
-    console.log("Ref current:", trainingCenterRef.current);
-    if (trainingCenterRef.current) {
-      const choices = new Choices(trainingCenterRef.current, {
+    if (showTrainingFields.trainingCenter && trainingCenterRef.current) {
+      if (choicesInstance.current) {
+        choicesInstance.current.destroy(); // destroy previous instance
+      }
+
+      choicesInstance.current = new Choices(trainingCenterRef.current, {
         removeItemButton: true,
         searchEnabled: true,
         itemSelectText: '',
@@ -163,52 +223,24 @@ const choicesInstance = useRef(null);
         silent: false
       });
 
+      // Set selected options
+      if (formData.trainingCenter?.length) {
+        choicesInstance.current.setChoiceByValue(formData.trainingCenter);
+      }
+
       // Remove empty option if it exists
       const emptyOption = trainingCenterRef.current.querySelector('option[value=""]');
       if (emptyOption) {
         emptyOption.remove();
       }
 
-      // Clean up on component unmount
       return () => {
-        choices.destroy();
+        if (choicesInstance.current) {
+          choicesInstance.current.destroy();
+        }
       };
     }
-  }, [centers]);
-
-useEffect(() => {
-  if (showTrainingFields.trainingCenter && trainingCenterRef.current) {
-    if (choicesInstance.current) {
-      choicesInstance.current.destroy(); // destroy previous instance
-    }
-
-    choicesInstance.current = new Choices(trainingCenterRef.current, {
-      removeItemButton: true,
-      searchEnabled: true,
-      itemSelectText: '',
-      placeholder: false
-    });
-
-    // Optional: sync selected options manually if needed
-    if (formData.trainingCenter?.length) {
-      choicesInstance.current.setChoiceByValue(formData.trainingCenter);
-    }
-
-    return () => {
-      choicesInstance.current?.destroy();
-    };
-  }
-}, [showTrainingFields.trainingCenter, centers]); // <== trigger only when field becomes visible
-
-
-//  edit mode 
-
-// useEffect(() => {
-//   if (choicesInstance.current && formData.trainingCenter?.length > 0) {
-//     choicesInstance.current.setChoiceByValue(formData.trainingCenter);
-//   }
-// }, [formData.trainingCenter]);
-
+  }, [showTrainingFields.trainingCenter, centers, formData.trainingCenter]);
 
   // Handle input field changes
   const handleChange = (e) => {
@@ -272,15 +304,6 @@ useEffect(() => {
     });
   };
 
-  const handlefileChange = (selectedOptions) => {
-    const selectedValues = Array.from(selectedOptions).map(option => option.value);
-    setFormData({
-      ...formData,
-      trainingCenter: selectedValues
-    });
-  };
-
-
   // Validate file based on type
   const validateFile = (file, fileType) => {
     if (!file) return false;
@@ -329,9 +352,76 @@ useEffect(() => {
     return true;
   };
 
+  // File upload handlers
+  const handlePhotoUpload = (e) => {
+    const files = Array.from(e.target.files);
+    setSelectedPhotos(files);
+  };
 
+  const handleVideoUpload = (e) => {
+    const files = Array.from(e.target.files);
+    setSelectedVideos(files);
+  };
 
+  const handleTestimonialVideoUpload = (e) => {
+    const files = Array.from(e.target.files);
+    setSelectedTestimonialVideos(files);
+  };
 
+  const handleBrochureUpload = (e) => {
+    const file = e.target.files[0];
+    if (validateFile(file, 'brochure')) {
+      setSelectedBrochure(file);
+    }
+  };
+
+  const handleThumbnailUpload = (e) => {
+    const file = e.target.files[0];
+    if (validateFile(file, 'thumbnail')) {
+      setSelectedThumbnail(file);
+    }
+  };
+
+  // Handle remove file from server
+  const removeFile = async (fileType, key) => {
+    try {
+      await axios.post(`${backendUrl}/api/deletefile`, { key });
+      
+      let endpoint = '';
+      switch (fileType) {
+        case 'video':
+          endpoint = '/college/courses/removevideo';
+          setFormData(prev => ({ ...prev, videos: prev.videos.filter(v => v !== key) }));
+          break;
+        case 'photo':
+          endpoint = '/college/courses/removephoto';
+          setFormData(prev => ({ ...prev, photos: prev.photos.filter(p => p !== key) }));
+          break;
+        case 'testimonial':
+          endpoint = '/college/courses/removetestimonial';
+          setFormData(prev => ({ ...prev, testimonialvideos: prev.testimonialvideos.filter(t => t !== key) }));
+          break;
+        case 'brochure':
+          endpoint = '/college/courses/removebrochure';
+          setFormData(prev => ({ ...prev, brochure: '' }));
+          break;
+        case 'thumbnail':
+          endpoint = '/college/courses/removethumbnail';
+          setFormData(prev => ({ ...prev, thumbnail: '' }));
+          break;
+        default:
+          break;
+      }
+      
+      if (endpoint) {
+        await axios.post(`${backendUrl}${endpoint}`, { courseId: id, key });
+        alert(`${fileType} removed successfully`);
+      }
+    } catch (error) {
+      console.error('Error removing file:', error);
+      alert('Failed to remove file');
+    }
+  };
 
   // Add a new document field
   const addDocumentField = () => {
@@ -343,6 +433,28 @@ useEffect(() => {
     const updatedDocs = [...docsRequired];
     updatedDocs[index].name = value;
     setDocsRequired(updatedDocs);
+  };
+
+  // Remove document field
+  const removeDocumentField = (index) => {
+    const updatedDocs = [...docsRequired];
+    updatedDocs.splice(index, 1);
+    setDocsRequired(updatedDocs);
+  };
+
+  // Handle document disabling (server call)
+  const disableDocument = async (docId) => {
+    if (window.confirm('Are you sure you want to remove this document?')) {
+      try {
+        const res = await axios.patch(`${backendUrl}/college/courses/${id}/disable-doc/${docId}`);
+        alert(res.data.message);
+        // Remove from local state
+        setDocsRequired(prev => prev.filter(doc => doc._id !== docId));
+      } catch (error) {
+        console.error('Error disabling document:', error);
+        alert('Failed to disable document');
+      }
+    }
   };
 
   // Add a new question-answer pair
@@ -378,155 +490,97 @@ useEffect(() => {
 
   // Reset form to initial state
   const resetForm = () => {
-    // Reset all form fields
-    setFormData({
-      sector: '',
-      courseLevel: '',
-      courseFeeType: '',
-      projectName: '',
-      typeOfProject: '',
-      courseType: '',
-      name: '',
-      duration: '',
-      certifyingAgency: '',
-      certifyingAgencyWebsite: '',
-      qualification: '',
-      age: '',
-      experience: '',
-      trainingMode: '',
-      onlineTrainingTiming: '',
-      offlineTrainingTiming: '',
-      trainingCenter: [],
-      address: '',
-      city: '',
-      state: '',
-      appLink: '',
-      addressInput: '',
-      ojt: '',
-      registrationCharges: '',
-      courseFee: '',
-      cutPrice: '',
-      examFee: '',
-      otherFee: '',
-      emiOptionAvailable: '',
-      maxEMITenure: '',
-      stipendDuringTraining: '',
-      lastDateForApply: '',
-      youtubeURL: '',
-      courseFeatures: '',
-      importantTerms: '',
-      isContact: false,
-      counslername: '',
-      counslerphonenumber: '',
-      counslerwhatsappnumber: '',
-      counsleremail: '',
-    });
-
-    // Reset file URLs
-
-
-    // Reset docs required
-    setDocsRequired([{ name: '' }]);
-
-    // Reset questions and answers
-    setQuestionAnswers([
-      { question: '<p>Do you offer a safe working environment?</p>', answer: '<p>Do you offer a safe working environment?</p>' }
-    ]);
-
-    // Reset UI state
-
-    setShowTrainingFields({
-      online: false,
-      offline: false,
-      trainingCenter: false
-    });
-    setShowAddressFields({
-      appLink: false,
-      addressInput: false
-    });
-    setShowContactInfo(false);
-
-    // Reset form validation
-    setFormErrors({});
-    setIsSubmitting(false);
-    setSubmitSuccess(false);
+    if (window.confirm('Are you sure you want to reset the form? All unsaved changes will be lost.')) {
+      window.location.reload();
+    }
   };
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    
     if (!validateForm()) return;
-
-    const user = JSON.parse(sessionStorage.getItem('user'));
-
-    const form = new FormData();
-
-    // Append basic fields
-    Object.entries(formData).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        value.forEach(v => form.append(`${key}[]`, v));
-      } else {
-        form.append(key, value);
-      }
-    });
-
-    // Append files (assume you have these in state: selectedVideos, selectedPhotos, selectedBrochure, selectedThumbnail)
-    // Append videos
-    if(selectedVideos.length>0){
-    selectedVideos.forEach(file => form.append('videos', file));}
-
-    // Append photos
-    if(selectedPhotos.length>0){
-    selectedPhotos.forEach(file => form.append('photos', file));}
-
-
-    // Append brochure
-    if (selectedBrochure) {
-      form.append('brochure', selectedBrochure);
-    }
-
-    // Append thumbnail
-    if (selectedThumbnail) {
-      form.append('thumbnail', selectedThumbnail);
-    }
-
-    // Append testimonial videos
-    if(selectedTestimonialVideos.length>0){
-    selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
-    }
-
-    // Append JSON fields (docsRequired and questionAnswers)
-    form.append('docsRequired', JSON.stringify(docsRequired));
-    form.append('questionAnswers', JSON.stringify(questionAnswers));
-
-    // CreatedBy & college
-    form.append('createdBy', JSON.stringify({
-      type: 'college',
-      id: user._id
-    }));
-    form.append('college', user.collegeId);
-
+    
+    setIsSubmitting(true);
+    
     try {
-      const response = await axios.post(`${backendUrl}/college/courses/add`, form, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'x-auth': user.token
+      const user = JSON.parse(sessionStorage.getItem('user'));
+      const form = new FormData();
+      
+      // Append form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key !== 'photos' && key !== 'videos' && key !== 'testimonialvideos' && 
+            key !== 'brochure' && key !== 'thumbnail') {
+          if (Array.isArray(value)) {
+            value.forEach(v => form.append(`${key}[]`, v));
+          } else {
+            form.append(key, value);
+          }
         }
       });
-
+      
+      // Append existing photos, videos, testimonials
+      form.append('existingPhotos', JSON.stringify(formData.photos));
+      form.append('existingVideos', JSON.stringify(formData.videos));
+      form.append('existingTestimonialVideos', JSON.stringify(formData.testimonialvideos));
+      form.append('existingBrochure', formData.brochure);
+      form.append('existingThumbnail', formData.thumbnail);
+      
+      // Append new files
+      if (selectedVideos.length > 0) {
+        selectedVideos.forEach(file => form.append('videos', file));
+      }
+      
+      if (selectedPhotos.length > 0) {
+        selectedPhotos.forEach(file => form.append('photos', file));
+      }
+      
+      if (selectedBrochure) {
+        form.append('brochure', selectedBrochure);
+      }
+      
+      if (selectedThumbnail) {
+        form.append('thumbnail', selectedThumbnail);
+      }
+      
+      if (selectedTestimonialVideos.length > 0) {
+        selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
+      }
+      
+      // Append docs required
+      form.append('docsRequired', JSON.stringify(docsRequired.map(doc => ({ 
+        _id: doc._id, 
+        Name: doc.name 
+      }))));
+      
+      // Append question answers
+      form.append('questionAnswers', JSON.stringify(questionAnswers.map(qa => ({ 
+        Question: qa.question, 
+        Answer: qa.answer 
+      }))));
+      
+      
+      const response = await axios.post(`${backendUrl}/college/courses/edit/${id}`, form, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'x-auth': user?.token || sessionStorage.getItem('token')
+        }
+      });
+      
       if (response.data.status) {
-        alert("Course added successfully");
-        window.location.reload();
+        setSubmitSuccess(true);
+        alert('Course updated successfully');
+        navigate('/institute/courses');
       } else {
-        alert(response.data.message || "Failed to add course");
+        alert(response.data.message || 'Failed to update course');
       }
     } catch (error) {
-      console.error(error);
-      alert("Error while submitting course");
+      console.error('Error updating course:', error);
+      alert('Error updating course. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
 
   // CKEditor configuration
   const editorConfig = {
@@ -546,11 +600,11 @@ useEffect(() => {
         <div className="content-header-left col-md-9 col-12 mb-2">
           <div className="row breadcrumbs-top">
             <div className="col-12">
-              <h3 className="content-header-title float-left mb-0">Add Course</h3>
+              <h3 className="content-header-title float-left mb-0">Edit Course</h3>
               <div className="breadcrumb-wrapper col-12">
                 <ol className="breadcrumb">
-                  <li className="breadcrumb-item"><a href="/admin">Home</a></li>
-                  <li className="breadcrumb-item active">Add Course</li>
+                  <li className="breadcrumb-item"><a href="/institute">Home</a></li>
+                  <li className="breadcrumb-item active">Edit Course</li>
                 </ol>
               </div>
             </div>
@@ -561,12 +615,12 @@ useEffect(() => {
       {/* Success Message (if form successfully submitted) */}
       {submitSuccess && (
         <div className="alert alert-success mb-2" role="alert">
-          Course added successfully!
+          Course updated successfully!
         </div>
       )}
 
       {/* Form */}
-      <form className="form-horizontal" id="addCourseForm" onSubmit={handleSubmit}>
+      <form className="form-horizontal" id="editCourseForm" onSubmit={handleSubmit}>
         {/* Course Information Section */}
         <section id="course-info">
           <div className="row">
@@ -636,38 +690,38 @@ useEffect(() => {
                       </div>
 
                       {/* Project Name (conditional) */}
-                      {/* {showProjectFields && ( */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="projectNameblock">
-                        <label htmlFor="projectName">Project Name</label>
-                        <input
-                          className="form-control"
-                          type="text"
-                          name="projectName"
-                          id="projectName"
-                          value={formData.projectName}
-                          onChange={handleChange}
-                        />
-                      </div>
-                      {/* )} */}
+                      {showProjectFields && (
+                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="projectNameblock">
+                          <label htmlFor="projectName">Project Name</label>
+                          <input
+                            className="form-control"
+                            type="text"
+                            name="projectName"
+                            id="projectName"
+                            value={formData.projectName}
+                            onChange={handleChange}
+                          />
+                        </div>
+                      )}
 
                       {/* Type of Project (conditional) */}
-                      {/* {showProjectFields && ( */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="typeOfProject">Type of Project</label>
-                        <select
-                          className="form-control"
-                          name="typeOfProject"
-                          id="typeOfProject"
-                          value={formData.typeOfProject}
-                          onChange={handleChange}
-                        >
-                          <option value="">Select Type of Project</option>
-                          <option value="T&P">T&P</option>
-                          <option value="P&T">P&T</option>
-                          <option value="General">General</option>
-                        </select>
-                      </div>
-                      {/* )} */}
+                      {showProjectFields && (
+                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                          <label htmlFor="typeOfProject">Type of Project</label>
+                          <select
+                            className="form-control"
+                            name="typeOfProject"
+                            id="typeOfProject"
+                            value={formData.typeOfProject}
+                            onChange={handleChange}
+                          >
+                            <option value="">Select Type of Project</option>
+                            <option value="T&P">T&P</option>
+                            <option value="P&T">P&T</option>
+                            <option value="General">General</option>
+                          </select>
+                        </div>
+                      )}
 
                       {/* Course Type */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseTypeblock">
@@ -1100,15 +1154,26 @@ useEffect(() => {
                   <div className="card-body">
                     <div id="documentContainer">
                       {docsRequired.map((doc, index) => (
-                        <div className="row requiredDocsRow" key={index}>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                        <div className="row requiredDocsRow" key={doc._id || index}>
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1 doc-item">
                             <label>Document Name</label>
-                            <input
-                              type="text"
-                              className="form-control docsName"
-                              value={doc.name}
-                              onChange={(e) => updateDocumentField(index, e.target.value)}
-                            />
+                            <div className="input-group">
+                              <input
+                                type="text"
+                                className="form-control docsName"
+                                value={doc.name || ''}
+                                onChange={(e) => updateDocumentField(index, e.target.value)}
+                              />
+                              <div className="input-group-append">
+                                <button
+                                  className="btn btn-danger remove-doc"
+                                  type="button"
+                                  onClick={() => doc._id ? disableDocument(doc._id) : removeDocumentField(index)}
+                                >
+                                  X
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1141,59 +1206,161 @@ useEffect(() => {
                 <div className="card-content">
                   <div className="card-body">
                     <div className="row">
+                      {/* Existing Videos */}
+                      {formData.videos && formData.videos.length > 0 && (
+                        <div className="col-12 mb-3">
+                          <h5>Uploaded Videos</h5>
+                          <div className="row">
+                            {formData.videos.map((video, i) => (
+                              <div key={`video-${i}`} className="col-xl-2 col-lg-2 col-md-3 col-sm-4 col-6 mb-2">
+                                <div className="card">
+                                  <div className="card-body p-1">
+                                    <a href={`${bucketUrl}/${video}`} target="_blank" rel="noopener noreferrer" className="text-primary">
+                                      Video {i + 1}
+                                    </a>
+                                    <button 
+                                      type="button"
+                                      className="btn btn-sm btn-danger ml-2"
+                                      onClick={() => removeFile('video', video)}
+                                    >
+                                      <i className="feather icon-x"></i>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Videos */}
                       <div className="col-xl-4 col-xl-lg-4 col-md-4 col-sm-12 col-12 mb-1">
-                        <label htmlFor="videos">Add Videos</label>
+                        <label htmlFor="videos">Add New Videos</label>
                         <input
-                          name='videos'
+                          name="videos"
                           id="videos"
                           type="file"
                           accept="video/*"
-
                           multiple
-                          onChange={(e) => setSelectedVideos(Array.from(e.target.files))}
+                          onChange={handleVideoUpload}
                         />
-
                       </div>
 
-                      {/* Brochure */}
-                      <div className="col-xl-4 col-xl-lg-4 col-md-4 col-sm-12 col-12 mb-1" id="brochures">
-                        <label htmlFor="brochure">Add Brochure</label>
-                        <input
-                          type="file"
-                          id="brochure"
-                          name="brochure"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => setSelectedBrochure(e.target.files[0])}
-                        />
-
-                      </div>
-
-                      {/* Thumbnail */}
-                      <div className="col-xl-4 col-xl-lg-4 col-md-4 col-sm-12 col-12 mb-1" id="thumbnails">
-                        <label htmlFor="thumbnail">Add Thumbnail</label>
-                        <input
-                          type="file"
-                          id="thumbnail"
-                          name="thumbnail"
-                          accept="image/*"
-                          onChange={(e) => setSelectedThumbnail(e.target.files[0])}
-                        />
-
-                      </div>
+                      {/* Existing Photos */}
+                      {formData.photos && formData.photos.length > 0 && (
+                        <div className="col-12 mb-3">
+                          <h5>Uploaded Photos</h5>
+                          <div className="row">
+                            {formData.photos.map((photo, i) => (
+                              <div key={`photo-${i}`} className="col-xl-2 col-lg-2 col-md-3 col-sm-4 col-6 mb-2">
+                                <div className="card">
+                                  <div className="card-body p-1 text-center">
+                                    <img 
+                                      src={`${bucketUrl}/${photo}`} 
+                                      alt={`Photo ${i + 1}`} 
+                                      className="img-fluid mb-1"
+                                      style={{ maxHeight: '100px' }}
+                                    />
+                                    <button 
+                                      type="button"
+                                      className="btn btn-sm btn-danger"
+                                      onClick={() => removeFile('photo', photo)}
+                                    >
+                                      <i className="feather icon-x"></i>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Photos */}
                       <div className="col-xl-4 col-xl-lg-4 col-md-4 col-sm-12 col-12 mb-1" id="uploadgallery">
-                        <label htmlFor="photos">Add Photos</label>
+                        <label htmlFor="photos">Add New Photos</label>
                         <input
                           type="file"
                           id="photos"
                           name="photos"
                           accept="image/*"
                           multiple
-                          onChange={(e) => setSelectedPhotos(Array.from(e.target.files))}
+                          onChange={handlePhotoUpload}
                         />
+                      </div>
 
+                      {/* Existing Brochure */}
+                      {formData.brochure && (
+                        <div className="col-12 mb-3">
+                          <h5>Uploaded Brochure</h5>
+                          <div className="row">
+                            <div className="col-xl-4 col-lg-4 col-md-6 col-sm-6 col-12 mb-2">
+                              <div className="card">
+                                <div className="card-body p-2">
+                                  <a href={`${bucketUrl}/${formData.brochure}`} target="_blank" rel="noopener noreferrer" className="text-primary">
+                                    View Brochure
+                                  </a>
+                                  <button 
+                                    type="button"
+                                    className="btn btn-sm btn-danger ml-2"
+                                    onClick={() => removeFile('brochure', formData.brochure)}
+                                  >
+                                    <i className="feather icon-x"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Brochure */}
+                      <div className="col-xl-4 col-xl-lg-4 col-md-4 col-sm-12 col-12 mb-1" id="brochures">
+                        <label htmlFor="brochure">Add New Brochure</label>
+                        <input
+                          type="file"
+                          id="brochure"
+                          name="brochure"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          onChange={handleBrochureUpload}
+                        />
+                      </div>
+
+                      {/* Existing Thumbnail */}
+                      {formData.thumbnail && (
+                        <div className="col-12 mb-3">
+                          <h5>Uploaded Thumbnail</h5>
+                          <div className="row">
+                            <div className="col-xl-4 col-lg-4 col-md-6 col-sm-6 col-12 mb-2">
+                              <div className="card">
+                                <div className="card-body p-2">
+                                  <a href={`${bucketUrl}/${formData.thumbnail}`} target="_blank" rel="noopener noreferrer" className="text-primary">
+                                    View Thumbnail
+                                  </a>
+                                  <button 
+                                    type="button"
+                                    className="btn btn-sm btn-danger ml-2"
+                                    onClick={() => removeFile('thumbnail', formData.thumbnail)}
+                                  >
+                                    <i className="feather icon-x"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Thumbnail */}
+                      <div className="col-xl-4 col-xl-lg-4 col-md-4 col-sm-12 col-12 mb-1" id="thumbnails">
+                        <label htmlFor="thumbnail">Add New Thumbnail</label>
+                        <input
+                          type="file"
+                          id="thumbnail"
+                          name="thumbnail"
+                          accept="image/*"
+                          onChange={handleThumbnailUpload}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1213,18 +1380,46 @@ useEffect(() => {
                 </div>
                 <div className="card-content">
                   <div className="card-body">
+                    {/* Existing Testimonial Videos */}
+                    {formData.testimonialvideos && formData.testimonialvideos.length > 0 && (
+                      <div className="row mb-3">
+                        <div className="col-12">
+                          <h5>Uploaded Testimonial Videos</h5>
+                          <div className="row">
+                            {formData.testimonialvideos.map((video, i) => (
+                              <div key={`testimonial-${i}`} className="col-xl-2 col-lg-2 col-md-3 col-sm-4 col-6 mb-2">
+                                <div className="card">
+                                  <div className="card-body p-1">
+                                    <a href={`${bucketUrl}/${video}`} target="_blank" rel="noopener noreferrer" className="text-primary">
+                                      Testimonial {i + 1}
+                                    </a>
+                                    <button 
+                                      type="button"
+                                      className="btn btn-sm btn-danger ml-2"
+                                      onClick={() => removeFile('testimonial', video)}
+                                    >
+                                      <i className="feather icon-x"></i>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="row">
                       <div className="col-xl-4 col-xl-lg-4 col-md-4 col-sm-12 col-12 mb-1">
-                        <label htmlFor="testimonialvideos">Add Testimonial Videos</label>
+                        <label htmlFor="testimonialvideos">Add New Testimonial Videos</label>
                         <input
                           type="file"
                           id="testimonialvideos"
                           name="testimonialvideos"
                           accept="video/*"
                           multiple
-                          onChange={(e) => setSelectedTestimonialVideos(Array.from(e.target.files))}
+                          onChange={handleTestimonialVideoUpload}
                         />
-
                       </div>
                     </div>
                   </div>
@@ -1485,10 +1680,34 @@ useEffect(() => {
       <style>
         {
           `
-          .ck-editor__editable_inline{
-          height:40px;
+          .ck-editor__editable_inline {
+            height: 100px;
           }
           
+          .choices__list--multiple .choices__item {
+            position: relative !important;
+            margin: 3px 5px 3px 0 !important;
+            padding: 3px 20px 3px 5px !important;
+            border: 1px solid #aaa !important;
+            max-width: 100% !important;
+            border-radius: 3px !important;
+            background-color: #eee !important;
+            color: #333 !important;
+            line-height: 13px !important;
+            cursor: default !important;
+          }
+          
+          .choices[data-type*=select-multiple] .choices__button {
+            position: absolute;
+            right: 0;
+            top: 0;
+            padding: 2px 6px;
+            margin-right: 0;
+            border: none;
+            background-color: transparent;
+            border-left: 1px solid #aaa;
+            color: #333;
+          }
           `
         }
       </style>
@@ -1496,4 +1715,4 @@ useEffect(() => {
   );
 };
 
-export default AddCourse;
+export default EditCourse;

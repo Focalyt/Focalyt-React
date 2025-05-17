@@ -58,6 +58,25 @@ const SearchCourses = () => {
     };
   }, []);
 
+  const openChatbot = () => {
+    console.log("On click start")
+    const chatContainer = document.getElementById("iframe-box");
+    if (chatContainer) {
+      chatContainer.classList.toggle("active");
+      console.log("class added")
+    } else {
+      console.error("Chat container (iframe-box) not found!");
+    }
+
+    // Trigger the bootm-box click event to initialize the chat
+    const bootmBox = document.getElementById("bootm-box");
+    if (bootmBox) {
+      bootmBox.click();
+    } else {
+      console.error("Element with ID 'bootm-box' not found!");
+    }
+  }
+
   return (
     <div className="">
       <div className="container mt-3">
@@ -224,13 +243,18 @@ const SearchCourses = () => {
                           </Link>
                         </div>
                         <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                          <a
-                            className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
-                            href="https://wa.me/918699017301?text=hi"
-                          >
-                            <i className="la la-phone plane-font ml-2"></i>
+                          {/*
+<a
+  className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
+  href="https://wa.me/918699017301?text=hi"
+>
+  <i className="la la-phone plane-font ml-2"></i>
+  Chat Now
+</a>
+*/}
+                          <button onClick={() => openChatbot()} className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0">
                             Chat Now
-                          </a>
+                          </button>
                         </div>
                       </div>
                     </div>
