@@ -6,7 +6,7 @@ const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company } = require("../../models");
+	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical , Project, Batch} = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -1632,5 +1632,76 @@ router.post("/courses/add", async (req, res) => {
   }
 });
 
+router.post('/addVertical', async (req, res) => {
+  try {
+    const body = req.body;
+    console.log("📥 Incoming vertical data:", body);
+
+    // Default value handling
+    const newVertical = new Vertical({
+      name: body.name,
+      description: body.description,
+      status: body.status || 'active',
+      projects: 0,
+      createdBy: body.createdBy || null,
+      approvedBy: body.approvedBy || null
+    });
+
+    const savedVertical = await newVertical.save();
+
+    return res.json({
+      status: true,
+      message: "Vertical added successfully",
+      data: savedVertical
+    });
+
+  } catch (err) {
+    console.error("❌ Vertical Add Error:", err.message);
+    return res.status(500).json({
+      status: false,
+      message: err.message || "Failed to add vertical"
+    });
+  }
+});
+router.post('/editVertical/:id', async (req, res) => {
+  try {
+    const verticalId = req.params.id;
+    const body = req.body;
+
+    console.log("📝 Editing vertical:", verticalId);
+    console.log("📦 Updated data:", body);
+
+    const updated = await Vertical.findByIdAndUpdate(
+      verticalId,
+      {
+        name: body.name,
+        description: body.description,
+        status: body.status || 'active',
+        approvedBy: body.approvedBy || null
+      },
+      { new: true } // return updated document
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        status: false,
+        message: "Vertical not found"
+      });
+    }
+
+    return res.json({
+      status: true,
+      message: "Vertical updated successfully",
+      data: updated
+    });
+
+  } catch (err) {
+    console.error("❌ Edit Vertical Error:", err.message);
+    return res.status(500).json({
+      status: false,
+      message: err.message || "Failed to update vertical"
+    });
+  }
+});
 
 module.exports = router;

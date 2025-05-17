@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNavigate } from "react-router-dom";
 
 import {
-  faChartLine, faUser, faSearch, faClipboardList, faChevronRight, faPlusCircle, faForward, faCoins, faGraduationCap, faBuilding, faBookOpen,
+  faChartLine, faUser, faSearch, faClipboardList, faChevronRight, faPlusCircle, faForward, faCoins, faGraduationCap, faBuilding, faBookOpen, faTasks
 } from "@fortawesome/free-solid-svg-icons";
 
 import {
@@ -29,16 +29,16 @@ function CollegeLayout({ children }) {
   //     navigate('/college/login');
   //   }
   // }, []);
- 
+
   useEffect(() => {
-      const storedUser = sessionStorage.getItem('user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        setUser(parsed);
-      } else {
-        navigate('/institute/login');
-      }
-    }, []);
+    const storedUser = sessionStorage.getItem('user');
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      setUser(parsed);
+    } else {
+      navigate('/institute/login');
+    }
+  }, []);
 
   const [openDropdown, setOpenDropdown] = useState(null);
   const profileMenuRef = useRef(null);
@@ -61,7 +61,8 @@ function CollegeLayout({ children }) {
     students: false,
     jobs: false,
     courses: false,
-    settings: false
+    settings: false,
+    education: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
@@ -110,7 +111,8 @@ function CollegeLayout({ children }) {
     students: useRef(null),
     jobs: useRef(null),
     courses: useRef(null),
-    settings: useRef(null)
+    settings: useRef(null),
+    education: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -122,7 +124,8 @@ function CollegeLayout({ children }) {
     students: '0px',
     jobs: '0px',
     courses: '0px',
-    settings: '0px'
+    settings: '0px',
+    education: '0px'
   });
 
   useLayoutEffect(() => {
@@ -326,6 +329,13 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Assignment Rule</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/institute/projectmanagment' ? 'active' : ''}`}>
+                    <Link to="/institute/projectmanagment" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faTasks} />
+                      <span className="menu-title">Project Management </span>
+                    </Link>
+                  </li>
+
                 </ul>
               </li>
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Users, Shield, CheckSquare, Layers, UserPlus, Edit, Trash2, Copy, 
-  Search, Filter, Plus, AlertTriangle, Building, BookOpen, X, Save
+  Search, Filter, Plus, AlertTriangle, Building, BookOpen, X, Save, 
+  ChevronDown
 } from 'lucide-react';
 
 const AccessManagementSystem = () => {
@@ -36,9 +37,14 @@ const AccessManagementSystem = () => {
   });
   
   // Context permission states
-  const [contextType, setContextType] = useState('');
-  const [selectedContext, setSelectedContext] = useState('');
   const [userContextPerms, setUserContextPerms] = useState({});
+  const [coursesSelected, setCoursesSelected] = useState([]);
+  const [centersSelected, setCentersSelected] = useState([]);
+  const [projectsSelected, setProjectsSelected] = useState([]);
+  const [verticalsSelected, setVerticalsSelected] = useState([]);
+  
+  // UI state for multiselect dropdowns
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   
   // Sample data
   const [roles, setRoles] = useState([
@@ -67,6 +73,20 @@ const AccessManagementSystem = () => {
     { id: 2, name: 'Data Science', duration: '4 months' },
     { id: 3, name: 'Digital Marketing', duration: '2 months' },
     { id: 4, name: 'UI/UX Design', duration: '3 months' }
+  ]);
+  
+  const [projects, setProjects] = useState([
+    { id: 1, name: 'ERP Implementation' },
+    { id: 2, name: 'Mobile App Development' },
+    { id: 3, name: 'Website Redesign' },
+    { id: 4, name: 'Data Migration' }
+  ]);
+  
+  const [verticals, setVerticals] = useState([
+    { id: 1, name: 'Education' },
+    { id: 2, name: 'Healthcare' },
+    { id: 3, name: 'Finance' },
+    { id: 4, name: 'Technology' }
   ]);
   
   // Permission definitions
@@ -99,27 +119,7 @@ const AccessManagementSystem = () => {
         { key: 'VERIFY_DOCUMENT', description: 'Can verify course documents', contextRequired: true },
       ]
     },
-    {
-      name: 'Center Management',
-      permissions: [
-        { key: 'VIEW_CENTERS', description: 'Can view centers' },
-        { key: 'CREATE_CENTER', description: 'Can create centers' },
-        { key: 'MANAGE_CENTER', description: 'Can manage center operations', contextRequired: true },
-        { key: 'VIEW_CENTER_ANALYTICS', description: 'Can view center analytics', contextRequired: true },
-        { key: 'VIEW_LEADS_ANALYTICS', description: 'Can view Leads analytics', contextRequired: true },
-        { key: 'APPROVE_CENTER', description: 'Can approve center for operations', contextRequired: true },
-      ]
-    },{
-      name: 'Add Center',
-      permissions: [
-        { key: 'VIEW_CENTERS', description: 'Can view centers' },
-        { key: 'CREATE_CENTER', description: 'Can create centers' },
-        { key: 'MANAGE_CENTER', description: 'Can manage center operations', contextRequired: true },
-        { key: 'VIEW_CENTER_ANALYTICS', description: 'Can view center analytics', contextRequired: true },
-        { key: 'VIEW_LEADS_ANALYTICS', description: 'Can view Leads analytics', contextRequired: true },
-        { key: 'APPROVE_CENTER', description: 'Can approve center for operations', contextRequired: true },
-      ]
-    }
+  
   ];
   
   // Role permissions mapping
@@ -172,11 +172,31 @@ const AccessManagementSystem = () => {
     } else if (type === 'course') {
       const course = courses.find(c => c.id.toString() === id.toString());
       return course ? course.name : id;
+    } else if (type === 'project') {
+      const project = projects.find(p => p.id.toString() === id.toString());
+      return project ? project.name : id;
+    } else if (type === 'vertical') {
+      const vertical = verticals.find(v => v.id.toString() === id.toString());
+      return vertical ? vertical.name : id;
     }
     return id;
   };
   
   // ------- EVENT HANDLERS -------
+  
+  // Check if a context is selected
+  const isItemSelected = (list, itemId) => {
+    return list.includes(itemId);
+  };
+  
+  // Toggle context selection
+  const toggleItemSelection = (list, setList, itemId) => {
+    if (isItemSelected(list, itemId)) {
+      setList(list.filter(id => id !== itemId));
+    } else {
+      setList([...list, itemId]);
+    }
+  };
   
   // Role handlers
   const handleOpenRoleModal = (role = null) => {
@@ -435,6 +455,12 @@ const AccessManagementSystem = () => {
   const handleOpenPermissionModal = (user) => {
     setEditingUser(user);
     
+    // Reset all selections
+    setCoursesSelected([]);
+    setCentersSelected([]);
+    setProjectsSelected([]);
+    setVerticalsSelected([]);
+    
     // Load user's context permissions
     const userPerms = {};
     contextPermissions
@@ -466,27 +492,34 @@ const AccessManagementSystem = () => {
     }
   };
   
-  const handleAddPermissionContext = (permKey) => {
-    if (!contextType || !selectedContext) return;
+  // Modified to handle multiple context types and selections
+  const handleAddPermissionContext = (permKey, contextType, selectedItems) => {
+    if (!contextType || selectedItems.length === 0) return;
     
-    // Check for duplicates
-    const isDuplicate = userContextPerms[permKey]?.some(
-      ctx => ctx.type === contextType && ctx.id === selectedContext
-    );
+    // Get current contexts for this permission
+    const currentContexts = userContextPerms[permKey] || [];
     
-    if (isDuplicate) return;
+    // Create array of new contexts to add
+    const newContextsToAdd = selectedItems.map(itemId => ({
+      type: contextType,
+      id: itemId
+    }));
     
-    // Add context to permission
+    // Filter out duplicates
+    const newContexts = [
+      ...currentContexts,
+      ...newContextsToAdd.filter(newCtx => 
+        !currentContexts.some(ctx => 
+          ctx.type === newCtx.type && ctx.id === newCtx.id
+        )
+      )
+    ];
+    
+    // Update user context permissions
     setUserContextPerms({
       ...userContextPerms,
-      [permKey]: [
-        ...(userContextPerms[permKey] || []),
-        { type: contextType, id: selectedContext }
-      ]
+      [permKey]: newContexts
     });
-    
-    // Reset selection
-    setSelectedContext('');
   };
   
   const handleRemovePermissionContext = (permKey, index) => {
@@ -597,6 +630,58 @@ const AccessManagementSystem = () => {
   };
   
   // ------- RENDER FUNCTIONS -------
+  
+  // Multiselect dropdown component
+  const MultiSelectDropdown = ({ items, selectedItems, onChange }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    return (
+      <div className="position-relative">
+        <div 
+          className="form-select d-flex justify-content-between align-items-center cursor-pointer"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <div className="text-truncate">
+            {selectedItems.length === 0 ? (
+              <span className="text-muted">Select items</span>
+            ) : (
+              <span>{selectedItems.length} selected</span>
+            )}
+          </div>
+          <div>
+            <ChevronDown size={16} />
+          </div>
+        </div>
+        
+        {isOpen && (
+          <div className="position-absolute top-100 start-0 mt-1 w-100 bg-white border rounded-2 shadow-sm z-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+            {items.map(item => (
+              <div 
+                key={item.id}
+                className="d-flex align-items-center px-3 py-2 border-bottom cursor-pointer hover-bg-light"
+                onClick={() => {
+                  onChange(item.id);
+                }}
+              >
+                <input
+                  type="checkbox"
+                  className="form-check-input me-2"
+                  checked={selectedItems.includes(item.id)}
+                  onChange={() => {}}
+                />
+                <span>{item.name}</span>
+              </div>
+            ))}
+            {items.length === 0 && (
+              <div className="px-3 py-2 text-muted">
+                No items available
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
   
   // Render roles tab
   const renderRolesTab = () => (
@@ -761,7 +846,7 @@ const AccessManagementSystem = () => {
                       >
                         <option value="">No Role</option>
                         {roles.map(role => (
-                          <option key={role.id} value={role.name} disabled>{role.name}</option>
+                          <option key={role.id} value={role.name}>{role.name}</option>
                         ))}
                       </select>
                   
@@ -1144,14 +1229,14 @@ const AccessManagementSystem = () => {
     </div>
   );
   
-  // Custom permissions modal
+  // Custom permissions modal with simplified layout matching the reference design
   const renderPermissionModal = () => (
     <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)', overflowY: 'auto'}}>
       <div className="modal-dialog modal-dialog-centered modal-lg">
         <div className="modal-content">
-          <div className="modal-header">
+          <div className="modal-header bg-danger text-white">
             <h5 className="modal-title">Custom Permissions: {editingUser?.name}</h5>
-            <button type="button" className="btn-close" onClick={() => setShowPermissionModal(false)}></button>
+            <button type="button" className="btn-close btn-close-white" onClick={() => setShowPermissionModal(false)}></button>
           </div>
           <div className="modal-body">
             <div className="alert alert-warning d-flex align-items-center" role="alert">
@@ -1161,18 +1246,21 @@ const AccessManagementSystem = () => {
               </div>
             </div>
             
-            {/* Context-specific permissions section */}
-            <div className="mb-3">
-              {permissionCategories.map((category) => (
-                <div key={category.name} className="mb-4">
-                  <h6 className="fw-medium mb-2">{category.name}</h6>
-                  
-                  {/* Only show permissions that require context */}
-                  {category.permissions
+            {/* Context-specific permissions by category */}
+            {permissionCategories.map((category) => (
+              <div key={category.name} className="mb-4">
+                <h6 className="fw-medium mb-2">{category.name}</h6>
+                
+                {/* If no context permissions in category */}
+                {category.permissions.filter(p => p.contextRequired).length === 0 ? (
+                  <div className="text-muted">No context-specific permissions in this category</div>
+                ) : (
+                  /* List each permission that requires context as a checkbox */
+                  category.permissions
                     .filter(permission => permission.contextRequired)
                     .map((permission) => (
-                      <div key={permission.key} className="mb-4 border-bottom pb-3">
-                        <div className="form-check mb-2">
+                      <div key={permission.key} className="mb-4 pb-3 border-bottom">
+                        <div className="form-check mb-3">
                           <input
                             className="form-check-input"
                             type="checkbox"
@@ -1185,60 +1273,120 @@ const AccessManagementSystem = () => {
                           </label>
                         </div>
                         
-                        {/* Context selector */}
+                        {/* Context selectors - only shown when permission is checked */}
                         {!!userContextPerms[permission.key] && (
-                          <div className="ms-4 mt-3">
-                            <div className="row align-items-end">
-                              <div className="col-md-4 mb-2">
-                                <label className="form-label text-secondary small">Context Type</label>
-                                <select 
-                                  className="form-select form-select-sm"
-                                  onChange={(e) => setContextType(e.target.value)}
-                                  value={contextType}
-                                >
-                                  <option value="">Select Type</option>
-                                  <option value="center">Center</option>
-                                  <option value="course">Course</option>
-                                </select>
-                              </div>
-                              <div className="col-md-5 mb-2">
-                                <label className="form-label text-secondary small">Specific Item</label>
-                                <select 
-                                  className="form-select form-select-sm"
-                                  onChange={(e) => setSelectedContext(e.target.value)}
-                                  value={selectedContext}
-                                  disabled={!contextType}
-                                >
-                                  <option value="">Select Item</option>
-                                  {contextType === 'center' && centers.map(center => (
-                                    <option key={center.id} value={center.id}>{center.name}</option>
-                                  ))}
-                                  {contextType === 'course' && courses.map(course => (
-                                    <option key={course.id} value={course.id}>{course.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="col-md-3 mb-2">
+                          <div className="ms-4">
+                            {/* Courses */}
+                            <div className="mb-3">
+                              <label className="form-label">Courses</label>
+                              <div className="d-flex">
+                                <div className="flex-grow-1 me-2">
+                                  <MultiSelectDropdown
+                                    items={courses}
+                                    selectedItems={coursesSelected}
+                                    onChange={(id) => toggleItemSelection(coursesSelected, setCoursesSelected, id)}
+                                  />
+                                </div>
                                 <button 
-                                  className="btn btn-sm btn-outline-primary w-100"
-                                  onClick={() => handleAddPermissionContext(permission.key)}
-                                  disabled={!contextType || !selectedContext}
-                                  type="button"
+                                  className="btn btn-outline-danger"
+                                  onClick={() => {
+                                    handleAddPermissionContext(permission.key, 'course', coursesSelected);
+                                    setCoursesSelected([]);
+                                  }}
+                                  disabled={coursesSelected.length === 0}
                                 >
-                                  <Plus size={16} />
-                                  Add
+                                  <Plus size={16} className="me-1" />
+                                  Add Courses
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Centers */}
+                            <div className="mb-3">
+                              <label className="form-label">Centers</label>
+                              <div className="d-flex">
+                                <div className="flex-grow-1 me-2">
+                                  <MultiSelectDropdown
+                                    items={centers}
+                                    selectedItems={centersSelected}
+                                    onChange={(id) => toggleItemSelection(centersSelected, setCentersSelected, id)}
+                                  />
+                                </div>
+                                <button 
+                                  className="btn btn-outline-danger"
+                                  onClick={() => {
+                                    handleAddPermissionContext(permission.key, 'center', centersSelected);
+                                    setCentersSelected([]);
+                                  }}
+                                  disabled={centersSelected.length === 0}
+                                >
+                                  <Plus size={16} className="me-1" />
+                                  Add Centers
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Projects */}
+                            <div className="mb-3">
+                              <label className="form-label">Projects</label>
+                              <div className="d-flex">
+                                <div className="flex-grow-1 me-2">
+                                  <MultiSelectDropdown
+                                    items={projects}
+                                    selectedItems={projectsSelected}
+                                    onChange={(id) => toggleItemSelection(projectsSelected, setProjectsSelected, id)}
+                                  />
+                                </div>
+                                <button 
+                                  className="btn btn-outline-danger"
+                                  onClick={() => {
+                                    handleAddPermissionContext(permission.key, 'project', projectsSelected);
+                                    setProjectsSelected([]);
+                                  }}
+                                  disabled={projectsSelected.length === 0}
+                                >
+                                  <Plus size={16} className="me-1" />
+                                  Add Projects
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Verticals */}
+                            <div className="mb-3">
+                              <label className="form-label">Verticals</label>
+                              <div className="d-flex">
+                                <div className="flex-grow-1 me-2">
+                                  <MultiSelectDropdown
+                                    items={verticals}
+                                    selectedItems={verticalsSelected}
+                                    onChange={(id) => toggleItemSelection(verticalsSelected, setVerticalsSelected, id)}
+                                  />
+                                </div>
+                                <button 
+                                  className="btn btn-outline-danger"
+                                  onClick={() => {
+                                    handleAddPermissionContext(permission.key, 'vertical', verticalsSelected);
+                                    setVerticalsSelected([]);
+                                  }}
+                                  disabled={verticalsSelected.length === 0}
+                                >
+                                  <Plus size={16} className="me-1" />
+                                  Add Verticals
                                 </button>
                               </div>
                             </div>
                             
                             {/* Display assigned contexts */}
-                            <div className="mt-3">
-                              <div className="small fw-medium mb-2 text-secondary">Assigned Contexts:</div>
-                              {userContextPerms[permission.key]?.length > 0 ? (
+                            {userContextPerms[permission.key]?.length > 0 && (
+                              <div className="mt-3">
+                                <div className="small fw-medium mb-2 text-secondary">Assigned Contexts:</div>
                                 <div>
                                   {userContextPerms[permission.key]?.map((context, index) => (
                                     <span key={index} className="badge bg-light text-dark me-2 mb-2 p-2">
-                                      {context.type === 'center' ? <Building size={14} className="me-1" /> : <BookOpen size={14} className="me-1" />}
+                                      {context.type === 'center' && <Building size={14} className="me-1" />}
+                                      {context.type === 'course' && <BookOpen size={14} className="me-1" />}
+                                      {context.type === 'project' && <Layers size={14} className="me-1" />}
+                                      {context.type === 'vertical' && <Users size={14} className="me-1" />}
                                       {getContextName(context.type, context.id)}
                                       <button 
                                         className="btn-close ms-2" 
@@ -1249,21 +1397,15 @@ const AccessManagementSystem = () => {
                                     </span>
                                   ))}
                                 </div>
-                              ) : (
-                                <div className="text-muted small">No contexts assigned yet</div>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    ))}
-                  
-                  {category.permissions.filter(p => p.contextRequired).length === 0 && (
-                    <div className="text-muted">No context-specific permissions in this category</div>
-                  )}
-                </div>
-              ))}
-            </div>
+                    ))
+                )}
+              </div>
+            ))}
           </div>
           <div className="modal-footer">
             <button
@@ -1282,7 +1424,7 @@ const AccessManagementSystem = () => {
             </button>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-danger"
               onClick={handleSaveCustomPermissions}
             >
               Save Custom Permissions
@@ -1396,15 +1538,23 @@ const AccessManagementSystem = () => {
 
 
       <style>
-        {
-
-          `
-          .scrollY{
-          overflow-y: scroll!important;
+        {`
+          .scrollY {
+            overflow-y: scroll!important;
           }
           
-          `
-        }
+          .cursor-pointer {
+            cursor: pointer;
+          }
+          
+          .hover-bg-light:hover {
+            background-color: #f8f9fa;
+          }
+          
+          .z-3 {
+            z-index: 3;
+          }
+        `}
       </style>
     </div>
   );

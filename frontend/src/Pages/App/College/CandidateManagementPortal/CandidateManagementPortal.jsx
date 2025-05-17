@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 const CandidateManagementPortal = () => {
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   // Tab state variables for each section
   const [verticalActiveTab, setVerticalActiveTab] = useState('active');
   const [projectActiveTab, setProjectActiveTab] = useState('active');
@@ -371,22 +372,94 @@ const CandidateManagementPortal = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     
     // Logic based on modal type
-    if (modalType === 'addVertical') {
-      const newVertical = {
-        id: verticals.length + 1,
-        name: formData.name,
-        description: formData.description,
-        projects: 0,
-        status: formData.status || 'active'
-      };
-      setVerticals([...verticals, newVertical]);
-      showNotification('Vertical added successfully!');
-    }
+    // if (modalType === 'addVertical') {
+    //   const newVertical = {
+    //     id: verticals.length + 1,
+    //     name: formData.name,
+    //     description: formData.description,
+    //     projects: 0,
+    //     status: formData.status || 'active'
+    //   };
+    //   setVerticals([...verticals, newVertical]);
+    //   showNotification('Vertical added successfully!');
+    // }
+  if (modalType === 'addVertical') {
+ try {
+  console.log('API hitting...');
+  const response = await fetch(`${backendUrl}/college/addVertical`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: formData.name,
+      description: formData.description,
+      status: formData.status || 'active',
+      approvedBy: null
+    })
+  });
+
+  const result = await response.json();
+  console.log('API Response:', result);
+
+  if (response.ok && result.status) {
+    setVerticals(prev => [
+      ...prev,
+      {
+        ...result.data,
+        id: result.data._id || prev.length + 1 // prefer _id from backend
+      }
+    ]);
+    showNotification('Vertical added successfully!');
+  } else {
+    showNotification(result.message || 'Failed to add vertical', 'error');
+  }
+} catch (err) {
+  console.error('API Error:', err);
+  showNotification('Something went wrong. Please try again.', 'error');
+}
+
+}
+
+// else if (modalType === 'editVertical') {
+//   try {
+//     const response = await fetch(`${backendUrl}/college/editVertical/${formData.id}`, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json'
+//       },
+//       body: JSON.stringify({
+//         name: formData.name,
+//         description: formData.description,
+//         status: formData.status,
+//         approvedBy: null
+//       })
+//     });
+
+//     const result = await response.json();
+
+// if (response.ok && result.status) {
+//   setVerticals(prev =>
+//     prev.map(vertical =>
+//       vertical._id === result.data._id ? { ...vertical, ...result.data } : vertical
+//     )
+//   );
+//   showNotification('Vertical updated successfully!');
+// } else {
+//   showNotification(result.message || 'Failed to update vertical', 'error');
+// }
+
+//   } catch (err) {
+//     console.error('Edit Vertical Error:', err);
+//     showNotification('An error occurred while updating vertical', 'error');
+//   }
+// }
+
     else if (modalType === 'editVertical') {
       setVerticals(verticals.map(vertical => 
         vertical.id === formData.id ? { ...vertical, ...formData } : vertical
@@ -573,7 +646,7 @@ const CandidateManagementPortal = () => {
                     <div>
                       <h5 className="card-title mb-2">{vertical.name}</h5>
                       <p className="text-muted small mb-3">{vertical.description}</p>
-                      <span className={`text-white bg-${vertical.status === 'active' ? 'success' : 'secondary'} mb-3`}>
+                      <span className={`text-white p-1 bg-${vertical.status === 'active' ? 'success' : 'secondary'} mb-3`}>
                         {vertical.status}
                       </span>
                     </div>
@@ -584,7 +657,7 @@ const CandidateManagementPortal = () => {
                       {projects.filter(p => p.verticalId === vertical.id).length} Projects
                     </span>
                     <div>
-                      <button className="btn btn-sm btn-light me-1" onClick={(e) => {
+                      <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
                         e.stopPropagation();
                         openModal('editVertical', vertical);
                       }}>
@@ -697,7 +770,7 @@ const CandidateManagementPortal = () => {
                     <div className="d-flex justify-content-between mb-2">
                       <h5 className="card-title">{vertical.name}</h5>
                       <div>
-                        <button className="btn btn-sm btn-light me-1" onClick={(e) => {
+                        <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
                           e.stopPropagation();
                           openModal('editVertical', vertical);
                         }}>
@@ -737,7 +810,7 @@ const CandidateManagementPortal = () => {
                     <div className="d-flex justify-content-between mb-2">
                       <h5 className="card-title">{project.name}</h5>
                       <div>
-                        <button className="btn btn-sm btn-light me-1" onClick={(e) => {
+                        <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
                           e.stopPropagation();
                           openModal('editProject', project);
                         }}>
@@ -802,7 +875,7 @@ const CandidateManagementPortal = () => {
                     <div>
                       <h5 className="card-title mb-2">{project.name}</h5>
                       <p className="text-muted small mb-3">{project.description}</p>
-                      <span className={`text-white bg-${project.status === 'active' ? 'success' : 'secondary'} mb-3`}>
+                      <span className={`text-white p-1 bg-${project.status === 'active' ? 'success' : 'secondary'} mb-3`}>
                         {project.status}
                       </span>
                     </div>
@@ -813,7 +886,7 @@ const CandidateManagementPortal = () => {
                       {centers.filter(c => c.projectId === project.id).length} Centers
                     </span>
                     <div>
-                      <button className="btn btn-sm btn-light me-1" onClick={(e) => {
+                      <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
                         e.stopPropagation();
                         openModal('editProject', project);
                       }}>
@@ -875,7 +948,7 @@ const CandidateManagementPortal = () => {
                       <p className="text-primary mb-1">{center.candidates} Students</p>
                       <p className="text-muted small mb-1">{center.address}</p>
                       <p className="text-muted small mb-3">{center.contact}</p>
-                      <span className={`text-white bg-${center.status === 'active' ? 'success' : 'secondary'} mb-3`}>
+                      <span className={`text-white p-1 bg-${center.status === 'active' ? 'success' : 'secondary'} mb-3`}>
                         {center.status}
                       </span>
                     </div>
@@ -886,7 +959,7 @@ const CandidateManagementPortal = () => {
                       {courses.filter(c => c.centerId === center.id).length} Courses
                     </span>
                     <div>
-                      <button className="btn btn-sm btn-light me-1" onClick={(e) => {
+                      <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
                         e.stopPropagation();
                         openModal('editCenter', center);
                       }}>
@@ -947,7 +1020,7 @@ const CandidateManagementPortal = () => {
                       <h5 className="card-title mb-2">{course.name}</h5>
                       <p className="text-muted small mb-1">Duration: {course.duration}</p>
                       <p className="text-muted small mb-3">{course.description}</p>
-                      <span className={`text-white bg-${course.status === 'active' ? 'success' : 'secondary'} mb-3`}>
+                      <span className={`text-white p-1 bg-${course.status === 'active' ? 'success' : 'secondary'} mb-3`}>
                         {course.status}
                       </span>
                     </div>
@@ -1018,7 +1091,7 @@ const CandidateManagementPortal = () => {
                   <div className="d-flex justify-content-between align-items-start mb-3">
                     <div>
                       <h5 className="card-title mb-2">{batch.name}</h5>
-                      <span className={`text-white bg-${batch.status === 'active' ? 'success' : batch.status === 'completed' ? 'secondary' : 'warning'}`}>
+                      <span className={`text-white p-1 bg-${batch.status === 'active' ? 'success' : batch.status === 'completed' ? 'secondary' : 'warning'}`}>
                         {batch.status}
                       </span>
                     </div>
@@ -1175,17 +1248,17 @@ const CandidateManagementPortal = () => {
                       <td>{candidate.course}</td>
                       <td>{candidate.batch}</td>
                       <td>
-                        <span className={`text-white bg-${candidate.status === 'pursuing' ? 'primary' : candidate.status === 'completed' ? 'success' : 'danger'}`}>
+                        <span className={`text-white p-1 bg-${candidate.status === 'pursuing' ? 'primary' : candidate.status === 'completed' ? 'success' : 'danger'}`}>
                           {candidate.status}
                         </span>
                       </td>
                       <td>{candidate.enrollmentDate}</td>
                       <td>
                         <div className="d-flex">
-                          <button className="btn btn-sm btn-light me-1" onClick={() => openModal('viewStudent', candidate)}>
+                          <button className="btn btn-sm btn-light me-1 border-0" onClick={() => openModal('viewStudent', candidate)}>
                             <Eye size={16} />
                           </button>
-                          <button className="btn btn-sm btn-light me-1" onClick={() => openModal('editStudent', candidate)}>
+                          <button className="btn btn-sm btn-light me-1 border-0" onClick={() => openModal('editStudent', candidate)}>
                             <Edit size={16} />
                           </button>
                         </div>
@@ -1410,11 +1483,11 @@ const CandidateManagementPortal = () => {
             {modalType === 'viewStudent' ? (
               <div className="modal-body">
                 <div className="text-center mb-3">
-                  <div className="student-avatar bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style={{ width: "64px", height: "64px" }}>
+                  <div className="student-avatar bg-primary text-white p-1 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style={{ width: "64px", height: "64px" }}>
                     {formData.name?.charAt(0)}
                   </div>
                   <h4 className="mb-1">{formData.name}</h4>
-                  <span className={`text-white bg-${formData.status === 'pursuing' ? 'primary' : formData.status === 'completed' ? 'success' : 'danger'}`}>
+                  <span className={`text-white p-1 bg-${formData.status === 'pursuing' ? 'primary' : formData.status === 'completed' ? 'success' : 'danger'}`}>
                     {formData.status}
                   </span>
                 </div>
