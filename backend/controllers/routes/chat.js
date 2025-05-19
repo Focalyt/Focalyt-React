@@ -13,7 +13,7 @@ const apiKey = process.env.MIPIE_RAZORPAY_KEY;
 const razorSecretKey = process.env.MIPIE_RAZORPAY_SECRET;
 
 const {
-	coinsOffers, PaymentDetails, Vacancy, Courses, Candidate, Company, AppliedJobs, AppliedCourses, User, CandidateCashBack
+	coinsOffers, PaymentDetails, Vacancy, Courses, Candidate, Company, AppliedJobs, AppliedCourses, User, CandidateCashBack, FAQ
 } = require("../models");
 
 const { sendNotification } = require('./services/notification');
@@ -24,134 +24,10 @@ const { candidateProfileCashBack, candidateVideoCashBack, candidateApplyCashBack
 const chatRoutes = express.Router();
 const commonRoutes = express.Router();
 
-class MetaConversionAPI {
-	constructor() {
-		// Validate Meta Pixel ID
-		const pixelId = fbConversionPixelId;
-		if (!pixelId) {
-			throw new Error('META_PIXEL_ID environment variable is not set');
-		}
-
-		// Validate Access Token
-		const accessToken = fbConversionAccessToken;
-		if (!accessToken) {
-			throw new Error('META_ACCESS_TOKEN environment variable is not set');
-		}
-
-		this.accessToken = accessToken;
-		this.pixelId = pixelId;
-		this.apiVersion = 'v21.0';
-
-		// Add validation to ensure baseUrl is properly constructed
-		if (!this.pixelId || this.pixelId === 'undefined') {
-			throw new Error('Invalid Meta Pixel ID');
-		}
-
-		this.metaAPIUrl = `https://graph.facebook.com/${this.apiVersion}/${this.pixelId}/events`;
-
-		// Log configuration (without sensitive data)
-		// console.log('Meta Conversion API Configuration:', {
-		//   pixelIdExists: !!this.pixelId,
-		//   accessTokenExists: !!this.accessToken,
-		//   apiVersion: this.apiVersion,
-		//   metaAPIUrl: this.metaAPIUrl
-		// });
-	}
-
-	_hashData(data) {
-		if (!data) return null;
-		// Convert to string and handle non-string inputs
-		const stringData = String(data);
-		return crypto.createHash('sha256').update(stringData.toLowerCase().trim()).digest('hex');
-	}
-
-	async trackCourseApplication(courseData, userData, metaParams) {
-		try {
-			console.log('Course Data Console', courseData,'User Data Console', userData,'Meta Params Console', metaParams)
-			const eventData = {
-				data: [{
-					event_name: 'Course Apply',
-					event_time: Math.floor(Date.now() / 1000),
-					action_source: 'website',
-					user_data: {
-						em: this._hashData(userData.email),
-						ph: this._hashData(userData.phone),
-						fn: this._hashData(userData.firstName),
-						ln: this._hashData(userData.lastName),
-						ct: this._hashData(userData.city),
-						st: this._hashData(userData.state),
-						db: this._hashData(userData.dob),
-						ge: this._hashData(userData.gender),
-						country: this._hashData('in'),
-						client_ip_address: userData.ipAddress,
-						client_user_agent: userData.userAgent,
-						external_id: this._hashData(userData.phone),
-						fbc: metaParams.fbc, // Facebook Click ID
-						fbp: metaParams.fbp  // Facebook Browser ID
-					},
-					custom_data: {
-						content_name: courseData.courseName,
-						content_category: 'Course',
-						currency: 'INR',
-						value: courseData.courseValue
-					},
-					event_source_url: courseData.sourceUrl
-				}],
-				access_token: this.accessToken
-			};
-
-			const response = await axios.post(this.metaAPIUrl, eventData);
-			console.log('Course application event tracked successfully', response.data);
-			return response.data;
-		} catch (error) {
-			console.error('Meta Conversion API Error:', error.response?.data || error.message);
-			return null;
-		}
-	}
-}
 
 
 // Helper function to extract Meta parameters from cookies and URL
-const getMetaParameters = (req) => {
-	// Extract fbclid from URL
-	const fbclid = req.query.fbclid;
 
-	// Get cookies
-	const cookies = req.cookies || {};
-
-	// Construct fbc (Facebook Click ID) with proper format
-	let fbc = cookies._fbc;
-	if (fbclid) {
-		// Format should be: fb.1.${timestamp}.${fbclid}
-		// The '1' represents the version number
-		const timestamp = Date.now();
-		fbc = `fb.1.${timestamp}.${fbclid}`;
-	}
-
-	// Get fbp (Facebook Browser ID) from cookies
-	// fbp format should be: fb.1.${timestamp}.${random}
-	let fbp = cookies._fbp;
-	if (!fbp) {
-		const timestamp = Date.now();
-		const random = Math.floor(Math.random() * 1000000000);
-		fbp = `fb.1.${timestamp}.${random}`;
-	}
-
-	// Get ad specific parameters
-	const adId = req.query.ad_id || null;
-	const campaignId = req.query.campaign_id || null;
-	const adsetId = req.query.adset_id || null;
-
-	
-
-	return {
-		fbc,      // Only included if fbclid exists or _fbc cookie is present
-		fbp,      // Always included, generated if not present
-		adId,     // Ad ID from URL parameters
-		campaignId, // Campaign ID from URL parameters
-		adsetId    // Ad Set ID from URL parameters
-	};
-};
 
 
 
@@ -390,7 +266,6 @@ commonRoutes.post("/applycourse/:id", async (req, res) => {
 	try {
 		let { id } = req.params;
 		let courseId = id;
-		const metaParams = getMetaParameters(req);
 
 		let validation = { mobile: req.body.mobile }
 
@@ -446,33 +321,14 @@ commonRoutes.post("/applycourse/:id", async (req, res) => {
 				`${process.env.BASE_URL}/coursedetails/${courseId}`,
 				course?.registrationCharges,
 				appliedData?.registrationFee,
-				"Leads From ChatBot"
+				"Leads From ChatBot",
+				course?.courseFeeType,
+				course?.typeOfProject,
+				course?.projectName
 			];
 			await updateSpreadSheetValues(sheetData);
 
-			// Track conversion event
-				const metaApi = new MetaConversionAPI();
-				await metaApi.trackCourseApplication(
-				  {
-					courseName: course.name,
-					courseId: courseId,
-					courseValue: course.registrationCharges,
-					sourceUrl: `${process.env.BASE_URL}/coursedetails/${courseId}`
-				  },
-				  {
-					email: candidate.email,
-					phone: candidate.mobile,
-					firstName: candidate.name.split(' ')[0],
-					lastName: candidate.name.split(' ').slice(1).join(' '),
-					gender: candidate?.sex === 'Male' ? 'm' : candidate?.sex === 'Female' ? 'm' : '',
-					dob: candidate?.dob ? moment(candidate.dob).format('YYYYMMDD') : '',
-					city: candidate.city?.name,
-					state: candidate.state?.name,
-					ipAddress: req.ip,
-					userAgent: req.headers['user-agent']
-				  },
-				  metaParams
-				);
+			
 
 			// Capitalize every word's first letter
 			function capitalizeWords(str) {
@@ -480,7 +336,7 @@ commonRoutes.post("/applycourse/:id", async (req, res) => {
 				return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 			}
 
-			
+
 
 			if (!apply) {
 				req.flash("error", "Already failed");
@@ -1207,6 +1063,26 @@ commonRoutes.get("/getCreditCount", async (req, res) => {
 		res.status(200).send({ status: true, credit: candidate.creditLeft });
 	} catch (error) {
 		console.log('error: ', error);
+	}
+});
+
+commonRoutes.get("/chatbotfaq", async (req, res) => {
+	try {
+
+		const filter = {
+			status: true
+		}
+
+		const Que = await FAQ.find(filter)
+		return res.status(200).send({
+			Que
+		});
+	} catch (err) {
+		res.status(500).send({
+			status: "failure",
+			msg: "Error fetching faqs from server.",
+			error: err.message,
+		});
 	}
 });
 

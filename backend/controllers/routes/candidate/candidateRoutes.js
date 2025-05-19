@@ -2272,7 +2272,7 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     data["_candidate"] = candidate._id;
     data["_company"] = vacancy._company;
     // data["coinsDeducted"] = coinsDeducted
-    console.log('data', data)
+   
     const appliedData = await AppliedJobs.create(data);
 
     // let sheetData = [candidate?.name, candidate?.mobile, candidate?.email, candidate?.sex, candidate?.dob ? moment(candidate?.dob).format('DD MMM YYYY') : '', candidate?.state?.name, candidate.city?.name, 'Job', `${process.env.BASE_URL}/jobdetailsmore/${jobId}`, "", "", moment(appliedData?.createdAt).utcOffset('+05:30').format('DD MMM YYYY hh:mm')]
