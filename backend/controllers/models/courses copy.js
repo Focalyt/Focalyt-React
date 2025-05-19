@@ -1,30 +1,30 @@
+const { kStringMaxLength } = require('buffer');
+const { boolean } = require('joi');
 const { Schema, model } = require('mongoose');
+
 const { ObjectId } = Schema.Types;
 
 const courseSchema = new Schema({
-  sectors: [{ type: ObjectId, ref: "CourseSectors" }],
-  center: [{ type: ObjectId, ref: "Center" }],
-  
-  centerId: { type: ObjectId, ref: 'Center' }, // ✅ Added for simplified reference
-
+  sectors: [{
+    type: ObjectId, ref: "CourseSectors"
+  }],
+  center: [{
+    type: ObjectId, ref: "Center"
+  }],
   courseLevel: String,
   name: { type: String, lowercase: true, trim: true },
-  description: { type: String }, // ✅ Added to support short course summary
-  duration: String,
-  students: { type: Number, default: 0 }, // ✅ Added to track enrollment count
-
-  status: { type: String, enum: ['active', 'inactive'], default: 'active' }, // ✅ Added to reflect course status
-
   courseFeeType: {
-    type: String,
-    enum: ['Paid', 'Free'],
+    type: String, // Specifies which type of user created the post
+    enum: ['Paid', 'Free'], // Allowed user types
     required: true,
   },
   typeOfProject: {
-    type: String,
-    enum: ['P&T', 'T&P', "General"],
+    type: String, // Specifies which type of user created the post
+    enum: ['P&T', 'T&P', "General"], // Allowed user types
+
   },
   projectName: String,
+  duration: String,
   courseType: String,
   youtubeURL: String,
   brochure: String,
@@ -52,7 +52,6 @@ const courseSchema = new Schema({
   stipendDuringTraining: String,
   lastDateForApply: String,
   requiredDocuments: String,
-
   docsRequired: [
     {
       Name: { type: String },
@@ -60,29 +59,58 @@ const courseSchema = new Schema({
     }
   ],
 
-  testimonialvideos: [{ type: String }],
+  testimonialvideos: [{
+    type: String
+  }],
   photos: [String],
   audios: [String],
   videos: [String],
+  courseFeatures: {
+    type: String,
+    default: ""
+  },
+  importantTerms: {
+    type: String,
+    default: ""
+  },
 
-  courseFeatures: { type: String, default: "" },
-  importantTerms: { type: String, default: "" },
   questionAnswers: [{ Question: String, Answer: String }],
-  courseRemark: { type: String },
-  courseUrl: { type: String, default: "" },
-
-  isRecommended: { type: Boolean, default: false },
-  isDeleted: { type: Boolean, default: false },
-
-  counslername: { type: String, default: "" },
-  counslerphonenumber: { type: Number, default: "" },
-  counslerwhatsappnumber: { type: Number, default: "" },
-  counsleremail: { type: String, default: "" },
-
-  createdBy: { type: ObjectId, ref: 'User' }, // ✅ Replaced old nested structure with simple ObjectId
-  approvedBy: { type: ObjectId, ref: 'User' }, // ✅ Newly added field
-
-  createdByType: {
+  courseRemark: {
+    type: String
+  },
+  courseUrl: {
+    type: String,
+    default: ""
+  },
+  status: {
+    type: Boolean,
+    default: true,
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  counslername: {
+    type: String,
+    default: ""
+  },
+  counslerphonenumber: {
+    type: Number,
+    default: ""
+  },
+  counslerwhatsappnumber: {
+    type: Number,
+    default: ""
+  },
+  counsleremail: {
+    type: String,
+    default: ""
+  },
+  isRecommended: {
+    type: Boolean,
+    default: false,
+  },
+  createdBy: {
     type: {
       type: String,
       enum: ['admin', 'college'],
@@ -90,13 +118,11 @@ const courseSchema = new Schema({
     },
     id: { type: ObjectId, ref:'User' }
   },
-
   college: {
     type: ObjectId,
     ref: 'College',
     default: null
-  }
-
+  },
 }, { timestamps: true });
 
 module.exports = model('courses', courseSchema);

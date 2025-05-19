@@ -13,7 +13,7 @@ const AWS = require('aws-sdk');
 const multer = require('multer');
 const fs = require('fs');
 const uuid = require('uuid/v1');
-const {toHexString}=require("../../../helpers")
+const { toHexString } = require("../../../helpers")
 const path = require('path');
 // const SendOtp = require('sendotp');
 
@@ -43,13 +43,13 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     const basename = path.basename(file.originalname, ext);
-    cb(null,`${basename}-${Date.now()}${ext}`);
+    cb(null, `${basename}-${Date.now()}${ext}`);
   },
 });
 
 const upload = multer({ storage }).single('file');
 const {
-  Country, EducationBoard, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy,QualificationCourse,
+  Country, EducationBoard, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy, QualificationCourse, CourseSectors , Center
 } = require('../../models');
 const Candidate = require('../../models/candidateProfile');
 
@@ -96,10 +96,10 @@ module.exports.sendCompanyOtp = async (req, res) => {
     if (!user) {
       return res.send({ status: false, message: 'User not found, please signup' });
     }
-    if(user.status === false) {
+    if (user.status === false) {
       return res.send({ status: false, message: 'User disabled' });
     }
-    
+
     const auth = authKey;
     const template = templateId
     const url = `https://api.msg91.com/api/v5/otp?template_id=${template}&mobile=91${mobile}&authkey=${auth}`;
@@ -117,23 +117,37 @@ module.exports.sendCompanyOtp = async (req, res) => {
 module.exports.sendOtp = async (req, res) => {
   try {
 
-    const { mobile, module } = req.body;
-    let role = 3
+   const { userInput, module } = req.body;
+
+    let role = 3;
     if (module === 'college') {
-      role = 2
+      role = 2;
     } else if (module === 'candidate') {
-      role = 3
+      role = 3;
     } else if (module === 'company') {
-      role = 1
+      role = 1;
     }
-    const user = await User.findOne({ mobile, role });
+
+    console.log('userInput',userInput, 'module',module)
+    let user = null;
+    const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
+
+    if (isMobile) {
+      user = await User.findOne({ mobile: parseInt(userInput), role });
+    } else {
+      user = await User.findOne({ email: userInput.toLowerCase(), role });
+    }
+
     if (!user) {
       return res.send({ status: false, message: 'User not found, please signup' });
     }
-    if(user.status === false) {
+    if (user.status === false) {
       return res.send({ status: false, message: 'User disabled' });
     }
-  
+
+    // Now we have user, and we can access user.mobile to send OTP
+    const mobile = user.mobile;
+
 
     const auth = authKey;
     const template = templateId
@@ -157,9 +171,9 @@ module.exports.sendCandidateOtp = async (req, res) => {
     let newUser = false
     if (!user) {
       newUser = true
-      
+
     }
-    
+
     const url = msg91Url.replace("<<template>>", templateId).replace("<<mobile>>", mobile).replace("<<auth>>", authKey)
     const data = await axios.get(url);
     if (data.data.type !== 'success') throw req.ykError(data.data.message);
@@ -259,50 +273,50 @@ module.exports.uploadVideoFile = async (req, res) => {
     return req.errFunc(err);
   }
 }
-module.exports.generateNewToken= async (_id)=> {
-  let id=toHexString(_id)
+module.exports.generateNewToken = async (_id) => {
+  let id = toHexString(_id)
   const data = { id };
   const token = sign(data, jwtSecret).toString();
   return token;
 },
 
-module.exports.verifyOtp = async (req, res) => {
-  try {
-    const body = pick(req.body, ['mobile', 'otp']);
-    // const requireFields = {
-    //   mobile: 'Mobile no', otp: 'OTP',
-    // };
-    const { mobile, otp } = req.body;
-    // const missingField = req.requireFields(body, requireFields);
-    // if (missingField) throw req.ykError(missingField);
-    // const { authkey } = req.msg91Options.headers;
-    const auth = authKey
-    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
-    const result = await axios.get(url);
-    if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
-      return res.send({
-        status: true,
-        message: 'OTP verified!'
-      });
-    } else {
-      return res.send({
-        status: false,
-        message: 'Invalid OTP!'
-      });
+  module.exports.verifyOtp = async (req, res) => {
+    try {
+      const body = pick(req.body, ['mobile', 'otp']);
+      // const requireFields = {
+      //   mobile: 'Mobile no', otp: 'OTP',
+      // };
+      const { mobile, otp } = req.body;
+      // const missingField = req.requireFields(body, requireFields);
+      // if (missingField) throw req.ykError(missingField);
+      // const { authkey } = req.msg91Options.headers;
+      const auth = authKey
+      const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
+      const result = await axios.get(url);
+      if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
+        return res.send({
+          status: true,
+          message: 'OTP verified!'
+        });
+      } else {
+        return res.send({
+          status: false,
+          message: 'Invalid OTP!'
+        });
+      }
+      // const user = await Candidate.findOne({ mobile: body.mobile });
+      // if (user && user !== '') {
+      //   token = await user.generateAuthToken();
+      //   completeProfile = user.isProfileCompleted;
+      // } else {
+      //   const newAdd = await Candidate.create({ mobile: body.mobile });
+      //   completeProfile = false;
+      //   token = await newAdd.generateAuthToken();
+      // }
+    } catch (err) {
+      return req.errFunc(err);
     }
-    // const user = await Candidate.findOne({ mobile: body.mobile });
-    // if (user && user !== '') {
-    //   token = await user.generateAuthToken();
-    //   completeProfile = user.isProfileCompleted;
-    // } else {
-    //   const newAdd = await Candidate.create({ mobile: body.mobile });
-    //   completeProfile = false;
-    //   token = await newAdd.generateAuthToken();
-    // }
-  } catch (err) {
-    return req.errFunc(err);
-  }
-};
+  };
 
 module.exports.verifyPass = async (req, res) => {
   try {
@@ -375,9 +389,9 @@ module.exports.resendOTP = async (req, res) => {
 module.exports.resendOTP = async (req, res) => {
   try {
     console.log('resend OTP')
-    const mobile  = req.body.mobile;
-    console.log('body',req.body.mobile)
-    console.log('number',mobile)
+    const mobile = req.body.mobile;
+    console.log('body', req.body.mobile)
+    console.log('number', mobile)
 
     const auth = authKey
     let url = `https://api.msg91.com/api/v5/otp/retry?authkey=${auth}&mobile=91${mobile}`;
@@ -434,7 +448,7 @@ module.exports.otpCandidateLogin = async (req, res) => {
     } else {
       throw req.ykError('Invalid User!');
     }
-    res.status(200).send({ status: true, name: user.name, email: user.email, token,user:userData, })
+    res.status(200).send({ status: true, name: user.name, email: user.email, token, user: userData, })
   } catch (err) {
     console.log(err)
     return req.errFunc(err);
@@ -536,7 +550,7 @@ module.exports.loginCommon = async (req, res) => {
   }
 };
 
-module.exports.loginAs = async(req, res) => {
+module.exports.loginAs = async (req, res) => {
   try {
     const { id, module } = req.body;
     const user = await User.findById(id);
@@ -574,12 +588,12 @@ module.exports.loginAs = async(req, res) => {
   }
 }
 
-module.exports.loginAsCandidate = async(req,res) =>{
-  try{
-    let { mobile , module } = req.body;
+module.exports.loginAsCandidate = async (req, res) => {
+  try {
+    let { mobile, module } = req.body;
     let phoneNumber = +mobile
-    
-    let user = await User.findOne({ mobile: phoneNumber , role: 3})
+
+    let user = await User.findOne({ mobile: phoneNumber, role: 3 })
     const token = await user.generateAuthToken();
     let userData = {
       _id: user._id, name: user.name, role: 3, email: user.email, mobile: user.mobile
@@ -588,7 +602,7 @@ module.exports.loginAsCandidate = async(req,res) =>{
     req.session.user = userData;
     return res.status(200).send({ status: true, name: user.name, email: user.email, token, role: user.role })
   }
-  catch(err){
+  catch (err) {
     req.flash("error", err.message || "Something went wrong!");
     return res.redirect("back");
   }
@@ -707,7 +721,7 @@ module.exports.university = async (req, res) => {
     });
   } catch (err) {
     return req.errFunc(err);
-  }
+  }
 };
 
 module.exports.education = async (req, res) => {
@@ -721,12 +735,12 @@ module.exports.education = async (req, res) => {
     });
   } catch (err) {
     return req.errFunc(err);
-  }
+  }
 };
 
 module.exports.educationCoursesList = async (req, res) => {
   try {
-   
+
     const qualificationId = req.params.qualificationId; // or req.body based on your use case
     console.log("Qualification ID:", qualificationId);
     if (!qualificationId) {
@@ -736,7 +750,7 @@ module.exports.educationCoursesList = async (req, res) => {
       });
     }
 
-    if( typeof qualificationId === 'String' ){
+    if (typeof qualificationId === 'String') {
       console.log("Id is string")
 
     }
@@ -765,7 +779,7 @@ module.exports.courseSpecializationsList = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    console.log('courseId',courseId)
+    console.log('courseId', courseId)
 
     if (!courseId) {
       return res.status(400).json({
@@ -774,7 +788,7 @@ module.exports.courseSpecializationsList = async (req, res) => {
       });
     }
 
-    if( typeof courseId === 'String' ){
+    if (typeof courseId === 'String') {
       console.log("Id is string")
 
     }
@@ -786,7 +800,7 @@ module.exports.courseSpecializationsList = async (req, res) => {
 
     return res.send({
       status: true,
-      message: specializations.length > 0 
+      message: specializations.length > 0
         ? 'Specializations fetched successfully by course!'
         : 'No specializations found for this course.',
       data: { specializations: specializations || [] }
@@ -801,17 +815,45 @@ module.exports.courseSpecializationsList = async (req, res) => {
 
 
 module.exports.educationBoardList = async (req, res) => {
-  try {  
-console.log('api hitting')
+  try {
+    console.log('api hitting')
     const search = req.query.search || '';
-    console.log('search',search)
+    console.log('search', search)
     const boards = await EducationBoard.find({
       name: { $regex: search, $options: 'i' },
       status: true
     }).limit(10);
-  
+
     res.send(boards);
-    console.log('res',boards)
+    console.log('res', boards)
+
+  } catch (err) {
+    return req.errFunc(err);
+  }
+};
+module.exports.sectorList = async (req, res) => {
+  try {
+    console.log('sector api ')
+    const sector = await CourseSectors.find({
+      status: true
+    });
+console.log('res', sector)
+    res.send(sector);
+    
+
+  } catch (err) {
+    return req.errFunc(err);
+  }
+};
+module.exports.centerList = async (req, res) => {
+  try {
+    console.log('center api ')
+    const sector = await Center.find({
+      status: true
+    });
+console.log('res Center :- ', Center)
+    res.send(sector);
+    
 
   } catch (err) {
     return req.errFunc(err);

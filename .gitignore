@@ -17,7 +17,7 @@ backend/node_modules/.cache/default-development/
 backend/node_modules/
 backend/focalyt-new-key.json
 frontend/node_modules/
-
+/frontend/src/Pages/App/College/Login/CollegeLogin copy.jsx
 
 # Production
 /build

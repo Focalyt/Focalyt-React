@@ -1,29 +1,26 @@
 const { Schema, model } = require('mongoose');
 
-const centerSchema = new Schema({
+const projectSchema = new Schema({
   name: {
     type: String,
     required: true,
     trim: true
   },
-  address: {
+  description: {
     type: String,
-  },
-  contact: {
-    type: String,
-  },
-  candidates: {
-    type: Number,
-    default: 0,
   },
   status: {
     type: String,
     enum: ['active', 'inactive'],
     default: 'active',
   },
-  projectId: {
+  centers: {
+    type: Number,
+    default: 0,
+  },
+  verticalId: {
     type: Schema.Types.ObjectId,
-    ref: 'Project',
+    ref: 'Vertical',
     required: true,
   },
   createdBy: {
@@ -36,4 +33,4 @@ const centerSchema = new Schema({
   }
 }, { timestamps: true });
 
-module.exports = model('Center', centerSchema);
+module.exports = model('Project', projectSchema);

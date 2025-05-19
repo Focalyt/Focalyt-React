@@ -11,7 +11,7 @@ const { Courses, Country, Qualification, CourseSectors, Candidate, AppliedCourse
 const candidateServices = require('../services/candidate')
 const { candidateCashbackEventName } = require('../../db/constant');
 const router = express.Router();
-router.use(isAdmin);
+// router.use(isAdmin);
 
 const AWS = require("aws-sdk");
 const multer = require('multer');
@@ -51,13 +51,53 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).single('file');
 
+const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allowedExtensions }) => {
+	if (!files) return [];
+
+	const filesArray = Array.isArray(files) ? files : [files];
+	const uploaded = [];
+
+	const promises = filesArray.map((file) => {
+		const ext = file.name.split('.').pop().trim().toLowerCase();
+		console.log('file name',file.name)
+		console.log('allowedExtensions',allowedExtensions)
+		console.log('folder',folder)
+		if (!allowedExtensions.includes(ext)) {
+			throw new Error(`Unsupported file format: ${ext}`);
+		}
+		const fileType = allowedImageExtensions.includes(ext)
+			? 'image'
+			: allowedVideoExtensions.includes(ext)
+				? 'video'
+				: allowedDocumentExtensions.includes(ext)
+					? 'document'
+					: null;
+		const key = `upload/${folder}/${courseName}/${fileType}s/${uuid()}.${ext}`;
+
+		const params = {
+			Bucket: bucketName,
+			Key: key,
+			Body: file.data,
+			ContentType: file.mimetype,
+		};
+
+		return s3.upload(params).promise().then((result) => {
+			uploaded.push(result.Location);
+		});
+	});
+
+	await Promise.all(promises);
+	return uploaded;
+};
+
 
 
 router.route("/").get(async (req, res) => {
+	console.log('college api hitting')
 	try {
 		let view = false
 		let canEdit = false
-		const user = req.session.user
+		const user = req.user
 		console.log("user", user)
 		if (user.role === 0) {
 
@@ -116,17 +156,17 @@ router.route("/").get(async (req, res) => {
 			let filteredCourses = allCourses.filter(course => {
 				const courseId = course._id?.toString();
 				const courseCenterIds = Array.isArray(course.center)
-				  ? course.center.map(c => c.toString())
-				  : [];
-			  
+					? course.center.map(c => c.toString())
+					: [];
+
 				const hasMatchingCenter = courseCenterIds.some(cid => centerIds.includes(cid));
 				const hasMatchingCourse = courseIds.includes(courseId);
-			  
+
 				return hasMatchingCenter && hasMatchingCourse;
-			  });
-			  
-			  
-			  
+			});
+
+
+
 
 			courses = filteredCourses;
 			console.log("filteredCourses:", filteredCourses);
@@ -135,9 +175,9 @@ router.route("/").get(async (req, res) => {
 		}
 
 
-		// console.log(courses, "this is courses")
-		return res.render(`${req.vPath}/admin/course`, {
-			menu: 'course',
+		console.log(courses, "this is courses")
+		return res.json( {
+			
 			view,
 			courses,
 			isChecked,
@@ -157,7 +197,7 @@ router
 			const sectors = await CourseSectors.find({ status: true })
 			const center = await Center.find({ status: true })
 
-			return res.render(`${req.vPath}/admin/course/add`, {
+			return res.render(`${req.vPath}/College/Course`, {
 				menu: 'addCourse',
 				sectors,
 				center
@@ -168,31 +208,89 @@ router
 		}
 	})
 	.post(async (req, res) => {
+		console.log('post api hitting')
 		try {
-			console.log(req.body, "this is body of post data>>>>><><><><><")
-			let photos = req.body.photos?.split(',')
-			let testimonialvideos = req.body.testimonialvideos?.split(',')
-			let videos = req.body.videos?.split(',')
+			const { files } = req;
 			let body = req.body;
-			body.photos = photos
-			body.testimonialvideos = testimonialvideos
-			body.videos = videos
 
-			const addRecord = await Courses.create(body);
-			body.createdBy = 'admin';
-			
-			console.log(JSON.stringify(addRecord), "create coursessssssss")
-			if (addRecord) {
-				return res.json({ status: true, message: "Record added!" })
-			} else {
-				return res.json({ status: false, message: "Record not added!" })
+			const courseName = body.name || 'unnamed';
+			const bucketName = process.env.AWS_BUCKET_NAME;
+
+			// Parse JSON fields
+			body.docsRequired = JSON.parse(body.docsRequired || '[]');
+			body.questionAnswers = JSON.parse(body.questionAnswers || '[]');
+			body.createdBy = JSON.parse(body.createdBy || '{}');
+
+			// Upload files
+			if (files?.photos) {
+				const photoUrls = await uploadFilesToS3({
+					files: files.photos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedImageExtensions
+				});
+				body.photos = photoUrls;
 			}
-		} catch (err) {
-			console.log(err)
-			req.flash("error", err.message || "Something went wrong!");
-			return res.redirect("back");
 
+			if (files?.videos) {
+				const videoUrls = await uploadFilesToS3({
+					files: files.videos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedVideoExtensions
+				});
+				body.videos = videoUrls;
+			}
+
+			if (files?.testimonialvideos) {
+				const testimonialVideoUrls = await uploadFilesToS3({
+					files: files.testimonialvideos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedVideoExtensions
+				});
+				body.testimonialvideos = testimonialVideoUrls;
+			}
+
+			if (files?.thumbnail) {
+				const [thumbnailUrl] = await uploadFilesToS3({
+					files: files.thumbnail,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedImageExtensions
+				});
+				body.thumbnail = thumbnailUrl;
+			}
+
+			if (files?.brochure) {
+				const [brochureUrl] = await uploadFilesToS3({
+					files: files.brochure,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedDocumentExtensions
+				});
+				body.brochure = brochureUrl;
+			}
+
+			// Save course
+			const newCourse = await Courses.create(body);
+			res.json({ status: true, message: "Record added!", data: newCourse });
+
+		} catch (err) {
+			console.error("Error in course upload:", err);
+			res.status(400).json({ status: false, message: err.message || "Something went wrong!" });
 		}
+
 	});
 router.route("/changeStatus").patch(async (req, res) => {
 	try {
@@ -218,6 +316,7 @@ router
 	.route("/edit/:id")
 	.get(async (req, res) => {
 		try {
+			console.log('edit api');
 			const { id } = req.params;
 			let course = await Courses.findById(id);
 			if (!course) throw req.ykError("course not found!");
@@ -234,13 +333,13 @@ router
 			course = await Courses.findById(id).populate('sectors').populate('center');
 			course.docsRequired = course.docsRequired.filter(doc => doc.status === true);;
 
-			return res.render(`${req.vPath}/admin/course/edit`, {
+			return res.json ({
 				course,
 				sectors,
 				id,
 				center,
 				menu: 'course'
-			});
+			})
 
 		} catch (err) {
 			req.flash("error", err.message || "Something went wrong!");
@@ -250,6 +349,7 @@ router
 	.post(async (req, res) => {
 		try {
 			let { id } = req.params
+			console.log('edit api');
 			let body = req.body;
 			console.log("body data", body)
 			body.photos = req.body.photos?.split(',')
@@ -1237,6 +1337,7 @@ router.route('/leadStatus')
 			res.redirect('back');
 		}
 	});
+
 
 
 

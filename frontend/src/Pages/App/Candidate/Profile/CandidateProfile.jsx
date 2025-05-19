@@ -64,7 +64,7 @@ const CandidateProfile = () => {
     orgName: '',
     month: '',
     year: '',
-    orgLocation:{
+    orgLocation: {
       type: 'Point',
       coordinates: [],
       city: '',
@@ -1080,10 +1080,10 @@ const CandidateProfile = () => {
   // Save resume function
   const handleSaveCV = async () => {
     try {
-     let certificatesValid = true;
+      let certificatesValid = true;
       certificates.forEach(cert => {
-        if ((cert.month || cert.year || cert.currentlypursuing) && 
-            (!cert.certificateName || !cert.orgName)) {
+        if ((cert.month || cert.year || cert.currentlypursuing) &&
+          (!cert.certificateName || !cert.orgName)) {
           certificatesValid = false;
         }
       });
@@ -3027,7 +3027,18 @@ const CandidateProfile = () => {
               alert("Please accept the declaration before saving your resume.");
               return;
             }
+ // Certificate Validation
+                const certificatesValid = certificates.every(cert => {
+                  if (cert.month || cert.year || cert.currentlypursuing) {
+                    return cert.certificateName && cert.orgName;
+                  }
+                  return true;
+                });
 
+                if (!certificatesValid) {
+                  alert("Please complete all required certificate fields (name and organization) for certificates with dates or marked as 'Currently Pursuing'");
+                  return;
+                }
             // First save the resume data
             await handleSaveCV();
 

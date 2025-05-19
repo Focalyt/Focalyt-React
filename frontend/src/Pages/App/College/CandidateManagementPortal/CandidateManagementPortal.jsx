@@ -21,6 +21,14 @@ import {
 } from 'lucide-react';
 
 const CandidateManagementPortal = () => {
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  // Tab state variables for each section
+  const [verticalActiveTab, setVerticalActiveTab] = useState('active');
+  const [projectActiveTab, setProjectActiveTab] = useState('active');
+  const [centerActiveTab, setCenterActiveTab] = useState('active');
+  const [courseActiveTab, setCourseActiveTab] = useState('active');
+  const [batchActiveTab, setBatchActiveTab] = useState('active');
+
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,8 +36,8 @@ const CandidateManagementPortal = () => {
   const [selectedCenter, setSelectedCenter] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedBatch, setSelectedBatch] = useState(null);
-  // Start with projects view as the initial view
-  const [viewMode, setViewMode] = useState('projects');
+  // Start with verticals view as the initial view
+  const [viewMode, setViewMode] = useState('verticals');
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
   const [notification, setNotification] = useState(null);
@@ -37,33 +45,42 @@ const CandidateManagementPortal = () => {
   // Add navigation history to track where user came from
   const [navigationHistory, setNavigationHistory] = useState([]);
 
-  // Sample data
+  // Sample data for verticals
+  const [selectedVertical, setSelectedVertical] = useState(null);
+  const [verticals, setVerticals] = useState([
+    { id: 1, name: 'FFTL', description: 'Focalyt Future Technology LAbs', projects: 1, status: 'active' },
+    { id: 2, name: 'GSE', description: 'Guest Service Associates', projects: 1, status: 'active' },
+    { id: 3, name: 'Amber', description: 'Initiatives for rural area development', projects: 0, status: 'inactive' }
+  ]);
+
+  // Sample data with verticalId and status
   const [projects, setProjects] = useState([
-    { id: 1, name: 'PMKVY 2023', description: 'Pradhan Mantri Kaushal Vikas Yojana', status: 'active', centers: 3 },
-    { id: 2, name: 'DDU-GKY', description: 'Deen Dayal Upadhyaya Grameen Kaushalya Yojana', status: 'active', centers: 1 }
+    { id: 1, name: 'PMKVY 2023', description: 'Pradhan Mantri Kaushal Vikas Yojana', status: 'active', centers: 3, verticalId: 1 },
+    { id: 2, name: 'DDU-GKY', description: 'Deen Dayal Upadhyaya Grameen Kaushalya Yojana', status: 'active', centers: 1, verticalId: 2 },
+    { id: 3, name: 'NULM', description: 'National Urban Livelihood Mission', status: 'inactive', centers: 0, verticalId: 1 }
   ]);
 
   const [centers, setCenters] = useState([
-    { id: 1, name: 'Delhi Center', candidates: 150, address: 'Block A, Connaught Place, Delhi', contact: '+91 9876543210', projectId: 1 },
-    { id: 2, name: 'Mumbai Center', candidates: 200, address: 'Bandra West, Mumbai', contact: '+91 9988776655', projectId: 1 },
-    { id: 3, name: 'PSD Chandauli Center', candidates: 75, address: 'Main Road, Chandauli', contact: '+91 9876123450', projectId: 1 },
-    { id: 4, name: 'Bangalore Center', candidates: 180, address: 'Electronic City, Bangalore', contact: '+91 8765432109', projectId: 2 }
+    { id: 1, name: 'Delhi Center', candidates: 150, address: 'Block A, Connaught Place, Delhi', contact: '+91 9876543210', projectId: 1, status: 'active' },
+    { id: 2, name: 'Mumbai Center', candidates: 200, address: 'Bandra West, Mumbai', contact: '+91 9988776655', projectId: 1, status: 'active' },
+    { id: 3, name: 'PSD Chandauli Center', candidates: 75, address: 'Main Road, Chandauli', contact: '+91 9876123450', projectId: 1, status: 'active' },
+    { id: 4, name: 'Bangalore Center', candidates: 180, address: 'Electronic City, Bangalore', contact: '+91 8765432109', projectId: 2, status: 'inactive' }
   ]);
 
   const [courses, setCourses] = useState([
-    { id: 1, name: 'Hotel Management', duration: '6 months', students: 85, centerId: 3, description: 'Advanced hospitality training for front desk and housekeeping roles' },
-    { id: 2, name: 'Data Science', duration: '4 months', students: 65, centerId: 1, description: 'Python, statistics, and machine learning fundamentals' },
-    { id: 3, name: 'Retail Management', duration: '3 months', students: 45, centerId: 2, description: 'Inventory management and customer service excellence' },
-    { id: 4, name: 'Hotel Management', duration: '6 months', students: 65, centerId: 1, description: 'Hospitality training with focus on restaurant management' },
-    { id: 5, name: 'Data Science', duration: '4 months', students: 75, centerId: 4, description: 'Data analysis and visualization with R and Tableau' },
+    { id: 1, name: 'Hotel Management', duration: '6 months', students: 85, centerId: 3, description: 'Advanced hospitality training for front desk and housekeeping roles', status: 'active' },
+    { id: 2, name: 'Data Science', duration: '4 months', students: 65, centerId: 1, description: 'Python, statistics, and machine learning fundamentals', status: 'active' },
+    { id: 3, name: 'Retail Management', duration: '3 months', students: 45, centerId: 2, description: 'Inventory management and customer service excellence', status: 'active' },
+    { id: 4, name: 'Hotel Management', duration: '6 months', students: 65, centerId: 1, description: 'Hospitality training with focus on restaurant management', status: 'inactive' },
+    { id: 5, name: 'Data Science', duration: '4 months', students: 75, centerId: 4, description: 'Data analysis and visualization with R and Tableau', status: 'inactive' },
   ]);
 
   const [batches, setBatches] = useState([
     { id: 1, name: 'Batch A-2025', startDate: '2025-01-15', endDate: '2025-07-15', students: 30, status: 'active', courseId: 1 },
     { id: 2, name: 'Batch B-2025', startDate: '2025-02-01', endDate: '2025-08-01', students: 25, status: 'active', courseId: 2 },
     { id: 3, name: 'Batch C-2024', startDate: '2024-09-01', endDate: '2025-03-01', students: 35, status: 'completed', courseId: 3 },
-    { id: 4, name: 'Batch D-2025', startDate: '2025-01-20', endDate: '2025-07-20', students: 28, status: 'active', courseId: 4 },
-    { id: 5, name: 'Batch E-2025', startDate: '2025-02-15', endDate: '2025-06-15', students: 32, status: 'active', courseId: 5 },
+    { id: 4, name: 'Batch D-2025', startDate: '2025-01-20', endDate: '2025-07-20', students: 28, status: 'inactive', courseId: 4 },
+    { id: 5, name: 'Batch E-2025', startDate: '2025-02-15', endDate: '2025-06-15', students: 32, status: 'inactive', courseId: 5 },
   ]);
 
   const [candidates, setCandidates] = useState([
@@ -157,6 +174,7 @@ const CandidateManagementPortal = () => {
     // Save current state to history
     setNavigationHistory([...navigationHistory, { 
       viewMode, 
+      selectedVertical,
       selectedProject, 
       selectedCenter, 
       selectedCourse, 
@@ -167,7 +185,13 @@ const CandidateManagementPortal = () => {
     setViewMode(mode);
     
     // Set selected item based on the view we're navigating to
-    if (mode === 'centers') {
+    if (mode === 'projects') {
+      setSelectedVertical(selectedItem);
+      setSelectedProject(null);
+      setSelectedCenter(null);
+      setSelectedCourse(null);
+      setSelectedBatch(null);
+    } else if (mode === 'centers') {
       setSelectedProject(selectedItem);
       setSelectedCenter(null);
       setSelectedCourse(null);
@@ -192,6 +216,7 @@ const CandidateManagementPortal = () => {
       
       // Restore previous state
       setViewMode(prevState.viewMode);
+      setSelectedVertical(prevState.selectedVertical);
       setSelectedProject(prevState.selectedProject);
       setSelectedCenter(prevState.selectedCenter);
       setSelectedCourse(prevState.selectedCourse);
@@ -200,8 +225,9 @@ const CandidateManagementPortal = () => {
       // Remove the last state from history
       setNavigationHistory(navigationHistory.slice(0, -1));
     } else {
-      // If no history, default to projects view
-      setViewMode('projects');
+      // If no history, default to verticals view
+      setViewMode('verticals');
+      setSelectedVertical(null);
       setSelectedProject(null);
       setSelectedCenter(null);
       setSelectedCourse(null);
@@ -211,8 +237,18 @@ const CandidateManagementPortal = () => {
 
   // Handle breadcrumb navigation
   const handleBreadcrumbClick = (mode) => {
-    if (mode === 'projects') {
+     if (mode === 'verticals') {
       // Reset all selections and navigation
+      setNavigationHistory([]);
+      setViewMode('verticals');
+      setSelectedVertical(null);
+      setSelectedProject(null);
+      setSelectedCenter(null);
+      setSelectedCourse(null);
+      setSelectedBatch(null);
+    }
+    else if (mode === 'projects') {
+      // Reset to projects view but keep the vertical
       setNavigationHistory([]);
       setViewMode('projects');
       setSelectedProject(null);
@@ -231,6 +267,65 @@ const CandidateManagementPortal = () => {
     }
   };
 
+  // Get filtered verticals based on active tab
+  const getFilteredVerticals = () => {
+    return verticals.filter(vertical => 
+      verticalActiveTab === 'all' ? true : vertical.status === verticalActiveTab
+    );
+  };
+
+  // Get filtered projects based on selected vertical and active tab
+  const getFilteredProjects = () => {
+    let filtered = projects;
+    
+    if (selectedVertical) {
+      filtered = filtered.filter(project => project.verticalId === selectedVertical.id);
+    }
+    
+    return filtered.filter(project => 
+      projectActiveTab === 'all' ? true : project.status === projectActiveTab
+    );
+  };
+
+  // Get filtered centers based on selected project and active tab
+  const getFilteredCenters = () => {
+    let filtered = centers;
+    
+    if (selectedProject) {
+      filtered = filtered.filter(center => center.projectId === selectedProject.id);
+    }
+    
+    return filtered.filter(center => 
+      centerActiveTab === 'all' ? true : center.status === centerActiveTab
+    );
+  };
+
+  // Get filtered courses based on selected center and active tab
+  const getFilteredCourses = () => {
+    let filtered = courses;
+    
+    if (selectedCenter) {
+      filtered = filtered.filter(course => course.centerId === selectedCenter.id);
+    }
+    
+    return filtered.filter(course => 
+      courseActiveTab === 'all' ? true : course.status === courseActiveTab
+    );
+  };
+
+  // Get filtered batches based on selected course and active tab
+  const getFilteredBatches = () => {
+    let filtered = batches;
+    
+    if (selectedCourse) {
+      filtered = filtered.filter(batch => batch.courseId === selectedCourse.id);
+    }
+    
+    return filtered.filter(batch => 
+      batchActiveTab === 'all' ? true : batch.status === batchActiveTab
+    );
+  };
+
   // Filter candidates based on selected status, center, course, batch, and search query
   const getFilteredCandidates = () => {
     return candidates
@@ -245,26 +340,9 @@ const CandidateManagementPortal = () => {
       );
   };
 
-  // Get filtered centers based on selected project
-  const getFilteredCenters = () => {
-    if (!selectedProject) return centers;
-    return centers.filter(center => center.projectId === selectedProject.id);
-  };
-
-  // Get filtered courses based on selected center
-  const getFilteredCourses = () => {
-    if (!selectedCenter) return courses;
-    return courses.filter(course => course.centerId === selectedCenter.id);
-  };
-
-  // Get filtered batches based on selected course
-  const getFilteredBatches = () => {
-    if (!selectedCourse) return batches;
-    return batches.filter(batch => batch.courseId === selectedCourse.id);
-  };
-
   // Handle form input changes
   const handleFormChange = (e) => {
+    e.stopPropagation(); // Stop event propagation
     const { name, value } = e.target;
     setFormData({
       ...formData,
@@ -294,19 +372,118 @@ const CandidateManagementPortal = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     
     // Logic based on modal type
-    if (modalType === 'addProject') {
+    // if (modalType === 'addVertical') {
+    //   const newVertical = {
+    //     id: verticals.length + 1,
+    //     name: formData.name,
+    //     description: formData.description,
+    //     projects: 0,
+    //     status: formData.status || 'active'
+    //   };
+    //   setVerticals([...verticals, newVertical]);
+    //   showNotification('Vertical added successfully!');
+    // }
+  if (modalType === 'addVertical') {
+ try {
+  console.log('API hitting...');
+  const response = await fetch(`${backendUrl}/college/addVertical`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: formData.name,
+      description: formData.description,
+      status: formData.status || 'active',
+      approvedBy: null
+    })
+  });
+
+  const result = await response.json();
+  console.log('API Response:', result);
+
+  if (response.ok && result.status) {
+    setVerticals(prev => [
+      ...prev,
+      {
+        ...result.data,
+        id: result.data._id || prev.length + 1 // prefer _id from backend
+      }
+    ]);
+    showNotification('Vertical added successfully!');
+  } else {
+    showNotification(result.message || 'Failed to add vertical', 'error');
+  }
+} catch (err) {
+  console.error('API Error:', err);
+  showNotification('Something went wrong. Please try again.', 'error');
+}
+
+}
+
+// else if (modalType === 'editVertical') {
+//   try {
+//     const response = await fetch(`${backendUrl}/college/editVertical/${formData.id}`, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json'
+//       },
+//       body: JSON.stringify({
+//         name: formData.name,
+//         description: formData.description,
+//         status: formData.status,
+//         approvedBy: null
+//       })
+//     });
+
+//     const result = await response.json();
+
+// if (response.ok && result.status) {
+//   setVerticals(prev =>
+//     prev.map(vertical =>
+//       vertical._id === result.data._id ? { ...vertical, ...result.data } : vertical
+//     )
+//   );
+//   showNotification('Vertical updated successfully!');
+// } else {
+//   showNotification(result.message || 'Failed to update vertical', 'error');
+// }
+
+//   } catch (err) {
+//     console.error('Edit Vertical Error:', err);
+//     showNotification('An error occurred while updating vertical', 'error');
+//   }
+// }
+
+    else if (modalType === 'editVertical') {
+      setVerticals(verticals.map(vertical => 
+        vertical.id === formData.id ? { ...vertical, ...formData } : vertical
+      ));
+      showNotification('Vertical updated successfully!');
+    }
+    else if (modalType === 'addProject') {
       const newProject = {
         id: projects.length + 1,
         name: formData.name,
         description: formData.description,
-        status: 'active',
-        centers: 0
+        status: formData.status || 'active',
+        centers: 0,
+        verticalId: selectedVertical ? selectedVertical.id : parseInt(formData.verticalId)
       };
       setProjects([...projects, newProject]);
+      
+      // Update vertical's project count
+      if (selectedVertical) {
+        setVerticals(verticals.map(vertical =>
+          vertical.id === selectedVertical.id ? { ...vertical, projects: vertical.projects + 1 } : vertical
+        ));
+      }
+      
       showNotification('Project added successfully!');
     }
     else if (modalType === 'editProject') {
@@ -322,6 +499,7 @@ const CandidateManagementPortal = () => {
         candidates: 0,
         address: formData.address,
         contact: formData.contact,
+        status: formData.status || 'active',
         projectId: selectedProject ? selectedProject.id : parseInt(formData.projectId)
       };
       setCenters([...centers, newCenter]);
@@ -339,6 +517,7 @@ const CandidateManagementPortal = () => {
         name: formData.name,
         duration: formData.duration,
         students: 0,
+        status: formData.status || 'active',
         centerId: selectedCenter ? selectedCenter.id : parseInt(formData.centerId),
         description: formData.description
       };
@@ -358,7 +537,7 @@ const CandidateManagementPortal = () => {
         startDate: formData.startDate,
         endDate: formData.endDate,
         students: 0,
-        status: 'active',
+        status: formData.status || 'active',
         courseId: selectedCourse ? selectedCourse.id : parseInt(formData.courseId)
       };
       setBatches([...batches, newBatch]);
@@ -415,6 +594,90 @@ const CandidateManagementPortal = () => {
     
     closeModal();
   };
+
+  // Tab component for all sections
+  const TabsComponent = ({ activeTab, setActiveTab, tabs }) => (
+    <div className="mb-3 border-bottom">
+      <ul className="nav nav-tabs border-0">
+        {tabs.map(tab => (
+          <li className="nav-item" key={tab.value}>
+            <button
+              onClick={() => setActiveTab(tab.value)}
+              className={`nav-link ${activeTab === tab.value ? 'active text-primary fw-medium border-primary border-top-0 border-start-0 border-end-0 border-3 rounded-0' : 'text-muted'}`}
+            >
+              {tab.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  // Verticals list view
+  const VerticalsView = () => (
+    <div className="card shadow-sm mb-4">
+      <div className="card-header bg-white">
+        <div className="d-flex justify-content-between align-items-center mb-3 gap-4">
+          <div className="d-flex align-items-center">
+            <h5 className="mb-0">Verticals</h5>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => openModal('addVertical')}>
+            Add Vertical
+          </button>
+        </div>
+        
+        <TabsComponent 
+          activeTab={verticalActiveTab}
+          setActiveTab={setVerticalActiveTab}
+          tabs={[
+            { value: 'active', label: 'Active Verticals' },
+            { value: 'inactive', label: 'Inactive Verticals' },
+            { value: 'all', label: 'All Verticals' }
+          ]}
+        />
+      </div>
+      <div className="card-body">
+        <div className="row">
+          {getFilteredVerticals().map(vertical => (
+            <div key={vertical.id} className="col-md-4 mb-3">
+              <div className="card h-100 cursor-pointer border-hover" onClick={() => navigateTo('projects', vertical)}>
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h5 className="card-title mb-2">{vertical.name}</h5>
+                      <p className="text-muted small mb-3">{vertical.description}</p>
+                      <span className={`text-white p-1 bg-${vertical.status === 'active' ? 'success' : 'secondary'} mb-3`}>
+                        {vertical.status}
+                      </span>
+                    </div>
+                    <ChevronRight size={20} className="text-muted" />
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center pt-2 border-top">
+                    <span className="text-muted small">
+                      {projects.filter(p => p.verticalId === vertical.id).length} Projects
+                    </span>
+                    <div>
+                      <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
+                        e.stopPropagation();
+                        openModal('editVertical', vertical);
+                      }}>
+                        <Edit size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {getFilteredVerticals().length === 0 && (
+            <div className="col-12 text-center py-5">
+              <p className="text-muted">No verticals found. Try changing the filter or add a new vertical.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   // Dashboard component
   const Dashboard = () => (
@@ -490,6 +753,47 @@ const CandidateManagementPortal = () => {
         </div>
       </div>
 
+      {/* Verticals Overview */}
+      <div className="card shadow-sm mb-4">
+        <div className="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 className="mb-0">Verticals Overview</h5>
+          <button className="btn btn-primary btn-sm" onClick={() => setViewMode('verticals')}>
+            View All Verticals
+          </button>
+        </div>
+        <div className="card-body">
+          <div className="row">
+            {verticals.filter(vertical => vertical.status === 'active').map(vertical => (
+              <div key={vertical.id} className="col-md-4 mb-3">
+                <div className="card h-100 cursor-pointer" onClick={() => navigateTo('projects', vertical)}>
+                  <div className="card-body">
+                    <div className="d-flex justify-content-between mb-2">
+                      <h5 className="card-title">{vertical.name}</h5>
+                      <div>
+                        <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
+                          e.stopPropagation();
+                          openModal('editVertical', vertical);
+                        }}>
+                          <Edit size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-muted small mb-3">{vertical.description}</p>
+                    <div className="d-flex justify-content-between align-items-center pt-2 border-top">
+                      <span className="text-muted small">
+                        {projects.filter(p => p.verticalId === vertical.id).length} Projects
+                      </span>
+                      <span className="text-primary small fw-medium">View Details</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Projects Overview */}
       <div className="card shadow-sm mb-4">
         <div className="card-header bg-white d-flex justify-content-between align-items-center">
           <h5 className="mb-0">Projects Overview</h5>
@@ -499,14 +803,14 @@ const CandidateManagementPortal = () => {
         </div>
         <div className="card-body">
           <div className="row">
-            {projects.map(project => (
+            {projects.filter(project => project.status === 'active').map(project => (
               <div key={project.id} className="col-md-4 mb-3">
                 <div className="card h-100 cursor-pointer" onClick={() => navigateTo('centers', project)}>
                   <div className="card-body">
                     <div className="d-flex justify-content-between mb-2">
                       <h5 className="card-title">{project.name}</h5>
                       <div>
-                        <button className="btn btn-sm btn-light me-1" onClick={(e) => {
+                        <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
                           e.stopPropagation();
                           openModal('editProject', project);
                         }}>
@@ -534,17 +838,36 @@ const CandidateManagementPortal = () => {
   // Projects list view
   const ProjectsView = () => (
     <div className="card shadow-sm mb-4">
-      <div className="card-header bg-white d-flex justify-content-between align-items-center">
-        <div className="d-flex align-items-center">
-          <h5 className="mb-0">Projects</h5>
+      <div className="card-header bg-white">
+        <div className="d-flex justify-content-between align-items-center mb-3 gap-4">
+          <div className="d-flex align-items-center">
+            {selectedVertical && (
+              <button className="btn btn-primary btn-sm me-2" onClick={goBack}>
+                <ArrowLeft size={16} />
+              </button>
+            )}
+            <h5 className="mb-0">
+              Projects {selectedVertical && `- ${selectedVertical.name}`}
+            </h5>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => openModal('addProject')}>
+            Add Project
+          </button>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => openModal('addProject')}>
-          Add Project
-        </button>
+        
+        <TabsComponent 
+          activeTab={projectActiveTab}
+          setActiveTab={setProjectActiveTab}
+          tabs={[
+            { value: 'active', label: 'Active Projects' },
+            { value: 'inactive', label: 'Inactive Projects' },
+            { value: 'all', label: 'All Projects' }
+          ]}
+        />
       </div>
       <div className="card-body">
         <div className="row">
-          {projects.map(project => (
+          {getFilteredProjects().map(project => (
             <div key={project.id} className="col-md-4 mb-3">
               <div className="card h-100 cursor-pointer border-hover" onClick={() => navigateTo('centers', project)}>
                 <div className="card-body">
@@ -552,7 +875,7 @@ const CandidateManagementPortal = () => {
                     <div>
                       <h5 className="card-title mb-2">{project.name}</h5>
                       <p className="text-muted small mb-3">{project.description}</p>
-                      <span className={`badge bg-${project.status === 'active' ? 'success' : 'secondary'} mb-3`}>
+                      <span className={`text-white p-1 bg-${project.status === 'active' ? 'success' : 'secondary'} mb-3`}>
                         {project.status}
                       </span>
                     </div>
@@ -563,7 +886,7 @@ const CandidateManagementPortal = () => {
                       {centers.filter(c => c.projectId === project.id).length} Centers
                     </span>
                     <div>
-                      <button className="btn btn-sm btn-light me-1" onClick={(e) => {
+                      <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
                         e.stopPropagation();
                         openModal('editProject', project);
                       }}>
@@ -575,6 +898,11 @@ const CandidateManagementPortal = () => {
               </div>
             </div>
           ))}
+          {getFilteredProjects().length === 0 && (
+            <div className="col-12 text-center py-5">
+              <p className="text-muted">No projects found. Try changing the filter or add a new project.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -583,18 +911,30 @@ const CandidateManagementPortal = () => {
   // Centers list view
   const CentersView = () => (
     <div className="card shadow-sm mb-4">
-      <div className="card-header bg-white d-flex justify-content-between align-items-center">
-        <div className="d-flex align-items-center">
-          <button className="btn btn-primary btn-sm me-2" onClick={goBack}>
-            <ArrowLeft size={16} />
+      <div className="card-header bg-white">
+        <div className="d-flex justify-content-between align-items-center mb-3 gap-4">
+          <div className="d-flex align-items-center">
+            <button className="btn btn-primary btn-sm me-2" onClick={goBack}>
+              <ArrowLeft size={16} />
+            </button>
+            <h5 className="mb-0">
+              Centers {selectedProject && `- ${selectedProject.name}`}
+            </h5>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => openModal('addCenter')}>
+            Add Center
           </button>
-          <h5 className="mb-0">
-            Centers {selectedProject && `- ${selectedProject.name}`}
-          </h5>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => openModal('addCenter')}>
-          Add Center
-        </button>
+        
+        <TabsComponent 
+          activeTab={centerActiveTab}
+          setActiveTab={setCenterActiveTab}
+          tabs={[
+            { value: 'active', label: 'Active Centers' },
+            { value: 'inactive', label: 'Inactive Centers' },
+            { value: 'all', label: 'All Centers' }
+          ]}
+        />
       </div>
       <div className="card-body">
         <div className="row">
@@ -608,6 +948,9 @@ const CandidateManagementPortal = () => {
                       <p className="text-primary mb-1">{center.candidates} Students</p>
                       <p className="text-muted small mb-1">{center.address}</p>
                       <p className="text-muted small mb-3">{center.contact}</p>
+                      <span className={`text-white p-1 bg-${center.status === 'active' ? 'success' : 'secondary'} mb-3`}>
+                        {center.status}
+                      </span>
                     </div>
                     <ChevronRight size={20} className="text-muted" />
                   </div>
@@ -616,7 +959,7 @@ const CandidateManagementPortal = () => {
                       {courses.filter(c => c.centerId === center.id).length} Courses
                     </span>
                     <div>
-                      <button className="btn btn-sm btn-light me-1" onClick={(e) => {
+                      <button className="btn btn-sm btn-light me-1 border-0" onClick={(e) => {
                         e.stopPropagation();
                         openModal('editCenter', center);
                       }}>
@@ -628,6 +971,11 @@ const CandidateManagementPortal = () => {
               </div>
             </div>
           ))}
+          {getFilteredCenters().length === 0 && (
+            <div className="col-12 text-center py-5">
+              <p className="text-muted">No centers found. Try changing the filter or add a new center.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -636,18 +984,30 @@ const CandidateManagementPortal = () => {
   // Courses list view
   const CoursesView = () => (
     <div className="card shadow-sm mb-4">
-      <div className="card-header bg-white d-flex justify-content-between align-items-center">
-        <div className="d-flex align-items-center">
-          <button className="btn btn-primary btn-sm me-2" onClick={goBack}>
-            <ArrowLeft size={16} />
+      <div className="card-header bg-white">
+        <div className="d-flex justify-content-between align-items-center mb-3 gap-4">
+          <div className="d-flex align-items-center">
+            <button className="btn btn-primary btn-sm me-2" onClick={goBack}>
+              <ArrowLeft size={16} />
+            </button>
+            <h5 className="mb-0">
+              Courses {selectedCenter && `- ${selectedCenter.name}`}
+            </h5>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => openModal('addCourse')}>
+            Add Course
           </button>
-          <h5 className="mb-0">
-            Courses {selectedCenter && `- ${selectedCenter.name}`}
-          </h5>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => openModal('addCourse')}>
-          Add Course
-        </button>
+        
+        <TabsComponent 
+          activeTab={courseActiveTab}
+          setActiveTab={setCourseActiveTab}
+          tabs={[
+            { value: 'active', label: 'Active Courses' },
+            { value: 'inactive', label: 'Inactive Courses' },
+            { value: 'all', label: 'All Courses' }
+          ]}
+        />
       </div>
       <div className="card-body">
         <div className="row">
@@ -660,6 +1020,9 @@ const CandidateManagementPortal = () => {
                       <h5 className="card-title mb-2">{course.name}</h5>
                       <p className="text-muted small mb-1">Duration: {course.duration}</p>
                       <p className="text-muted small mb-3">{course.description}</p>
+                      <span className={`text-white p-1 bg-${course.status === 'active' ? 'success' : 'secondary'} mb-3`}>
+                        {course.status}
+                      </span>
                     </div>
                     <ChevronRight size={20} className="text-muted" />
                   </div>
@@ -680,6 +1043,11 @@ const CandidateManagementPortal = () => {
               </div>
             </div>
           ))}
+          {getFilteredCourses().length === 0 && (
+            <div className="col-12 text-center py-5">
+              <p className="text-muted">No courses found. Try changing the filter or add a new course.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -688,18 +1056,31 @@ const CandidateManagementPortal = () => {
   // Batches list view
   const BatchesView = () => (
     <div className="card shadow-sm mb-4">
-      <div className="card-header bg-white d-flex justify-content-between align-items-center">
-        <div className="d-flex align-items-center">
-          <button className="btn btn-primary btn-sm me-2" onClick={goBack}>
-            <ArrowLeft size={16} />
+      <div className="card-header bg-white">
+        <div className="d-flex justify-content-between align-items-center mb-3 gap-4">
+          <div className="d-flex align-items-center">
+            <button className="btn btn-primary btn-sm me-2" onClick={goBack}>
+              <ArrowLeft size={16} />
+            </button>
+            <h5 className="mb-0">
+              Batches {selectedCourse && `- ${selectedCourse.name}`}
+            </h5>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => openModal('addBatch')}>
+            Add Batch
           </button>
-          <h5 className="mb-0">
-            Batches {selectedCourse && `- ${selectedCourse.name}`}
-          </h5>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => openModal('addBatch')}>
-          Add Batch
-        </button>
+        
+        <TabsComponent 
+          activeTab={batchActiveTab}
+          setActiveTab={setBatchActiveTab}
+          tabs={[
+            { value: 'active', label: 'Active Batches' },
+            { value: 'inactive', label: 'Inactive Batches' },
+            { value: 'completed', label: 'Completed Batches' },
+            { value: 'all', label: 'All Batches' }
+          ]}
+        />
       </div>
       <div className="card-body">
         <div className="row">
@@ -710,7 +1091,7 @@ const CandidateManagementPortal = () => {
                   <div className="d-flex justify-content-between align-items-start mb-3">
                     <div>
                       <h5 className="card-title mb-2">{batch.name}</h5>
-                      <span className={`badge bg-${batch.status === 'active' ? 'success' : batch.status === 'completed' ? 'secondary' : 'warning'}`}>
+                      <span className={`text-white p-1 bg-${batch.status === 'active' ? 'success' : batch.status === 'completed' ? 'secondary' : 'warning'}`}>
                         {batch.status}
                       </span>
                     </div>
@@ -737,6 +1118,11 @@ const CandidateManagementPortal = () => {
               </div>
             </div>
           ))}
+          {getFilteredBatches().length === 0 && (
+            <div className="col-12 text-center py-5">
+              <p className="text-muted">No batches found. Try changing the filter or add a new batch.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -787,10 +1173,7 @@ const CandidateManagementPortal = () => {
               <button className="btn btn-light me-2">
                 <Download size={18} />
               </button>
-              <button className="btn btn-primary d-flex align-items-center" onClick={() => openModal('addStudent')}>
-                <UserPlus size={18} className="me-2" />
-                Add Student
-              </button>
+             
             </div>
           </div>
         </div>
@@ -799,8 +1182,13 @@ const CandidateManagementPortal = () => {
         <nav aria-label="breadcrumb" className="px-3 pt-3">
           <ol className="breadcrumb mb-0">
             <li className="breadcrumb-item">
-              <a href="#" onClick={() => handleBreadcrumbClick('projects')}>Projects</a>
+              <a href="#" onClick={() => handleBreadcrumbClick('verticals')}>Verticals</a>
             </li>
+            {selectedVertical && (
+              <li className="breadcrumb-item">
+                <a href="#" onClick={() => handleBreadcrumbClick('projects')}>{selectedVertical.name}</a>
+              </li>
+            )}
             {selectedProject && (
               <li className="breadcrumb-item">
                 <a href="#" onClick={() => handleBreadcrumbClick('centers')}>{selectedProject.name}</a>
@@ -860,17 +1248,17 @@ const CandidateManagementPortal = () => {
                       <td>{candidate.course}</td>
                       <td>{candidate.batch}</td>
                       <td>
-                        <span className={`badge bg-${candidate.status === 'pursuing' ? 'primary' : candidate.status === 'completed' ? 'success' : 'danger'}`}>
+                        <span className={`text-white p-1 bg-${candidate.status === 'pursuing' ? 'primary' : candidate.status === 'completed' ? 'success' : 'danger'}`}>
                           {candidate.status}
                         </span>
                       </td>
                       <td>{candidate.enrollmentDate}</td>
                       <td>
                         <div className="d-flex">
-                          <button className="btn btn-sm btn-light me-1" onClick={() => openModal('viewStudent', candidate)}>
+                          <button className="btn btn-sm btn-light me-1 border-0" onClick={() => openModal('viewStudent', candidate)}>
                             <Eye size={16} />
                           </button>
-                          <button className="btn btn-sm btn-light me-1" onClick={() => openModal('editStudent', candidate)}>
+                          <button className="btn btn-sm btn-light me-1 border-0" onClick={() => openModal('editStudent', candidate)}>
                             <Edit size={16} />
                           </button>
                         </div>
@@ -888,10 +1276,7 @@ const CandidateManagementPortal = () => {
                         </div>
                         <h5>No students found</h5>
                         <p className="text-muted">Try adjusting your filters or add a new student</p>
-                        <button className="btn btn-primary" onClick={() => openModal('addStudent')}>
-                          <UserPlus size={18} className="me-2" />
-                          Add Student
-                        </button>
+                        
                       </div>
                     </td>
                   </tr>
@@ -910,24 +1295,49 @@ const CandidateManagementPortal = () => {
     let formFields = [];
     let modalTitle = '';
 
-    if (modalType === 'addProject' || modalType === 'editProject') {
+    if (modalType === 'addVertical' || modalType === 'editVertical') {
+      modalTitle = modalType === 'addVertical' ? 'Add New Vertical' : 'Edit Vertical';
+      formFields = [
+        { name: 'name', label: 'Vertical Name', type: 'text', placeholder: 'Enter vertical name', required: true },
+        { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Enter vertical description', required: true },
+        { name: 'status', label: 'Status', type: 'select', options: [
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' }
+        ], required: true }
+      ];
+    }
+    else if (modalType === 'addProject' || modalType === 'editProject') {
       modalTitle = modalType === 'addProject' ? 'Add New Project' : 'Edit Project';
       formFields = [
         { name: 'name', label: 'Project Name', type: 'text', placeholder: 'Enter project name', required: true },
         { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Enter project description', required: true },
         { name: 'status', label: 'Status', type: 'select', options: [
           { value: 'active', label: 'Active' },
-          { value: 'completed', label: 'Completed' },
-          { value: 'upcoming', label: 'Upcoming' }
+          { value: 'inactive', label: 'Inactive' }
         ], required: true }
       ];
+      
+      // Add vertical selection if not in a specific vertical context
+      if (!selectedVertical) {
+        formFields.push({
+          name: 'verticalId',
+          label: 'Vertical',
+          type: 'select',
+          options: verticals.map(vertical => ({ value: vertical.id, label: vertical.name })),
+          required: true
+        });
+      }
     }
     else if (modalType === 'addCenter' || modalType === 'editCenter') {
       modalTitle = modalType === 'addCenter' ? 'Add New Center' : 'Edit Center';
       formFields = [
         { name: 'name', label: 'Center Name', type: 'text', placeholder: 'Enter center name', required: true },
         { name: 'address', label: 'Address', type: 'text', placeholder: 'Enter center address', required: true },
-        { name: 'contact', label: 'Contact Number', type: 'text', placeholder: 'Enter contact number', required: true }
+        { name: 'contact', label: 'Contact Number', type: 'text', placeholder: 'Enter contact number', required: true },
+        { name: 'status', label: 'Status', type: 'select', options: [
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' }
+        ], required: true }
       ];
 
       // Add project selection if not in a specific project context
@@ -946,7 +1356,11 @@ const CandidateManagementPortal = () => {
       formFields = [
         { name: 'name', label: 'Course Name', type: 'text', placeholder: 'Enter course name', required: true },
         { name: 'duration', label: 'Duration', type: 'text', placeholder: 'e.g. 6 months', required: true },
-        { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Enter course description', required: true }
+        { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Enter course description', required: true },
+        { name: 'status', label: 'Status', type: 'select', options: [
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' }
+        ], required: true }
       ];
 
       // Add center selection if not in a specific center context
@@ -968,8 +1382,8 @@ const CandidateManagementPortal = () => {
         { name: 'endDate', label: 'End Date', type: 'date', required: true },
         { name: 'status', label: 'Status', type: 'select', options: [
           { value: 'active', label: 'Active' },
-          { value: 'completed', label: 'Completed' },
-          { value: 'upcoming', label: 'Upcoming' }
+          { value: 'inactive', label: 'Inactive' },
+          { value: 'completed', label: 'Completed' }
         ], required: true }
       ];
 
@@ -1048,9 +1462,18 @@ const CandidateManagementPortal = () => {
       // This is just a view mode, no form fields needed
     }
 
+    // Modal event handlers to prevent form input focus issues
+    const handleModalClick = (e) => {
+      e.stopPropagation();
+    };
+
+    const handleInputClick = (e) => {
+      e.stopPropagation();
+    };
+
     return (
-      <div className={`modal ${showModal ? 'd-block' : ''}`} tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <div className="modal-dialog modal-dialog-centered">
+      <div className={`modal ${showModal ? 'd-block' : ''}`} tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={closeModal}>
+        <div className="modal-dialog modal-dialog-centered" onClick={handleModalClick}>
           <div className="modal-content">
             <div className="modal-header">
               <h5 className="modal-title">{modalTitle}</h5>
@@ -1060,11 +1483,11 @@ const CandidateManagementPortal = () => {
             {modalType === 'viewStudent' ? (
               <div className="modal-body">
                 <div className="text-center mb-3">
-                  <div className="student-avatar bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style={{ width: "64px", height: "64px" }}>
+                  <div className="student-avatar bg-primary text-white p-1 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style={{ width: "64px", height: "64px" }}>
                     {formData.name?.charAt(0)}
                   </div>
                   <h4 className="mb-1">{formData.name}</h4>
-                  <span className={`badge bg-${formData.status === 'pursuing' ? 'primary' : formData.status === 'completed' ? 'success' : 'danger'}`}>
+                  <span className={`text-white p-1 bg-${formData.status === 'pursuing' ? 'primary' : formData.status === 'completed' ? 'success' : 'danger'}`}>
                     {formData.status}
                   </span>
                 </div>
@@ -1111,7 +1534,8 @@ const CandidateManagementPortal = () => {
                 
                 <div className="modal-footer">
                   <button type="button" className="btn btn-secondary" onClick={closeModal}>Close</button>
-                  <button type="button" className="btn btn-primary" onClick={() => {
+                  <button type="button" className="btn btn-primary" onClick={(e) => {
+                    e.stopPropagation();
                     closeModal();
                     openModal('editStudent', formData);
                   }}>Edit Student</button>
@@ -1130,6 +1554,7 @@ const CandidateManagementPortal = () => {
                           name={field.name}
                           value={formData[field.name] || ''}
                           onChange={handleFormChange}
+                          onClick={handleInputClick}
                           className="form-select"
                           required={field.required}
                         >
@@ -1146,6 +1571,7 @@ const CandidateManagementPortal = () => {
                           name={field.name}
                           value={formData[field.name] || ''}
                           onChange={handleFormChange}
+                          onClick={handleInputClick}
                           placeholder={field.placeholder}
                           className="form-control"
                           rows="3"
@@ -1158,6 +1584,7 @@ const CandidateManagementPortal = () => {
                           name={field.name}
                           value={formData[field.name] || ''}
                           onChange={handleFormChange}
+                          onClick={handleInputClick}
                           placeholder={field.placeholder}
                           className="form-control"
                           required={field.required}
@@ -1184,6 +1611,8 @@ const CandidateManagementPortal = () => {
   // Main content based on view mode
   const renderContent = () => {
     switch (viewMode) {
+      case 'verticals':
+        return <VerticalsView />;
       case 'dashboard':
         return <Dashboard />;
       case 'projects':
@@ -1197,7 +1626,7 @@ const CandidateManagementPortal = () => {
       case 'candidates':
         return <CandidateList />;
       default:
-        return <ProjectsView />;
+        return <VerticalsView />;
     }
   };
 
@@ -1251,7 +1680,8 @@ const CandidateManagementPortal = () => {
               <button
                 onClick={() => {
                   setActiveTab('details');
-                  setViewMode('projects');
+                  setViewMode('verticals');
+                  setSelectedVertical(null);
                   setSelectedProject(null);
                   setSelectedCenter(null);
                   setSelectedCourse(null);
@@ -1292,6 +1722,78 @@ const CandidateManagementPortal = () => {
 
         .student-avatar {
           font-weight: 500;
+        }
+        
+        /* Custom tab styling */
+        .nav-tabs {
+          border-bottom: none;
+        }
+        
+        .nav-tabs .nav-link {
+          border: none;
+          padding: 0.5rem 1rem;
+          margin-right: 1rem;
+          color: #6c757d;
+          font-weight: 500;
+          transition: all 0.2s ease-in-out;
+        }
+        
+        .nav-tabs .nav-link:hover {
+          color: #0d6efd;
+          background-color: transparent;
+        }
+        
+        .nav-tabs .nav-link.active {
+          color: #0d6efd;
+          background-color: transparent;
+          border-bottom: 3px solid #0d6efd;
+          font-weight: 600;
+        }
+        
+        /* Modal form styling */
+        .modal-dialog {
+          max-width: 500px;
+        }
+        
+        .form-control:focus,
+        .form-select:focus {
+          border-color: #0d6efd;
+          box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        
+        /* Make sure the font styles are consistent */
+        .form-control, 
+        .form-select {
+          font-size: 0.875rem;
+        }
+        
+        /* Improve input focus visibility */
+        .form-control:focus,
+        .form-select:focus,
+        .form-check-input:focus {
+          border-color: #86b7fe;
+          box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        
+        /* Ensure consistent button styling */
+        .btn {
+          font-weight: 500;
+        }
+        
+        /* Responsive fixes for mobile */
+        @media (max-width: 768px) {
+          .nav-tabs .nav-link {
+            margin-right: 0.5rem;
+            padding: 0.5rem 0.5rem;
+          }
+          
+          .card-header {
+            padding: 1rem;
+          }
+          
+          .modal-dialog {
+            margin: 0.5rem;
+          }
         }
       `}</style>
     </div>

@@ -526,7 +526,8 @@ router.get("/event", async (req, res) => {
 
 	const countEvents = await Event.find(filter).countDocuments()
 	const events = await Event.find(filter)
-	
+	console.log('events......' , events)
+	console.log('events......length' , events.length)
 	const perPage = 50;
 	const p = parseInt(req.query.page);
 	const page = p || 1;

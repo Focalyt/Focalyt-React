@@ -72,4 +72,7 @@ module.exports.EducationBoard = require("./educationBoard");
 module.exports.Universities = require("./universities");
 module.exports.StudentRegistration = require("./studentRegistration");
 module.exports.AccessUser = require("./AccessUserSchema");
+module.exports.Vertical = require("./verticals");
+module.exports.Project = require("./Project");
+module.exports.centerSchema = require("./center");
 // module.exports.Manager = required("");

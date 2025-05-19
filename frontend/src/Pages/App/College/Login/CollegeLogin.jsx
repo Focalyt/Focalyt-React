@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { useLocation } from 'react-router-dom';
 import "./CollegeLogin.css";
+
 const CollegeLogin = () => {
     const urlLocation = useLocation();
     const queryParams = new URLSearchParams(urlLocation.search);
@@ -13,6 +15,22 @@ const CollegeLogin = () => {
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [activeTab, setActiveTab] = useState('login');
+    const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'otp'
+    const [otp, setOtp] = useState('');
+    const [showOtpField, setShowOtpField] = useState(false);
+    const [isUserInputDisabled, setIsUserInputDisabled] = useState(false);
+    
+    // Forgot password states
+    const [showForgotModal, setShowForgotModal] = useState(false);
+    const [forgotStep, setForgotStep] = useState(1); // 1: mobile input, 2: OTP verify, 3: new password
+    const [forgotMobile, setForgotMobile] = useState('');
+    const [forgotOtp, setForgotOtp] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    
+    // Logo URL
+    const logoUrl = "/Assets/images/logo/logo.png";
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const loginBtnRef = useRef(null);
@@ -28,33 +46,220 @@ const CollegeLogin = () => {
         setShowPassword(!showPassword);
     };
 
+    const toggleNewPassword = () => {
+        setShowNewPassword(!showNewPassword);
+    };
+
     const handleLogin = async () => {
-        const body = {
-            userInput,
-            password,
-            module: 'college'
-        };
+        if (loginMethod === 'password') {
+            // Existing password login
+            const body = {
+                userInput,
+                password,
+                module: 'college'
+            };
 
-        try {
-            const verifyRes = await axios.post(`${backendUrl}/college/login`, body);
+            try {
+                const verifyRes = await axios.post(`${backendUrl}/college/login`, body);
 
-            if (verifyRes.data.status === true) {
-                setErrorMessage('');
-                setSuccessMessage('Password verified');
-                sessionStorage.setItem("user",JSON.stringify(verifyRes.data.userData));
-                if (returnUrl) {
-                    window.location.href = decodeURIComponent(returnUrl);
+                if (verifyRes.data.status === true) {
+                    setErrorMessage('');
+                    setSuccessMessage('Password verified');
+                    sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
+                    if (returnUrl) {
+                        window.location.href = decodeURIComponent(returnUrl);
+                    } else {
+                        window.location.href = '/institute/dashboard';
+                    }
                 } else {
-                    window.location.href = '/institute/dashboard';
+                    setSuccessMessage('');
+                    setErrorMessage('Login failed !!!');
                 }
-            } else {
-                setSuccessMessage('');
+
+            } catch (err) {
+                console.error("Error in login:", err);
                 setErrorMessage('Login failed !!!');
             }
+        } else {
+            // OTP login
+            // Verify OTP here
+            try {
+                const body = {
+                    userInput,
+                    otp,
+                    module: 'college'
+                };
+                
+                const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, body);
+                
+                if (verifyRes.data.status === true) {
+                    setErrorMessage('');
+                    setSuccessMessage('OTP verified');
+                    sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
+                    if (returnUrl) {
+                        window.location.href = decodeURIComponent(returnUrl);
+                    } else {
+                        window.location.href = '/institute/dashboard';
+                    }
+                } else {
+                    setSuccessMessage('');
+                    setErrorMessage('OTP verification failed !!!');
+                }
+            } catch (err) {
+                console.error("Error in OTP verification:", err);
+                setErrorMessage('OTP verification failed !!!');
+            }
+        }
+    };
 
+    const sendOtp = async () => {
+        try {
+            // Validate userInput (email or mobile)
+            if (!userInput) {
+                setErrorMessage('Please enter mobile number or email');
+                return;
+            }
+            
+            const body = {
+                userInput,
+                module: 'college'
+            };
+            
+            const sendRes = await axios.post(`${backendUrl}/api/sendOtp`, body);
+            
+            if (sendRes.data.status === true) {
+                            toast.success(sendRes.data.message);
+
+               
+                setShowOtpField(true); // Show OTP field after successful OTP send
+                setIsUserInputDisabled(true); // Disable the mobile/email input
+            } else {
+                toast.error(sendRes.data.message);
+                setSuccessMessage('');
+                setErrorMessage(sendRes.data.message);
+            }
         } catch (err) {
-            console.error("Error in login:", err);
-            setErrorMessage('Login failed !!!');
+            console.error("Error in sending OTP:", err);
+            setErrorMessage('Failed to send OTP !!!');
+        }
+    };
+    
+    const handleChangeNumber = () => {
+        setIsUserInputDisabled(false);
+        setShowOtpField(false);
+        setOtp('');
+    };
+    
+    // Forgot password functions
+    const openForgotModal = () => {
+        setShowForgotModal(true);
+        setForgotStep(1);
+        setForgotMobile('');
+        setForgotOtp('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setErrorMessage('');
+        setSuccessMessage('');
+    };
+    
+    const closeForgotModal = () => {
+        setShowForgotModal(false);
+    };
+    
+    const sendForgotOtp = async () => {
+        try {
+            // Validate mobile/email
+            if (!forgotMobile) {
+                setErrorMessage('Please enter mobile number or email');
+                return;
+            }
+            
+            const body = {
+                userInput: forgotMobile,
+                module: 'college',
+            };
+            
+            const sendRes = await axios.post(`${backendUrl}/api/sendOtp`, body);
+            
+            if (sendRes.data.status === true) {
+                            toast.success(sendRes.data.message);
+
+                setForgotStep(2);
+            } else {
+            toast.error(sendRes.data.message);
+
+            }
+        } catch (err) {
+            console.error("Error in sending forgot OTP:", err);
+            setErrorMessage('Failed to send OTP !!!');
+        }
+    };
+    
+    const verifyForgotOtp = async () => {
+        try {
+            // Validate OTP
+            if (!forgotOtp) {
+                setErrorMessage('Please enter OTP');
+                return;
+            }
+            
+            const body = {
+                userInput: forgotMobile,
+                otp: forgotOtp,
+                module: 'college',
+                purpose: 'reset_password'
+            };
+            
+            const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, body);
+            
+            if (verifyRes.data.status === true) {
+                setErrorMessage('');
+                setSuccessMessage('OTP verified successfully');
+                setForgotStep(3);
+            } else {
+                setSuccessMessage('');
+                setErrorMessage('OTP verification failed !!!');
+            }
+        } catch (err) {
+            console.error("Error in verifying forgot OTP:", err);
+            setErrorMessage('OTP verification failed !!!');
+        }
+    };
+    
+    const resetPassword = async () => {
+        try {
+            // Validate password
+            if (!newPassword) {
+                setErrorMessage('Please enter new password');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                setErrorMessage('Passwords do not match');
+                return;
+            }
+            
+            const body = {
+                userInput: forgotMobile,
+                password: newPassword,
+                module: 'college'
+            };
+            
+            const resetRes = await axios.post(`${backendUrl}/college/reset-password`, body);
+            
+            if (resetRes.data.status === true) {
+                setErrorMessage('');
+                setSuccessMessage('Password reset successfully');
+                setTimeout(() => {
+                    closeForgotModal();
+                }, 2000);
+            } else {
+                setSuccessMessage('');
+                setErrorMessage('Failed to reset password !!!');
+            }
+        } catch (err) {
+            console.error("Error in resetting password:", err);
+            setErrorMessage('Failed to reset password !!!');
         }
     };
 
@@ -67,215 +272,558 @@ const CollegeLogin = () => {
     };
 
     return (
-        <div
-            className="vertical-layout vertical-menu-modern 1-column navbar-floating footer-static bg-full-screen-image blank-page blank-page"
-            data-open="click"
-            data-menu="vertical-menu-modern"
-            data-col="1-column"
-        >
-            {/* Google Tag Manager (noscript) */}
-            {/* <noscript>
-                <iframe 
-                    src="https://www.googletagmanager.com/ns.html?id=GTM-W39K27R"
-                    height="0"
-                    width="0"
-                    style={{ display: 'none', visibility: 'hidden' }}
-                ></iframe>
-            </noscript> */}
-            {/* End Google Tag Manager (noscript) */}
-
-            <div className="app-content content">
-                <div className="content-overlay"></div>
-                <div className="header-navbar-shadow"></div>
-                <div className="content-wrapper">
-                    <div className="content-header row"></div>
-                    <div className="content-body" id="login_card">
-                        <section className="row flexbox-container">
-                            <div className="col-xl-6 col-lg-7 col-sm-9 col-12 d-flex justify-content-center mx-auto px-3">
-                                <div className="col-xl-12 card bg-authentication rounded mb-0 shadow px-0 card-placement">
-                                    <div className="row m-0">
-                                        <div className="col-lg-12 col-sm-12 col-12 text-center align-self-center px-1 py-0 logo_sec">
-                                            <img
-                                                src="/Assets/images/logo/logo.png"
-                                                alt="branding logo"
-                                                className="img-fluid brand_logo py-1 w-25"
-                                            />
-                                        </div>
-                                        <div className="col-lg-12 col-sm-12 col-12 col-12 p-0">
-                                            <div className="card rounded-0 mb-0 px-xl-2 px-lg-2 px-md-2 px-sm-0 px-0 card-placement-bottom">
-                                                <div className="card-header pb-1 px-1">
-                                                    <div className="card-title">
-                                                        <h4>Institute Portal</h4>
-                                                    </div>
-                                                </div>
-                                                <p className="card-header pt-0 px-1">Please login to your account</p>
-                                                <div className="card-content card-placement-bottom">
-                                                    <div className="card-body px-1">
-                                                        <ul className="nav nav-tabs justify-content-left" role="tablist">
-                                                            <li className="nav-item">
-                                                                <a
-                                                                    className={`nav-link ${activeTab === 'login' ? 'active' : ''}`}
-                                                                    id="service-tab-center"
-                                                                    data-toggle="tab"
-                                                                    href="#"
-                                                                    aria-controls="service-center"
-                                                                    role="tab"
-                                                                    aria-selected={activeTab === 'login' ? 'true' : 'false'}
-                                                                    onClick={(e) => {
-                                                                        e.preventDefault();
-                                                                        setActiveTab('login');
-                                                                    }}
-                                                                >
-                                                                    Login
-                                                                </a>
-                                                            </li>
-                                                            <li className="nav-item">
-                                                                <a
-                                                                    className={`nav-link ${activeTab === 'signup' ? 'active' : ''}`}
-                                                                    id="home-tab-center"
-                                                                    data-toggle="tab"
-                                                                    href={`/institute/register${window.location.search}`}
-                                                                    aria-controls="home-center"
-                                                                    role="tab"
-                                                                    aria-selected={activeTab === 'signup' ? 'true' : 'false'}
-                                                                >
-                                                                    Signup
-                                                                </a>
-                                                            </li>
-                                                        </ul>
-
-                                                        <div className="tab-content mt-3">
-                                                            <div
-                                                                className={`tab-pane ${activeTab === 'login' ? 'active' : ''}`}
-                                                                id="service-center"
-                                                                aria-labelledby="service-tab-center"
-                                                                role="tabpanel"
-                                                            >
-                                                                <div className=" rounded-0 mb-0">
-                                                                    <div className="card-content">
-                                                                        <div className="card-body p-0">
-                                                                            <fieldset className="input-group form-label-group form-group position-relative has-icon-left">
-                                                                                <input
-                                                                                    type="tel"
-                                                                                    className="form-control"
-                                                                                    maxLength="10"
-                                                                                    id="user-input"
-                                                                                    placeholder="Mobile / Email"
-                                                                                    value={userInput}
-                                                                                    onChange={(e) => setUserInput(e.target.value)}
-
-                                                                                    aria-label="Mobile Number"
-                                                                                    aria-describedby="basic-addon2"
-                                                                                />
-                                                                                <div className="form-control-position">
-                                                                                    <i className="fa-regular fa-user"></i>
-                                                                                </div>
-                                                                            </fieldset>
-
-                                                                            <fieldset className="input-group form-label-group form-group position-relative has-icon-left">
-                                                                                <div
-                                                                                    className="form-control-position"
-                                                                                    onClick={togglePassword}
-                                                                                >
-                                                                                    <i
-                                                                                        className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}
-                                                                                        id="toggleIcon"
-                                                                                    ></i>
-                                                                                </div>
-                                                                                <input
-                                                                                    type={showPassword ? "text" : "password"}
-                                                                                    placeholder="Enter your password"
-                                                                                    id="userPassword"
-                                                                                    className="form-control"
-                                                                                    value={password}
-                                                                                    onChange={(e) => setPassword(e.target.value)}
-                                                                                    onKeyPress={handleKeyPress}
-                                                                                />
-                                                                            </fieldset>
-
-                                                                            <p className="pt-0 px-0 mb-0">
-                                                                                I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
-                                                                            </p>
-
-                                                                            <div className="row">
-                                                                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mt-1">
-                                                                                    <a
-                                                                                        className="btn btn-primary float-right btn-inline waves-effect waves-light text-white btn-block"
-                                                                                        id="login-btn"
-                                                                                        onClick={handleLogin}
-                                                                                        ref={loginBtnRef}
-                                                                                    >
-                                                                                        Login
-                                                                                    </a>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div className="form-group d-flex justify-content-between align-items-center">
-                                                                            </div>
-
-                                                                            <div
-                                                                                id="error"
-                                                                                style={{
-                                                                                    color: 'red',
-                                                                                    fontWeight: 'bold',
-                                                                                    display: errorMessage ? 'block' : 'none'
-                                                                                }}
-                                                                            >
-                                                                                {errorMessage}
-                                                                            </div>
-
-                                                                            <div
-                                                                                id="success"
-                                                                                style={{
-                                                                                    color: 'green',
-                                                                                    fontWeight: 'bold',
-                                                                                    display: successMessage ? 'block' : 'none'
-                                                                                }}
-                                                                            >
-                                                                                {successMessage}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div
-                                                                className={`tab-pane ${activeTab === 'signup' ? 'active' : ''}`}
-                                                                id="home-center"
-                                                                aria-labelledby="home-tab-center"
-                                                                role="tabpanel"
-                                                            >
-                                                                <div className="card rounded-0 mb-0">
-                                                                    <div className="card-content">
-                                                                        <div className="card-body p-0">
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
+        <div className="login-page-container">
+            <div className="login-card">
+                <div className="logo-container">
+                    <img src={logoUrl} alt="Focalyt Logo" className="logo" />
+                </div>
+                
+                <h3 className="title">Institute Portal</h3>
+                <p className="subtitle">Please login to your account</p>
+                
+                <div className="login-tabs">
+                    <span 
+                        className={`tab ${activeTab === 'login' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('login')}
+                    >
+                        Login
+                    </span>
+                    <span 
+                        className={`tab ${activeTab === 'signup' ? 'active' : ''}`}
+                        onClick={() => window.location.href = `/institute/register${window.location.search}`}
+                    >
+                        Signup
+                    </span>
+                </div>
+                
+                <div className="login-content">
+                    <div className="login-method">
+                        <label className="radio-container">
+                            <input
+                                type="radio"
+                                name="loginMethod"
+                                checked={loginMethod === 'password'}
+                                onChange={() => {
+                                    setLoginMethod('password');
+                                    setShowOtpField(false);
+                                }}
+                            />
+                            <span className="radio-label">Password Login</span>
+                        </label>
+                        <label className="radio-container">
+                            <input
+                                type="radio"
+                                name="loginMethod"
+                                checked={loginMethod === 'otp'}
+                                onChange={() => {
+                                    setLoginMethod('otp');
+                                    setShowOtpField(false);
+                                }}
+                            />
+                            <span className="radio-label">OTP Login</span>
+                        </label>
                     </div>
+                    
+                    <div className="input-field">
+                        <span className="input-icon">
+                            <i className="fa-regular fa-user"></i>
+                        </span>
+                        <input
+                            type="text"
+                            placeholder="Mobile / Email"
+                            value={userInput}
+                            onChange={(e) => setUserInput(e.target.value)}
+                            disabled={loginMethod === 'otp' && isUserInputDisabled}
+                        />
+                    </div>
+                    
+                    {loginMethod === 'password' ? (
+                        <div className="input-field">
+                            <span className="input-icon">
+                                <i className="fa-regular fa-lock"></i>
+                            </span>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Enter your password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                onKeyPress={handleKeyPress}
+                            />
+                            <span className="toggle-password" onClick={togglePassword}>
+                                <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                            </span>
+                        </div>
+                    ) : (
+                        <div>
+                            {loginMethod === 'otp' && isUserInputDisabled && (
+                                <div className="change-number-container">
+                                    <button 
+                                        className="change-number-btn"
+                                        onClick={handleChangeNumber}
+                                    >
+                                        Change Number/Email
+                                    </button>
+                                </div>
+                            )}
+                        
+                            {showOtpField && (
+                                <div className="input-field">
+                                    <span className="input-icon">
+                                        <i className="fa-regular fa-key"></i>
+                                    </span>
+                                    <input
+                                        type="text"
+                                        placeholder="Enter OTP"
+                                        maxLength="6"
+                                        value={otp}
+                                        onChange={(e) => setOtp(e.target.value)}
+                                        onKeyPress={handleKeyPress}
+                                    />
+                                </div>
+                            )}
+                            
+                            <div className="otp-btn-container">
+                                <button 
+                                    className="send-otp-btn"
+                                    onClick={sendOtp}
+                                >
+                                    {showOtpField ? "Resend OTP" : "Send OTP"}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {loginMethod === 'password' && (
+                        <div className="forgot-password">
+                            <a 
+                                href="#" 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    openForgotModal();
+                                }}
+                            >
+                                Forgot Password?
+                            </a>
+                        </div>
+                    )}
+                    
+                    <div className="terms">
+                        I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
+                    </div>
+                    
+                    <button 
+                        className="login-btn"
+                        onClick={handleLogin}
+                        ref={loginBtnRef}
+                    >
+                        Login
+                    </button>
+                    
+                    {errorMessage && (
+                        <div className="error-message">{errorMessage}</div>
+                    )}
+                    
+                    {successMessage && (
+                        <div className="success-message">{successMessage}</div>
+                    )}
                 </div>
             </div>
+            
+            {/* Forgot Password Modal */}
+            {showForgotModal && (
+                <div className="modal-overlay">
+                    <div className="modal-container">
+                        <div className="modal-header">
+                            <h4>Forgot Password</h4>
+                            <button className="close-btn" onClick={closeForgotModal}>×</button>
+                        </div>
+                        
+                        <div className="modal-body">
+                            {forgotStep === 1 && (
+                                <div>
+                                    <div className="input-field">
+                                        <span className="input-icon">
+                                            <i className="fa-regular fa-user"></i>
+                                        </span>
+                                        <input
+                                            type="text"
+                                            placeholder="Mobile / Email"
+                                            value={forgotMobile}
+                                            onChange={(e) => setForgotMobile(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        className="modal-btn"
+                                        onClick={sendForgotOtp}
+                                    >
+                                        Send OTP
+                                    </button>
+                                </div>
+                            )}
 
-            <style>
-                {
-                    `
-                    .app-content.content{
-                    height: 100dvh;}
-                    html body .content {
-    margin-left: 0!important;
-}
-                    `
+                            {forgotStep === 2 && (
+                                <div>
+                                    <div className="input-field">
+                                        <span className="input-icon">
+                                            <i className="fa-regular fa-key"></i>
+                                        </span>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter OTP"
+                                            maxLength="6"
+                                            value={forgotOtp}
+                                            onChange={(e) => setForgotOtp(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        className="modal-btn"
+                                        onClick={verifyForgotOtp}
+                                    >
+                                        Verify OTP
+                                    </button>
+                                </div>
+                            )}
+
+                            {forgotStep === 3 && (
+                                <div>
+                                    <div className="input-field">
+                                        <span className="input-icon">
+                                            <i className="fa-regular fa-lock"></i>
+                                        </span>
+                                        <input
+                                            type={showNewPassword ? "text" : "password"}
+                                            placeholder="Enter new password"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                        />
+                                        <span className="toggle-password" onClick={toggleNewPassword}>
+                                            <i className={`fa-regular ${showNewPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="input-field">
+                                        <span className="input-icon">
+                                            <i className="fa-regular fa-lock"></i>
+                                        </span>
+                                        <input
+                                            type={showNewPassword ? "text" : "password"}
+                                            placeholder="Confirm new password"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                        />
+                                    </div>
+                                    
+                                    <button
+                                        className="modal-btn"
+                                        onClick={resetPassword}
+                                    >
+                                        Reset Password
+                                    </button>
+                                </div>
+                            )}
+
+                            {errorMessage && (
+                                <div className="error-message">{errorMessage}</div>
+                            )}
+                            
+                            {successMessage && (
+                                <div className="success-message">{successMessage}</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            <style jsx>{`
+                .login-page-container {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    background-color: #f5f5f5;
+                    background-image: url('/Assets/images/bg.jpg');
+                    background-size: cover;
+                    background-position: center;
                 }
-            </style>
+                
+                .login-card {
+                    width: 100%;
+                    max-width: 400px;
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+                    padding: 25px;
+                    margin: 20px;
+                }
+                
+                .logo-container {
+                    text-align: center;
+                    margin-bottom: 20px;
+                }
+                
+                .logo {
+                    max-width: 120px;
+                    height: auto;
+                }
+                
+                .title {
+                    font-size: 22px;
+                    font-weight: 600;
+                    text-align: left;
+                    margin-bottom: 5px;
+                    color: #333;
+                }
+                
+                .subtitle {
+                    font-size: 14px;
+                    color: #666;
+                    margin-bottom: 20px;
+                }
+                
+                .login-tabs {
+                    display: flex;
+                    margin-bottom: 25px;
+                    border-bottom: 1px solid #eee;
+                }
+                
+                .tab {
+                    padding: 10px 0;
+                    margin-right: 20px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    color: #666;
+                    position: relative;
+                }
+                
+                .tab.active {
+                    color: #7a29c9;
+                    font-weight: 600;
+                }
+                
+                .tab.active:after {
+                    content: '';
+                    position: absolute;
+                    bottom: -1px;
+                    left: 0;
+                    width: 100%;
+                    height: 2px;
+                    background-color: #7a29c9;
+                }
+                
+                .login-method {
+                    display: flex;
+                    margin-bottom: 20px;
+                }
+                
+                .radio-container {
+                    display: flex;
+                    align-items: center;
+                    margin-right: 25px;
+                    cursor: pointer;
+                }
+                
+                .radio-container input[type="radio"] {
+                    margin-right: 8px;
+                    accent-color: #7a29c9;
+                }
+                
+                .radio-label {
+                    font-size: 14px;
+                    color: #333;
+                }
+                
+                .input-field {
+                    position: relative;
+                    margin-bottom: 15px;
+                }
+                
+                .input-field input {
+                    width: 100%;
+                    padding: 12px 15px 12px 40px;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    transition: border-color 0.3s;
+                }
+                
+                .input-field input:focus {
+                    border-color: #7a29c9;
+                    outline: none;
+                }
+                
+                .input-field input:disabled {
+                    background-color: #f9f9f9;
+                    color: #666;
+                }
+                
+                .input-icon {
+                    position: absolute;
+                    left: 15px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    color: #999;
+                }
+                
+                .toggle-password {
+                    position: absolute;
+                    right: 15px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    cursor: pointer;
+                    color: #999;
+                }
+                
+                .otp-btn-container {
+                    display: flex;
+                    justify-content: flex-end;
+                    margin-bottom: 15px;
+                }
+                
+                .send-otp-btn {
+                    background: none;
+                    border: none;
+                    color: #7a29c9;
+                    cursor: pointer;
+                    font-size: 14px;
+                    padding: 0;
+                    text-decoration: underline;
+                }
+                
+                .change-number-container {
+                    display: flex;
+                    justify-content: flex-end;
+                    margin-bottom: 10px;
+                }
+                
+                .change-number-btn {
+                    background: none;
+                    border: none;
+                    color: #7a29c9;
+                    cursor: pointer;
+                    font-size: 14px;
+                    padding: 0;
+                    text-decoration: underline;
+                }
+                
+                .forgot-password {
+                    text-align: right;
+                    margin-bottom: 15px;
+                }
+                
+                .forgot-password a {
+                    color: #7a29c9;
+                    font-size: 14px;
+                    text-decoration: none;
+                }
+                
+                .terms {
+                    font-size: 12px;
+                    color: #666;
+                    margin-bottom: 20px;
+                }
+                
+                .terms a {
+                    color: #7a29c9;
+                    text-decoration: none;
+                }
+                
+                .login-btn {
+                    width: 100%;
+                    background-color: #7a29c9;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 12px;
+                    font-size: 15px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                }
+                
+                .login-btn:hover {
+                    background-color: #6a1ca9;
+                }
+                
+                .error-message {
+                    color: #f44336;
+                    font-size: 14px;
+                    margin-top: 15px;
+                    text-align: center;
+                }
+                
+                .success-message {
+                    color: #4caf50;
+                    font-size: 14px;
+                    margin-top: 15px;
+                    text-align: center;
+                }
+                
+                /* Modal Styles */
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 1000;
+                }
+                
+                .modal-container {
+                    background: white;
+                    border-radius: 8px;
+                    width: 100%;
+                    max-width: 400px;
+                    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+                }
+                
+                .modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 15px 20px;
+                    border-bottom: 1px solid #eee;
+                }
+                
+                .modal-header h4 {
+                    margin: 0;
+                    font-size: 18px;
+                    color: #333;
+                }
+                
+                .close-btn {
+                    background: none;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #999;
+                }
+                
+                .modal-body {
+                    padding: 20px;
+                }
+                
+                .modal-btn {
+                    width: 100%;
+                    background-color: #ff4081;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 12px;
+                    font-size: 16px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                    margin-top: 10px;
+                }
+                
+                .modal-btn:hover {
+                    background-color: #e91e63;
+                }
+            `}</style>
         </div>
     );
 };
