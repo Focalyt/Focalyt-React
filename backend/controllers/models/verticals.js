@@ -9,14 +9,11 @@ const verticalSchema = new Schema({
   description: {
     type: String,
   },
-  projects: {
-    type: Number,
-    default: 0,
-  },
+  
   status: {
-    type: String,
-    enum: ['active', 'inactive'],
-    default: 'active',
+    type: Boolean,
+    
+    default: true,
   },
   createdBy: {
     type: Schema.Types.ObjectId,

@@ -26,6 +26,7 @@
     "lucide-react": "^0.507.0",
     "react-google-autocomplete": "^2.7.4",
     "react-toastify": "^11.0.5",
+    "reactflow": "^11.11.4",
     "yup": "^1.6.1"
   }
 }

@@ -26,7 +26,7 @@ function CollegeLayout({ children }) {
   //   if (token && collegeData) {
   //     setUser({ token, collegeName: collegeData });
   //   } else {
-  //     navigate('/college/login');
+  //     navigate('/institute/login');
   //   }
   // }, []);
 
@@ -194,6 +194,12 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">Your Profile</span>
                 </Link>
               </li>
+              <li className={`nav-item ${location.pathname === '/institute/projectmanagment' ? 'active' : ''}`}>
+                    <Link to="/institute/projectmanagment" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faTasks} />
+                      <span className="menu-title">Project Management </span>
+                    </Link>
+                  </li>
 
               {/* Courses */}
               <li className={`nav-item has-sub ${openSubmenu.courses ? 'open' : ''}`}>
@@ -329,12 +335,7 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Assignment Rule</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${location.pathname === '/institute/projectmanagment' ? 'active' : ''}`}>
-                    <Link to="/institute/projectmanagment" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faTasks} />
-                      <span className="menu-title">Project Management </span>
-                    </Link>
-                  </li>
+                 
 
                 </ul>
               </li>

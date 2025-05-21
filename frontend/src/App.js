@@ -65,6 +65,8 @@ import EditCourse from './Pages/App/College/Course/EditCourse';
 import Registrations from './Pages/App/College/Course/Registrations';
 import AccessManagement from './Pages/App/College/Settings/AccessManagement';
 import ClgCourse from './Pages/App/College/Settings/Course';
+import ApprovalManagement from './Pages/App/College/ApprovalManagement/ApprovalManagement';
+import Status from './Pages/App/College/Status/status';
 
 
 const Layout = () => {
@@ -173,6 +175,8 @@ const Layout = () => {
           <Route path="courses/edit/:id" element={<EditCourse />} />
           <Route path='accessManagement' element={<AccessManagement/>}/>
           <Route path='projectmanagment' element={<CandidateManagementPortal/>}/>
+          <Route path='approvalManagement' element={<ApprovalManagement/>}/>
+          <Route path='statusdesign' element={<Status/>}/>
         </Route>
 
 

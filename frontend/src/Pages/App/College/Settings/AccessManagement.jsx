@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { 
-  Users, Shield, CheckSquare, Layers, UserPlus, Edit, Trash2, Copy, 
-  Search, Filter, Plus, AlertTriangle, Building, BookOpen, X, Save, 
+import React, { useState, useEffect } from 'react';
+import axios from 'axios'
+import {
+  Users, Shield, CheckSquare, Layers, UserPlus, Edit, Trash2, Copy,
+  Search, Filter, Plus, AlertTriangle, Building, BookOpen, X, Save,
   ChevronDown
 } from 'lucide-react';
 
@@ -9,86 +10,156 @@ const AccessManagementSystem = () => {
   // ------- STATE MANAGEMENT -------
   // Tab state
   const [activeTab, setActiveTab] = useState('roles');
-  
+
   // Modal states
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
-  
+
   // Editing states
   const [editingRole, setEditingRole] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [itemToDelete, setItemToDelete] = useState(null);
-  
+
   // Form states
   const [roleForm, setRoleForm] = useState({
     name: '',
     description: '',
     permissions: {}
   });
-  
+
+  const [passwordMismatch, setPasswordMismatch] = useState(false);
+
+
   const [userForm, setUserForm] = useState({
     name: '',
     email: '',
     role: '',
     designation: '',
-    mobile: ''
+    mobile: '',
+    password:'',
+    confirmPassword:''
   });
-  
+
   // Context permission states
   const [userContextPerms, setUserContextPerms] = useState({});
   const [coursesSelected, setCoursesSelected] = useState([]);
   const [centersSelected, setCentersSelected] = useState([]);
   const [projectsSelected, setProjectsSelected] = useState([]);
   const [verticalsSelected, setVerticalsSelected] = useState([]);
-  
+
   // UI state for multiselect dropdowns
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  
+
   // Sample data
   const [roles, setRoles] = useState([
-    { id: 1, name: 'Admin', description: 'Full system access', usersCount: 2, lastModified: '2025-05-10' },
-    { id: 2, name: 'Instructor', description: 'Can manage courses and content', usersCount: 5, lastModified: '2025-05-08' },
-    { id: 3, name: 'Center Manager', description: 'Can manage center operations', usersCount: 3, lastModified: '2025-05-05' },
-    { id: 4, name: 'Student Coordinator', description: 'Can manage student data', usersCount: 4, lastModified: '2025-05-01' }
   ]);
-  
+
+  useEffect(() => {
+    fetchRoles();
+    fetchRoleslist();
+    
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      fetchUsers();
+    }
+    if (activeTab === 'analysis' || activeTab === 'roles') {
+      fetchRoleslist();
+    }
+  }, [activeTab]);
+
+  const fetchRoles = async () => {
+    try {
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(`${backendUrl}/college/roles/all-roles`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        const fetchedRoles = response.data.data;
+
+        // Set roles for table
+        setRoles(fetchedRoles.map((r, index) => ({
+          _id:r._id,
+          id: index + 1,
+          name: r.roleName,
+          description: r.description,
+          usersCount: 0, // You can compute actual count if needed
+          lastModified: r.updatedAt?.slice(0, 10) || ''
+        })));
+
+        // Set rolePermissions
+        // const rolePermMap = {};
+        // fetchedRoles.forEach(role => {
+        //   rolePermMap[role.roleName] = role.permissions || [];
+        // });
+        // setRolePermissions(rolePermMap);
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      alert('Failed to fetch roles');
+    }
+  };
+
+  const fetchRoleslist = async () => {
+    try {
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(`${backendUrl}/college/roles/all-roleslist`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        const fetchedRoles = response.data.data;
+
+        setRolePermissions(response.data.rolePermissions);
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      alert('Failed to fetch roles');
+    }
+  };
+
   const [users, setUsers] = useState([
-    { id: 1, name: 'Vikram Singh', email: 'vikram@example.com', role: 'Admin', lastActive: '2025-05-13', hasCustomPerms: false },
-    { id: 2, name: 'Priya Sharma', email: 'priya@example.com', role: 'Instructor', lastActive: '2025-05-12', hasCustomPerms: true },
-    { id: 3, name: 'Rahul Patel', email: 'rahul@example.com', role: 'Center Manager', lastActive: '2025-05-11', hasCustomPerms: true },
-    { id: 4, name: 'Meera Kapoor', email: 'meera@example.com', role: 'Student Coordinator', lastActive: '2025-05-10', hasCustomPerms: false }
+    
   ]);
-  
+
   const [centers, setCenters] = useState([
     { id: 1, name: 'Chandigarh Center', location: 'Chandigarh' },
     { id: 2, name: 'Delhi Center', location: 'New Delhi' },
     { id: 3, name: 'Mumbai Center', location: 'Mumbai' },
     { id: 4, name: 'Bangalore Center', location: 'Bangalore' }
   ]);
-  
+
   const [courses, setCourses] = useState([
     { id: 1, name: 'Web Development', duration: '3 months' },
     { id: 2, name: 'Data Science', duration: '4 months' },
     { id: 3, name: 'Digital Marketing', duration: '2 months' },
     { id: 4, name: 'UI/UX Design', duration: '3 months' }
   ]);
-  
+
   const [projects, setProjects] = useState([
     { id: 1, name: 'ERP Implementation' },
     { id: 2, name: 'Mobile App Development' },
     { id: 3, name: 'Website Redesign' },
     { id: 4, name: 'Data Migration' }
   ]);
-  
+
   const [verticals, setVerticals] = useState([
     { id: 1, name: 'Education' },
     { id: 2, name: 'Healthcare' },
     { id: 3, name: 'Finance' },
     { id: 4, name: 'Technology' }
   ]);
-  
+
   // Permission definitions
   const permissionCategories = [
     {
@@ -110,6 +181,33 @@ const AccessManagementSystem = () => {
       ]
     },
     {
+      name: 'Verticals Management',
+      permissions: [
+        { key: 'VIEW_VERTICALS', description: 'Can view verticals' },
+        { key: 'CREATE_VERTICALS', description: 'Can create verticals' },
+        { key: 'EDIT_VERTICALS', description: 'Can edit vertical details', contextRequired: true },
+
+      ]
+    },
+    {
+      name: 'Projects Management',
+      permissions: [
+        { key: 'VIEW_PROJECTS', description: 'Can view projects' },
+        { key: 'CREATE_PROJECTS', description: 'Can create projects' },
+        { key: 'EDIT_PROJECTS', description: 'Can edit project details', contextRequired: true },
+
+      ]
+    },
+    {
+      name: 'Center Management',
+      permissions: [
+        { key: 'VIEW_CENTERS', description: 'Can view centers' },
+        { key: 'CREATE_CENTERS', description: 'Can create centers' },
+        { key: 'EDIT_CENTERS', description: 'Can edit center details', contextRequired: true },
+
+      ]
+    },
+    {
       name: 'Course Management',
       permissions: [
         { key: 'VIEW_COURSES', description: 'Can view courses' },
@@ -119,18 +217,12 @@ const AccessManagementSystem = () => {
         { key: 'VERIFY_DOCUMENT', description: 'Can verify course documents', contextRequired: true },
       ]
     },
-  
+
   ];
-  
+
   // Role permissions mapping
-  const [rolePermissions, setRolePermissions] = useState({
-    'Admin': ['VIEW_USERS', 'CREATE_USER', 'EDIT_USER', 'DELETE_USER', 'VIEW_ROLES', 'CREATE_ROLE', 'EDIT_ROLE', 'DELETE_ROLE', 
-              'VIEW_COURSES', 'CREATE_COURSE', 'EDIT_COURSE', 'MANAGE_COURSE_CONTENT', 'VIEW_CENTERS', 'CREATE_CENTER', 'MANAGE_CENTER', 'VIEW_CENTER_ANALYTICS'],
-    'Instructor': ['VIEW_USERS', 'VIEW_COURSES', 'EDIT_COURSE', 'MANAGE_COURSE_CONTENT', 'VIEW_CENTERS'],
-    'Center Manager': ['VIEW_USERS', 'VIEW_COURSES', 'VIEW_CENTERS', 'MANAGE_CENTER', 'VIEW_CENTER_ANALYTICS'],
-    'Student Coordinator': ['VIEW_USERS', 'VIEW_COURSES', 'VIEW_CENTERS']
-  });
-  
+  const [rolePermissions, setRolePermissions] = useState({});
+
   // Context-specific permissions
   const [contextPermissions, setContextPermissions] = useState([
     { userId: 2, permKey: 'EDIT_COURSE', contextType: 'course', contextId: 1 },
@@ -140,12 +232,12 @@ const AccessManagementSystem = () => {
     { userId: 5, permKey: 'EDIT_LEAD', contextType: 'lead', contextId: 1 },
     { userId: 5, permKey: 'CONVERT_LEAD', contextType: 'lead', contextId: 2 }
   ]);
-  
+
   // ------- HELPER FUNCTIONS -------
-  
+
   // Get user by ID
   const getUserById = (id) => users.find(user => user.id === id);
-  
+
   // Get permission description by key
   const getPermissionDesc = (key) => {
     for (const category of permissionCategories) {
@@ -154,7 +246,7 @@ const AccessManagementSystem = () => {
     }
     return key;
   };
-  
+
   // Check if permission requires context
   const isContextRequired = (key) => {
     for (const category of permissionCategories) {
@@ -163,7 +255,7 @@ const AccessManagementSystem = () => {
     }
     return false;
   };
-  
+
   // Get context name by type and id
   const getContextName = (type, id) => {
     if (type === 'center') {
@@ -181,14 +273,14 @@ const AccessManagementSystem = () => {
     }
     return id;
   };
-  
+
   // ------- EVENT HANDLERS -------
-  
+
   // Check if a context is selected
   const isItemSelected = (list, itemId) => {
     return list.includes(itemId);
   };
-  
+
   // Toggle context selection
   const toggleItemSelection = (list, setList, itemId) => {
     if (isItemSelected(list, itemId)) {
@@ -197,13 +289,22 @@ const AccessManagementSystem = () => {
       setList([...list, itemId]);
     }
   };
-  
+
   // Role handlers
-  const handleOpenRoleModal = (role = null) => {
+  const handleOpenRoleModal = async (role = null) => {
     if (role) {
       // Editing existing role
       setEditingRole(role);
-      
+
+      console.log('role',role)
+
+       // agar permissions nahi aaye toh pehle fetch kar lo
+    
+      await fetchRoleslist(); // ✅ async wait karo
+
+      console.log('rolePermissions',rolePermissions)
+    
+
       // Create permissions object based on rolePermissions
       const permissions = {};
       if (rolePermissions[role.name]) {
@@ -211,12 +312,14 @@ const AccessManagementSystem = () => {
           permissions[permKey] = true;
         });
       }
-      
+
       setRoleForm({
         name: role.name,
         description: role.description,
         permissions: permissions
       });
+
+      
     } else {
       // Creating new role
       setEditingRole(null);
@@ -228,7 +331,7 @@ const AccessManagementSystem = () => {
     }
     setShowRoleModal(true);
   };
-  
+
   const handleCopyRole = (role) => {
     // Create permissions object based on rolePermissions
     const permissions = {};
@@ -237,7 +340,7 @@ const AccessManagementSystem = () => {
         permissions[permKey] = true;
       });
     }
-    
+
     setRoleForm({
       name: `${role.name} (Copy)`,
       description: role.description,
@@ -246,12 +349,8 @@ const AccessManagementSystem = () => {
     setEditingRole(null);
     setShowRoleModal(true);
   };
-  
-  const handleDeleteRole = (role) => {
-    setItemToDelete({ type: 'role', item: role });
-    setShowDeleteModal(true);
-  };
-  
+
+
   const handleRoleFormChange = (e) => {
     const { id, value } = e.target;
     setRoleForm({
@@ -259,7 +358,7 @@ const AccessManagementSystem = () => {
       [id]: value
     });
   };
-  
+
   const handlePermissionChange = (e) => {
     const { id, checked } = e.target;
     setRoleForm({
@@ -270,80 +369,106 @@ const AccessManagementSystem = () => {
       }
     });
   };
-  
+
   const handleSelectAllPermissions = (categoryName) => {
     const category = permissionCategories.find(cat => cat.name === categoryName);
     if (!category) return;
-    
+
     const newPermissions = { ...roleForm.permissions };
-    
+
     category.permissions.forEach(perm => {
       newPermissions[perm.key] = true;
     });
-    
+
     setRoleForm({
       ...roleForm,
       permissions: newPermissions
     });
   };
+  const handleDeleteRole = async (id) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this role?');
+    if (!confirmDelete) return;
   
-  const handleSaveRole = () => {
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
+  
+    try {
+      const response = await axios.delete(`${backendUrl}/college/roles/delete-role/${id}`, {
+        headers: { 'x-auth': token }
+      });
+  
+      if (response.data.success) {
+        alert('Role deleted successfully!');
+        fetchRoles(); // refresh the list
+        setRoleForm({ name: '', description: '', permissions: {} });
+        setEditingRole(null);
+        setShowRoleModal(false);
+      } else {
+        alert('Failed to delete role.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.message);
+    }
+  };
+  
+
+  const handleSaveRole = async () => {
     const currentDate = new Date().toISOString().slice(0, 10);
     const permissionsArray = Object.keys(roleForm.permissions)
       .filter(key => roleForm.permissions[key]);
-    
-    if (editingRole) {
-      // Update existing role
-      setRoles(roles.map(role => 
-        role.id === editingRole.id 
-          ? { ...role, name: roleForm.name, description: roleForm.description, lastModified: currentDate }
-          : role
-      ));
-      
-      // If the role name changed, update the old name in permissions
-      if (editingRole.name !== roleForm.name) {
-        const updatedRolePermissions = { ...rolePermissions };
-        delete updatedRolePermissions[editingRole.name];
-        updatedRolePermissions[roleForm.name] = permissionsArray;
-        setRolePermissions(updatedRolePermissions);
-        
-        // Also update user roles
-        setUsers(users.map(user => 
-          user.role === editingRole.name 
-            ? { ...user, role: roleForm.name }
-            : user
-        ));
-      } else {
-        // Just update permissions
-        setRolePermissions({
-          ...rolePermissions,
-          [roleForm.name]: permissionsArray
+
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      console.log('userData', userData)
+      const token = userData.token;
+
+      if (editingRole) {
+        // 🔁 Edit role (API call)
+        const response = await axios.put(`${backendUrl}/college/roles/edit-role/${editingRole._id}`, {
+          roleName: roleForm.name,
+          description: roleForm.description,
+          permissions: permissionsArray
+        }, {
+          headers: { 'x-auth': token }
         });
+  
+        if (response.data.success) {
+          alert("Role updated successfully");
+          fetchRoles(); // refresh list
+          fetchRoleslist();
+        }
       }
-    } else {
-      // Create new role
-      const newRole = {
-        id: Math.max(...roles.map(r => r.id)) + 1,
-        name: roleForm.name,
-        description: roleForm.description,
-        usersCount: 0,
-        lastModified: currentDate
-      };
-      setRoles([...roles, newRole]);
+    else {
       
-      // Add role permissions
-      setRolePermissions({
-        ...rolePermissions,
-        [roleForm.name]: permissionsArray
-      });
+      const response = await axios.post(`${backendUrl}/college/roles/add-role`,
+        {
+          roleName: roleForm.name,
+          description: roleForm.description,
+          permissions: permissionsArray
+        },
+        {
+          headers: { 'x-auth': token }
+        });
+
+      if (response.data.success) {
+        alert('Role added successfully!');
+        setShowRoleModal(false);
+        setRoleForm({ name: '', description: '', permissions: {} });
+
+        fetchRoles();
+
+
+      }
     }
-    
+
     // Reset form and close modal
     setRoleForm({ name: '', description: '', permissions: {} });
     setEditingRole(null);
     setShowRoleModal(false);
   };
-  
+
   // User handlers
   const handleOpenUserModal = (user = null) => {
     if (user) {
@@ -369,77 +494,123 @@ const AccessManagementSystem = () => {
     }
     setShowUserModal(true);
   };
-  
+
   const handleDeleteUser = (user) => {
     setItemToDelete({ type: 'user', item: user });
     setShowDeleteModal(true);
   };
-  
+
   const handleUserFormChange = (e) => {
-    const { id, value } = e.target;
-    setUserForm({
-      ...userForm,
-      [id]: value
-    });
+  const { id, value } = e.target;
+  const updatedForm = {
+    ...userForm,
+    [id]: value
   };
+
   
-  const handleSaveUser = () => {
+
+  // Match check only if both fields are filled
+  if (
+    (id === "password" || id === "confirmPassword") &&
+    updatedForm.password &&
+    updatedForm.confirmPassword
+  ) {
+    setPasswordMismatch(updatedForm.password !== updatedForm.confirmPassword);
+  }
+
+  setUserForm(updatedForm);
+};
+
+const fetchUsers = async () => {
+  try {
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
+    console.log('User',userData)
+    const collegeId = userData.collegeId;
+
+    const response = await axios.get(`${backendUrl}/college/roles/users/concern-persons/${collegeId}`, {
+      headers: { 'x-auth': token }
+    });
+    
+
+    console.log('response',response)
+
+    if (response.data.success) {
+      const fetchedUsers = response.data.users.map((user, index) => ({
+        _id: user._id,
+        id: index + 1,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        designation:user.designation,
+        role: user.roleId ? user.roleId.roleName : "Admin", // if roleName stored in access
+        lastActive: user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : "N/A",
+        hasCustomPerms: user.access?.contextPermissions?.length > 0
+      }));
+
+      setUsers(fetchedUsers);
+    }
+  } catch (err) {
+    console.error("Error fetching users:", err.message);
+  }
+};
+
+
+
+const handleSaveUser = async () => {
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
+
+  const headers = { headers: { 'x-auth': token } };
+  const payload = {
+    name: userForm.name,
+    email: userForm.email,
+    mobile: userForm.mobile,
+    designation: userForm.designation,
+    password: userForm.password,
+    confirmPassword: userForm.confirmPassword,
+    roleId: roles.find(r => r.name === userForm.role)?._id, // ensure your roles have _id
+    collegeId: userData.collegeId // assuming stored in session
+  };
+
+  try {
     if (editingUser) {
-      // Update existing user
-      setUsers(users.map(user => 
-        user.id === editingUser.id 
-          ? { ...user, name: userForm.name, email: userForm.email, role: userForm.role }
-          : user
-      ));
-      
-      // Update role user counts if role changed
-      if (editingUser.role !== userForm.role) {
-        setRoles(roles.map(role => {
-          if (role.name === editingUser.role) {
-            return { ...role, usersCount: Math.max(0, role.usersCount - 1) };
-          } else if (role.name === userForm.role) {
-            return { ...role, usersCount: role.usersCount + 1 };
-          }
-          return role;
-        }));
+      // Call update API
+      const response = await axios.put(`${backendUrl}/college/roles/users/${editingUser._id}`, payload, headers);
+      if (response.data.status) {
+        alert("User updated successfully");
+        fetchUsers(); // Reload user list
       }
     } else {
-      // Create new user
-      const newUser = {
-        id: Math.max(...users.map(u => u.id)) + 1,
-        name: userForm.name,
-        email: userForm.email,
-        role: userForm.role,
-        lastActive: 'Never',
-        hasCustomPerms: false
-      };
-      setUsers([...users, newUser]);
-      
-      // Update role user count
-      setRoles(roles.map(role => 
-        role.name === userForm.role 
-          ? { ...role, usersCount: role.usersCount + 1 }
-          : role
-      ));
+      // Call add API
+      const response = await axios.post(`${backendUrl}/college/roles/users/add-concern-person`, payload, headers);
+      if (response.data.status) {
+        alert("User added successfully");
+        fetchUsers(); // Reload user list
+      }
     }
-    
-    // Reset form and close modal
-    setUserForm({ name: '', email: '', role: '', designation: '', mobile: '' });
-    setEditingUser(null);
     setShowUserModal(false);
-  };
-  
+    setUserForm({ name: '', email: '', role: '', designation: '', mobile: '', password: '', confirmPassword: '' });
+    setEditingUser(null);
+  } catch (err) {
+    console.error(err);
+    alert(err?.response?.data?.error || "Something went wrong");
+  }
+};
+
   const handleChangeUserRole = (userId, newRole) => {
     const user = users.find(u => u.id === userId);
     if (!user) return;
-    
+
     // Update user's role
-    setUsers(users.map(u => 
-      u.id === userId 
+    setUsers(users.map(u =>
+      u.id === userId
         ? { ...u, role: newRole }
         : u
     ));
-    
+
     // Update role user counts
     setRoles(roles.map(role => {
       if (role.name === user.role) {
@@ -450,17 +621,17 @@ const AccessManagementSystem = () => {
       return role;
     }));
   };
-  
+
   // Context permission handlers
   const handleOpenPermissionModal = (user) => {
     setEditingUser(user);
-    
+
     // Reset all selections
     setCoursesSelected([]);
     setCentersSelected([]);
     setProjectsSelected([]);
     setVerticalsSelected([]);
-    
+
     // Load user's context permissions
     const userPerms = {};
     contextPermissions
@@ -474,11 +645,11 @@ const AccessManagementSystem = () => {
           id: cp.contextId
         });
       });
-    
+
     setUserContextPerms(userPerms);
     setShowPermissionModal(true);
   };
-  
+
   const handleCustomPermissionChange = (permKey, isChecked) => {
     if (isChecked && !userContextPerms[permKey]) {
       setUserContextPerms({
@@ -491,43 +662,43 @@ const AccessManagementSystem = () => {
       setUserContextPerms(updatedPerms);
     }
   };
-  
+
   // Modified to handle multiple context types and selections
   const handleAddPermissionContext = (permKey, contextType, selectedItems) => {
     if (!contextType || selectedItems.length === 0) return;
-    
+
     // Get current contexts for this permission
     const currentContexts = userContextPerms[permKey] || [];
-    
+
     // Create array of new contexts to add
     const newContextsToAdd = selectedItems.map(itemId => ({
       type: contextType,
       id: itemId
     }));
-    
+
     // Filter out duplicates
     const newContexts = [
       ...currentContexts,
-      ...newContextsToAdd.filter(newCtx => 
-        !currentContexts.some(ctx => 
+      ...newContextsToAdd.filter(newCtx =>
+        !currentContexts.some(ctx =>
           ctx.type === newCtx.type && ctx.id === newCtx.id
         )
       )
     ];
-    
+
     // Update user context permissions
     setUserContextPerms({
       ...userContextPerms,
       [permKey]: newContexts
     });
   };
-  
+
   const handleRemovePermissionContext = (permKey, index) => {
     if (!userContextPerms[permKey]) return;
-    
+
     const updatedContexts = [...userContextPerms[permKey]];
     updatedContexts.splice(index, 1);
-    
+
     // If no contexts left, consider removing the permission key entirely
     if (updatedContexts.length === 0) {
       const updatedPerms = { ...userContextPerms };
@@ -540,11 +711,11 @@ const AccessManagementSystem = () => {
       });
     }
   };
-  
+
   const handleSaveCustomPermissions = () => {
     // Convert userContextPerms to contextPermissions format
     const newContextPerms = [];
-    
+
     Object.keys(userContextPerms).forEach(permKey => {
       userContextPerms[permKey].forEach(context => {
         newContextPerms.push({
@@ -555,89 +726,89 @@ const AccessManagementSystem = () => {
         });
       });
     });
-    
+
     // Filter out existing permissions for this user
     const otherUserPerms = contextPermissions.filter(cp => cp.userId !== editingUser.id);
-    
+
     // Combine with new permissions
     setContextPermissions([...otherUserPerms, ...newContextPerms]);
-    
+
     // Update user's hasCustomPerms flag
-    setUsers(users.map(user => 
-      user.id === editingUser.id 
+    setUsers(users.map(user =>
+      user.id === editingUser.id
         ? { ...user, hasCustomPerms: newContextPerms.length > 0 }
         : user
     ));
-    
+
     setShowPermissionModal(false);
   };
-  
+
   const handleResetToRoleDefaults = () => {
     // Remove all custom permissions for this user
     setContextPermissions(contextPermissions.filter(cp => cp.userId !== editingUser.id));
-    
+
     // Update user's hasCustomPerms flag
-    setUsers(users.map(user => 
-      user.id === editingUser.id 
+    setUsers(users.map(user =>
+      user.id === editingUser.id
         ? { ...user, hasCustomPerms: false }
         : user
     ));
-    
+
     setUserContextPerms({});
     setShowPermissionModal(false);
   };
-  
+
   // Delete confirmation handler
   const handleConfirmDelete = () => {
     if (!itemToDelete) return;
-    
+
     if (itemToDelete.type === 'role') {
       const roleToDelete = itemToDelete.item;
-      
+
       // Remove role from rolePermissions
       const updatedRolePermissions = { ...rolePermissions };
       delete updatedRolePermissions[roleToDelete.name];
       setRolePermissions(updatedRolePermissions);
-      
+
       // Remove role from roles array
       setRoles(roles.filter(role => role.id !== roleToDelete.id));
-      
+
       // Update users with this role to have no role
-      setUsers(users.map(user => 
-        user.role === roleToDelete.name 
+      setUsers(users.map(user =>
+        user.role === roleToDelete.name
           ? { ...user, role: '' }
           : user
       ));
     } else if (itemToDelete.type === 'user') {
       const userToDelete = itemToDelete.item;
-      
+
       // Remove user from users array
       setUsers(users.filter(user => user.id !== userToDelete.id));
-      
+
       // Update role user count
-      setRoles(roles.map(role => 
-        role.name === userToDelete.role 
+      setRoles(roles.map(role =>
+        role.name === userToDelete.role
           ? { ...role, usersCount: Math.max(0, role.usersCount - 1) }
           : role
       ));
-      
+
       // Remove user's context permissions
       setContextPermissions(contextPermissions.filter(cp => cp.userId !== userToDelete.id));
     }
-    
+
     setItemToDelete(null);
     setShowDeleteModal(false);
   };
-  
+
   // ------- RENDER FUNCTIONS -------
-  
+
   // Multiselect dropdown component
   const MultiSelectDropdown = ({ items, selectedItems, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
-    
+
     return (
       <div className="position-relative">
-        <div 
+        <div
           className="form-select d-flex justify-content-between align-items-center cursor-pointer"
           onClick={() => setIsOpen(!isOpen)}
         >
@@ -652,11 +823,11 @@ const AccessManagementSystem = () => {
             <ChevronDown size={16} />
           </div>
         </div>
-        
+
         {isOpen && (
           <div className="position-absolute top-100 start-0 mt-1 w-100 bg-white border rounded-2 shadow-sm z-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
             {items.map(item => (
-              <div 
+              <div
                 key={item.id}
                 className="d-flex align-items-center px-3 py-2 border-bottom cursor-pointer hover-bg-light"
                 onClick={() => {
@@ -667,7 +838,7 @@ const AccessManagementSystem = () => {
                   type="checkbox"
                   className="form-check-input me-2"
                   checked={selectedItems.includes(item.id)}
-                  onChange={() => {}}
+                  onChange={() => { }}
                 />
                 <span>{item.name}</span>
               </div>
@@ -682,7 +853,7 @@ const AccessManagementSystem = () => {
       </div>
     );
   };
-  
+
   // Render roles tab
   const renderRolesTab = () => (
     <div>
@@ -696,7 +867,7 @@ const AccessManagementSystem = () => {
           Create Role
         </button>
       </div>
-      
+
       {/* Search and filter */}
       <div className="d-flex align-items-center mb-4">
         <div className="position-relative flex-grow-1">
@@ -714,7 +885,7 @@ const AccessManagementSystem = () => {
           Filter
         </button>
       </div>
-      
+
       {/* Roles table */}
       <div className="card">
         <div className="table-responsive">
@@ -746,23 +917,23 @@ const AccessManagementSystem = () => {
                   <td className="text-secondary">{role.lastModified}</td>
                   <td>
                     <div className="d-flex gap-2">
-                      <button 
+                      <button
                         className="btn btn-sm btn-link text-primary p-0 border-0"
                         onClick={() => handleOpenRoleModal(role)}
                         title="Edit role"
                       >
                         <Edit size={16} />
                       </button>
-                      <button 
+                      <button
                         className="btn btn-sm btn-link text-success p-0 border-0"
                         onClick={() => handleCopyRole(role)}
                         title="Duplicate role"
                       >
                         <Copy size={16} />
                       </button>
-                      <button 
+                      <button
                         className="btn btn-sm btn-link text-danger p-0 border-0"
-                        onClick={() => handleDeleteRole(role)}
+                        onClick={() => handleDeleteRole(role._id)}
                         title="Delete role"
                       >
                         <Trash2 size={16} />
@@ -777,21 +948,21 @@ const AccessManagementSystem = () => {
       </div>
     </div>
   );
-  
+
   // Render users tab
   const renderUsersTab = () => (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="fs-3 fw-semibold">User Management</h1>
-        <button 
-          className="btn btn-primary d-flex align-items-center" 
+        <button
+          className="btn btn-primary d-flex align-items-center"
           onClick={() => handleOpenUserModal()}
         >
           <UserPlus className="me-2" size={16} />
           Add User
         </button>
       </div>
-      
+
       {/* Search and filter */}
       <div className="d-flex align-items-center mb-4">
         <div className="position-relative flex-grow-1">
@@ -809,7 +980,7 @@ const AccessManagementSystem = () => {
           Filter
         </button>
       </div>
-      
+
       {/* Users table */}
       <div className="card">
         <div className="table-responsive">
@@ -839,19 +1010,10 @@ const AccessManagementSystem = () => {
                   <td className="text-secondary">{user.email}</td>
                   <td>
                     <div className="d-flex align-items-center position-relative">
-                      <select 
-                        className="form-select form-select-sm"
-                        value={user.role}
-                        onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
-                      >
-                        <option value="">No Role</option>
-                        {roles.map(role => (
-                          <option key={role.id} value={role.name}>{role.name}</option>
-                        ))}
-                      </select>
-                  
+                      {user.role}
+
                       {user.hasCustomPerms && (
-                        <span className="ms-2 badge bg-warning bg-opacity-10 text-warning border-0 bg-transparent" style={{top: '-6px'}}>
+                        <span className="ms-2 badge bg-warning bg-opacity-10 text-warning border-0 bg-transparent" style={{ top: '-6px' }}>
                           <Shield size={16} />
                         </span>
                       )}
@@ -860,24 +1022,33 @@ const AccessManagementSystem = () => {
                   <td className="text-secondary">{user.lastActive}</td>
                   <td>
                     <div className="d-flex gap-2">
-                      <button 
+                      <button
                         className="btn btn-sm btn-link text-primary p-0 border-0"
                         onClick={() => handleOpenUserModal(user)}
                         title="Edit user"
+                        disabled={
+                          user.role === "Admin"
+                        }
                       >
                         <Edit size={16} />
                       </button>
-                      <button 
+                      <button
                         className="btn btn-sm btn-link text-warning p-0 border-0"
                         onClick={() => handleOpenPermissionModal(user)}
                         title="Custom permissions"
+                        disabled={
+                          user.role === "Admin"
+                        }
                       >
                         <Shield size={16} />
                       </button>
-                      <button 
+                      <button
                         className="btn btn-sm btn-link text-danger p-0 border-0"
                         onClick={() => handleDeleteUser(user)}
                         title="Delete user"
+                        disabled={
+                          user.role === "Admin"
+                        }
                       >
                         <Trash2 size={16} />
                       </button>
@@ -891,14 +1062,14 @@ const AccessManagementSystem = () => {
       </div>
     </div>
   );
-  
+
   // Render permission analysis tab
   const renderAnalysisTab = () => (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="fs-3 fw-semibold">Permission Analysis</h1>
       </div>
-      
+
       {/* Permission matrix */}
       <div className="card mb-4">
         <div className="card-header">
@@ -950,7 +1121,7 @@ const AccessManagementSystem = () => {
           </table>
         </div>
       </div>
-      
+
       {/* Context-specific permissions */}
       <div className="card">
         <div className="card-header">
@@ -968,7 +1139,7 @@ const AccessManagementSystem = () => {
               </button>
             </li>
           </ul>
-          
+
           <div className="table-responsive">
             <table className="table table-bordered">
               <thead className="table-light">
@@ -1018,12 +1189,12 @@ const AccessManagementSystem = () => {
       </div>
     </div>
   );
-  
+
   // ------- MODALS -------
-  
+
   // Role modal
   const renderRoleModal = () => (
-    <div className="modal d-block scrollY " style={{ backgroundColor: 'rgba(0,0,0,0.5)'}}>
+    <div className="modal d-block scrollY " style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="modal-dialog modal-dialog-centered modal-lg">
         <div className="modal-content">
           <div className="modal-header">
@@ -1053,16 +1224,16 @@ const AccessManagementSystem = () => {
                 onChange={handleRoleFormChange}
               ></textarea>
             </div>
-            
+
             {/* Permissions section */}
             <div className="mb-3">
               <h6 className="mb-3">Permissions</h6>
-              
+
               {permissionCategories.map((category) => (
                 <div key={category.name} className="mb-4">
                   <div className="d-flex justify-content-between align-items-center">
                     <h6 className="fw-medium mb-0">{category.name}</h6>
-                    <button 
+                    <button
                       className="btn btn-sm btn-link text-primary"
                       onClick={() => handleSelectAllPermissions(category.name)}
                       type="button"
@@ -1093,7 +1264,7 @@ const AccessManagementSystem = () => {
                   </div>
                 </div>
               ))}
-              
+
               <div className="alert alert-info mt-3">
                 <div className="d-flex">
                   <div className="me-2">
@@ -1101,7 +1272,7 @@ const AccessManagementSystem = () => {
                   </div>
                   <div>
                     <p className="mb-0">
-                      <strong>Context-specific permissions</strong> require assigning specific courses or centers 
+                      <strong>Context-specific permissions</strong> require assigning specific courses or centers
                       to users. After creating the role, you can assign these contexts from the User Management tab.
                     </p>
                   </div>
@@ -1129,10 +1300,10 @@ const AccessManagementSystem = () => {
       </div>
     </div>
   );
-  
+
   // User modal
   const renderUserModal = () => (
-    <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)'}}>
+    <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="modal-dialog modal-dialog-centered">
         <div className="modal-content">
           <div className="modal-header">
@@ -1153,7 +1324,7 @@ const AccessManagementSystem = () => {
             </div>
             <div className="mb-3">
               <label htmlFor="email" className="form-label">Email</label>
-              <input 
+              <input
                 type="email"
                 className="form-control"
                 id="email"
@@ -1164,7 +1335,7 @@ const AccessManagementSystem = () => {
             </div>
             <div className="mb-3">
               <label htmlFor="mobile" className="form-label">Mobile Number</label>
-              <input 
+              <input
                 type="text"
                 className="form-control"
                 id="mobile"
@@ -1198,7 +1369,27 @@ const AccessManagementSystem = () => {
                 ))}
               </select>
             </div>
-            
+            <div className="mb-3">
+              <label htmlFor="pass" className="form-label">Password</label>
+              <input
+                type="password"
+                className="form-control"
+                id="password"
+                placeholder="Password"
+                onChange={handleUserFormChange}
+              />
+            </div>
+            <div className="mb-3">
+              <label htmlFor="confPass" className="form-label">Confirm Password</label>
+              <input
+                type="password"
+                className="form-control"
+                id="confirmPassword"
+                placeholder="Confirm Password"
+                onChange={handleUserFormChange}
+              />
+            </div>
+
             {editingUser && editingUser.hasCustomPerms && (
               <div className="alert alert-warning d-flex align-items-center" role="alert">
                 <AlertTriangle className="me-2" size={20} />
@@ -1220,18 +1411,25 @@ const AccessManagementSystem = () => {
               type="button"
               className="btn btn-primary"
               onClick={handleSaveUser}
+              disabled={
+                !userForm.name ||!userForm.mobile  ||!userForm.email || !userForm.designation || !userForm.role ||!userForm.password || !userForm.confirmPassword || passwordMismatch
+              }
             >
               {editingUser ? 'Save Changes' : 'Create User'}
             </button>
           </div>
+          {passwordMismatch && (
+  <div className="text-danger mb-2">Passwords do not match</div>
+)}
+
         </div>
       </div>
     </div>
   );
-  
+
   // Custom permissions modal with simplified layout matching the reference design
   const renderPermissionModal = () => (
-    <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)', overflowY: 'auto'}}>
+    <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)', overflowY: 'auto' }}>
       <div className="modal-dialog modal-dialog-centered modal-lg">
         <div className="modal-content">
           <div className="modal-header bg-danger text-white">
@@ -1245,12 +1443,12 @@ const AccessManagementSystem = () => {
                 Custom permissions override role-based permissions. Use with caution.
               </div>
             </div>
-            
+
             {/* Context-specific permissions by category */}
             {permissionCategories.map((category) => (
               <div key={category.name} className="mb-4">
                 <h6 className="fw-medium mb-2">{category.name}</h6>
-                
+
                 {/* If no context permissions in category */}
                 {category.permissions.filter(p => p.contextRequired).length === 0 ? (
                   <div className="text-muted">No context-specific permissions in this category</div>
@@ -1272,7 +1470,7 @@ const AccessManagementSystem = () => {
                             {permission.description}
                           </label>
                         </div>
-                        
+
                         {/* Context selectors - only shown when permission is checked */}
                         {!!userContextPerms[permission.key] && (
                           <div className="ms-4">
@@ -1287,7 +1485,7 @@ const AccessManagementSystem = () => {
                                     onChange={(id) => toggleItemSelection(coursesSelected, setCoursesSelected, id)}
                                   />
                                 </div>
-                                <button 
+                                <button
                                   className="btn btn-outline-danger"
                                   onClick={() => {
                                     handleAddPermissionContext(permission.key, 'course', coursesSelected);
@@ -1300,7 +1498,7 @@ const AccessManagementSystem = () => {
                                 </button>
                               </div>
                             </div>
-                            
+
                             {/* Centers */}
                             <div className="mb-3">
                               <label className="form-label">Centers</label>
@@ -1312,7 +1510,7 @@ const AccessManagementSystem = () => {
                                     onChange={(id) => toggleItemSelection(centersSelected, setCentersSelected, id)}
                                   />
                                 </div>
-                                <button 
+                                <button
                                   className="btn btn-outline-danger"
                                   onClick={() => {
                                     handleAddPermissionContext(permission.key, 'center', centersSelected);
@@ -1325,7 +1523,7 @@ const AccessManagementSystem = () => {
                                 </button>
                               </div>
                             </div>
-                            
+
                             {/* Projects */}
                             <div className="mb-3">
                               <label className="form-label">Projects</label>
@@ -1337,7 +1535,7 @@ const AccessManagementSystem = () => {
                                     onChange={(id) => toggleItemSelection(projectsSelected, setProjectsSelected, id)}
                                   />
                                 </div>
-                                <button 
+                                <button
                                   className="btn btn-outline-danger"
                                   onClick={() => {
                                     handleAddPermissionContext(permission.key, 'project', projectsSelected);
@@ -1350,7 +1548,7 @@ const AccessManagementSystem = () => {
                                 </button>
                               </div>
                             </div>
-                            
+
                             {/* Verticals */}
                             <div className="mb-3">
                               <label className="form-label">Verticals</label>
@@ -1362,7 +1560,7 @@ const AccessManagementSystem = () => {
                                     onChange={(id) => toggleItemSelection(verticalsSelected, setVerticalsSelected, id)}
                                   />
                                 </div>
-                                <button 
+                                <button
                                   className="btn btn-outline-danger"
                                   onClick={() => {
                                     handleAddPermissionContext(permission.key, 'vertical', verticalsSelected);
@@ -1375,7 +1573,7 @@ const AccessManagementSystem = () => {
                                 </button>
                               </div>
                             </div>
-                            
+
                             {/* Display assigned contexts */}
                             {userContextPerms[permission.key]?.length > 0 && (
                               <div className="mt-3">
@@ -1388,9 +1586,9 @@ const AccessManagementSystem = () => {
                                       {context.type === 'project' && <Layers size={14} className="me-1" />}
                                       {context.type === 'vertical' && <Users size={14} className="me-1" />}
                                       {getContextName(context.type, context.id)}
-                                      <button 
-                                        className="btn-close ms-2" 
-                                        style={{fontSize: '10px'}}
+                                      <button
+                                        className="btn-close ms-2"
+                                        style={{ fontSize: '10px' }}
                                         onClick={() => handleRemovePermissionContext(permission.key, index)}
                                         type="button"
                                       ></button>
@@ -1434,10 +1632,10 @@ const AccessManagementSystem = () => {
       </div>
     </div>
   );
-  
+
   // Delete confirmation modal
   const renderDeleteModal = () => (
-    <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)'}}>
+    <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="modal-dialog modal-dialog-centered">
         <div className="modal-content">
           <div className="modal-header">
@@ -1475,7 +1673,7 @@ const AccessManagementSystem = () => {
       </div>
     </div>
   );
-  
+
   // ------- MAIN COMPONENT RENDER -------
   return (
     <div className="bg-light min-vh-100">
@@ -1490,13 +1688,13 @@ const AccessManagementSystem = () => {
           </div>
         </div>
       </nav>
-      
+
       {/* Main content */}
       <div className="container py-4">
         {/* Tabs */}
         <ul className="nav nav-tabs mb-4">
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link d-flex align-items-center ${activeTab === 'roles' ? 'active' : ''}`}
               onClick={() => setActiveTab('roles')}
             >
@@ -1505,7 +1703,7 @@ const AccessManagementSystem = () => {
             </button>
           </li>
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link d-flex align-items-center ${activeTab === 'users' ? 'active' : ''}`}
               onClick={() => setActiveTab('users')}
             >
@@ -1514,7 +1712,7 @@ const AccessManagementSystem = () => {
             </button>
           </li>
           <li className="nav-item">
-            <button 
+            <button
               className={`nav-link d-flex align-items-center ${activeTab === 'analysis' ? 'active' : ''}`}
               onClick={() => setActiveTab('analysis')}
             >
@@ -1523,13 +1721,13 @@ const AccessManagementSystem = () => {
             </button>
           </li>
         </ul>
-        
+
         {/* Tab content */}
         {activeTab === 'roles' && renderRolesTab()}
         {activeTab === 'users' && renderUsersTab()}
         {activeTab === 'analysis' && renderAnalysisTab()}
       </div>
-      
+
       {/* Modals */}
       {showRoleModal && renderRoleModal()}
       {showUserModal && renderUserModal()}

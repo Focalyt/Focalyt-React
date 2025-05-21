@@ -40,18 +40,18 @@ const userSchema = new Schema(
 			default: false,
 		},
 		role: { type: Number, trim: true }, // 0-admin, 1-company, 2-college, 3-student, 10-admin view
+		roleId: { type: ObjectId, ref: 'RoleManagement' },
+		contextPermissions: [
+			{
+			  permKey: { type: String, required: true },
+			  contextType: { type: String, enum: ['course', 'center', 'project', 'vertical'], required: true },
+			  contextId: { type: Schema.Types.ObjectId, required: true }
+			}
+		  ],
 		access: {
 			roleName: { type: String },
 			courseAccess: [{ type: ObjectId, ref: "course" }],
 			centerAccess: [{ type: ObjectId, ref: "Center" }],
-			rolePermissions: [{ type: String }], // Standard permissions from the role
-			contextPermissions: [
-				{
-					permKey: { type: String }, // e.g. "MANAGE_COURSE_CONTENT"
-					contextType: { type: String, enum: ["center", "course"] },
-					contextId: { type: ObjectId },
-				},
-			],
 		},
 		status: {
 			type: Boolean,
@@ -64,7 +64,12 @@ const userSchema = new Schema(
 		isImported: {
 			type: Boolean,
 			default: false,
-		}
+		},
+		hasCustomPerms:{
+			type: Boolean,
+			default: false,
+		},
+		
 	},
 	{ timestamps: true }
 );

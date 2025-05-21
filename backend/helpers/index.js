@@ -10,6 +10,7 @@ const {
   SubIndustry,
   SubQualification,
   Candidate,
+  UserActivityLog,
   User,
   College,
   University,
@@ -102,13 +103,12 @@ module.exports.isCollege = async (req, res, next) => {
 
       // ✅ Else check for token in headers (for React SPA project)
       const token = req.header('x-auth');
+      console.log('token',token)
       if (!token) throw error;
       const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
       user = await User.findById(decoded.id);     
 
       req.user = user;
-
-    
     if (!user || user.role !== 2) throw error;
     return next();
   } catch (err) {
@@ -159,6 +159,38 @@ module.exports.isCandidate = async (req, res, next) => {
     return res.redirect("/candidate/login");
   }
 };
+
+module.exports.logUserActivity = (action) => {
+  return async (req, res, next) => {
+  try {
+    let user = null;
+
+      // ✅ Else check for token in headers (for React SPA project)
+      const token = req.header('x-auth');
+      if (!token) throw error;
+      const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+      user = await User.findById(decoded.id); 
+      user = req.user; // `req.user` middleware में पहले से populated होना चाहिए
+    if (!user || !user._id) return next(); // अगर user login नहीं है, तो आगे बढ़ जाएं
+
+    const ip = req.header('x-forwarded-for') || req.socket.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    const page = req.originalUrl;
+
+    await UserActivityLog.create({
+      user: user._id,
+      action: action || 'visit',  // 👈 yahi pe default use ho raha hai,
+      meta: {
+        ip,
+        userAgent,
+        page
+      }
+    });
+  } catch (err) {
+    console.error("Failed to log user activity:", err.message);
+  }
+  next();
+};}
 
 
 

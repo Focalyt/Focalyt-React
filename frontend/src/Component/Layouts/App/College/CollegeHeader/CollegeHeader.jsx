@@ -18,13 +18,6 @@ const CollegeHeader = () => {
 
   const logout = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`${backendUrl}/api/logout`, {   // <<==== backendUrl laga diya
-        method: 'GET',
-        headers: {
-          'x-auth': token
-        }
-      });
       localStorage.clear();
       sessionStorage.clear();
       navigate('/institute/login');

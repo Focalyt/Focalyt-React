@@ -271,11 +271,11 @@ const CollegeRegister = () => {
                         }
                     };
 
-                    const registerRes = await axios.post(`${backendUrl}/college/register`, body);
+                    const registerRes = await axios.post(`${backendUrl}/institute/register`, body);
 
                     if (registerRes.data.status) {
                         body = { userInput: phoneNumber, password  };
-                        const loginRes = await axios.post(`${backendUrl}/college/login`, );
+                        const loginRes = await axios.post(`${backendUrl}/institute/login`, );
 
                         if (loginRes.data.status === true) {
                             sessionStorage.setItem("user", JSON.stringify(loginRes.data.userData));
@@ -283,7 +283,7 @@ const CollegeRegister = () => {
                             if (returnUrl) {
                                 window.location.href = decodeURIComponent(returnUrl);
                             } else {
-                                window.location.href = "/college/dashboard";
+                                window.location.href = "/institute/dashboard";
                             }
                             
                         } else {

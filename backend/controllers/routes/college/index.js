@@ -15,6 +15,7 @@ const skillTestRoutes = require("./skillTest");
 const careerObjectiveRoutes = require("../college/careerObjective");
 const todoRoutes = require("./todo");
 const smsRoutes = require("./sms");
+const roleManagementRoutes = require("./roleManagement");
 const coverLetterRoutes = require("./coverLetter");
 const mockInterviewRoutes = require("./mockInterview");
 const coursesRoutes = require("./courses");
@@ -22,6 +23,7 @@ const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
 router.use("/sms", isCollege, smsRoutes);
+router.use("/roles", isCollege, roleManagementRoutes);
 router.use("/candidate", isCollege, candidateRoutes);
 router.use("/skillTest", isCollege, skillTestRoutes);
 router.use("/careerObjective", isCollege, careerObjectiveRoutes);
@@ -80,7 +82,8 @@ router.route("/login")
 				return res.json({ status: false, error: "Wrong password" });
 			}
 
-			const college = await College.findOne({ _concernPerson: user._id }, "name")
+			const college = await College.findOne({ _concernPerson: { $in: [user._id] } }, "name");
+
 			if (!college || college === null) {
 				return res.json({ status: false, message: 'Missing College!' });
 
@@ -147,7 +150,7 @@ router.route("/register")
 						});
 					}
 					let college = await College.create({
-						_concernPerson: user._id,
+						_concernPerson: [user._id],
 						name: collegeName,
 						type: type,
 						location

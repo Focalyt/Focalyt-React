@@ -75,4 +75,6 @@ module.exports.AccessUser = require("./AccessUserSchema");
 module.exports.Vertical = require("./verticals");
 module.exports.Project = require("./Project");
 module.exports.centerSchema = require("./center");
+module.exports.Roles = require("./roleManagement");
+module.exports.UserActivityLog = require("./userActivityLog");
 // module.exports.Manager = required("");
