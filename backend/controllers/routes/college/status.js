@@ -1,0 +1,248 @@
+// server.js
+const express = require("express");
+const mongoose = require('mongoose');
+const cors = require('cors');
+const router = express.Router();
+
+
+// Status Model
+const Status = require('../../models/status');
+
+// @route   GET api/statuses
+// @desc    Get All Statuses
+// @access  Public
+router.get('/', async (req, res) => {
+  try {
+    const statuses = await Status.find().sort({ index: 1 });
+    return res.status(201).json({ success: true, message: 'Role created successfully', data: statuses });
+
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST api/statuses
+// @desc    Create A Status
+// @access  Public
+router.post('/add', async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    
+    // Find the highest index to add new status at the end
+    const highestIndexStatus = await Status.findOne().sort('-index');
+    const newIndex = highestIndexStatus ? highestIndexStatus.index + 1 : 0;
+    
+    const newStatus = new Status({
+      title,
+      description,
+      index: newIndex,
+      substatuses: []
+    });
+    
+    const data = await newStatus.save();
+    
+	return res.status(201).json({ success: true, message: 'Status created successfully', data: data });
+
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   PUT api/statuses/:id
+// @desc    Update A Status
+// @access  Public
+router.put('/edit/:id', async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    
+    // Find status by id
+    const status = await Status.findById(req.params.id);
+    
+    if (!status) {
+      return res.status(404).json({ msg: 'Status not found' });
+    }
+    
+    // Update fields
+    status.title = title;
+    status.description = description;
+    
+    const data = await status.save();
+    return res.status(200).json({
+        success: true,
+        message: 'Status updated successfully',
+        data: data,
+      });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   DELETE api/statuses/:id
+// @desc    Delete A Status
+// @access  Public
+router.delete('/delete/:id', async (req, res) => {
+  try {
+    const status = await Status.findById(req.params.id);
+    if (!status) {
+      return res.status(404).json({ msg: 'Status not found' });
+    }
+    
+    await status.deleteOne();;
+    
+    // Reindex remaining statuses
+    const remainingStatuses = await Status.find().sort('index');
+    for (let i = 0; i < remainingStatuses.length; i++) {
+      remainingStatuses[i].index = i;
+      await remainingStatuses[i].save();
+    }
+    
+    return res.status(200).json({
+        success: true,
+        message: 'Status deleted successfully'
+        
+      });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   PUT api/statuses/reorder
+// @desc    Reorder Statuses
+// @access  Public
+router.put('/reorder', async (req, res) => {
+    try {
+      const { statusOrder } = req.body;
+  
+      if (!Array.isArray(statusOrder)) {
+        return res.status(400).json({ success: false, message: 'Invalid statusOrder array' });
+      }
+  
+      for (let i = 0; i < statusOrder.length; i++) {
+        const { _id, index } = statusOrder[i];
+  
+        if (!mongoose.Types.ObjectId.isValid(_id)) {
+          return res.status(400).json({ success: false, message: `Invalid status ID at position ${i}` });
+        }
+  
+        await Status.findByIdAndUpdate(_id, { index: index });
+      }
+  
+      const updatedStatuses = await Status.find().sort('index');
+  
+      return res.status(200).json({
+        success: true,
+        message: 'Status order updated successfully',
+        data: updatedStatuses,
+      });
+    } catch (error) {
+      console.error('Error in reorder:', error.message);
+      return res.status(500).json({ success: false, message: 'Server Error' });
+    }
+  });
+  
+
+// @route   POST api/statuses/:statusId/substatus
+// @desc    Add a substatus to a status
+// @access  Public
+router.post('/:statusId/substatus', async (req, res) => {
+  try {
+    const { title, description, hasRemarks, hasFollowup, hasAttachment } = req.body;
+    
+    const status = await Status.findById(req.params.statusId);
+    
+    if (!status) {
+      return res.status(404).json({ msg: 'Status not found' });
+    }
+    
+    const newSubstatus = {
+      title,
+      description,
+      hasRemarks: hasRemarks || false,
+      hasFollowup: hasFollowup || false,
+      hasAttachment: hasAttachment || false
+    };
+    
+    status.substatuses.push(newSubstatus);
+    
+    const data = await status.save();
+    return res.status(201).json({ success: true, message: 'Sub status created successfully', data: data });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   PUT api/statuses/:statusId/substatus/:substatusId
+// @desc    Update a substatus
+// @access  Public
+router.put('/:statusId/substatus/:substatusId', async (req, res) => {
+  try {
+    const { title, description, hasRemarks, hasFollowup, hasAttachment } = req.body;
+    
+    const status = await Status.findById(req.params.statusId);
+    
+    if (!status) {
+      return res.status(404).json({ msg: 'Status not found' });
+    }
+    
+    // Find the substatus
+    const substatus = status.substatuses.id(req.params.substatusId);
+    
+    if (!substatus) {
+      return res.status(404).json({ msg: 'Substatus not found' });
+    }
+    
+    // Update substatus
+    substatus.title = title;
+    substatus.description = description;
+    substatus.hasRemarks = hasRemarks;
+    substatus.hasFollowup = hasFollowup;
+    substatus.hasAttachment = hasAttachment;
+    
+    const data = await status.save();
+    return res.status(201).json({ success: true, message: 'Sub status updated successfully', data: data });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   DELETE api/statuses/:statusId/substatus/:substatusId
+// @desc    Delete a substatus
+// @access  Public
+router.delete('/deleteSubStatus/:statusId/substatus/:substatusId', async (req, res) => {
+  try {
+    const status = await Status.findById(req.params.statusId);
+    
+    if (!status) {
+      return res.status(404).json({ msg: 'Status not found' });
+    }
+    
+    // Find the substatus index
+    const substatusIndex = status.substatuses.findIndex(
+      sub => sub._id.toString() === req.params.substatusId
+    );
+    
+    if (substatusIndex === -1) {
+      return res.status(404).json({ msg: 'Substatus not found' });
+    }
+    
+    // Remove the substatus
+    status.substatuses.splice(substatusIndex, 1);
+    
+    await status.save();
+    return res.status(200).json({
+        success: true,
+        message: 'Status deleted successfully'
+      });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+module.exports = router;

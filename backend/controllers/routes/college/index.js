@@ -1,7 +1,9 @@
 const express = require("express");
 const { isCollege, auth1, authenti } = require("../../../helpers");
 const { extraEdgeAuthToken, extraEdgeUrl, env, baseUrl } = require("../../../config");
-const axios = require("axios")
+const axios = require("axios");
+const mongoose = require('mongoose');
+
 const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
@@ -11,6 +13,7 @@ const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
 const candidateRoutes = require("./candidate");
+const statusRoutes = require("./status");
 const skillTestRoutes = require("./skillTest");
 const careerObjectiveRoutes = require("../college/careerObjective");
 const todoRoutes = require("./todo");
@@ -31,6 +34,7 @@ router.use("/careerObjective", isCollege, careerObjectiveRoutes);
 router.use("/coverLetter", isCollege, coverLetterRoutes);
 router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
+router.use("/status", statusRoutes);
 const readXlsxFile = require("read-excel-file/node");
 
 router.route('/')
@@ -80,10 +84,11 @@ router.route("/login")
 
 			if (!isMatch) {
 				return res.json({ status: false, error: "Wrong password" });
+
 			}
-
-			const college = await College.findOne({ _concernPerson: { $in: [user._id] } }, "name");
-
+			const userId = new mongoose.Types.ObjectId(user._id);
+			const college = await College.findOne({ _concernPerson: { $in: [userId] } }, "name");
+			
 			if (!college || college === null) {
 				return res.json({ status: false, message: 'Missing College!' });
 
@@ -94,7 +99,6 @@ router.route("/login")
 			userData = {
 				_id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token
 			};
-			console.log('userData login',userData)
 			return res.json({ status: true, message: "Login successful", userData });
 
 		} catch (err) {
