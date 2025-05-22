@@ -85,12 +85,11 @@ const CollegeLogin = () => {
             // Verify OTP here
             try {
                 const body = {
-                    userInput,
-                    otp,
-                    module: 'college'
+                    mobile:userInput,
+                    otp
                 };
                 
-                const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, body);
+                const verifyRes = await axios.post(`${backendUrl}/api/otpCollegeLogin`, body);
                 
                 if (verifyRes.data.status === true) {
                     setErrorMessage('');
@@ -103,6 +102,7 @@ const CollegeLogin = () => {
                     }
                 } else {
                     setSuccessMessage('');
+                    console.log('response',verifyRes )
                     setErrorMessage('OTP verification failed !!!');
                 }
             } catch (err) {

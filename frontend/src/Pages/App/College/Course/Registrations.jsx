@@ -856,7 +856,6 @@ const Registrations = () => {
 
 export default Registrations;
 
-// import React, { useState, useEffect, useRef } from 'react';
 // import axios from 'axios';
 // import { useNavigate, useLocation, Link } from 'react-router-dom';
 // import { 

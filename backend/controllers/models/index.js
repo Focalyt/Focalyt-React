@@ -77,4 +77,5 @@ module.exports.Project = require("./Project");
 module.exports.centerSchema = require("./center");
 module.exports.Roles = require("./roleManagement");
 module.exports.UserActivityLog = require("./userActivityLog");
+module.exports.Status = require("./status");
 // module.exports.Manager = required("");

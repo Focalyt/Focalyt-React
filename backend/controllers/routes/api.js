@@ -40,6 +40,7 @@ const educationRoutes = express.Router();
 educationRoutes.get("/educationlist", educationlist.educationlist);
 
 
+commonRoutes.post("/otpCollegeLogin", commonFunc.loginAsCollege);
 commonRoutes.post("/sendCandidateOtp", commonFunc.sendCandidateOtp);
 commonRoutes.get("/sectorList", commonFunc.sectorList);
 commonRoutes.get("/centerList", commonFunc.centerList);

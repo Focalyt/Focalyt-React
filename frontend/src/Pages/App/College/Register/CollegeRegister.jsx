@@ -271,11 +271,11 @@ const CollegeRegister = () => {
                         }
                     };
 
-                    const registerRes = await axios.post(`${backendUrl}/institute/register`, body);
+                    const registerRes = await axios.post(`${backendUrl}/college/register`, body);
 
                     if (registerRes.data.status) {
                         body = { userInput: phoneNumber, password  };
-                        const loginRes = await axios.post(`${backendUrl}/institute/login`, );
+                        const loginRes = await axios.post(`${backendUrl}/college/login`,body);
 
                         if (loginRes.data.status === true) {
                             sessionStorage.setItem("user", JSON.stringify(loginRes.data.userData));
@@ -289,7 +289,7 @@ const CollegeRegister = () => {
                         } else {
                             setSuccessMessage('');
                             setErrorMessage('Login failed !!!');
-                            window.location.href = "/college/login";
+                            window.location.href = "/institute/login";
                         }
                     } else {
                         console.log('error',registerRes.data)
