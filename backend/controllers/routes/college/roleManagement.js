@@ -23,7 +23,7 @@ router.post('/add-role',logUserActivity('role-added'), async (req, res) => {
 		return res.status(400).json({ success: false, message: 'Role already exists' });
 	  }
   
-	  const role = new RoleManagement({
+	  const role = new Roles({
 		roleName,
 		description,
 		permissions: permissions.map(key => ({ key }))
