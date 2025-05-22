@@ -1,1765 +1,2308 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
 import moment from 'moment';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faArrowDown, 
-  faArrowUp, 
-  faSearch, 
-  faSignInAlt 
-} from '@fortawesome/free-solid-svg-icons';
+import './CourseCrm.css';
+const CRMDashboard = () => {
+  const [activeTab, setActiveTab] = useState(0);
+  const [activeCrmFilter, setActiveCrmFilter] = useState(0);
+  const [showEditPanel, setShowEditPanel] = useState(false);
+  const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
+  const [mainContentClass, setMainContentClass] = useState('col-12');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [leadDetailsVisible, setLeadDetailsVisible] = useState(true);
+  const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+  const [viewMode, setViewMode] = useState('grid');
 
-const Registrations = () => {
-  // Environment variables
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-
-  // State management
-  const [candidates, setCandidates] = useState([]);
+  // Filter state from Registration component
   const [filterData, setFilterData] = useState({
     name: '',
     courseType: '',
     FromDate: '',
     ToDate: '',
-    status: 'true'
-  });
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1
-  });
-  const [sorting, setSorting] = useState({
-    value: 'createdAt',
-    order: -1
-  });
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [showCourseModal, setShowCourseModal] = useState(false);
-  const [courseFormData, setCourseFormData] = useState({
-    assignDate: '',
-    url: '',
-    remarks: ''
-  });
-  const [statusMessages, setStatusMessages] = useState({
-    success: '',
-    error: ''
+    status: 'true',
+    leadStatus: '',
+    sector: ''
   });
 
-  // Fetch candidates on component mount and when filters/sorting/pagination change
+  const crmFilters = [
+    { name: 'All', count: 4 },
+    { name: 'Untouched Lead', count: 1 },
+    { name: 'Not Connected', count: 1 },
+    { name: 'Junk', count: 0 },
+    { name: 'Not Interested', count: 0 },
+    { name: 'Warm', count: 1 },
+    { name: 'Hot', count: 1 },
+    { name: 'Job Joined', count: 1 },
+    { name: 'Missed Call', count: 1 },
+    { name: 'Lead For Future', count: 1 }
+  ];
+
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  const tabs = [
+    'Lead Details',
+    'Profile',
+    'Job History',
+    'Course History'
+  ];
+
+  const [profileData, setProfileData] = useState({
+    personalInfo: {
+      name: 'John Doe',
+      professionalTitle: 'Software Developer',
+      currentAddress: { fullAddress: '123 Main St, City' },
+      permanentAddress: { fullAddress: '456 Secondary St, City' },
+      summary: 'Experienced developer specializing in React.',
+    },
+    mobile: '9999999999',
+    email: 'john@example.com',
+    dob: '1990-01-01',
+    sex: 'Male',
+    experienceType: 'experienced',
+    fresherDetails: '',
+    isExperienced: '5 years of experience in software development',
+  });
+
+  const [user, setUser] = useState({
+    image: '',
+    name: 'John Doe'
+  });
+
+  const [experiences, setExperiences] = useState([
+    { jobTitle: 'Frontend Developer', companyName: 'ABC Corp', jobDescription: 'Developed UI with React', from: '2019-01-01', to: '2021-12-31', currentlyWorking: false }
+  ]);
+
+  const [educations, setEducations] = useState([
+    { education: 'Bachelor of Science', course: 'Computer Science', schoolName: 'XYZ School', collegeName: '', universityName: 'State University', passingYear: '2018', marks: '75', specialization: 'Software Engineering', currentlypursuing: false }
+  ]);
+
+  const [educationList, setEducationList] = useState([
+    { _id: '1', name: 'Bachelor of Science' }
+  ]);
+
+  const [coursesList, setCoursesList] = useState([
+    [{ _id: '1', name: 'Computer Science' }]
+  ]);
+
+  const [skills, setSkills] = useState([
+    { skillName: 'React', skillPercent: 80 }
+  ]);
+
+  const [languages, setLanguages] = useState([
+    { lname: 'English', level: 5 }
+  ]);
+
+  const [certificates, setCertificates] = useState([
+    { certificateName: 'React Certification', orgName: 'Coursera', currentlypursuing: false, month: 'May', year: '2023' }
+  ]);
+
+  const [projects, setProjects] = useState([
+    { projectName: 'Portfolio Website', proDescription: 'Created personal portfolio using React.', proyear: '2023' }
+  ]);
+
+  const [interests, setInterests] = useState([
+    'Reading', 'Traveling'
+  ]);
+
+  const [declaration, setDeclaration] = useState({
+    text: 'I hereby declare that the above information is true to the best of my knowledge.'
+  });
+
   useEffect(() => {
-    fetchCandidates();
-  }, [pagination.currentPage, sorting]);
+    // Initialize circular progress
+    const containers = document.querySelectorAll('.circular-progress-container');
+    containers.forEach(container => {
+      const percent = container.getAttribute('data-percent');
+      const circle = container.querySelector('circle.circle-progress');
+      if (circle && percent) {
+        const radius = 16;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percent / 100) * circumference;
 
-  const fetchCandidates = async () => {
-    try {
-      // Build query string from filter data
-      const queryParams = new URLSearchParams();
-      Object.keys(filterData).forEach(key => {
-        if (filterData[key]) {
-          queryParams.append(key, filterData[key]);
+        circle.style.strokeDasharray = circumference;
+        circle.style.strokeDashoffset = offset;
+
+        const progressText = container.querySelector('.progress-text');
+        if (progressText) {
+          progressText.innerText = percent + '%';
         }
-      });
-      // Add pagination and sorting
-      queryParams.append('page', pagination.currentPage);
-      queryParams.append('value', sorting.value);
-      queryParams.append('order', sorting.order);
-
-      const response = await axios.get(`${backendUrl}/admin/courses/registrations?${queryParams.toString()}`);
-      
-      if (response.data) {
-        setCandidates(response.data.candidates || []);
-        setPagination({
-          currentPage: parseInt(response.data.page) || 1,
-          totalPages: response.data.totalPages || 1
-        });
       }
-    } catch (error) {
-      console.error('Error fetching candidates:', error);
-    }
+    });
+  }, []);
+
+  const handleCrmFilterClick = (index) => {
+    setActiveCrmFilter(index);
   };
 
-  // Handle filter form submission
-  const handleFilterSubmit = (e) => {
-    e.preventDefault();
-    // Validate dates
-    if ((filterData.FromDate && !filterData.ToDate) || (!filterData.FromDate && filterData.ToDate)) {
-      return; // Both dates must be provided or neither
-    }
-    // Reset to first page when applying new filters
-    setPagination({...pagination, currentPage: 1});
-    fetchCandidates();
+  const handleTabClick = (index) => {
+    setActiveTab(index);
   };
 
-  // Handle filter input changes
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilterData({
-      ...filterData,
-      [name]: value
-    });
+    setFilterData({ ...filterData, [name]: value });
   };
 
-  // Handle sorting
-  const handleSorting = (column) => {
-    if (sorting.value === column) {
-      // Toggle order if same column
-      setSorting({
-        ...sorting,
-        order: sorting.order * -1
-      });
-    } else {
-      // New column with default descending order
-      setSorting({
-        value: column,
-        order: -1
-      });
-    }
+  const openEditPanel = () => {
+    setShowEditPanel(true);
+    setShowWhatsappPanel(false);
+    setMainContentClass('col-8');
   };
 
-  // Handle lead status update
-  const handleStatusUpdate = async (id, status) => {
-    try {
-      await axios.post(`${backendUrl}/admin/courses/leadStatus`, {
-        id,
-        status
-      });
-      // Refresh data or update locally
-      fetchCandidates();
-    } catch (error) {
-      console.error('Error updating status:', error);
+  const closeEditPanel = () => {
+    setShowEditPanel(false);
+    setMainContentClass(showWhatsappPanel ? 'col-8' : 'col-12');
+  };
+
+  const openWhatsappPanel = () => {
+    setShowWhatsappPanel(true);
+    setShowEditPanel(false);
+    setMainContentClass('col-8');
+  };
+
+  const closeWhatsappPanel = () => {
+    setShowWhatsappPanel(false);
+    setMainContentClass(showEditPanel ? 'col-8' : 'col-12');
+  };
+
+  const scrollLeft = () => {
+    const container = document.querySelector('.scrollable-content');
+    if (container) {
+      const cardWidth = document.querySelector('.info-card')?.offsetWidth || 200;
+      container.scrollBy({ left: -cardWidth, behavior: 'smooth' });
     }
   };
 
-  // Handle pagination click
-  const handlePageChange = (page) => {
-    setPagination({...pagination, currentPage: page});
-  };
-
-  // Handle course assignment modal
-  const handleActionClick = (candidate) => {
-    setSelectedCandidate(candidate);
-    
-    // Format date for input if it exists
-    let formattedDate = '';
-    if (candidate.assignDate) {
-      formattedDate = moment(candidate.assignDate).format('YYYY-MM-DD');
-    } else {
-      formattedDate = moment().format('YYYY-MM-DD');
+  const scrollRight = () => {
+    const container = document.querySelector('.scrollable-content');
+    if (container) {
+      const cardWidth = document.querySelector('.info-card')?.offsetWidth || 200;
+      container.scrollBy({ left: cardWidth, behavior: 'smooth' });
     }
-
-    setCourseFormData({
-      assignDate: formattedDate,
-      url: candidate.url || '',
-      remarks: candidate.remarks || ''
-    });
-    
-    setShowCourseModal(true);
-  };
-
-  // Handle course assignment
-  const assignCourse = async () => {
-    try {
-      const updateCourse = {
-        url: courseFormData.url,
-        remarks: courseFormData.remarks,
-        courseStatus: 0,
-        assignDate: new Date(courseFormData.assignDate).toISOString()
-      };
-
-      await axios.put(`${backendUrl}/admin/courses/assignCourses/${selectedCandidate._id}`, updateCourse);
-      
-      setStatusMessages({
-        success: 'Course assigned successfully!',
-        error: ''
-      });
-      
-      // Close modal and refresh
-      setTimeout(() => {
-        setShowCourseModal(false);
-        fetchCandidates();
-      }, 1000);
-    } catch (error) {
-      console.error('Error assigning course:', error);
-      setStatusMessages({
-        success: '',
-        error: 'Failed to assign course. Please try again.'
-      });
-    }
-  };
-
-  // Handle login as candidate
-  const loginAs = async (mobile) => {
-    try {
-      const response = await axios.post(`${backendUrl}/api/loginAsCandidate`, {
-        mobile,
-        module: 'candidate'
-      });
-      
-      if (response.data.role === 3) {
-        localStorage.setItem('candidate', response.data.name);
-        localStorage.setItem('token', response.data.token);
-        window.location.href = '/candidate/dashboard';
-      }
-    } catch (error) {
-      console.error('Error logging in as candidate:', error);
-    }
-  };
-
-  // Reset filters
-  const resetFilters = () => {
-    setFilterData({
-      name: '',
-      courseType: '',
-      FromDate: '',
-      ToDate: '',
-      status: 'true'
-    });
-    
-    // Reset pagination and fetch data
-    setPagination({...pagination, currentPage: 1});
-    
-    // Need to wait for state update before fetching
-    setTimeout(() => {
-      fetchCandidates();
-    }, 0);
-  };
-
-  // Generate pagination links
-  const renderPagination = () => {
-    const { currentPage, totalPages } = pagination;
-    if (totalPages <= 1) return null;
-
-    let first = 1;
-    let last = totalPages > 4 ? 4 : totalPages;
-
-    if (totalPages > 4 && currentPage >= 2) {
-      first = currentPage - 1;
-      last = currentPage + 1;
-      if (last > totalPages) last = totalPages;
-    }
-
-    const pages = [];
-
-    // First page button if not at the beginning
-    if (first > 1) {
-      pages.push(
-        <li key="first" className="page-item">
-          <button className="page-link" onClick={() => handlePageChange(1)}>
-            First
-          </button>
-        </li>
-      );
-    }
-
-    // Page numbers
-    for (let i = first; i <= last; i++) {
-      pages.push(
-        <li key={i} className={`page-item ${i === currentPage ? 'active' : ''}`}>
-          <button 
-            className="page-link" 
-            onClick={() => handlePageChange(i)}
-            disabled={i === currentPage}
-          >
-            {i}
-          </button>
-        </li>
-      );
-    }
-
-    // Last page button if not at the end
-    if (last < totalPages) {
-      pages.push(
-        <li key="ellipsis" className="page-item">
-          <button className="page-link" onClick={() => handlePageChange(last + 1)}>
-            ...
-          </button>
-        </li>
-      );
-      
-      pages.push(
-        <li key="last" className="page-item">
-          <button className="page-link" onClick={() => handlePageChange(totalPages)}>
-            Last
-          </button>
-        </li>
-      );
-    }
-
-    return (
-      <ul className="pagination justify-content-end ml-2 mb-2">
-        {pages}
-      </ul>
-    );
   };
 
   return (
-    <div className="content-body">
-      {/* Breadcrumbs */}
-      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-        <div className="content-header-left col-md-12 col-12 mb-2">
-          <div className="row breadcrumbs-top">
-            <div className="col-9">
-              <h3 className="content-header-title float-left mb-0">Registrations</h3>
-              <div className="breadcrumb-wrapper col-12">
-                <ol className="breadcrumb">
-                  <li className="breadcrumb-item"><Link to="/admin">Home</Link></li>
-                  <li className="breadcrumb-item active">Registrations</li>
-                </ol>
+    <div className="container-fluid row">
+      <div className={`col-8 ${mainContentClass}`}>
+
+      {/* Header */}
+      <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints" >
+        <div className="container-fluid py-2 " >
+          <div className="row align-items-center">
+            <div className="col-md-6">
+              <div className="d-flex align-items-center">
+                <h4 className="fw-bold text-dark mb-0 me-3">Registration</h4>
+                <nav aria-label="breadcrumb">
+                  <ol className="breadcrumb mb-0 small">
+                    <li className="breadcrumb-item">
+                      <a href="#" className="text-decoration-none">Home</a>
+                    </li>
+                    <li className="breadcrumb-item active">Registration</li>
+                  </ol>
+                </nav>
               </div>
             </div>
+            <div className="col-md-6">
+              <div className="d-flex justify-content-end align-items-center gap-2">
+                <div className="input-group" style={{ maxWidth: '300px' }}>
+                  <span className="input-group-text bg-white border-end-0 input-height" >
+                    <i className="fas fa-search text-muted"></i>
+                  </span>
+                  <input
+                    type="text"
+                    name="name"
+                    className="form-control border-start-0 m-0"
+                    placeholder="Search name, mobile, email..."
+                    value={filterData.name}
+                    onChange={handleFilterChange}
+                  />
+                </div>
+                <button
+                  onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                  className="btn btn-outline-primary"
+                >
+                  <i className="fas fa-filter me-1"></i>
+                  Filters
+                </button>
+                <div className="btn-group">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  >
+                    <i className="fas fa-th"></i>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  >
+                    <i className="fas fa-list"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+           
+            <div className="card-body p-3">
+              <div className="d-flex flex-wrap gap-2">
+                {crmFilters.map((filter, index) => (
+                  <button
+                    key={index}
+                    className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                    onClick={() => handleCrmFilterClick(index)}
+                  >
+                    {filter.name}
+                    <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                      ({filter.count})
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          
           </div>
         </div>
       </div>
 
-      <section className="list-view">
-        <div className="row">
-          <div className="col-12 rounded equal-height-2 coloumn-2">
-            <div className="card">
-              <div className="row">
-                <div className="card-content col-12">
-                  {/* Filter Form */}
-                  <div className="row mb-2">
-                    <div className="col-xl-12 col-lg-12 px-3">
-                      <form onSubmit={handleFilterSubmit} id="filterForm">
-                        <div className="row">
-                          <div className="col-xl-3 mt-1">
-                            <label>Name/ Mobile/ Whatsapp</label>
-                            <input 
-                              type="text" 
-                              name="name" 
-                              className="form-control" 
-                              id="username" 
-                              value={filterData.name}
-                              onChange={handleFilterChange}
-                              maxLength="25"
-                            />
-                          </div>
-                          <div style={{ marginTop: '2.5rem !important' }} className="col-xl-3 text-center mt-3">
-                            <button className="btn btn-success waves-effect waves-light text-white d-inline" type="submit">
-                              Go
-                            </button>
-                            <button 
-                              className="extra-ss btn btn-danger d-inline waves-effect waves-light mb-md-0 mb-2 text-white mx-1" 
-                              type="button"
-                              onClick={resetFilters}
-                            >
-                              RESET
-                            </button>
-                          </div>
-                          <div className="col-xl-6 text-right mt-3">
-                            <div className="custom-control custom-checkbox">
-                              <input 
-                                type="checkbox" 
-                                className="custom-control-input" 
-                                id="filterToggle"
-                                checked={showAdvancedFilters}
-                                onChange={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                              />
-                              <label className="custom-control-label" htmlFor="filterToggle"></label>
-                            </div>
-                          </div>
-                        </div>
+      {/* Advanced Filters */}
+      {!isFilterCollapsed && (
+        <div className="bg-white border-bottom">
+          <div className="container-fluid py-3">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h6 className="fw-bold mb-0">Advanced Filters</h6>
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => setIsFilterCollapsed(true)}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
 
-                        {/* Advanced Filters */}
-                        <div 
-                          className="row justify-content-start advanced-filters" 
-                          style={{ 
-                            maxHeight: showAdvancedFilters ? '300px' : '0px',
-                            opacity: showAdvancedFilters ? '1' : '0',
-                            transition: '0.3s ease-in-out',
-                            overflow: 'hidden' 
-                          }}
-                        >
-                          <div className="col-xl-2 ml-1 mt-1">
-                            <label>Course Fee Type</label>
-                            <select 
-                              className="form-control text-capitalize" 
-                              name="courseType" 
-                              id="courseType"
-                              value={filterData.courseType}
-                              onChange={handleFilterChange}
-                            >
-                              <option value="">Select</option>
-                              <option className="text-capitalize" value="Free">Free</option>
-                              <option className="text-capitalize" value="Paid">Paid</option>
-                            </select>
-                          </div>
-                          <div className="col-xl-2 ml-1 mt-1">
-                            <label>From Date</label>
-                            <input 
-                              type="date" 
-                              className="form-control" 
-                              id="from-date" 
-                              name="FromDate"
-                              value={filterData.FromDate}
-                              onChange={handleFilterChange}
-                            />
-                          </div>
-                          <div className="col-xl-2 ml-1 mt-1">
-                            <label>To Date</label>
-                            <input 
-                              type="date" 
-                              className="form-control" 
-                              id="to-date" 
-                              name="ToDate"
-                              value={filterData.ToDate}
-                              onChange={handleFilterChange}
-                            />
-                          </div>
-                          <input type="hidden" className="form-control" name="status" value="true" />
-                          <div style={{ marginTop: '2.5rem !important' }} className="col-xl-3 text-center mt-3">
-                            <button
-                              className="btn btn-success waves-effect waves-light text-white d-inline"
-                              type="submit"
-                            >
-                              Go
-                            </button>
-                            <button
-                              className="extra-ss btn btn-danger d-inline waves-effect waves-light mb-sm-0 mb-2 text-white mx-1"
-                              type="button"
-                              onClick={resetFilters}
-                            >
-                              RESET
-                            </button>
-                          </div>
-                        </div>
-                      </form>
-                    </div>
-                  </div>
+            <div className="row g-3">
+              <div className="col-md-3">
+                <label className="form-label small fw-medium">Lead Category</label>
+                <select
+                  className="form-select form-select-sm"
+                  name="leadStatus"
+                  value={filterData.leadStatus}
+                  onChange={handleFilterChange}
+                >
+                  <option value="">All Categories</option>
+                  <option value="Application">Application</option>
+                  <option value="Lead">Lead</option>
+                  <option value="Prospect">Prospect</option>
+                </select>
+              </div>
 
-                  {/* Candidates Table */}
-                  <div className="table-responsive">
-                    <table id="tblexportData" className="table table-hover-animation mb-0 table-hover" width="100%">
-                      <thead>
-                        <tr>
-                          <th 
-                            className="three column wide" 
-                            width="18%" 
-                            style={{ cursor: 'pointer' , whiteSpace : 'nowrap'}} 
-                            onClick={() => handleSorting('createdAt')}
-                          >
-                            DATE 
-                            <FontAwesomeIcon 
-                              icon={sorting.value === 'createdAt' ? 
-                                (sorting.order === 1 ? faArrowUp : faArrowDown) : 
-                                faArrowDown} 
-                              className="success cursors pointer" 
-                            />
-                          </th>
-                          <th 
-                            className="three column wide candidate-wrap" 
-                            width="19%" 
-                            onClick={() => handleSorting('name')}
-                            style={{ cursor: 'pointer' , whiteSpace : 'nowrap' }}
-                          >
-                            CANDIDATE NAME
-                            {sorting.value === 'name' && (
-                              <FontAwesomeIcon 
-                                icon={sorting.order === 1 ? faArrowUp : faArrowDown} 
-                                className="success cursors pointer ml-1" 
-                              />
-                            )}
-                          </th>
-                          <th className="one column wide" width="15%">MOBILE NO.</th>
-                          <th className="one column wide" width="15%">Email</th>
-                          <th className="one column wide" width="15%">Document Status</th>
-                          <th className="one column wide" width="15%">Lead Status</th>
-                          <th className="one column wide" width="15%">Demo Status</th>
-                          <th className="one column wide" width="15%">Center Status</th>
-                          <th 
-                            className="one column wide" 
-                            width="7%" 
-                            style={{ cursor: 'pointer' }} 
-                            onClick={() => handleSorting('courseName')}
-                          >
-                            Course
-                            {sorting.value === 'courseName' && (
-                              <FontAwesomeIcon 
-                                icon={sorting.order === 1 ? faArrowUp : faArrowDown} 
-                                className="success cursors pointer ml-1" 
-                              />
-                            )}
-                          </th>
-                          <th 
-                            className="one column wide" 
-                            width="7%" 
-                            style={{ cursor: 'pointer' }} 
-                            onClick={() => handleSorting('registrationCharges')}
-                          >
-                            Reg Fee
-                            {sorting.value === 'registrationCharges' && (
-                              <FontAwesomeIcon 
-                                icon={sorting.order === 1 ? faArrowUp : faArrowDown} 
-                                className="success cursors pointer ml-1" 
-                              />
-                            )}
-                          </th>
-                          <th className="one column wide" width="7%" style={{ cursor: 'pointer' }}>
-                            Reg Status
-                          </th>
-                          <th 
-                            className="one column wide" 
-                            width="7%" 
-                            style={{ cursor: 'pointer' }} 
-                            onClick={() => handleSorting('sector')}
-                          >
-                            Sector
-                            {sorting.value === 'sector' && (
-                              <FontAwesomeIcon 
-                                icon={sorting.order === 1 ? faArrowUp : faArrowDown} 
-                                className="success cursors pointer ml-1" 
-                              />
-                            )}
-                          </th>
-                          <th className="one column wide" width="10%" style={{ cursor: 'pointer' }}>Course Fee Type</th>
-                          <th className="one column wide" width="10%" style={{ cursor: 'pointer' }}>Registered By</th>
-                          <th className="one column wide" width="10%">Action</th>
-                          <th className="one column wide" width="10%">View Docs</th>
-                          <th className="one column wide" width="10%">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {candidates && candidates.length > 0 ? (
-                          candidates.map((candidate, index) => (
-                            <tr key={index}>
-                              <td className="text-capitalize">
-                                {candidate.createdAt ? 
-                                  moment(candidate.createdAt).format('MMM DD YYYY hh:mm A') : 
-                                  "N/A"}
-                              </td>
-                              <td className="text-capitalize candid-wrap">
-                                {candidate.name || "N/A"}
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.mobile || "N/A"}
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.email || "N/A"}
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.docProgress && candidate.docProgress.totalRequired && 
-                                  candidate.docProgress.totalRequired > 0 ? (
-                                  <div 
-                                    className="circular-progress-container" 
-                                    data-percent={candidate.docProgress.percent}
-                                  >
-                                    <svg width="40" height="40">
-                                      <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
-                                      <circle 
-                                        className="circle-progress" 
-                                        cx="20" 
-                                        cy="20" 
-                                        r="16"
-                                        style={{
-                                          strokeDasharray: `${2 * Math.PI * 16}`,
-                                          strokeDashoffset: `${2 * Math.PI * 16 - (candidate.docProgress.percent / 100) * 2 * Math.PI * 16}`
-                                        }}
-                                      ></circle>
-                                    </svg>
-                                    <div className="progress-text">
-                                      {candidate.docProgress.percent}%
-                                    </div>
-                                  </div>
-                                ) : (
-                                  "NDR"
-                                )}
-                              </td>
-                              <td className="text-capitalize">
-                                <select 
-                                  onChange={(e) => handleStatusUpdate(candidate._id, e.target.value)} 
-                                  className="form-control leadsSelect"
-                                  value={candidate.leadStatus || ""}
-                                >
-                                  <option value="">Select</option>
-                                  <option value="Hot">Hot</option>
-                                  <option value="Warm">Warm</option>
-                                  <option value="Cold">Cold</option>
-                                </select>
-                              </td>
-                              <td className="text-capitalize">
-                                <select 
-                                  className="form-control leadsSelect"
-                                  value={candidate.demoStatus || ""}
-                                  onChange={(e) => {
-                                    // Handle demo status change
-                                  }}
-                                >
-                                  <option value="">Select</option>
-                                  <option value="Demo Scheduled">Demo Scheduled</option>
-                                  <option value="Demo Pending">Demo Pending</option>
-                                  <option value="Demo Done">Demo Done</option>
-                                </select>
-                              </td>
-                              <td className="text-capitalize">
-                                <select 
-                                  className="form-control leadsSelect"
-                                  value={candidate.centerStatus || ""}
-                                  onChange={(e) => {
-                                    // Handle center status change
-                                  }}
-                                >
-                                  <option value="">Select</option>
-                                  <option value="Add Center">Add Center</option>
-                                  <option value="Rejected">Rejected</option>
-                                  <option value="Drop Out">Drop Out</option>
-                                </select>
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.courseName || "N/A"}
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.registrationCharges || "N/A"}
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.registrationFee ? candidate.registrationFee : "Unpaid"}
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.sector || "N/A"}
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.courseFeeType || "Free/Paid"}
-                              </td>
-                              <td className="text-capitalize">
-                                {candidate.registeredByName || "N/A"}
-                              </td>
-                              <td className="text-capitalize">
-                                <button 
-                                  className={`btn ${candidate.courseStatus === 0 ? 'btn-danger' : 'btn-success'} waves-effect waves-light text-white d-inline btn-sm`}
-                                  onClick={() => handleActionClick(candidate)}
-                                >
-                                  {candidate.courseStatus === 0 ? 'DUE' : 'Assigned'}
-                                </button>
-                              </td>
-                              <td className="text-capitalize">
-                                <Link 
-                                  to={`/admin/courses/${candidate.courseId}/${candidate.candidateId}/docsview`} 
-                                  className="btn btn-danger waves-effect waves-light text-white d-inline btn-sm"
-                                  style={{ padding: '8px' }}
-                                >
-                                  View Docs
-                                </Link>
-                              </td>
-                              <td className="text-capitalize">
-                                <FontAwesomeIcon 
-                                  icon={faSignInAlt} 
-                                  className="fa-lg primary cursor-pointer loginIcon" 
-                                  title="Login as user" 
-                                  onClick={() => loginAs(candidate.mobile)}
-                                />
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            {/* <td colSpan="17" className="text-center">
-                              <div className="p-3">No Record Found</div>
-                            </td> */}
-                            <td  className="text-center">
-                              May 13 2025 10:56 AM
-                            </td>
-                            <td  className="text-center">
-                              Akash
-                            </td>
-                            <td  className="text-center">
-                             6230211219
-                            </td>
-                            <td  className="text-center">
-                              muskaanmehra814@gmail.com
-                            </td>
-                            <td  className="text-center">
-                              nr
-                            </td>
-                            <td  className="text-center">
-                              dropdown
-                            </td>
-                            <td  className="text-center">
-                              dropdown
-                            </td>
-                            <td  className="text-center">
-                              dropdown
-                            </td>
-                            <td  className="text-center">
-                              guest service  associate (food & beverage)	
-                            </td>
-                            <td  className="text-center">
-                              No Fees	
-                            </td>
-                            <td  className="text-center">
-                              Unpaid	
-                            </td>
-                            <td  className="text-center">
-                              tourism and hospitality
-                            </td>
-                            <td  className="text-center">
-                              Free/paid
-                            </td>
-                            <td  className="text-center">
-                              Daman Chaudhary
-                            </td>
-                            <td className="text-capitalize">
-                                <button 
-                                  className={`btn`}
-                                 
-                                >
-                                  
-                                </button>
-                              </td>
-                              <td className="text-capitalize">
-                                <a 
-                                  className="btn btn-danger waves-effect waves-light text-white d-inline btn-sm"
-                                  style={{ padding: '8px' }}
-                                >
-                                  View Docs
-                                </a>
-                              </td>
-                              <td className="text-capitalize">
-                                <FontAwesomeIcon 
-                                  icon={faSignInAlt} 
-                                  className="fa-lg primary cursor-pointer loginIcon" 
-                                  title="Login as user" 
-                                />
-                              </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+              <div className="col-md-3">
+                <label className="form-label small fw-medium">Status</label>
+                <select
+                  className="form-select form-select-sm"
+                  name="status"
+                  value={filterData.status}
+                  onChange={handleFilterChange}
+                >
+                  <option value="">All Status</option>
+                  <option value="Hot">Hot</option>
+                  <option value="Warm">Warm</option>
+                  <option value="Cold">Cold</option>
+                </select>
+              </div>
 
-                    {/* Pagination */}
-                    {renderPagination()}
-                  </div>
-                </div>
+              <div className="col-md-3">
+                <label className="form-label small fw-medium">Course Type</label>
+                <select
+                  className="form-select form-select-sm"
+                  name="courseType"
+                  value={filterData.courseType}
+                  onChange={handleFilterChange}
+                >
+                  <option value="">All Types</option>
+                  <option value="Free">Free</option>
+                  <option value="Paid">Paid</option>
+                </select>
+              </div>
+
+              <div className="col-md-3">
+                <label className="form-label small fw-medium">Sector</label>
+                <select
+                  className="form-select form-select-sm"
+                  name="sector"
+                  value={filterData.sector}
+                  onChange={handleFilterChange}
+                >
+                  <option value="">All Sectors</option>
+                  <option value="Tourism and Hospitality">Tourism & Hospitality</option>
+                  <option value="Information Technology">Information Technology</option>
+                  <option value="Healthcare">Healthcare</option>
+                  <option value="Finance">Finance</option>
+                </select>
+              </div>
+
+              <div className="col-md-3">
+                <label className="form-label small fw-medium">From Date</label>
+                <input
+                  type="date"
+                  className="form-control form-control-sm"
+                  name="FromDate"
+                  value={filterData.FromDate}
+                  onChange={handleFilterChange}
+                />
+              </div>
+
+              <div className="col-md-3">
+                <label className="form-label small fw-medium">To Date</label>
+                <input
+                  type="date"
+                  className="form-control form-control-sm"
+                  name="ToDate"
+                  value={filterData.ToDate}
+                  onChange={handleFilterChange}
+                />
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Course Assignment Modal */}
-      {showCourseModal && (
-        <div className="modal fade show" id="courseAssignModal" tabIndex="-1" role="dialog" style={{display: 'block', backgroundColor: 'rgba(0,0,0,0.5)'}}>
-          <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title text-white text-uppercase">Assign Course</h5>
-                <button type="button" className="close" onClick={() => setShowCourseModal(false)}>
-                  <span aria-hidden="true">&times;</span>
-                </button>
-              </div>
-              <div className="modal-body pt-1">
-                <div className="row">
-                  <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-1 text-left">
-                    <label>Date</label>
-                    <input 
-                      className="form-control text-capitalize" 
-                      type="date" 
-                      value={courseFormData.assignDate}
-                      onChange={(e) => setCourseFormData({...courseFormData, assignDate: e.target.value})}
-                    />
-                  </div>
-                  <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-1 text-left">
-                    <label>Course URL</label>
-                    <input 
-                      className="form-control text-capitalize" 
-                      type="text" 
-                      value={courseFormData.url}
-                      onChange={(e) => setCourseFormData({...courseFormData, url: e.target.value})}
-                    />
-                  </div>
-                  <div className="col-xl-12 mb-1 text-left">
-                    <label>Remarks</label>
-                    <textarea 
-                      className="form-control" 
-                      cols="5" 
-                      rows="3"
-                      value={courseFormData.remarks}
-                      onChange={(e) => setCourseFormData({...courseFormData, remarks: e.target.value})}
-                    ></textarea>
-                  </div>
-                </div>
-                {statusMessages.success && (
-                  <p className="text-success font-weight-bolder">{statusMessages.success}</p>
-                )}
-                {statusMessages.error && (
-                  <p className="text-danger font-weight-bolder">{statusMessages.error}</p>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-primary" onClick={assignCourse}>
-                  Assigned
-                </button>
-              </div>
+            <div className="d-flex justify-content-end gap-2 mt-3">
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => {
+                  setFilterData({
+                    name: '',
+                    courseType: '',
+                    FromDate: '',
+                    ToDate: '',
+                    status: '',
+                    leadStatus: '',
+                    sector: ''
+                  });
+                }}
+              >
+                Reset
+              </button>
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => setIsFilterCollapsed(true)}
+              >
+                Apply Filters
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      <style jsx>{`
-        #tblexportData td {
-          white-space: nowrap;
-        }
-        .circular-progress-container {
-          position: relative;
-          width: 40px;
-          height: 40px;
-        }
+      {/* Main Content */}
+      <div className="content-body">
+        <section className="list-view">
+          
+          <div className='row'>
+            <div>
+              <div className="col-12 rounded equal-height-2 coloumn-2">
+                <div className="card px-3">
+                  <div className="row" id="crm-main-row">
+                    <div className={`card-content transition-col`} id="mainContent">
+
+                      {/* Quick Categories */}
+
+
+                      {/* Contact Row */}
+                      <div className="card border-0 shadow-sm mb-0 mt-2">
+                        <div className="card-body px-1 py-0 my-2" >
+                          <div className="row align-items-center">
+                            <div className="col-md-4">
+                              <div className="d-flex align-items-center">
+                                <div className="form-check me-3">
+                                  <input className="form-check-input" type="checkbox" />
+                                </div>
+                                <div className="me-3">
+                                  <div className="circular-progress-container" data-percent="40">
+                                    <svg width="40" height="40">
+                                      <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
+                                      <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
+                                    </svg>
+                                    <div className="progress-text"></div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <h6 className="mb-0 fw-bold">Akash Gaurav</h6>
+                                  <small className="text-muted">9027486847</small>
+                                </div>
+                                <div style={{ marginLeft: '15px' }}>
+                                  <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                    <i className="fas fa-phone"></i>
+                                  </button>
+                                  <button
+                                    className="btn btn-outline-success btn-sm border-0"
+                                    onClick={openWhatsappPanel}
+                                    style={{ fontSize: '20px' }}
+                                    title="WhatsApp"
+                                  >
+                                    <i className="fab fa-whatsapp"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-md-5">
+                              <div className="d-flex gap-2">
+                                <div className="flex-grow-1">
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm m-0" style={{
+                                      cursor: 'pointer',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '0px',
+                                      borderTopRightRadius: '5px',
+                                      borderTopLeftRadius: '5px', cursor: 'pointer',
+                                      width: '145px',
+                                      height: '20px', fontSize: '10px'
+                                    }}
+                                    value={crmFilters[activeCrmFilter].name}
+                                    readOnly
+                                    onClick={openEditPanel}
+                                  />
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm m-0"
+                                    value="Untouched Lead Long Text Example..."
+                                    style={{
+                                      cursor: 'pointer',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '0px',
+                                      borderBottomRightRadius: '5px',
+                                      borderBottomLeftRadius: '5px', cursor: 'pointer',
+                                      width: '145px',
+                                      height: '20px', fontSize: '10px'
+                                    }}
+                                    readOnly
+                                  />
+                                </div>
+                                {/* <button className="btn btn-danger btn-sm" style={{maxHeight: '30px'}}>
+                                View Docs
+                              </button> */}
+                              </div>
+                            </div>
+
+                            <div className="col-md-3 text-end">
+                              <div className="btn-group">
+
+                                <button
+                                  className="btn btn-sm btn-outline-secondary border-0"
+                                  onClick={() => setLeadDetailsVisible(!leadDetailsVisible)} style={{ border: 'none' }}
+                                >
+                                  {leadDetailsVisible ? (
+                                    <i className="fas fa-chevron-up"></i>
+                                  ) : (
+                                    <i className="fas fa-chevron-down"></i>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tab Navigation with Collapsible Arrow */}
+                      <div className="card border-0 shadow-sm mb-4">
+                        <div className="card-header bg-white border-bottom-0 py-3 mb-3">
+                          <div className="d-flex justify-content-between align-items-center">
+                            <ul className="nav nav-pills nav-pills-sm">
+                              {tabs.map((tab, index) => (
+                                <li className="nav-item" key={index}>
+                                  <button
+                                    className={`nav-link ${activeTab === index ? 'active' : ''}`}
+                                    onClick={() => handleTabClick(index)}
+                                  >
+                                    {tab}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+
+                          </div>
+                        </div>
+
+                        {/* Tab Content - Collapsible */}
+                        {leadDetailsVisible && (
+                          <div>
+                            {/* Lead Details Tab */}
+                            <div className={`tab-pane ${activeTab === 0 ? 'active' : ''}`} id="lead-details">
+
+                              {/* Mobile Scrollable View */}
+                              <div className="scrollable-container">
+                                <div className="scrollable-content">
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD AGE</div>
+                                      <div className="info-value">282 Days</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">Lead Owner</div>
+                                      <div className="info-value">Meta Ads Inbound IVR Inbound Call</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">COURSE / JOB NAME</div>
+                                      <div className="info-value">Operator</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">BATCH NAME</div>
+                                      <div className="info-value">-</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">TYPE OF PROJECT</div>
+                                      <div className="info-value">Job</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">PROJECT</div>
+                                      <div className="info-value">Job</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">SECTOR</div>
+                                      <div className="info-value">Retail</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD CREATION DATE</div>
+                                      <div className="info-value">Jan 15, 2024 9:29 AM</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">STATE</div>
+                                      <div className="info-value">Uttar Pradesh</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">City</div>
+                                      <div className="info-value">Chandauli</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">BRANCH NAME</div>
+                                      <div className="info-value">PSD Chandauli Center</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD MODIFICATION DATE</div>
+                                      <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Scroll Arrows */}
+                              <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                              <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+
+                              {/* Desktop View - Enhanced Layout */}
+                              <div className="desktop-view">
+                                <div className="row g-4">
+                                  {/* Personal Information Section */}
+                                  <div className="col-12">
+                                    <div class="scrollable-container">
+                                      <div class="scrollable-content">
+                                        <div class="info-card">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD AGE</div>
+                                            <div class="info-value">282 Days</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">Lead Owner</div>
+                                            <div class="info-value">Meta Ads Inbound IVR Inbound Call
+                                            </div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">COURSE / JOB NAME</div>
+                                            <div class="info-value">Operator</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">BATCH NAME</div>
+                                            <div class="info-value"></div>
+                                          </div>
+
+                                        </div>
+
+                                        <div class="info-card">
+
+                                          <div class="info-group">
+                                            <div class="info-label">TYPE OF PROJECT</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">PROJECT</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">SECTOR</div>
+                                            <div class="info-value">Retail</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD CREATION DATE</div>
+                                            <div class="info-value">Jan 15, 2024 9:29 AM</div>
+                                          </div>
+                                        </div>
+
+                                        <div class="info-card">
+
+                                          <div class="info-group">
+                                            <div class="info-label">STATE</div>
+                                            <div class="info-value">Uttar Pradesh</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">City</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">BRANCH NAME</div>
+                                            <div class="info-value">PSD Chandauli Center</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD MODIFICATION DATE</div>
+                                            <div class="info-value">Mar 21, 2025 3:32 PM</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD MODIFICATION By</div>
+                                            <div class="info-value">Mar 21, 2025 3:32 PM</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">Counsellor Name</div>
+                                            <div class="info-value">Name</div>
+                                          </div>
+                                        </div>
+
+
+                                      </div>
+                                    </div>
+                                    <div class="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                    <div class="scroll-arrow scroll-right  d-md-none">&gt;</div>
+
+
+                                    <div class="desktop-view">
+
+                                      <div class="row">
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD AGE</div>
+                                            <div class="info-value">282 Days</div>
+                                          </div>
+                                        </div>
+
+
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">STATE</div>
+                                            <div class="info-value">Uttar Pradesh</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">CITY</div>
+                                            <div class="info-value"></div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">TYPE OF PROJECT</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">PROJECT</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">Sector</div>
+                                            <div class="info-value">Retail</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">COURSE / JOB NAME</div>
+                                            <div class="info-value">Operator</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">BATCH NAME</div>
+                                            <div class="info-value"></div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">SECTOR</div>
+                                            <div class="info-value">Retail</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">BRANCH NAME</div>
+                                            <div class="info-value">PSD Chandauli Center</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">NEXT ACTION DATE</div>
+                                            <div class="info-value"></div>
+                                          </div>
+                                        </div>
+
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD CREATION DATE</div>
+                                            <div class="info-value">Jan 15, 2024 9:29 AM</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD MODIFICATION DATE</div>
+                                            <div class="info-value">Mar 21, 2025 3:32 PM</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD MODIFICATION BY</div>
+                                            <div class="info-value">Name</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">Counsellor Name</div>
+                                            <div class="info-value">Name</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD OWNER</div>
+                                            <div class="info-value">Rahul Sharma</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Profile Tab */}
+                            <div className={`tab-pane ${activeTab === 1 ? 'active' : ''}`} id="profile">
+                              <div className="resume-preview-body">
+                                <div id="resume-download" className="resume-document">
+                                  {/* Header Section */}
+                                  <div className="resume-document-header">
+                                    <div className="resume-profile-section">
+                                      {user?.image ? (
+                                        <img
+                                          src={`${bucketUrl}/${user.image}`}
+                                          alt="Profile"
+                                          className="resume-profile-image"
+                                        />
+                                      ) : (
+                                        <div className="resume-profile-placeholder">
+                                          <i className="bi bi-person-circle"></i>
+                                        </div>
+                                      )}
+
+                                      <div className="resume-header-content">
+                                        <h1 className="resume-name">
+                                          {profileData?.personalInfo?.name || user?.name || 'Your Name'}
+                                        </h1>
+                                        <p className="resume-title">
+                                          {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
+                                        </p>
+                                        <p className="resume-title">
+                                          {profileData?.sex || 'Sex'}
+                                        </p>
+
+                                        <div className="resume-contact-details">
+                                          {profileData?.mobile && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-telephone-fill"></i>
+                                              <span>{profileData.mobile}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.email && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-envelope-fill"></i>
+                                              <span>{profileData.email}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.dob && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-calendar-heart-fill"></i>
+                                              {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
+                                                day: '2-digit',
+                                                month: 'long',
+                                                year: 'numeric'
+                                              }) : ''}
+                                            </div>
+                                          )}
+                                          {profileData?.personalInfo?.currentAddress?.fullAddress && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-geo-alt-fill"></i>
+                                              <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.personalInfo?.permanentAddress && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-house-fill"></i>
+                                              <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="resume-summary">
+                                      <h2 className="resume-section-title">Professional Summary</h2>
+                                      <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Two Column Layout */}
+                                  <div className="resume-document-body">
+                                    {/* Left Column */}
+                                    <div className="resume-column resume-left-column">
+                                      {/* Experience Section */}
+                                      {profileData?.experienceType === 'fresher' ? (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Work Experience</h2>
+                                          <div className="resume-experience-item">
+                                            <div className="resume-item-header">
+                                              <h3 className="resume-item-title">Fresher</h3>
+                                            </div>
+                                            {profileData?.fresherDetails && (
+                                              <div className="resume-item-content">
+                                                <p>{profileData.isExperienced}</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                          <div className="resume-section">
+                                            <h2 className="resume-section-title">Work Experience</h2>
+                                            {experiences.map((exp, index) => (
+                                              (exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                                <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                  <div className="resume-item-header">
+                                                    {exp.jobTitle && (
+                                                      <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                    )}
+                                                    {exp.companyName && (
+                                                      <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                    )}
+                                                    {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                      <p className="resume-item-period">
+                                                        {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                          year: 'numeric',
+                                                          month: 'short',
+                                                        }) : 'Start Date'}
+                                                        {" - "}
+                                                        {exp.currentlyWorking ? 'Present' :
+                                                          exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                            year: 'numeric',
+                                                            month: 'short',
+                                                          }) : 'End Date'}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                  {exp.jobDescription && (
+                                                    <div className="resume-item-content">
+                                                      <p>{exp.jobDescription}</p>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        )
+                                      )}
+
+                                      {/* Education Section */}
+                                      {educations.length > 0 && educations.some(edu =>
+                                        edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
+                                      ) && (
+                                          <div className="resume-section">
+                                            <h2 className="resume-section-title">Education</h2>
+                                            {educations.map((edu, index) => (
+                                              (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
+                                                <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                  <div className="resume-item-header">
+                                                    {edu.education && (
+                                                      <h3 className="resume-item-title">
+                                                        {educationList.find(e => e._id === edu.education)?.name || 'Education'}
+                                                      </h3>
+                                                    )}
+                                                    {typeof edu.course === 'string' && edu.course && (
+                                                      <h3 className="resume-item-title">
+                                                        {coursesList[index]?.find(course => course._id === edu.course)?.name || edu.course}
+                                                      </h3>
+                                                    )}
+                                                    {edu.universityName && (
+                                                      <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                    )}
+                                                    {(edu.schoolName && !edu.universityName) && (
+                                                      <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                    )}
+                                                    {edu.collegeName && (
+                                                      <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                    )}
+                                                    {edu.currentlypursuing ? (
+                                                      <p className="resume-item-period highlight-text">Currently Pursuing</p>
+                                                    ) : edu.passingYear ? (
+                                                      <p className="resume-item-period">{edu.passingYear}</p>
+                                                    ) : null}
+                                                  </div>
+                                                  <div className="resume-item-content">
+                                                    {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                    {edu.specialization && <p>Specialization: {typeof edu.specialization === 'string' ? edu.specialization : 'Specialization'}</p>}
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        )}
+                                    </div>
+
+                                    {/* Right Column */}
+                                    <div className="resume-column resume-right-column">
+                                      {/* Skills Section */}
+                                      {skills.length > 0 && skills.some(skill => skill.skillName) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Skills</h2>
+                                          <div className="resume-skills-list">
+                                            {skills.map((skill, index) => (
+                                              skill.skillName && (
+                                                <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                  <div className="resume-skill-name">{skill.skillName}</div>
+                                                  <div className="resume-skill-bar-container">
+                                                    <div
+                                                      className="resume-skill-bar"
+                                                      style={{ width: `${skill.skillPercent || 0}%` }}
+                                                    ></div>
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Languages Section */}
+                                      {languages.length > 0 && languages.some(lang => lang.lname) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Languages</h2>
+                                          <div className="resume-languages-list">
+                                            {languages.map((lang, index) => (
+                                              lang.lname && (
+                                                <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                  <div className="resume-language-name">{lang.lname}</div>
+                                                  <div className="resume-language-level">
+                                                    {[1, 2, 3, 4, 5].map(dot => (
+                                                      <span
+                                                        key={`resume-lang-dot-${index}-${dot}`}
+                                                        className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                      ></span>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Certifications Section */}
+                                      {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Certifications</h2>
+                                          <ul className="resume-certifications-list">
+                                            {certificates.map((cert, index) => (
+                                              (cert.certificateName || cert.orgName) && (
+                                                <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                  {cert.certificateName && (
+                                                    <strong>{cert.certificateName}</strong>
+                                                  )}
+                                                  {cert.orgName && (
+                                                    <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                  )}
+                                                  {cert.currentlypursuing ? (
+                                                    <span className="resume-cert-date highlight-text"> (Currently Pursuing)</span>
+                                                  ) : (cert.month || cert.year) && (
+                                                    <span className="resume-cert-date">
+                                                      {cert.month && cert.year ?
+                                                        ` (${cert.month}/${cert.year})` :
+                                                        cert.month ?
+                                                          ` (${cert.month})` :
+                                                          cert.year ?
+                                                            ` (${cert.year})` :
+                                                            ''}
+                                                    </span>
+                                                  )}
+                                                </li>
+                                              )
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+
+                                      {/* Projects Section */}
+                                      {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Projects</h2>
+                                          {projects.map((proj, index) => (
+                                            (proj.projectName || proj.proDescription) && (
+                                              <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                <div className="resume-item-header">
+                                                  <h3 className="resume-project-title">
+                                                    {proj.projectName || 'Project'}
+                                                    {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
+                                                  </h3>
+                                                </div>
+                                                {proj.proDescription && (
+                                                  <div className="resume-item-content">
+                                                    <p>{proj.proDescription}</p>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Interests Section */}
+                                      {interests.filter(i => i.trim() !== '').length > 0 && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Interests</h2>
+                                          <div className="resume-interests-tags">
+                                            {interests.filter(i => i.trim() !== '').map((interest, index) => (
+                                              <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                {interest}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Declaration */}
+                                  {declaration?.text && (
+                                    <div className="resume-declaration">
+                                      <h2 className="resume-section-title">Declaration</h2>
+                                      <p>{declaration.text}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Job History Tab */}
+                            <div className={`tab-pane ${activeTab === 2 ? 'active' : ''}`} id="job-history">
+                              <div className="section-card">
+                                <div className="table-responsive">
+                                  <table className="table table-hover table-bordered job-history-table">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>S.No</th>
+                                        <th>Company Name</th>
+                                        <th>Position</th>
+                                        <th>Duration</th>
+                                        <th>Location</th>
+                                        <th>Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {experiences.map((job, index) => (
+                                        <tr key={index}>
+                                          <td>{index + 1}</td>
+                                          <td>{job.companyName}</td>
+                                          <td>{job.jobTitle}</td>
+                                          <td>
+                                            {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                            {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                          </td>
+                                          <td>Remote</td>
+                                          <td><span className="text-success">Completed</span></td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Course History Tab */}
+                            <div className={`tab-pane ${activeTab === 3 ? 'active' : ''}`} id="course-history">
+                              <div className="section-card">
+                                <div className="table-responsive">
+                                  <table className="table table-hover table-bordered course-history-table">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>S.No</th>
+                                        <th>Course Name</th>
+                                        <th>Institute</th>
+                                        <th>Completion Date</th>
+                                        <th>Certificate ID</th>
+                                        <th>Score</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {certificates.map((course, index) => (
+                                        <tr key={index}>
+                                          <td>{index + 1}</td>
+                                          <td>{course.certificateName}</td>
+                                          <td>{course.orgName}</td>
+                                          <td>{course.month} {course.year}</td>
+                                          <td>CRT{index + 1}001</td>
+                                          <td><span className="text-success">Completed</span></td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2nd card section  */}
+
+           <div className="card border-0 shadow-sm my-3">
+            <div className="card-body p-3">
+              <div className="d-flex flex-wrap gap-2">
+                {crmFilters.map((filter, index) => (
+                  <button
+                    key={index}
+                    className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                    onClick={() => handleCrmFilterClick(index)}
+                  >
+                    {filter.name}
+                    <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                      ({filter.count})
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className='row'>
+            <div>
+              <div className="col-12 rounded equal-height-2 coloumn-2">
+                <div className="card px-3">
+                  <div className="row" id="crm-main-row">
+                    <div className={`card-content transition-col`} id="mainContent">
+
+                      {/* Quick Categories */}
+
+
+                      {/* Contact Row */}
+                      <div className="card border-0 shadow-sm mb-0 mt-2">
+                        <div className="card-body px-1 py-0 my-2" >
+                          <div className="row align-items-center">
+                            <div className="col-md-4">
+                              <div className="d-flex align-items-center">
+                                <div className="form-check me-3">
+                                  <input className="form-check-input" type="checkbox" />
+                                </div>
+                                <div className="me-3">
+                                  <div className="circular-progress-container" data-percent="40">
+                                    <svg width="40" height="40">
+                                      <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
+                                      <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
+                                    </svg>
+                                    <div className="progress-text"></div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <h6 className="mb-0 fw-bold">Akash Gaurav</h6>
+                                  <small className="text-muted">9027486847</small>
+                                </div>
+                                <div style={{ marginLeft: '15px' }}>
+                                  <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                    <i className="fas fa-phone"></i>
+                                  </button>
+                                  <button
+                                    className="btn btn-outline-success btn-sm border-0"
+                                    onClick={openWhatsappPanel}
+                                    style={{ fontSize: '20px' }}
+                                    title="WhatsApp"
+                                  >
+                                    <i className="fab fa-whatsapp"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-md-5">
+                              <div className="d-flex gap-2">
+                                <div className="flex-grow-1">
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm m-0" style={{
+                                      cursor: 'pointer',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '0px',
+                                      borderTopRightRadius: '5px',
+                                      borderTopLeftRadius: '5px', cursor: 'pointer',
+                                      width: '145px',
+                                      height: '20px', fontSize: '10px'
+                                    }}
+                                    value={crmFilters[activeCrmFilter].name}
+                                    readOnly
+                                    onClick={openEditPanel}
+                                  />
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm m-0"
+                                    value="Untouched Lead Long Text Example..."
+                                    style={{
+                                      cursor: 'pointer',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '0px',
+                                      borderBottomRightRadius: '5px',
+                                      borderBottomLeftRadius: '5px', cursor: 'pointer',
+                                      width: '145px',
+                                      height: '20px', fontSize: '10px'
+                                    }}
+                                    readOnly
+                                  />
+                                </div>
+                                {/* <button className="btn btn-danger btn-sm" style={{maxHeight: '30px'}}>
+                                View Docs
+                              </button> */}
+                              </div>
+                            </div>
+
+                            <div className="col-md-3 text-end">
+                              <div className="btn-group">
+
+                                <button
+                                  className="btn btn-sm btn-outline-secondary border-0"
+                                  onClick={() => setLeadDetailsVisible(!leadDetailsVisible)} style={{ border: 'none' }}
+                                >
+                                  {leadDetailsVisible ? (
+                                    <i className="fas fa-chevron-up"></i>
+                                  ) : (
+                                    <i className="fas fa-chevron-down"></i>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tab Navigation with Collapsible Arrow */}
+                      <div className="card border-0 shadow-sm mb-4">
+                        <div className="card-header bg-white border-bottom-0 py-3 mb-3">
+                          <div className="d-flex justify-content-between align-items-center">
+                            <ul className="nav nav-pills nav-pills-sm">
+                              {tabs.map((tab, index) => (
+                                <li className="nav-item" key={index}>
+                                  <button
+                                    className={`nav-link ${activeTab === index ? 'active' : ''}`}
+                                    onClick={() => handleTabClick(index)}
+                                  >
+                                    {tab}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+
+                          </div>
+                        </div>
+
+                        {/* Tab Content - Collapsible */}
+                        {leadDetailsVisible && (
+                          <div>
+                            {/* Lead Details Tab */}
+                            <div className={`tab-pane ${activeTab === 0 ? 'active' : ''}`} id="lead-details">
+
+                              {/* Mobile Scrollable View */}
+                              <div className="scrollable-container">
+                                <div className="scrollable-content">
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD AGE</div>
+                                      <div className="info-value">282 Days</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">Lead Owner</div>
+                                      <div className="info-value">Meta Ads Inbound IVR Inbound Call</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">COURSE / JOB NAME</div>
+                                      <div className="info-value">Operator</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">BATCH NAME</div>
+                                      <div className="info-value">-</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">TYPE OF PROJECT</div>
+                                      <div className="info-value">Job</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">PROJECT</div>
+                                      <div className="info-value">Job</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">SECTOR</div>
+                                      <div className="info-value">Retail</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD CREATION DATE</div>
+                                      <div className="info-value">Jan 15, 2024 9:29 AM</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">STATE</div>
+                                      <div className="info-value">Uttar Pradesh</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">City</div>
+                                      <div className="info-value">Chandauli</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">BRANCH NAME</div>
+                                      <div className="info-value">PSD Chandauli Center</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD MODIFICATION DATE</div>
+                                      <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Scroll Arrows */}
+                              <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                              <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+
+                              {/* Desktop View - Enhanced Layout */}
+                              <div className="desktop-view">
+                                <div className="row g-4">
+                                  {/* Personal Information Section */}
+                                  <div className="col-12">
+                                    <div class="scrollable-container">
+                                      <div class="scrollable-content">
+                                        <div class="info-card">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD AGE</div>
+                                            <div class="info-value">282 Days</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">Lead Owner</div>
+                                            <div class="info-value">Meta Ads Inbound IVR Inbound Call
+                                            </div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">COURSE / JOB NAME</div>
+                                            <div class="info-value">Operator</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">BATCH NAME</div>
+                                            <div class="info-value"></div>
+                                          </div>
+
+                                        </div>
+
+                                        <div class="info-card">
+
+                                          <div class="info-group">
+                                            <div class="info-label">TYPE OF PROJECT</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">PROJECT</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">SECTOR</div>
+                                            <div class="info-value">Retail</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD CREATION DATE</div>
+                                            <div class="info-value">Jan 15, 2024 9:29 AM</div>
+                                          </div>
+                                        </div>
+
+                                        <div class="info-card">
+
+                                          <div class="info-group">
+                                            <div class="info-label">STATE</div>
+                                            <div class="info-value">Uttar Pradesh</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">City</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">BRANCH NAME</div>
+                                            <div class="info-value">PSD Chandauli Center</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD MODIFICATION DATE</div>
+                                            <div class="info-value">Mar 21, 2025 3:32 PM</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD MODIFICATION By</div>
+                                            <div class="info-value">Mar 21, 2025 3:32 PM</div>
+                                          </div>
+                                          <div class="info-group">
+                                            <div class="info-label">Counsellor Name</div>
+                                            <div class="info-value">Name</div>
+                                          </div>
+                                        </div>
+
+
+                                      </div>
+                                    </div>
+                                    <div class="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                    <div class="scroll-arrow scroll-right  d-md-none">&gt;</div>
+
+
+                                    <div class="desktop-view">
+
+                                      <div class="row">
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD AGE</div>
+                                            <div class="info-value">282 Days</div>
+                                          </div>
+                                        </div>
+
+
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">STATE</div>
+                                            <div class="info-value">Uttar Pradesh</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">CITY</div>
+                                            <div class="info-value"></div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">TYPE OF PROJECT</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">PROJECT</div>
+                                            <div class="info-value">Job</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">Sector</div>
+                                            <div class="info-value">Retail</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">COURSE / JOB NAME</div>
+                                            <div class="info-value">Operator</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">BATCH NAME</div>
+                                            <div class="info-value"></div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">SECTOR</div>
+                                            <div class="info-value">Retail</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">BRANCH NAME</div>
+                                            <div class="info-value">PSD Chandauli Center</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">NEXT ACTION DATE</div>
+                                            <div class="info-value"></div>
+                                          </div>
+                                        </div>
+
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD CREATION DATE</div>
+                                            <div class="info-value">Jan 15, 2024 9:29 AM</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD MODIFICATION DATE</div>
+                                            <div class="info-value">Mar 21, 2025 3:32 PM</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD MODIFICATION BY</div>
+                                            <div class="info-value">Name</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">Counsellor Name</div>
+                                            <div class="info-value">Name</div>
+                                          </div>
+                                        </div>
+                                        <div class="col-xl-3">
+                                          <div class="info-group">
+                                            <div class="info-label">LEAD OWNER</div>
+                                            <div class="info-value">Rahul Sharma</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Profile Tab */}
+                            <div className={`tab-pane ${activeTab === 1 ? 'active' : ''}`} id="profile">
+                              <div className="resume-preview-body">
+                                <div id="resume-download" className="resume-document">
+                                  {/* Header Section */}
+                                  <div className="resume-document-header">
+                                    <div className="resume-profile-section">
+                                      {user?.image ? (
+                                        <img
+                                          src={`${bucketUrl}/${user.image}`}
+                                          alt="Profile"
+                                          className="resume-profile-image"
+                                        />
+                                      ) : (
+                                        <div className="resume-profile-placeholder">
+                                          <i className="bi bi-person-circle"></i>
+                                        </div>
+                                      )}
+
+                                      <div className="resume-header-content">
+                                        <h1 className="resume-name">
+                                          {profileData?.personalInfo?.name || user?.name || 'Your Name'}
+                                        </h1>
+                                        <p className="resume-title">
+                                          {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
+                                        </p>
+                                        <p className="resume-title">
+                                          {profileData?.sex || 'Sex'}
+                                        </p>
+
+                                        <div className="resume-contact-details">
+                                          {profileData?.mobile && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-telephone-fill"></i>
+                                              <span>{profileData.mobile}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.email && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-envelope-fill"></i>
+                                              <span>{profileData.email}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.dob && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-calendar-heart-fill"></i>
+                                              {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
+                                                day: '2-digit',
+                                                month: 'long',
+                                                year: 'numeric'
+                                              }) : ''}
+                                            </div>
+                                          )}
+                                          {profileData?.personalInfo?.currentAddress?.fullAddress && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-geo-alt-fill"></i>
+                                              <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.personalInfo?.permanentAddress && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-house-fill"></i>
+                                              <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="resume-summary">
+                                      <h2 className="resume-section-title">Professional Summary</h2>
+                                      <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Two Column Layout */}
+                                  <div className="resume-document-body">
+                                    {/* Left Column */}
+                                    <div className="resume-column resume-left-column">
+                                      {/* Experience Section */}
+                                      {profileData?.experienceType === 'fresher' ? (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Work Experience</h2>
+                                          <div className="resume-experience-item">
+                                            <div className="resume-item-header">
+                                              <h3 className="resume-item-title">Fresher</h3>
+                                            </div>
+                                            {profileData?.fresherDetails && (
+                                              <div className="resume-item-content">
+                                                <p>{profileData.isExperienced}</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                          <div className="resume-section">
+                                            <h2 className="resume-section-title">Work Experience</h2>
+                                            {experiences.map((exp, index) => (
+                                              (exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                                <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                  <div className="resume-item-header">
+                                                    {exp.jobTitle && (
+                                                      <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                    )}
+                                                    {exp.companyName && (
+                                                      <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                    )}
+                                                    {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                      <p className="resume-item-period">
+                                                        {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                          year: 'numeric',
+                                                          month: 'short',
+                                                        }) : 'Start Date'}
+                                                        {" - "}
+                                                        {exp.currentlyWorking ? 'Present' :
+                                                          exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                            year: 'numeric',
+                                                            month: 'short',
+                                                          }) : 'End Date'}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                  {exp.jobDescription && (
+                                                    <div className="resume-item-content">
+                                                      <p>{exp.jobDescription}</p>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        )
+                                      )}
+
+                                      {/* Education Section */}
+                                      {educations.length > 0 && educations.some(edu =>
+                                        edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
+                                      ) && (
+                                          <div className="resume-section">
+                                            <h2 className="resume-section-title">Education</h2>
+                                            {educations.map((edu, index) => (
+                                              (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
+                                                <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                  <div className="resume-item-header">
+                                                    {edu.education && (
+                                                      <h3 className="resume-item-title">
+                                                        {educationList.find(e => e._id === edu.education)?.name || 'Education'}
+                                                      </h3>
+                                                    )}
+                                                    {typeof edu.course === 'string' && edu.course && (
+                                                      <h3 className="resume-item-title">
+                                                        {coursesList[index]?.find(course => course._id === edu.course)?.name || edu.course}
+                                                      </h3>
+                                                    )}
+                                                    {edu.universityName && (
+                                                      <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                    )}
+                                                    {(edu.schoolName && !edu.universityName) && (
+                                                      <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                    )}
+                                                    {edu.collegeName && (
+                                                      <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                    )}
+                                                    {edu.currentlypursuing ? (
+                                                      <p className="resume-item-period highlight-text">Currently Pursuing</p>
+                                                    ) : edu.passingYear ? (
+                                                      <p className="resume-item-period">{edu.passingYear}</p>
+                                                    ) : null}
+                                                  </div>
+                                                  <div className="resume-item-content">
+                                                    {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                    {edu.specialization && <p>Specialization: {typeof edu.specialization === 'string' ? edu.specialization : 'Specialization'}</p>}
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        )}
+                                    </div>
+
+                                    {/* Right Column */}
+                                    <div className="resume-column resume-right-column">
+                                      {/* Skills Section */}
+                                      {skills.length > 0 && skills.some(skill => skill.skillName) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Skills</h2>
+                                          <div className="resume-skills-list">
+                                            {skills.map((skill, index) => (
+                                              skill.skillName && (
+                                                <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                  <div className="resume-skill-name">{skill.skillName}</div>
+                                                  <div className="resume-skill-bar-container">
+                                                    <div
+                                                      className="resume-skill-bar"
+                                                      style={{ width: `${skill.skillPercent || 0}%` }}
+                                                    ></div>
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Languages Section */}
+                                      {languages.length > 0 && languages.some(lang => lang.lname) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Languages</h2>
+                                          <div className="resume-languages-list">
+                                            {languages.map((lang, index) => (
+                                              lang.lname && (
+                                                <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                  <div className="resume-language-name">{lang.lname}</div>
+                                                  <div className="resume-language-level">
+                                                    {[1, 2, 3, 4, 5].map(dot => (
+                                                      <span
+                                                        key={`resume-lang-dot-${index}-${dot}`}
+                                                        className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                      ></span>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Certifications Section */}
+                                      {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Certifications</h2>
+                                          <ul className="resume-certifications-list">
+                                            {certificates.map((cert, index) => (
+                                              (cert.certificateName || cert.orgName) && (
+                                                <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                  {cert.certificateName && (
+                                                    <strong>{cert.certificateName}</strong>
+                                                  )}
+                                                  {cert.orgName && (
+                                                    <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                  )}
+                                                  {cert.currentlypursuing ? (
+                                                    <span className="resume-cert-date highlight-text"> (Currently Pursuing)</span>
+                                                  ) : (cert.month || cert.year) && (
+                                                    <span className="resume-cert-date">
+                                                      {cert.month && cert.year ?
+                                                        ` (${cert.month}/${cert.year})` :
+                                                        cert.month ?
+                                                          ` (${cert.month})` :
+                                                          cert.year ?
+                                                            ` (${cert.year})` :
+                                                            ''}
+                                                    </span>
+                                                  )}
+                                                </li>
+                                              )
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+
+                                      {/* Projects Section */}
+                                      {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Projects</h2>
+                                          {projects.map((proj, index) => (
+                                            (proj.projectName || proj.proDescription) && (
+                                              <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                <div className="resume-item-header">
+                                                  <h3 className="resume-project-title">
+                                                    {proj.projectName || 'Project'}
+                                                    {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
+                                                  </h3>
+                                                </div>
+                                                {proj.proDescription && (
+                                                  <div className="resume-item-content">
+                                                    <p>{proj.proDescription}</p>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Interests Section */}
+                                      {interests.filter(i => i.trim() !== '').length > 0 && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Interests</h2>
+                                          <div className="resume-interests-tags">
+                                            {interests.filter(i => i.trim() !== '').map((interest, index) => (
+                                              <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                {interest}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Declaration */}
+                                  {declaration?.text && (
+                                    <div className="resume-declaration">
+                                      <h2 className="resume-section-title">Declaration</h2>
+                                      <p>{declaration.text}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Job History Tab */}
+                            <div className={`tab-pane ${activeTab === 2 ? 'active' : ''}`} id="job-history">
+                              <div className="section-card">
+                                <div className="table-responsive">
+                                  <table className="table table-hover table-bordered job-history-table">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>S.No</th>
+                                        <th>Company Name</th>
+                                        <th>Position</th>
+                                        <th>Duration</th>
+                                        <th>Location</th>
+                                        <th>Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {experiences.map((job, index) => (
+                                        <tr key={index}>
+                                          <td>{index + 1}</td>
+                                          <td>{job.companyName}</td>
+                                          <td>{job.jobTitle}</td>
+                                          <td>
+                                            {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                            {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                          </td>
+                                          <td>Remote</td>
+                                          <td><span className="text-success">Completed</span></td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Course History Tab */}
+                            <div className={`tab-pane ${activeTab === 3 ? 'active' : ''}`} id="course-history">
+                              <div className="section-card">
+                                <div className="table-responsive">
+                                  <table className="table table-hover table-bordered course-history-table">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>S.No</th>
+                                        <th>Course Name</th>
+                                        <th>Institute</th>
+                                        <th>Completion Date</th>
+                                        <th>Certificate ID</th>
+                                        <th>Score</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {certificates.map((course, index) => (
+                                        <tr key={index}>
+                                          <td>{index + 1}</td>
+                                          <td>{course.certificateName}</td>
+                                          <td>{course.orgName}</td>
+                                          <td>{course.month} {course.year}</td>
+                                          <td>CRT{index + 1}001</td>
+                                          <td><span className="text-success">Completed</span></td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      
+      </div>
+      <div className="col-4">
+        <div className="row sticky-top stickyBreakpoints">
+             {showEditPanel && (
+                    <div className="col-12 transition-col" id="editFollowupPanel">
+                      <div className="card border-0 shadow-sm">
+                        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+                          <div className="d-flex align-items-center">
+                            <div className="me-2">
+                              <i className="fas fa-user-edit text-secondary"></i>
+                            </div>
+                            <h6 className="mb-0 followUp fw-medium">Edit Followup for AKASH GAURAV</h6>
+                          </div>
+                          <div>
+                            <button className="btn-close" type="button" onClick={closeEditPanel}>
+                              <i className="fa-solid fa-xmark"></i>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="card-body">
+                          <form>
+                            <div className="mb-1">
+                              <label htmlFor="leadCategory" className="form-label small fw-medium text-dark">
+                                Lead Category<span className="text-danger">*</span>
+                              </label>
+                              <div className="d-flex">
+                                <div className="form-floating flex-grow-1">
+                                  <select
+                                    className="form-select border-0"
+                                    id="leadCategory"
+                                    style={{
+                                      height: '42px',
+                                      paddingTop: '8px',
+                                      paddingInline: '10px',
+                                      width: '100%',
+                                      backgroundColor: '#f1f2f6'
+                                    }}
+                                  >
+                                    <option value="">Application</option>
+                                    <option value="lead">Lead</option>
+                                    <option value="b2b">B2B</option>
+                                    <option value="rawdata">Raw Data</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mb-1">
+                              <label htmlFor="status" className="form-label small fw-medium text-dark">
+                                Status<span className="text-danger">*</span>
+                              </label>
+                              <div className="d-flex">
+                                <div className="form-floating flex-grow-1">
+                                  <select
+                                    className="form-select border-0"
+                                    id="status"
+                                    style={{
+                                      height: '42px',
+                                      paddingTop: '8px',
+                                      paddingInline: '10px',
+                                      width: '100%',
+                                      backgroundColor: '#f1f2f6'
+                                    }}
+                                  >
+                                    <option value="">Select Status</option>
+                                    <option value="03">03 - Junk (B2C)</option>
+                                    <option value="01">01 - Untouched Lead</option>
+                                    <option value="02">02 - Not Connected</option>
+                                    <option value="04">04 - Not Interested</option>
+                                    <option value="05">05 - Warm</option>
+                                    <option value="06">06 - Hot</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mb-1">
+                              <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
+                                Sub-Status<span className="text-danger">*</span>
+                              </label>
+                              <div className="d-flex">
+                                <div className="form-floating flex-grow-1">
+                                  <select
+                                    className="form-select border-0"
+                                    id="subStatus"
+                                    style={{
+                                      height: '42px',
+                                      paddingTop: '8px',
+                                      backgroundColor: '#f1f2f6',
+                                      paddingInline: '10px',
+                                      width: '100%'
+                                    }}
+                                  >
+                                    <option value="">Select Sub-Status</option>
+                                    <option value="not-relevant">Not Relevant</option>
+                                    <option value="wrong-number">Wrong Number</option>
+                                    <option value="duplicate">Duplicate</option>
+                                    <option value="out-of-service">Out of Service</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="row mb-1">
+                              <div className="col-6">
+                                <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
+                                  Next Action Date <span className="text-danger">*</span>
+                                </label>
+                                <div className="input-group">
+                                  <input
+                                    type="date"
+                                    className="form-control border-0"
+                                    id="nextActionDate"
+                                    defaultValue="2025-01-13"
+                                    style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="col-6">
+                                <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
+                                  Time <span className="text-danger">*</span>
+                                </label>
+                                <div className="input-group">
+                                  <input
+                                    type="time"
+                                    className="form-control border-0"
+                                    id="actionTime"
+                                    defaultValue="12:36"
+                                    style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mb-1">
+                              <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
+                              <textarea
+                                className="form-control border-0"
+                                id="comment"
+                                rows="4"
+                                style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
+                                defaultValue="wrong no."
+                              ></textarea>
+                            </div>
+
+                            <div className="d-flex justify-content-end gap-2 mt-4">
+                              <button
+                                type="button"
+                                className="btn"
+                                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                                onClick={closeEditPanel}
+                              >
+                                CLOSE
+                              </button>
+                              <button
+                                type="submit"
+                                className="btn text-white"
+                                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+                              >
+                                UPDATE STATUS
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* WhatsApp Panel */}
+                  {showWhatsappPanel && (
+                    <div className="col-12 transition-col" id="whatsappPanel">
+                      <div className="whatsapp-chat right-side-panel">
+                        <section className="topbar-container">
+                          <div className="left-topbar">
+                            <div className="img-container">
+                              <div className="small-avatar" title="Ram Ruhela">RR</div>
+                            </div>
+                            <div className="flex-column">
+                              <span title="Ram Ruhela" className="lead-name">Ram Ruhela</span><br />
+                              <span className="selected-number">Primary: 918875426236</span>
+                            </div>
+                          </div>
+                          <div className="right-topbar">
+                            <a className="margin-horizontal-4" href="#">
+                              <img src="/Assets/public_assets/images/whatapp/whatsAppAccount.svg" alt="whatsAppAccount" title="whatsAppChatList.title.whatsAppAccount" />
+                            </a>
+                            <a className="margin-horizontal-5" href="#">
+                              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
+                            </a>
+                            <button
+                              className="btn btn-sm btn-outline-secondary"
+                              onClick={closeWhatsappPanel}
+                              title="Close WhatsApp"
+                            >
+                              <i className="fas fa-times"></i>
+                            </button>
+                          </div>
+                        </section>
+
+                        <section className="chat-view">
+                          <ul className="chat-container" id="messageList">
+                            <div className="counselor-msg-container">
+                              <div className="chatgroupdate"><span>03/26/2025</span></div>
+                              <div className="counselor-msg-0 counselor-msg macro">
+                                <div className="text text-r">
+                                  <div>
+                                    <span className="message-header-name student-messages">Anjali</span><br />
+                                    <div className="d-flex">
+                                      <pre className="text-message">
+                                        <br /><span><span style={{ fontSize: '16px' }}>🎯</span>&nbsp;फ्री&nbsp;होटल&nbsp;मैनेजमेंट&nbsp;कोर्स&nbsp;-&nbsp;सुनहरा&nbsp;मौका&nbsp;<span style={{ fontSize: '16px' }}>🎯</span><br /><br />अब&nbsp;बने&nbsp;Guest&nbsp;Service&nbsp;Executive&nbsp;(Front&nbsp;Office)&nbsp;और&nbsp;होटल&nbsp;इंडस्ट्री&nbsp;में&nbsp;पाएं&nbsp;शानदार&nbsp;करियर&nbsp;की&nbsp;शुरुआत।<br /><br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;आयु&nbsp;सीमा:&nbsp;18&nbsp;से&nbsp;29&nbsp;वर्ष<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;योग्यता:&nbsp;12वीं&nbsp;पास<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;कोर्स&nbsp;अवधि:&nbsp;3&nbsp;से&nbsp;4&nbsp;महीने<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;100%&nbsp;जॉब&nbsp;प्लेसमेंट&nbsp;गारंटी</span>
+                                        <span className="messageTime text-message-time" id="time_0" style={{ marginTop: '12px' }}>
+                                          12:31 PM
+                                          <img src="/api/placeholder/16/16" style={{ marginLeft: '5px', marginBottom: '2px' }} alt="tick" />
+                                        </span>
+                                      </pre>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="counselor-msg-container">
+                              <div className="chatgroupdate"><span>04/07/2025</span></div>
+                              <div className="counselor-msg-1 counselor-msg macro">
+                                <div className="text text-r">
+                                  <div className="d-flex">
+                                    <pre className="text-message">
+                                      <span className="message-header-name student-messages">Mr. Parveen Bansal</span><br />
+                                      <span><h6>Hello</h6></span>
+                                      <span className="messageTime text-message-time" id="time_1" style={{ marginTop: '7px' }}>
+                                        04:28 PM
+                                        <img src="/api/placeholder/16/16" style={{ marginLeft: '5px', marginBottom: '2px' }} alt="tick" />
+                                      </span>
+                                    </pre>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="sessionExpiredMsg">
+                              <span>Your session has come to end. It will start once you receive a WhatsApp from the lead.<br />Meanwhile, you can send a Business Initiated Messages (BIM).</span>
+                            </div>
+                          </ul>
+                        </section>
+
+                        <section className="footer-container">
+                          <div className="footer-box">
+                            <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
+                              <textarea
+                                placeholder="Choose a template"
+                                className="disabled-style message-input"
+                                disabled
+                                rows="1"
+                                id="message-input"
+                                style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
+                              ></textarea>
+                            </div>
+                            <hr className="divider" />
+                            <div className="message-container-input">
+                              <div className="left-footer">
+                                <span className="disabled-style margin-bottom-5">
+                                  <a className="margin-right-10" href="#" title="Emoji">
+                                    <img src="/Assets/public_assets/images/whatapp/emoji-whatsapp.svg" alt="Emoji" />
+                                  </a>
+                                </span>
+                                <span className="disabled-style">
+                                  <input name="fileUpload" type="file" title="Attach File" className="fileUploadIcon" />
+                                </span>
+                                <span className="input-template">
+                                  <a title="Whatsapp Template">
+                                    <img src="/Assets/public_assets/images/whatapp/orange-template-whatsapp.svg" alt="Whatsapp Template" />
+                                  </a>
+                                </span>
+                              </div>
+                              <div className="right-footer">
+                                <span className="disabled-style">
+                                  <a className="send-button" href="#" title="Send">
+                                    <img className="send-img" src="/Assets/public_assets/images/whatapp/paper-plane.svg" alt="Send" />
+                                  </a>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+                      </div>
+                    </div>
+                  )}
+          </div>
+      </div>
+      
+      <style jsx>
+        {`
+
+      html body .content .content-wrapper {
+         padding: calc(0.9rem - 0.1rem) 1.2rem
+      }
+.container-fluid.py-2 {
+  position: sticky!important;
+  top: 0; /* ya jitni height chahiye sticky hone ke liye */
+  z-index: 1020;
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+@media(max-width:1920px){
+.stickyBreakpoints{
+top: 20%
+}
+}
+@media(max-width:1400px){
+.stickyBreakpoints{
+top: 17%
+}
+}
+
+
+
         
-        .circular-progress-container svg {
-          transform: rotate(-90deg);
-        }
-        
-        .circle-bg {
-          fill: none;
-          stroke: #e6e6e6;
-          stroke-width: 4;
-        }
-        
-        .circle-progress {
-          fill: none;
-          stroke: #FC2B5A;
-          stroke-width: 4;
-          stroke-linecap: round;
-          transition: stroke-dashoffset 0.5s ease;
-        }
-        
-        .circular-progress-container .progress-text {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          font-size: 10px;
-          color: #333;
-        }
-        
-        .leadsSelect {
-          width: 75px;
-        }
-        
-        .advanced-filters {
-          max-height: 0;
-          opacity: 0;
-          transition: max-height 0.3s ease, opacity 0.3s ease;
-        }
-        
-        /* Modal backdrop */
-        .modal-backdrop {
-          background-color: rgba(0,0,0,0.5);
-        }
-          #tblexportData thead tr th{
-          font-size: 12px;
-    color: #626262;
-    font-weight: 700;
-          }
       `}</style>
     </div>
   );
 };
 
-export default Registrations;
-
-// import React, { useState, useEffect, useRef } from 'react';
-// import axios from 'axios';
-// import { useNavigate, useLocation, Link } from 'react-router-dom';
-// import { 
-//   Container, 
-//   Row, 
-//   Col, 
-//   Card, 
-//   Table, 
-//   Form, 
-//   Button, 
-//   Breadcrumb,
-//   Modal,
-//   Alert
-// } from 'react-bootstrap';
-// import { Edit, LogIn } from 'react-feather';
-// import moment from 'moment';
-// import qs from 'query-string';
-// import "./Registration.css";
-// const Registrations = () => {
-//   const navigate = useNavigate();
-//   const location = useLocation();
-//   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-//   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-
-//   // State variables
-//   const [candidates, setCandidates] = useState([]);
-//   const [totalPages, setTotalPages] = useState(1);
-//   const [currentPage, setCurrentPage] = useState(1);
-//   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-//   const [canView, setCanView] = useState(true);
-//   const [flashMessage, setFlashMessage] = useState(null);
-//   const [sortingValue, setSortingValue] = useState('');
-//   const [sortingOrder, setSortingOrder] = useState(1);
-
-//   // Modal state
-//   const [showModal, setShowModal] = useState(false);
-//   const [modalData, setModalData] = useState({
-//     id: '',
-//     remarks: '',
-//     assignDate: '',
-//     url: ''
-//   });
-
-//   // Filter state
-//   const [filterData, setFilterData] = useState({
-//     name: '',
-//     FromDate: '',
-//     ToDate: '',
-//     courseType: '',
-//     status: 'true'
-//   });
-
-//   // Get query params from URL
-//   useEffect(() => {
-//     const queryParams = qs.parse(location.search);
-//     setCurrentPage(parseInt(queryParams.page) || 1);
-    
-//     // Set filter data from query params
-//     setFilterData({
-//       name: queryParams.name || '',
-//       FromDate: queryParams.FromDate || '',
-//       ToDate: queryParams.ToDate || '',
-//       courseType: queryParams.courseType || '',
-//       status: queryParams.status || 'true'
-//     });
-
-//     // Set sorting params
-//     setSortingValue(queryParams.value || '');
-//     setSortingOrder(parseInt(queryParams.order) || 1);
-
-//     // Fetch registrations based on query params
-//     fetchRegistrations(queryParams);
-//   }, [location.search]);
-
-//   // Fetch registrations data
-//   const fetchRegistrations = async (params) => {
-//     try {
-//       const headers = {
-//         'x-auth': localStorage.getItem('token')
-//       };
-
-//       // Build query string from params
-//       const queryString = qs.stringify(params);
-//       const response = await axios.get(`${backendUrl}/admin/courses/registrations?${queryString}`, { headers });
-
-//       if (response.data) {
-//         setCandidates(response.data.candidates || []);
-//         setTotalPages(response.data.totalPages || 1);
-//         setCanView(response.data.view !== undefined ? response.data.view : true);
-//       }
-//     } catch (error) {
-//       console.error('Error fetching registrations:', error);
-//       setFlashMessage({
-//         type: 'danger',
-//         message: 'Failed to fetch registrations'
-//       });
-//     }
-//   };
-
-//   // Handle input change for filter
-//   const handleInputChange = (e) => {
-//     const { name, value } = e.target;
-//     setFilterData(prev => ({ ...prev, [name]: value }));
-//   };
-
-//   // Validate date filters
-//   const validateFilters = () => {
-//     if ((filterData.FromDate && !filterData.ToDate) || (!filterData.FromDate && filterData.ToDate)) {
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   // Handle filter form submit
-//   const handleFilterSubmit = (e) => {
-//     e.preventDefault();
-    
-//     if (!validateFilters()) {
-//       return;
-//     }
-
-//     // Build query string for navigation
-//     const queryParams = {};
-    
-//     Object.keys(filterData).forEach(key => {
-//       if (filterData[key]) {
-//         queryParams[key] = filterData[key];
-//       }
-//     });
-
-//     navigate(`/admin/courses/registrations?${qs.stringify(queryParams)}`);
-//   };
-
-//   // Handle reset filters
-//   const handleResetFilters = () => {
-//     navigate('/admin/courses/registrations');
-//   };
-
-//   // Handle pagination click
-//   const handlePageClick = (page) => {
-//     const queryParams = qs.parse(location.search);
-//     queryParams.page = page;
-//     navigate(`/admin/courses/registrations?${qs.stringify(queryParams)}`);
-//   };
-
-//   // Handle sorting
-//   const handleSorting = (value) => {
-//     const newOrder = sortingValue === value ? -sortingOrder : 1;
-    
-//     const queryParams = qs.parse(location.search);
-//     queryParams.value = value;
-//     queryParams.order = newOrder;
-    
-//     navigate(`/admin/courses/registrations?${qs.stringify(queryParams)}`);
-//   };
-
-//   // Handle action click (Due/Assigned)
-//   const handleActionClick = (id, remarks, assignDate, url) => {
-//     const formattedDate = assignDate ? 
-//       moment(assignDate).format('YYYY-MM-DD') : 
-//       moment().format('YYYY-MM-DD');
-
-//     setModalData({
-//       id,
-//       remarks: remarks || '',
-//       assignDate: formattedDate,
-//       url: url || ''
-//     });
-
-//     setShowModal(true);
-//   };
-
-//   // Handle assign course
-//   const handleAssignCourse = async () => {
-//     try {
-//       const updateCourse = {
-//         url: modalData.url,
-//         remarks: modalData.remarks,
-//         courseStatus: 0,
-//         assignDate: new Date(modalData.assignDate).toISOString()
-//       };
-
-//       await axios.put(
-//         `${backendUrl}/admin/courses/assignCourses/${modalData.id}`, 
-//         updateCourse,
-//         {
-//           headers: {
-//             'x-auth': localStorage.getItem('token')
-//           }
-//         }
-//       );
-
-//       setShowModal(false);
-      
-//       // Refresh data
-//       fetchRegistrations(qs.parse(location.search));
-      
-//       setFlashMessage({
-//         type: 'success',
-//         message: 'Course assigned successfully'
-//       });
-//     } catch (error) {
-//       console.error('Error assigning course:', error);
-//       setFlashMessage({
-//         type: 'danger',
-//         message: 'An error occurred while assigning the course'
-//       });
-//     }
-//   };
-
-//   // Handle lead status update
-//   const handleLeadStatusUpdate = async (appliedId, status) => {
-//     try {
-//       await axios.post(
-//         `${backendUrl}/admin/courses/leadStatus`,
-//         { appliedId, status },
-//         {
-//           headers: {
-//             'x-auth': localStorage.getItem('token')
-//           }
-//         }
-//       );
-      
-//       // Refresh data
-//       fetchRegistrations(qs.parse(location.search));
-      
-//       setFlashMessage({
-//         type: 'success',
-//         message: 'Lead status updated successfully'
-//       });
-//     } catch (error) {
-//       console.error('Error updating lead status:', error);
-//       setFlashMessage({
-//         type: 'danger',
-//         message: 'An error occurred while updating lead status'
-//       });
-//     }
-//   };
-
-//   // Handle login as candidate
-//   const handleLoginAs = async (mobile) => {
-//     try {
-//       const response = await axios.post(
-//         `${backendUrl}/api/loginAsCandidate`,
-//         { mobile, module: 'candidate' },
-//         {
-//           headers: {
-//             'x-auth': localStorage.getItem('token')
-//           }
-//         }
-//       );
-
-//       if (response.data && response.data.role === 3) {
-//         localStorage.setItem("candidate", response.data.name);
-//         localStorage.setItem("token", response.data.token);
-//         window.location.href = "/candidate/dashboard";
-//       }
-//     } catch (error) {
-//       console.error('Error logging in as candidate:', error);
-//       setFlashMessage({
-//         type: 'danger',
-//         message: 'An error occurred while logging in as candidate'
-//       });
-//     }
-//   };
-
-//   // Render pagination
-//   const renderPagination = () => {
-//     if (!totalPages || totalPages <= 1) return null;
-
-//     let first = 1;
-//     let last = totalPages > 4 ? 4 : totalPages;
-
-//     if (totalPages > 4 && currentPage >= 2) {
-//       first = currentPage - 1;
-//       last = currentPage + 1;
-//       if (last > totalPages) last = totalPages;
-//     }
-
-//     return (
-//       <ul className="pagination justify-content-end ml-2 mb-2">
-//         {first > 1 && (
-//           <li className="page-item">
-//             <Button 
-//               variant="link" 
-//               className="page-link" 
-//               onClick={() => handlePageClick(1)}
-//             >
-//               First
-//             </Button>
-//           </li>
-//         )}
-        
-//         {Array.from({ length: last - first + 1 }, (_, i) => i + first).map(page => (
-//           <li key={page} className={`page-item ${page === currentPage ? 'active' : ''}`}>
-//             <Button 
-//               variant={page === currentPage ? 'primary' : 'link'} 
-//               className="page-link" 
-//               onClick={() => handlePageClick(page)}
-//               disabled={page === currentPage}
-//             >
-//               {page}
-//             </Button>
-//           </li>
-//         ))}
-        
-//         {totalPages > last && (
-//           <>
-//             <li className="page-item">
-//               <Button 
-//                 variant="link" 
-//                 className="page-link" 
-//                 onClick={() => handlePageClick(last + 1)}
-//               >
-//                 ...
-//               </Button>
-//             </li>
-//             <li className="page-item">
-//               <Button 
-//                 variant="link" 
-//                 className="page-link" 
-//                 onClick={() => handlePageClick(totalPages)}
-//               >
-//                 Last
-//               </Button>
-//             </li>
-//           </>
-//         )}
-//       </ul>
-//     );
-//   };
-
-//   return (
-//     <div className="">
-//       {/* Header */}
-//       <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-//         <div className="content-header-left col-md-12 col-12 mb-2">
-//           <div className="row breadcrumbs-top">
-//             <div className="col-9">
-//               <h3 className="content-header-title float-left mb-0">Registrations</h3>
-//               <Breadcrumb>
-//                 <Breadcrumb.Item href="/admin">Home</Breadcrumb.Item>
-//                 <Breadcrumb.Item active>Registrations</Breadcrumb.Item>
-//               </Breadcrumb>
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Content Body */}
-//       <div className="content-body">
-//         {/* Flash Message */}
-//         {flashMessage && (
-//           <Alert 
-//             variant={flashMessage.type} 
-//             onClose={() => setFlashMessage(null)} 
-//             dismissible
-//           >
-//             {flashMessage.message}
-//           </Alert>
-//         )}
-        
-//         <section className="list-view">
-//           <Row>
-//             <Col xs={12} className="rounded equal-height-2 coloumn-2">
-//               <Card>
-//                 <Card.Body>
-//                   <Row>
-//                     <Col xs={12}>
-//                       <Row className="mb-2">
-//                         <Col xl={12} lg={12} className="px-3">
-//                           <Form onSubmit={handleFilterSubmit} id="filterForm">
-//                             <Row>
-//                               <Col xl={3} className="mt-1">
-//                                 <Form.Group>
-//                                   <Form.Label>Name/ Mobile/ Whatsapp</Form.Label>
-//                                   <Form.Control
-//                                     type="text"
-//                                     name="name"
-//                                     value={filterData.name}
-//                                     onChange={handleInputChange}
-//                                     maxLength={25}
-//                                   />
-//                                 </Form.Group>
-//                               </Col>
-//                               <Col 
-//                                 xl={3} 
-//                                 className="text-center mt-3"
-//                                 style={{ marginTop: '2.5rem !important' }}
-//                               >
-//                                 <Button
-//                                   variant="success"
-//                                   type="submit"
-//                                   className="waves-effect waves-light text-white d-inline"
-//                                 >
-//                                   Go
-//                                 </Button>
-//                                 <Button
-//                                   variant="danger"
-//                                   className="d-inline waves-effect waves-light mb-2 text-white mx-1"
-//                                   onClick={handleResetFilters}
-//                                 >
-//                                   RESET
-//                                 </Button>
-//                               </Col>
-//                               <Col xl={6} className="text-right mt-3">
-//                                 <Form.Check
-//                                   type="checkbox"
-//                                   id="filterToggle"
-//                                   label=""
-//                                   checked={showAdvancedFilters}
-//                                   onChange={() => setShowAdvancedFilters(!showAdvancedFilters)}
-//                                   custom
-//                                 />
-//                               </Col>
-//                             </Row>
-
-//                             {showAdvancedFilters && (
-//                               <Row 
-//                                 className="justify-content-end" 
-//                                 style={{ 
-//                                   transition: '0.3s ease-in-out',
-//                                   overflow: 'hidden',
-//                                   maxHeight: showAdvancedFilters ? '300px' : '0',
-//                                   opacity: showAdvancedFilters ? '1' : '0'
-//                                 }}
-//                               >
-//                                 <Col xl={2} className="ml-1 mt-1">
-//                                   <Form.Group>
-//                                     <Form.Label>Course Fee Type</Form.Label>
-//                                     <Form.Control
-//                                       as="select"
-//                                       name="courseType"
-//                                       value={filterData.courseType}
-//                                       onChange={handleInputChange}
-//                                       className="text-capitalize"
-//                                     >
-//                                       <option value="">Select</option>
-//                                       <option value="Free" className="text-capitalize">Free</option>
-//                                       <option value="Paid" className="text-capitalize">Paid</option>
-//                                     </Form.Control>
-//                                   </Form.Group>
-//                                 </Col>
-//                                 <Col xl={2} className="ml-1 mt-1">
-//                                   <Form.Group>
-//                                     <Form.Label>From Date</Form.Label>
-//                                     <Form.Control
-//                                       type="date"
-//                                       name="FromDate"
-//                                       value={filterData.FromDate}
-//                                       onChange={handleInputChange}
-//                                       isInvalid={!filterData.FromDate && filterData.ToDate}
-//                                     />
-//                                     <Form.Control.Feedback type="invalid">
-//                                       From date is required when To date is set
-//                                     </Form.Control.Feedback>
-//                                   </Form.Group>
-//                                 </Col>
-//                                 <Col xl={2} className="ml-1 mt-1">
-//                                   <Form.Group>
-//                                     <Form.Label>To Date</Form.Label>
-//                                     <Form.Control
-//                                       type="date"
-//                                       name="ToDate"
-//                                       value={filterData.ToDate}
-//                                       onChange={handleInputChange}
-//                                       isInvalid={filterData.FromDate && !filterData.ToDate}
-//                                     />
-//                                     <Form.Control.Feedback type="invalid">
-//                                       To date is required when From date is set
-//                                     </Form.Control.Feedback>
-//                                   </Form.Group>
-//                                 </Col>
-//                                 <Form.Control 
-//                                   type="hidden" 
-//                                   name="status" 
-//                                   value="true" 
-//                                 />
-//                                 <Col 
-//                                   xl={3} 
-//                                   className="text-center mt-3"
-//                                   style={{ marginTop: '2.5rem !important' }}
-//                                 >
-//                                   <Button
-//                                     variant="success"
-//                                     type="submit"
-//                                     className="waves-effect waves-light text-white d-inline"
-//                                   >
-//                                     Go
-//                                   </Button>
-//                                   <Button
-//                                     variant="danger"
-//                                     className="d-inline waves-effect waves-light mb-2 text-white mx-1"
-//                                     onClick={handleResetFilters}
-//                                   >
-//                                     RESET
-//                                   </Button>
-//                                 </Col>
-//                               </Row>
-//                             )}
-//                           </Form>
-//                         </Col>
-//                       </Row>
-
-//                       {/* Table */}
-//                       <div className="table-responsive">
-//                         {candidates && candidates.length > 0 ? (
-//                           <Table id="tblexportData" className="table table-hover-animation mb-0 table-hover" style={{ width: '100%' }}>
-//                            <thead>
-//                               <tr>
-//                                 <th 
-//                                   className="three column wide" 
-//                                   style={{ width: '18%', cursor: 'pointer' }}
-//                                   onClick={() => handleSorting('createdAt')}
-//                                 >
-//                                   DATE <i 
-//                                     className={`fa-solid fa-arrow-${sortingValue === 'createdAt' ? (sortingOrder === 1 ? 'down' : 'up') : 'down'} success`} 
-//                                   />
-//                                 </th>
-//                                 <th 
-//                                   className="three column wide candidate-wrap" 
-//                                   style={{ width: '19%' ,  whiteSpace : 'nowrap'}}
-//                                   onClick={() => handleSorting('name')}
-//                                 >
-//                                   CANDIDATE NAME
-//                                 </th>
-//                                 <th className="one column wide" style={{ width: '15%' ,  whiteSpace : 'nowrap'}}>MOBILE NO.</th>
-//                                 <th className="one column wide" style={{ width: '15%' }}>Email</th>
-//                                 <th className="one column wide" style={{ width: '15%' , whiteSpace : 'nowrap' }}>Document Status</th>
-//                                 <th className="one column wide" style={{ width: '15%' ,  whiteSpace : 'nowrap'}}>Lead Status</th>
-//                                 <th className="one column wide" style={{ width: '15%' ,  whiteSpace : 'nowrap'}}>Demo Status</th>
-//                                 <th className="one column wide" style={{ width: '15%' ,  whiteSpace : 'nowrap'}}>Center Status</th>
-//                                 <th 
-//                                   className="one column wide" 
-//                                   style={{ width: '7%', cursor: 'pointer' }}
-//                                   onClick={() => handleSorting('courseName')}
-//                                 >
-//                                   Course <i 
-//                                     className={sortingValue === 'courseName' ? `fa-solid fa-arrow-${sortingOrder === 1 ? 'down' : 'up'} success` : ''} 
-//                                   />
-//                                 </th>
-//                                 <th 
-//                                   className="one column wide" 
-//                                   style={{ width: '7%', cursor: 'pointer' ,  whiteSpace : 'nowrap'}}
-//                                   onClick={() => handleSorting('registrationCharges')}
-//                                 >
-//                                   Reg Fee <i 
-//                                     className={sortingValue === 'registrationCharges' ? `fa-solid fa-arrow-${sortingOrder === 1 ? 'down' : 'up'} success` : ''} 
-//                                   />
-//                                 </th>
-//                                 <th className="one column wide" style={{ width: '7%', cursor: 'pointer' ,  whiteSpace : 'nowrap'}}>
-//                                   Reg Status <i className="" />
-//                                 </th>
-//                                 <th 
-//                                   className="one column wide" 
-//                                   style={{ width: '7%', cursor: 'pointer' }}
-//                                   onClick={() => handleSorting('sector')}
-//                                 >
-//                                   Sector <i 
-//                                     className={sortingValue === 'sector' ? `fa-solid fa-arrow-${sortingOrder === 1 ? 'down' : 'up'} success` : ''} 
-//                                   />
-//                                 </th>
-//                                 <th className="one column wide" style={{ width: '10%', cursor: 'pointer' , whiteSpace : 'nowrap' }}>
-//                                   Course Fee Type
-//                                 </th>
-//                                 <th className="one column wide" style={{ width: '10%', cursor: 'pointer' , whiteSpace : 'nowrap'}}>
-//                                   Registered By
-//                                 </th>
-                                
-//                                 {!canView && (
-//                                   <th className="one column wide" style={{ width: '10%' }}>Action</th>
-//                                 )}
-//                                 <th className="one column wide" style={{ width: '10%' ,  whiteSpace : 'nowrap'}}>View Docs</th>
-//                                 <th className="one column wide" style={{ width: '10%' }}>Action</th>
-//                               </tr>
-//                             </thead>
-//                             <tbody>
-//                               {candidates.map((candidate, i) => (
-//                                 <tr key={candidate._id}>
-//                                   <td className="text-capitalize">
-//                                     {candidate.createdAt 
-//                                       ? moment(candidate.createdAt).utcOffset("+05:30").format('MMM DD YYYY hh:mm A')
-//                                       : "N/A"
-//                                     }
-//                                   </td>
-//                                   <td className="text-capitalize candid-wrap">
-//                                     {candidate.name || "N/A"}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.mobile || "N/A"}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.email || "N/A"}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.docProgress && candidate.docProgress.totalRequired && candidate.docProgress.totalRequired > 0 ? (
-//                                       <div 
-//                                         className="circular-progress-container" 
-//                                         data-percent={candidate.docProgress.percent}
-//                                       >
-//                                         <svg width="40" height="40">
-//                                           <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
-//                                           <circle 
-//                                             className="circle-progress" 
-//                                             cx="20" 
-//                                             cy="20" 
-//                                             r="16"
-//                                             style={{
-//                                               strokeDasharray: `${2 * Math.PI * 16}`,
-//                                               strokeDashoffset: `${2 * Math.PI * 16 - (candidate.docProgress.percent / 100) * 2 * Math.PI * 16}`
-//                                             }}
-//                                           ></circle>
-//                                         </svg>
-//                                         <div className="progress-text">
-//                                           {candidate.docProgress.percent}%
-//                                         </div>
-//                                       </div>
-//                                     ) : (
-//                                       "NDR"
-//                                     )}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     <Form.Control 
-//                                       as="select"
-//                                       className="leadsSelect"
-//                                       onChange={(e) => handleLeadStatusUpdate(candidate._id, e.target.value)}
-//                                       value={candidate.leadStatus || ''}
-//                                     >
-//                                       <option value="">Select</option>
-//                                       <option value="Hot">Hot</option>
-//                                       <option value="Warm">Warm</option>
-//                                       <option value="Cold">Cold</option>
-//                                     </Form.Control>
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     <Form.Control 
-//                                       as="select"
-//                                       className="leadsSelect"
-//                                       value={candidate.demoStatus || ''}
-//                                       onChange={(e) => handleLeadStatusUpdate(candidate._id, e.target.value)}
-//                                     >
-//                                       <option value="">Select</option>
-//                                       <option value="Demo Scheduled">Demo Scheduled</option>
-//                                       <option value="Demo Pending">Demo Pending</option>
-//                                       <option value="Demo Done">Demo Done</option>
-//                                     </Form.Control>
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     <Form.Control 
-//                                       as="select"
-//                                       className="leadsSelect"
-//                                       value={candidate.centerStatus || ''}
-//                                       onChange={(e) => handleLeadStatusUpdate(candidate._id, e.target.value)}
-//                                     >
-//                                       <option value="">Select</option>
-//                                       <option value="Add Center">Add Center</option>
-//                                       <option value="Rejected">Rejected</option>
-//                                       <option value="Drop Out">Drop Out</option>
-//                                     </Form.Control>
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.courseName || "N/A"}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.registrationCharges || "N/A"}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.registrationFee || "Unpaid"}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.sector || "N/A"}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.courseFeeType || "Free/Paid"}
-//                                   </td>
-//                                   <td className="text-capitalize">
-//                                     {candidate.registeredByName || "N/A"}
-//                                   </td>
-                                  
-//                                   {!canView && (
-//                                     <td className="text-capitalize">
-//                                       <Button
-//                                         variant={candidate.courseStatus === 0 ? "danger" : "success"}
-//                                         className="waves-effect waves-light text-white d-inline btn-sm"
-//                                         onClick={() => handleActionClick(
-//                                           candidate._id, 
-//                                           candidate.remarks, 
-//                                           candidate.assignDate, 
-//                                           candidate.url
-//                                         )}
-//                                       >
-//                                         {candidate.courseStatus === 0 ? "DUE" : "Assigned"}
-//                                       </Button>
-//                                     </td>
-//                                   )}
-                                  
-//                                   <td className="text-capitalize">
-//                                     <Link
-//                                       to={`/admin/courses/${candidate.courseId}/${candidate.candidateId}/docsview`}
-//                                       className="btn btn-danger waves-effect waves-light text-white d-inline btn-sm"
-//                                       style={{ padding: '8px' }}
-//                                     >
-//                                       View Docs
-//                                     </Link>
-//                                   </td>
-                                  
-//                                   <td className="text-capitalize">
-//                                     <Button
-//                                       variant="link"
-//                                       className="p-0"
-//                                       onClick={() => handleLoginAs(candidate.mobile)}
-//                                     >
-//                                       <LogIn size={18} className="text-primary cursor-pointer" title="Login As" />
-//                                     </Button>
-//                                   </td>
-//                                 </tr>
-//                               ))}
-//                             </tbody>
-//                           </Table>
-//                         ) : (
-//                             <>
-//                             <Table id="tblexportData" className="table table-hover-animation mb-0 table-hover" style={{ width: '100%' }}>
-//                             <thead>
-//                               <tr>
-//                                 <th 
-//                                   className="three column wide" 
-//                                   style={{ width: '18%', cursor: 'pointer' }}
-//                                   onClick={() => handleSorting('createdAt')}
-//                                 >
-//                                   DATE <i 
-//                                     className={`fa-solid fa-arrow-${sortingValue === 'createdAt' ? (sortingOrder === 1 ? 'down' : 'up') : 'down'} success`} 
-//                                   />
-//                                 </th>
-//                                 <th 
-//                                   className="three column wide candidate-wrap" 
-//                                   style={{ width: '19%' ,  whiteSpace : 'nowrap'}}
-//                                   onClick={() => handleSorting('name')}
-//                                 >
-//                                   CANDIDATE NAME
-//                                 </th>
-//                                 <th className="one column wide" style={{ width: '15%' ,  whiteSpace : 'nowrap'}}>MOBILE NO.</th>
-//                                 <th className="one column wide" style={{ width: '15%' }}>Email</th>
-//                                 <th className="one column wide" style={{ width: '15%' , whiteSpace : 'nowrap' }}>Document Status</th>
-//                                 <th className="one column wide" style={{ width: '15%' ,  whiteSpace : 'nowrap'}}>Lead Status</th>
-//                                 <th className="one column wide" style={{ width: '15%' ,  whiteSpace : 'nowrap'}}>Demo Status</th>
-//                                 <th className="one column wide" style={{ width: '15%' ,  whiteSpace : 'nowrap'}}>Center Status</th>
-//                                 <th 
-//                                   className="one column wide" 
-//                                   style={{ width: '7%', cursor: 'pointer' }}
-//                                   onClick={() => handleSorting('courseName')}
-//                                 >
-//                                   Course <i 
-//                                     className={sortingValue === 'courseName' ? `fa-solid fa-arrow-${sortingOrder === 1 ? 'down' : 'up'} success` : ''} 
-//                                   />
-//                                 </th>
-//                                 <th 
-//                                   className="one column wide" 
-//                                   style={{ width: '7%', cursor: 'pointer' ,  whiteSpace : 'nowrap'}}
-//                                   onClick={() => handleSorting('registrationCharges')}
-//                                 >
-//                                   Reg Fee <i 
-//                                     className={sortingValue === 'registrationCharges' ? `fa-solid fa-arrow-${sortingOrder === 1 ? 'down' : 'up'} success` : ''} 
-//                                   />
-//                                 </th>
-//                                 <th className="one column wide" style={{ width: '7%', cursor: 'pointer' ,  whiteSpace : 'nowrap'}}>
-//                                   Reg Status <i className="" />
-//                                 </th>
-//                                 <th 
-//                                   className="one column wide" 
-//                                   style={{ width: '7%', cursor: 'pointer' }}
-//                                   onClick={() => handleSorting('sector')}
-//                                 >
-//                                   Sector <i 
-//                                     className={sortingValue === 'sector' ? `fa-solid fa-arrow-${sortingOrder === 1 ? 'down' : 'up'} success` : ''} 
-//                                   />
-//                                 </th>
-//                                 <th className="one column wide" style={{ width: '10%', cursor: 'pointer' , whiteSpace : 'nowrap' }}>
-//                                   Course Fee Type
-//                                 </th>
-//                                 <th className="one column wide" style={{ width: '10%', cursor: 'pointer' , whiteSpace : 'nowrap'}}>
-//                                   Registered By
-//                                 </th>
-                                
-//                                 {!canView && (
-//                                   <th className="one column wide" style={{ width: '10%' }}>Action</th>
-//                                 )}
-//                                 <th className="one column wide" style={{ width: '10%' ,  whiteSpace : 'nowrap'}}>View Docs</th>
-//                                 <th className="one column wide" style={{ width: '10%' }}>Action</th>
-//                               </tr>
-//                             </thead>
-//                             <tbody>
-//                             <tr className="text-center mt-3">
-//                                 <td colSpan={16}>  No result found </td>
-//                             </tr>
-//                             </tbody>
-//                             </Table>
-//                             </>
-                         
-//                         )}
-                        
-//                         {/* Pagination */}
-//                         {renderPagination()}
-//                       </div>
-//                     </Col>
-//                   </Row>
-//                 </Card.Body>
-//               </Card>
-//             </Col>
-//           </Row>
-//         </section>
-//       </div>
-
-//       {/* Course Assign Modal */}
-//       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-//         <Modal.Header closeButton>
-//           <Modal.Title className="text-white text-uppercase">Assign Course</Modal.Title>
-//         </Modal.Header>
-//         <Modal.Body className="pt-1">
-//           <Row>
-//             <Col xl={6} lg={6} md={6} sm={6} xs={6} className="mb-1 text-left">
-//               <Form.Group>
-//                 <Form.Label>Date</Form.Label>
-//                 <Form.Control
-//                   type="date"
-//                   value={modalData.assignDate}
-//                   onChange={(e) => setModalData({ ...modalData, assignDate: e.target.value })}
-//                 />
-//               </Form.Group>
-//             </Col>
-//             <Col xl={6} lg={6} md={6} sm={6} xs={6} className="mb-1 text-left">
-//               <Form.Group>
-//                 <Form.Label>Course URL</Form.Label>
-//                 <Form.Control
-//                   type="text"
-//                   value={modalData.url}
-//                   onChange={(e) => setModalData({ ...modalData, url: e.target.value })}
-//                 />
-//               </Form.Group>
-//             </Col>
-//             <Col xl={12} className="mb-1 text-left">
-//               <Form.Group>
-//                 <Form.Label>Remarks</Form.Label>
-//                 <Form.Control
-//                   as="textarea"
-//                   rows={3}
-//                   value={modalData.remarks}
-//                   onChange={(e) => setModalData({ ...modalData, remarks: e.target.value })}
-//                 />
-//               </Form.Group>
-//             </Col>
-//           </Row>
-//         </Modal.Body>
-//         <Modal.Footer>
-//           <Button variant="primary" onClick={handleAssignCourse}>
-//             Assigned
-//           </Button>
-//         </Modal.Footer>
-//       </Modal>
-
-//       {/* CSS Styles */}
-//       <style jsx>{`
-//         #tblexportData td {
-//           white-space: nowrap;
-//         }
-//         .circular-progress-container {
-//           position: relative;
-//           width: 40px;
-//           height: 40px;
-//         }
-//         .circular-progress-container svg {
-//           transform: rotate(-90deg);
-//         }
-//         .circle-bg {
-//           fill: none;
-//           stroke: #e6e6e6;
-//           stroke-width: 4;
-//         }
-//         .circle-progress {
-//           fill: none;
-//           stroke: #FC2B5A;
-//           stroke-width: 4;
-//           stroke-linecap: round;
-//           transition: stroke-dashoffset 0.5s ease;
-//         }
-//         .circular-progress-container .progress-text {
-//           position: absolute;
-//           top: 50%;
-//           left: 50%;
-//           transform: translate(-50%, -50%);
-//           font-size: 10px;
-//           color: #333;
-//         }
-//         .leadsSelect {
-//           width: 150px;
-//         }
-//         .advanced-filters {
-//           max-height: 0;
-//           opacity: 0;
-//           transition: max-height 0.3s ease, opacity 0.3s ease;
-//         }
-//       `}</style>
-//     </div>
-//   );
-// };
-
-// export default Registrations;
+export default CRMDashboard;
