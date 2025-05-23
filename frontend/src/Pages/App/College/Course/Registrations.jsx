@@ -297,7 +297,7 @@ const CRMDashboard = () => {
           </div>
           <div>
             <button className="btn-close" type="button" onClick={closeEditPanel}>
-              <i className="fa-solid fa-xmark"></i>
+              {/* <i className="fa-solid fa-xmark"></i> */}
             </button>
           </div>
         </div>
@@ -1618,7 +1618,11 @@ const CRMDashboard = () => {
           background-color: white;
           box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-
+.stickyBreakpoints {
+  position: sticky;
+  top: 20px;  /* default top */
+  z-index: 1020;
+}
         @media(max-width:1920px){
           .stickyBreakpoints{
             top: 20%
