@@ -38,8 +38,8 @@ const AccessManagementSystem = () => {
     role: '',
     designation: '',
     mobile: '',
-    password:'',
-    confirmPassword:''
+    password: '',
+    confirmPassword: ''
   });
 
   // Context permission states
@@ -59,7 +59,7 @@ const AccessManagementSystem = () => {
   useEffect(() => {
     fetchRoles();
     fetchRoleslist();
-    
+
   }, []);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ const AccessManagementSystem = () => {
 
         // Set roles for table
         setRoles(fetchedRoles.map((r, index) => ({
-          _id:r._id,
+          _id: r._id,
           id: index + 1,
           name: r.roleName,
           description: r.description,
@@ -129,7 +129,7 @@ const AccessManagementSystem = () => {
   };
 
   const [users, setUsers] = useState([
-    
+
   ]);
 
   const [centers, setCenters] = useState([
@@ -177,7 +177,8 @@ const AccessManagementSystem = () => {
         { key: 'VIEW_ROLES', description: 'Can view roles' },
         { key: 'CREATE_ROLE', description: 'Can create roles' },
         { key: 'EDIT_ROLE', description: 'Can edit roles' },
-        { key: 'DELETE_ROLE', description: 'Can delete roles' }
+        { key: 'DELETE_ROLE', description: 'Can delete roles' },
+        { key: 'Approve_ROLE', description: 'Can delete roles' },
       ]
     },
     {
@@ -222,7 +223,7 @@ const AccessManagementSystem = () => {
       permissions: [
         { key: 'VIEW_BATCH', description: 'Can view Batch' },
         { key: 'CREATE_BATCH', description: 'Can create Batch' },
-        { key: 'EDIT_Batch', description: 'Can edit Batch details', contextRequired: true },
+        { key: 'EDIT_BATCH', description: 'Can edit Batch details', contextRequired: true },
         { key: 'MANAGE_COURSE_CONTENT', description: 'Can manage course content', contextRequired: true },
         { key: 'VERIFY_DOCUMENT', description: 'Can verify course documents', contextRequired: true },
       ]
@@ -230,7 +231,10 @@ const AccessManagementSystem = () => {
     {
       name: 'Lead Management',
       permissions: [
-        { key: 'VIEW_LEAD', description: 'Can view lead' },
+        { key: 'VIEW_LEAD_OWN', description: 'Can view lead (Own Lead)' },
+        { key: 'VIEW_LEAD_GLOBAL', description: 'Can view lead (Global Lead)' },
+        { key: 'DELETE_LEAD_OWN', description: 'Can delete lead (Own Lead)' },
+        { key: 'DELETE_LEAD_GLOBAL', description: 'Can delete lead (Global Lead)' },
         { key: 'CREATE_LEAD', description: 'Can create lead' },
         { key: 'EDIT_Lead', description: 'Can edit lead details', contextRequired: true },
         { key: 'MANAGE_COURSE_CONTENT', description: 'Can manage course content', contextRequired: true },
@@ -316,14 +320,14 @@ const AccessManagementSystem = () => {
       // Editing existing role
       setEditingRole(role);
 
-      console.log('role',role)
+      console.log('role', role)
 
-       // agar permissions nahi aaye toh pehle fetch kar lo
-    
+      // agar permissions nahi aaye toh pehle fetch kar lo
+
       await fetchRoleslist(); // ✅ async wait karo
 
-      console.log('rolePermissions',rolePermissions)
-    
+      console.log('rolePermissions', rolePermissions)
+
 
       // Create permissions object based on rolePermissions
       const permissions = {};
@@ -339,7 +343,7 @@ const AccessManagementSystem = () => {
         permissions: permissions
       });
 
-      
+
     } else {
       // Creating new role
       setEditingRole(null);
@@ -408,16 +412,16 @@ const AccessManagementSystem = () => {
   const handleDeleteRole = async (id) => {
     const confirmDelete = window.confirm('Are you sure you want to delete this role?');
     if (!confirmDelete) return;
-  
+
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
-  
+
     try {
       const response = await axios.delete(`${backendUrl}/college/roles/delete-role/${id}`, {
         headers: { 'x-auth': token }
       });
-  
+
       if (response.data.success) {
         alert('Role deleted successfully!');
         fetchRoles(); // refresh the list
@@ -432,36 +436,36 @@ const AccessManagementSystem = () => {
       alert(err.message);
     }
   };
-  
+
 
   const handleSaveRole = async () => {
     const currentDate = new Date().toISOString().slice(0, 10);
     const permissionsArray = Object.keys(roleForm.permissions)
       .filter(key => roleForm.permissions[key]);
 
-      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      console.log('userData', userData)
-      const token = userData.token;
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    console.log('userData', userData)
+    const token = userData.token;
 
-      if (editingRole) {
-        // 🔁 Edit role (API call)
-        const response = await axios.put(`${backendUrl}/college/roles/edit-role/${editingRole._id}`, {
-          roleName: roleForm.name,
-          description: roleForm.description,
-          permissions: permissionsArray
-        }, {
-          headers: { 'x-auth': token }
-        });
-  
-        if (response.data.success) {
-          alert("Role updated successfully");
-          fetchRoles(); // refresh list
-          fetchRoleslist();
-        }
+    if (editingRole) {
+      // 🔁 Edit role (API call)
+      const response = await axios.put(`${backendUrl}/college/roles/edit-role/${editingRole._id}`, {
+        roleName: roleForm.name,
+        description: roleForm.description,
+        permissions: permissionsArray
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        alert("Role updated successfully");
+        fetchRoles(); // refresh list
+        fetchRoleslist();
       }
+    }
     else {
-      
+
       const response = await axios.post(`${backendUrl}/college/roles/add-role`,
         {
           roleName: roleForm.name,
@@ -521,104 +525,104 @@ const AccessManagementSystem = () => {
   };
 
   const handleUserFormChange = (e) => {
-  const { id, value } = e.target;
-  const updatedForm = {
-    ...userForm,
-    [id]: value
+    const { id, value } = e.target;
+    const updatedForm = {
+      ...userForm,
+      [id]: value
+    };
+
+
+
+    // Match check only if both fields are filled
+    if (
+      (id === "password" || id === "confirmPassword") &&
+      updatedForm.password &&
+      updatedForm.confirmPassword
+    ) {
+      setPasswordMismatch(updatedForm.password !== updatedForm.confirmPassword);
+    }
+
+    setUserForm(updatedForm);
   };
 
-  
+  const fetchUsers = async () => {
+    try {
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      console.log('User', userData)
+      const collegeId = userData.collegeId;
 
-  // Match check only if both fields are filled
-  if (
-    (id === "password" || id === "confirmPassword") &&
-    updatedForm.password &&
-    updatedForm.confirmPassword
-  ) {
-    setPasswordMismatch(updatedForm.password !== updatedForm.confirmPassword);
-  }
+      const response = await axios.get(`${backendUrl}/college/roles/users/concern-persons/${collegeId}`, {
+        headers: { 'x-auth': token }
+      });
 
-  setUserForm(updatedForm);
-};
 
-const fetchUsers = async () => {
-  try {
+      console.log('response', response)
+
+      if (response.data.success) {
+        const fetchedUsers = response.data.users.map((user, index) => ({
+          _id: user._id,
+          id: index + 1,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          designation: user.designation,
+          role: user.roleId ? user.roleId.roleName : "Admin", // if roleName stored in access
+          lastActive: user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : "N/A",
+          hasCustomPerms: user.access?.contextPermissions?.length > 0
+        }));
+
+        setUsers(fetchedUsers);
+      }
+    } catch (err) {
+      console.error("Error fetching users:", err.message);
+    }
+  };
+
+
+
+  const handleSaveUser = async () => {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
-    console.log('User',userData)
-    const collegeId = userData.collegeId;
 
-    const response = await axios.get(`${backendUrl}/college/roles/users/concern-persons/${collegeId}`, {
-      headers: { 'x-auth': token }
-    });
-    
+    const headers = { headers: { 'x-auth': token } };
+    const payload = {
+      name: userForm.name,
+      email: userForm.email,
+      mobile: userForm.mobile,
+      designation: userForm.designation,
+      password: userForm.password,
+      confirmPassword: userForm.confirmPassword,
+      roleId: roles.find(r => r.name === userForm.role)?._id, // ensure your roles have _id
+      collegeId: userData.collegeId // assuming stored in session
+    };
 
-    console.log('response',response)
-
-    if (response.data.success) {
-      const fetchedUsers = response.data.users.map((user, index) => ({
-        _id: user._id,
-        id: index + 1,
-        name: user.name,
-        email: user.email,
-        mobile: user.mobile,
-        designation:user.designation,
-        role: user.roleId ? user.roleId.roleName : "Admin", // if roleName stored in access
-        lastActive: user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : "N/A",
-        hasCustomPerms: user.access?.contextPermissions?.length > 0
-      }));
-
-      setUsers(fetchedUsers);
+    try {
+      if (editingUser) {
+        // Call update API
+        const response = await axios.put(`${backendUrl}/college/roles/users/${editingUser._id}`, payload, headers);
+        if (response.data.status) {
+          alert("User updated successfully");
+          fetchUsers(); // Reload user list
+        }
+      } else {
+        // Call add API
+        const response = await axios.post(`${backendUrl}/college/roles/users/add-concern-person`, payload, headers);
+        if (response.data.status) {
+          alert("User added successfully");
+          fetchUsers(); // Reload user list
+        }
+      }
+      setShowUserModal(false);
+      setUserForm({ name: '', email: '', role: '', designation: '', mobile: '', password: '', confirmPassword: '' });
+      setEditingUser(null);
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.error || "Something went wrong");
     }
-  } catch (err) {
-    console.error("Error fetching users:", err.message);
-  }
-};
-
-
-
-const handleSaveUser = async () => {
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  const token = userData.token;
-
-  const headers = { headers: { 'x-auth': token } };
-  const payload = {
-    name: userForm.name,
-    email: userForm.email,
-    mobile: userForm.mobile,
-    designation: userForm.designation,
-    password: userForm.password,
-    confirmPassword: userForm.confirmPassword,
-    roleId: roles.find(r => r.name === userForm.role)?._id, // ensure your roles have _id
-    collegeId: userData.collegeId // assuming stored in session
   };
-
-  try {
-    if (editingUser) {
-      // Call update API
-      const response = await axios.put(`${backendUrl}/college/roles/users/${editingUser._id}`, payload, headers);
-      if (response.data.status) {
-        alert("User updated successfully");
-        fetchUsers(); // Reload user list
-      }
-    } else {
-      // Call add API
-      const response = await axios.post(`${backendUrl}/college/roles/users/add-concern-person`, payload, headers);
-      if (response.data.status) {
-        alert("User added successfully");
-        fetchUsers(); // Reload user list
-      }
-    }
-    setShowUserModal(false);
-    setUserForm({ name: '', email: '', role: '', designation: '', mobile: '', password: '', confirmPassword: '' });
-    setEditingUser(null);
-  } catch (err) {
-    console.error(err);
-    alert(err?.response?.data?.error || "Something went wrong");
-  }
-};
 
   const handleChangeUserRole = (userId, newRole) => {
     const user = users.find(u => u.id === userId);
@@ -1262,7 +1266,7 @@ const handleSaveUser = async () => {
                     </button>
                   </div>
                   <div className="bg-light p-3 rounded mt-2">
-                    {category.permissions.map((permission) => (
+                    {/* {category.permissions.map((permission) => (
                       <div key={permission.key} className="form-check mb-2">
                         <input
                           className="form-check-input"
@@ -1280,7 +1284,98 @@ const handleSaveUser = async () => {
                           )}
                         </label>
                       </div>
-                    ))}
+                    ))} */}
+                  
+                    {category.permissions.map((permission) => {
+                      // Radio button groups ke liye keys sets banaate hain
+                      const viewLeadKeys = ['VIEW_LEAD_OWN', 'VIEW_LEAD_GLOBAL'];
+                      const deleteLeadKeys = ['DELETE_LEAD_OWN', 'DELETE_LEAD_GLOBAL'];
+
+                      if (viewLeadKeys.includes(permission.key)) {
+                        return (
+                          <div key={permission.key} className="form-check mb-2">
+                            <input
+                              className="form-check-input"
+                              type="radio"
+                              id={permission.key}
+                              name="lead_view_permission"
+                              checked={roleForm.permissions[permission.key] || false}
+                              onChange={() => {
+                                setRoleForm(prev => ({
+                                  ...prev,
+                                  permissions: {
+                                    ...prev.permissions,
+                                    'VIEW_LEAD_OWN': permission.key === 'VIEW_LEAD_OWN',
+                                    'VIEW_LEAD_GLOBAL': permission.key === 'VIEW_LEAD_GLOBAL'
+                                  }
+                                }));
+                              }}
+                            />
+                            <label className="form-check-label" htmlFor={permission.key}>
+                              {permission.description}
+                              {permission.contextRequired && (
+                                <span className="ms-2 bg-info bg-opacity-10 text-info">
+                                  Context Required
+                                </span>
+                              )}
+                            </label>
+                          </div>
+                        );
+                      } else if (deleteLeadKeys.includes(permission.key)) {
+                        return (
+                          <div key={permission.key} className="form-check mb-2">
+                            <input
+                              className="form-check-input"
+                              type="radio"
+                              id={permission.key}
+                              name="lead_delete_permission"
+                              checked={roleForm.permissions[permission.key] || false}
+                              onChange={() => {
+                                setRoleForm(prev => ({
+                                  ...prev,
+                                  permissions: {
+                                    ...prev.permissions,
+                                    'DELETE_LEAD_OWN': permission.key === 'DELETE_LEAD_OWN',
+                                    'DELETE_LEAD_GLOBAL': permission.key === 'DELETE_LEAD_GLOBAL'
+                                  }
+                                }));
+                              }}
+                            />
+                            <label className="form-check-label" htmlFor={permission.key}>
+                              {permission.description}
+                              {permission.contextRequired && (
+                                <span className="ms-2 bg-info bg-opacity-10 text-info">
+                                  Context Required
+                                </span>
+                              )}
+                            </label>
+                          </div>
+                        );
+                      } else {
+                        // Baaki permissions checkbox ke roop me rahega
+                        return (
+                          <div key={permission.key} className="form-check mb-2">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id={permission.key}
+                              checked={roleForm.permissions[permission.key] || false}
+                              onChange={handlePermissionChange}
+                            />
+                            <label className="form-check-label" htmlFor={permission.key}>
+                              {permission.description}
+                              {permission.contextRequired && (
+                                <span className="ms-2 bg-info bg-opacity-10 text-info">
+                                  Context Required
+                                </span>
+                              )}
+                            </label>
+                          </div>
+                        );
+                      }
+                    })}
+
+
                   </div>
                 </div>
               ))}
@@ -1432,15 +1527,15 @@ const handleSaveUser = async () => {
               className="btn btn-primary"
               onClick={handleSaveUser}
               disabled={
-                !userForm.name ||!userForm.mobile  ||!userForm.email || !userForm.designation || !userForm.role ||!userForm.password || !userForm.confirmPassword || passwordMismatch
+                !userForm.name || !userForm.mobile || !userForm.email || !userForm.designation || !userForm.role || !userForm.password || !userForm.confirmPassword || passwordMismatch
               }
             >
               {editingUser ? 'Save Changes' : 'Create User'}
             </button>
           </div>
           {passwordMismatch && (
-  <div className="text-danger mb-2">Passwords do not match</div>
-)}
+            <div className="text-danger mb-2">Passwords do not match</div>
+          )}
 
         </div>
       </div>
@@ -1448,210 +1543,160 @@ const handleSaveUser = async () => {
   );
 
   // Custom permissions modal with simplified layout matching the reference design
-  const renderPermissionModal = () => (
-    <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)', overflowY: 'auto' }}>
-      <div className="modal-dialog modal-dialog-centered modal-lg">
-        <div className="modal-content">
-          <div className="modal-header bg-danger text-white">
-            <h5 className="modal-title">Custom Permissions: {editingUser?.name}</h5>
-            <button type="button" className="btn-close btn-close-white" onClick={() => setShowPermissionModal(false)}></button>
-          </div>
-          <div className="modal-body">
-            <div className="alert alert-warning d-flex align-items-center" role="alert">
-              <AlertTriangle className="me-2" size={20} />
-              <div>
-                Custom permissions override role-based permissions. Use with caution.
-              </div>
+const renderPermissionModal = () => (
+  <div className="modal d-block scrollY" style={{ backgroundColor: 'rgba(0,0,0,0.5)', overflowY: 'auto' }}>
+    <div className="modal-dialog modal-dialog-centered modal-lg">
+      <div className="modal-content">
+        <div className="modal-header bg-danger text-white">
+          <h5 className="modal-title">Custom Permissions: {editingUser?.name}</h5>
+          <button type="button" className="btn-close btn-close-white" onClick={() => setShowPermissionModal(false)}></button>
+        </div>
+        <div className="modal-body">
+          <div className="alert alert-warning d-flex align-items-center" role="alert">
+            <AlertTriangle className="me-2" size={20} />
+            <div>
+              Custom permissions override role-based permissions. Use with caution.
             </div>
+          </div>
 
-            {/* Context-specific permissions by category */}
-            {permissionCategories.map((category) => (
-              <div key={category.name} className="mb-4">
-                <h6 className="fw-medium mb-2">{category.name}</h6>
+          {/* Context-specific permissions by category */}
+          {permissionCategories.map((category) => (
+            <div key={category.name} className="mb-4">
+              <h6 className="fw-medium mb-2">{category.name}</h6>
 
-                {/* If no context permissions in category */}
-                {category.permissions.filter(p => p.contextRequired).length === 0 ? (
-                  <div className="text-muted">No context-specific permissions in this category</div>
-                ) : (
-                  /* List each permission that requires context as a checkbox */
-                  category.permissions
-                    .filter(permission => permission.contextRequired)
-                    .map((permission) => (
-                      <div key={permission.key} className="mb-4 pb-3 border-bottom">
-                        <div className="form-check mb-3">
-                          <input
-                            className="form-check-input"
-                            type="checkbox"
-                            id={`custom_${permission.key}`}
-                            checked={!!userContextPerms[permission.key]}
-                            onChange={(e) => handleCustomPermissionChange(permission.key, e.target.checked)}
-                          />
-                          <label className="form-check-label fw-medium" htmlFor={`custom_${permission.key}`}>
-                            {permission.description}
-                          </label>
-                        </div>
+              {/* If no context permissions in category */}
+              {category.permissions.filter(p => p.contextRequired).length === 0 ? (
+                <div className="text-muted">No context-specific permissions in this category</div>
+              ) : (
+                category.permissions
+                  .filter(permission => permission.contextRequired)
+                  .map((permission) => (
+                    <div key={permission.key} className="mb-4 pb-3 border-bottom">
+                      <div className="form-check mb-3">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id={`custom_${permission.key}`}
+                          checked={!!userContextPerms[permission.key]}
+                          onChange={(e) => handleCustomPermissionChange(permission.key, e.target.checked)}
+                        />
+                        <label className="form-check-label fw-medium" htmlFor={`custom_${permission.key}`}>
+                          {permission.description}
+                        </label>
+                      </div>
 
-                        {/* Context selectors - only shown when permission is checked */}
-                        {!!userContextPerms[permission.key] && (
-                          <div className="ms-4">
-                            {/* Courses */}
+                      {/* Context selectors - only shown when permission is checked */}
+                      {!!userContextPerms[permission.key] && (
+                        <div className="ms-4">
+
+                          {/* Courses Dropdown */}
+                          {permission.key.includes('COURSE') && (
                             <div className="mb-3">
                               <label className="form-label">Courses</label>
-                              <div className="d-flex">
-                                <div className="flex-grow-1 me-2">
-                                  <MultiSelectDropdown
-                                    items={courses}
-                                    selectedItems={coursesSelected}
-                                    onChange={(id) => toggleItemSelection(coursesSelected, setCoursesSelected, id)}
-                                  />
-                                </div>
-                                <button
-                                  className="btn btn-outline-danger"
-                                  onClick={() => {
-                                    handleAddPermissionContext(permission.key, 'course', coursesSelected);
-                                    setCoursesSelected([]);
-                                  }}
-                                  disabled={coursesSelected.length === 0}
-                                >
-                                  <Plus size={16} className="me-1" />
-                                  Add Courses
-                                </button>
-                              </div>
+                              <MultiSelectDropdown
+                                items={courses}
+                                selectedItems={coursesSelected}
+                                onChange={(id) => toggleItemSelection(coursesSelected, setCoursesSelected, id)}
+                              />
                             </div>
+                          )}
 
-                            {/* Centers */}
+                          {/* Centers Dropdown */}
+                          {permission.key.includes('CENTER') && (
                             <div className="mb-3">
                               <label className="form-label">Centers</label>
-                              <div className="d-flex">
-                                <div className="flex-grow-1 me-2">
-                                  <MultiSelectDropdown
-                                    items={centers}
-                                    selectedItems={centersSelected}
-                                    onChange={(id) => toggleItemSelection(centersSelected, setCentersSelected, id)}
-                                  />
-                                </div>
-                                <button
-                                  className="btn btn-outline-danger"
-                                  onClick={() => {
-                                    handleAddPermissionContext(permission.key, 'center', centersSelected);
-                                    setCentersSelected([]);
-                                  }}
-                                  disabled={centersSelected.length === 0}
-                                >
-                                  <Plus size={16} className="me-1" />
-                                  Add Centers
-                                </button>
-                              </div>
+                              <MultiSelectDropdown
+                                items={centers}
+                                selectedItems={centersSelected}
+                                onChange={(id) => toggleItemSelection(centersSelected, setCentersSelected, id)}
+                              />
                             </div>
+                          )}
 
-                            {/* Projects */}
+                          {/* Projects Dropdown */}
+                          {permission.key.includes('PROJECT') && (
                             <div className="mb-3">
                               <label className="form-label">Projects</label>
-                              <div className="d-flex">
-                                <div className="flex-grow-1 me-2">
-                                  <MultiSelectDropdown
-                                    items={projects}
-                                    selectedItems={projectsSelected}
-                                    onChange={(id) => toggleItemSelection(projectsSelected, setProjectsSelected, id)}
-                                  />
-                                </div>
-                                <button
-                                  className="btn btn-outline-danger"
-                                  onClick={() => {
-                                    handleAddPermissionContext(permission.key, 'project', projectsSelected);
-                                    setProjectsSelected([]);
-                                  }}
-                                  disabled={projectsSelected.length === 0}
-                                >
-                                  <Plus size={16} className="me-1" />
-                                  Add Projects
-                                </button>
-                              </div>
+                              <MultiSelectDropdown
+                                items={projects}
+                                selectedItems={projectsSelected}
+                                onChange={(id) => toggleItemSelection(projectsSelected, setProjectsSelected, id)}
+                              />
                             </div>
+                          )}
 
-                            {/* Verticals */}
+                          {/* Verticals Dropdown */}
+                          {permission.key.includes('VERTICAL') && (
                             <div className="mb-3">
                               <label className="form-label">Verticals</label>
-                              <div className="d-flex">
-                                <div className="flex-grow-1 me-2">
-                                  <MultiSelectDropdown
-                                    items={verticals}
-                                    selectedItems={verticalsSelected}
-                                    onChange={(id) => toggleItemSelection(verticalsSelected, setVerticalsSelected, id)}
-                                  />
-                                </div>
-                                <button
-                                  className="btn btn-outline-danger"
-                                  onClick={() => {
-                                    handleAddPermissionContext(permission.key, 'vertical', verticalsSelected);
-                                    setVerticalsSelected([]);
-                                  }}
-                                  disabled={verticalsSelected.length === 0}
-                                >
-                                  <Plus size={16} className="me-1" />
-                                  Add Verticals
-                                </button>
+                              <MultiSelectDropdown
+                                items={verticals}
+                                selectedItems={verticalsSelected}
+                                onChange={(id) => toggleItemSelection(verticalsSelected, setVerticalsSelected, id)}
+                              />
+                            </div>
+                          )}
+
+                          {/* Display assigned contexts */}
+                          {userContextPerms[permission.key]?.length > 0 && (
+                            <div className="mt-3">
+                              <div className="small fw-medium mb-2 text-secondary">Assigned Contexts:</div>
+                              <div>
+                                {userContextPerms[permission.key]?.map((context, index) => (
+                                  <span key={index} className="badge bg-light text-dark me-2 mb-2 p-2">
+                                    {context.type === 'center' && <Building size={14} className="me-1" />}
+                                    {context.type === 'course' && <BookOpen size={14} className="me-1" />}
+                                    {context.type === 'project' && <Layers size={14} className="me-1" />}
+                                    {context.type === 'vertical' && <Users size={14} className="me-1" />}
+                                    {getContextName(context.type, context.id)}
+                                    <button
+                                      className="btn-close ms-2"
+                                      style={{ fontSize: '10px' }}
+                                      onClick={() => handleRemovePermissionContext(permission.key, index)}
+                                      type="button"
+                                    ></button>
+                                  </span>
+                                ))}
                               </div>
                             </div>
+                          )}
 
-                            {/* Display assigned contexts */}
-                            {userContextPerms[permission.key]?.length > 0 && (
-                              <div className="mt-3">
-                                <div className="small fw-medium mb-2 text-secondary">Assigned Contexts:</div>
-                                <div>
-                                  {userContextPerms[permission.key]?.map((context, index) => (
-                                    <span key={index} className="badge bg-light text-dark me-2 mb-2 p-2">
-                                      {context.type === 'center' && <Building size={14} className="me-1" />}
-                                      {context.type === 'course' && <BookOpen size={14} className="me-1" />}
-                                      {context.type === 'project' && <Layers size={14} className="me-1" />}
-                                      {context.type === 'vertical' && <Users size={14} className="me-1" />}
-                                      {getContextName(context.type, context.id)}
-                                      <button
-                                        className="btn-close ms-2"
-                                        style={{ fontSize: '10px' }}
-                                        onClick={() => handleRemovePermissionContext(permission.key, index)}
-                                        type="button"
-                                      ></button>
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-outline-danger me-auto"
-              onClick={handleResetToRoleDefaults}
-            >
-              Reset to Role Defaults
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setShowPermissionModal(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={handleSaveCustomPermissions}
-            >
-              Save Custom Permissions
-            </button>
-          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="modal-footer">
+          <button
+            type="button"
+            className="btn btn-outline-danger me-auto"
+            onClick={handleResetToRoleDefaults}
+          >
+            Reset to Role Defaults
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setShowPermissionModal(false)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={handleSaveCustomPermissions}
+          >
+            Save Custom Permissions
+          </button>
         </div>
       </div>
     </div>
-  );
+  </div>
+);
+
 
   // Delete confirmation modal
   const renderDeleteModal = () => (

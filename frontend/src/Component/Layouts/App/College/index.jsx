@@ -307,6 +307,12 @@ function CollegeLayout({ children }) {
                   </li>
                 </ul>
               </li>
+               <li className={`nav-item ${location.pathname === '/institute/approvalManagement' ? 'active' : ''}`}>
+                    <Link to="/institute/approvalManagement" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faTasks} />
+                      <span className="menu-title">Approval Request </span>
+                    </Link>
+                  </li>
 
               {/* Settings */}
               <li className={`nav-item has-sub ${openSubmenu.settings ? 'open' : ''}`}>
@@ -329,12 +335,19 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Access Management</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${location.pathname === '/institute/assignmentRule' ? 'active' : ''}`}>
+                  {/* <li className={`nav-item ${location.pathname === '/institute/assignmentRule' ? 'active' : ''}`}>
                     <Link to="/institute/assignmentRule" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={farBookmark} />
                       <span className="menu-title">Assignment Rule</span>
                     </Link>
-                  </li>
+                  </li> */}
+
+                  <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
+                    <Link to="/institute/statusdesign" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={farBookmark} />
+                      <span className="menu-title">Status Design</span>
+                    </Link>
+                  </li> 
                  
 
                 </ul>
