@@ -41,6 +41,10 @@ const StatusSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  milestone: {
+    type: String,
+    trim: true
+  },
   index: {
     type: Number,
     required: true

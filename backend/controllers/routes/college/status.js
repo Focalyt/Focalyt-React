@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
 // @access  Public
 router.post('/add', async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, milestone } = req.body;
     
     // Find the highest index to add new status at the end
     const highestIndexStatus = await Status.findOne().sort('-index');
@@ -37,6 +37,7 @@ router.post('/add', async (req, res) => {
       title,
       description,
       index: newIndex,
+      milestone,
       substatuses: []
     });
     
@@ -55,8 +56,9 @@ router.post('/add', async (req, res) => {
 // @access  Public
 router.put('/edit/:id', async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description,milestone } = req.body;
     
+    console.log('req.body',req.body)
     // Find status by id
     const status = await Status.findById(req.params.id);
     
@@ -67,8 +69,10 @@ router.put('/edit/:id', async (req, res) => {
     // Update fields
     status.title = title;
     status.description = description;
+    status.milestone = milestone
     
     const data = await status.save();
+    console.log('data',data)
     return res.status(200).json({
         success: true,
         message: 'Status updated successfully',
@@ -175,6 +179,22 @@ router.post('/:statusId/substatus', async (req, res) => {
     res.status(500).send('Server Error');
   }
 });
+
+router.get('/:statusId/substatus', async (req, res) => {
+    try {
+      const status = await Status.findById(req.params.statusId);
+  
+      if (!status) {
+        return res.status(404).json({ msg: 'Status not found' });
+      }
+  
+      return res.status(200).json({ success: true, data: status.substatuses });
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
+    }
+  });
+  
 
 // @route   PUT api/statuses/:statusId/substatus/:substatusId
 // @desc    Update a substatus
