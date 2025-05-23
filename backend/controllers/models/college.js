@@ -3,13 +3,17 @@ const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
 
 const collegeSchema = new Schema({
-  _concernPerson: [{ type: ObjectId, ref: 'User' }],
+  _concernPerson: [{
+    _id: { type: ObjectId, ref: 'User' },
+    defaultAdmin: { type: Boolean, default: false }
+  }],
+
   _courses: [{ type: ObjectId, ref: 'courses' }],
   _branches: [{ type: ObjectId, ref: 'Center' }],
   _qualification: [{ type: ObjectId, ref: 'Qualification' }],
   _university: { type: ObjectId, ref: 'University' },
   name: { type: String, lowercase: false, trim: true },
-  type: {type: String , enum: ['School','College', 'Computer Center', 'University']},
+  type: { type: String, enum: ['School', 'College', 'Computer Center', 'University'] },
   website: {
     type: String, lowercase: true, trim: true,
   },
@@ -26,10 +30,10 @@ const collegeSchema = new Schema({
   address: String,
   description: String,
   zipcode: String,
-  place:String,
-  latitude:String,
-  longitude:String,
-  collegeRepresentatives:[{name:String,designation:String,email:String,mobile:String}],
+  place: String,
+  latitude: String,
+  longitude: String,
+  collegeRepresentatives: [{ name: String, designation: String, email: String, mobile: String }],
   status: {
     type: Boolean,
     default: true,
@@ -38,7 +42,7 @@ const collegeSchema = new Schema({
     type: Boolean,
     default: false,
   },
-  isProfileCompleted:{
+  isProfileCompleted: {
     type: Boolean,
     default: false
   },

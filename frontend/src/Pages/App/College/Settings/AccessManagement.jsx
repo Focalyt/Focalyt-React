@@ -556,21 +556,19 @@ const AccessManagementSystem = () => {
       const response = await axios.get(`${backendUrl}/college/roles/users/concern-persons/${collegeId}`, {
         headers: { 'x-auth': token }
       });
-
-
       console.log('response', response)
-
       if (response.data.success) {
         const fetchedUsers = response.data.users.map((user, index) => ({
-          _id: user._id,
+          _id: user._id._id,
           id: index + 1,
-          name: user.name,
-          email: user.email,
-          mobile: user.mobile,
-          designation: user.designation,
-          role: user.roleId ? user.roleId.roleName : "Admin", // if roleName stored in access
-          lastActive: user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : "N/A",
-          hasCustomPerms: user.access?.contextPermissions?.length > 0
+          defaultAdmin: user.defaultAdmin,
+          name: user._id.name,
+          email: user._id.email,
+          mobile: user._id.mobile,
+          designation: user._id.designation,
+          role: user._id.roleId ? user._id.roleId.roleName : "Default Admin", // if roleName stored in access
+          lastActive: user._id.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : "N/A",
+          hasCustomPerms: user._id.access?.contextPermissions?.length > 0
         }));
 
         setUsers(fetchedUsers);

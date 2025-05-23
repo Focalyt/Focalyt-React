@@ -11,7 +11,8 @@
     "restart": "pm2 reload mmt",
     "seed": "node seed",
     "lint": "eslint '**/*.js'",
-    "build": "echo 'No build step required for backend'"
+    "build": "echo 'No build step required for backend'",
+    "dump-concern": "mongoexport --uri=\"mongodb+srv://rahulsharma:rahul-690@test-focalyt.jticw.mongodb.net/mmt\" --collection=colleges --out=concernPersons.json --projection=\"{_concernPerson:1}\""
   },
   "jest": {
     "testEnvironment": "node"

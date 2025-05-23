@@ -8,7 +8,7 @@ const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical , Project, Batch} = require("../../models");
+	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -69,7 +69,7 @@ router.route("/login")
 			} else {
 				// Assume it's mobile — convert to number
 				const mobileNumber = Number(userInput);
-				query.$or.push({ mobile: mobileNumber,  role: 2 });
+				query.$or.push({ mobile: mobileNumber, role: 2 });
 			}
 
 			console.log('query', query)
@@ -87,17 +87,26 @@ router.route("/login")
 
 			}
 			const userId = new mongoose.Types.ObjectId(user._id);
-			const college = await College.findOne({ _concernPerson: { $in: [userId] } }, "name");
-			
+			// const college = await College.findOne({ _concernPerson: { $in: [{ _id: userId }] } }, "name");
+			const college = await College.findOne({
+				_concernPerson: { $elemMatch: { _id: userId } }
+			}, "name _concernPerson");
+			console.log('college', college)
+
 			if (!college || college === null) {
+				console.log('Missing College!');
+
 				return res.json({ status: false, message: 'Missing College!' });
 
 			};
+			// Extract isDefaultAdmin from _concernPerson
+			const concernPersonData = college._concernPerson.find(p => p._id.toString() === userId.toString());
+			const isDefaultAdmin = concernPersonData?.isDefaultAdmin || false;
 			const token = await user.generateAuthToken();
 
 
 			userData = {
-				_id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token
+				_id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token, isDefaultAdmin
 			};
 			return res.json({ status: true, message: "Login successful", userData });
 
@@ -154,7 +163,7 @@ router.route("/register")
 						});
 					}
 					let college = await College.create({
-						_concernPerson: [user._id],
+						_concernPerson: [{ _id: user._id, defaultAdmin: true }],
 						name: collegeName,
 						type: type,
 						location
@@ -180,7 +189,7 @@ router.route("/register")
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
 	console.log('User', req.user)
-	let college = await College.findOne({ _concernPerson: req.user._id, status: true })
+	let college = await College.findOne({ _concernPerson: { $elemMatch: { _id: req.user._id } }, status: true })
 
 	let totalShortlisted
 	let monthShortlisted
@@ -1463,12 +1472,12 @@ router.route("/myStudents")
 	.get(isCollege, async (req, res) => {
 		try {
 			let menu = 'myStudents';
-			let user = req.session.user;
+			let user = req.user;
 
 
 			const college = await College.findOne(
 				{
-					_concernPerson: user._id,
+					_concernPerson: { $elemMatch: { _id: user._id } },
 					status: true,
 					isDeleted: false,
 					place: { $exists: true }
@@ -1615,101 +1624,101 @@ router.route("/single").get(auth1, function (req, res) {
 	});
 });
 router.post("/courses/add", async (req, res) => {
-  try {
-    const body = req.body;
- console.log("Incoming course data:", req.body);
+	try {
+		const body = req.body;
+		console.log("Incoming course data:", req.body);
 
- const newCourse = new Course(req.body);
-    await newCourse.save();
+		const newCourse = new Course(req.body);
+		await newCourse.save();
 
-    // set creator
-    body.createdBy = "college";
+		// set creator
+		body.createdBy = "college";
 
-    // convert string to array
-    body.photos = body.photos ? body.photos.split(",") : [];
-    body.videos = body.videos ? body.videos.split(",") : [];
-    body.testimonialvideos = body.testimonialvideos ? body.testimonialvideos.split(",") : [];
+		// convert string to array
+		body.photos = body.photos ? body.photos.split(",") : [];
+		body.videos = body.videos ? body.videos.split(",") : [];
+		body.testimonialvideos = body.testimonialvideos ? body.testimonialvideos.split(",") : [];
 
-    const course = await Courses.create(body);
+		const course = await Courses.create(body);
 
-    return res.json({ status: true, message: "Course added", data: course });
-  } catch (err) {
-    console.error("❌ Course Add Error:", err.message);
-    return res.status(500).json({ status: false, message: err.message || "Failed to add course" });
-  }
+		return res.json({ status: true, message: "Course added", data: course });
+	} catch (err) {
+		console.error("❌ Course Add Error:", err.message);
+		return res.status(500).json({ status: false, message: err.message || "Failed to add course" });
+	}
 });
 
-router.post('/addVertical',[isCollege], async (req, res) => {
-  try {
-    const body = req.body;
-	const user = req.user;
-    console.log("📥 Incoming vertical data:", body);
-    console.log("📥 Incoming user data:", user);
+router.post('/addVertical', [isCollege], async (req, res) => {
+	try {
+		const body = req.body;
+		const user = req.user;
+		console.log("📥 Incoming vertical data:", body);
+		console.log("📥 Incoming user data:", user);
 
-    // Default value handling
-    const newVertical = new Vertical({
-      name: body.name,
-      description: body.description,
-      status: body.status || 'active',
-      createdBy: body.createdBy || null,
-      approvedBy: body.approvedBy || null
-    });
+		// Default value handling
+		const newVertical = new Vertical({
+			name: body.name,
+			description: body.description,
+			status: body.status || 'active',
+			createdBy: body.createdBy || null,
+			approvedBy: body.approvedBy || null
+		});
 
-    const savedVertical = await newVertical.save();
+		const savedVertical = await newVertical.save();
 
-    return res.json({
-      status: true,
-      message: "Vertical added successfully",
-      data: savedVertical
-    });
+		return res.json({
+			status: true,
+			message: "Vertical added successfully",
+			data: savedVertical
+		});
 
-  } catch (err) {
-    console.error("❌ Vertical Add Error:", err.message);
-    return res.status(500).json({
-      status: false,
-      message: err.message || "Failed to add vertical"
-    });
-  }
+	} catch (err) {
+		console.error("❌ Vertical Add Error:", err.message);
+		return res.status(500).json({
+			status: false,
+			message: err.message || "Failed to add vertical"
+		});
+	}
 });
 router.post('/editVertical/:id', async (req, res) => {
-  try {
-    const verticalId = req.params.id;
-    const body = req.body;
+	try {
+		const verticalId = req.params.id;
+		const body = req.body;
 
-    console.log("📝 Editing vertical:", verticalId);
-    console.log("📦 Updated data:", body);
+		console.log("📝 Editing vertical:", verticalId);
+		console.log("📦 Updated data:", body);
 
-    const updated = await Vertical.findByIdAndUpdate(
-      verticalId,
-      {
-        name: body.name,
-        description: body.description,
-        status: body.status || 'active',
-        approvedBy: body.approvedBy || null
-      },
-      { new: true } // return updated document
-    );
+		const updated = await Vertical.findByIdAndUpdate(
+			verticalId,
+			{
+				name: body.name,
+				description: body.description,
+				status: body.status || 'active',
+				approvedBy: body.approvedBy || null
+			},
+			{ new: true } // return updated document
+		);
 
-    if (!updated) {
-      return res.status(404).json({
-        status: false,
-        message: "Vertical not found"
-      });
-    }
+		if (!updated) {
+			return res.status(404).json({
+				status: false,
+				message: "Vertical not found"
+			});
+		}
 
-    return res.json({
-      status: true,
-      message: "Vertical updated successfully",
-      data: updated
-    });
+		return res.json({
+			status: true,
+			message: "Vertical updated successfully",
+			data: updated
+		});
 
-  } catch (err) {
-    console.error("❌ Edit Vertical Error:", err.message);
-    return res.status(500).json({
-      status: false,
-      message: err.message || "Failed to update vertical"
-    });
-  }
+	} catch (err) {
+		console.error("❌ Edit Vertical Error:", err.message);
+		return res.status(500).json({
+			status: false,
+			message: err.message || "Failed to update vertical"
+		});
+	}
 });
 
 module.exports = router;

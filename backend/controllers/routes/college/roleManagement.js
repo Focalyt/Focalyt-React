@@ -187,7 +187,7 @@ router.post('/add-role',logUserActivity('role-added'), async (req, res) => {
 		// 4. Add to _concernPerson array
 		const updatedCollege = await College.findByIdAndUpdate(
 			collegeId,
-			{ $addToSet: { _concernPerson: newUser._id } },
+			{ $addToSet: { _concernPerson:{ _id:newUser._id} } },
 			{ new: true }
 		);
 
@@ -240,7 +240,7 @@ router.get("/users/concern-persons/:collegeId", async (req, res) => {
 	  }
   
 	  const college = await College.findById(collegeId).populate({
-		path: "_concernPerson",
+		path: "_concernPerson._id",
 		select: "name email designation mobile role createdAt updatedAt",
 		populate: {
 			path: "roleId",
@@ -252,6 +252,8 @@ router.get("/users/concern-persons/:collegeId", async (req, res) => {
 	  if (!college) {
 		return res.status(404).json({ success: false, message: "College not found" });
 	  }
+
+	  console.log('users',college._concernPerson)
   
 	  return res.status(200).json({ success: true, users: college._concernPerson });
 	} catch (err) {

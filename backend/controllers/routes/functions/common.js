@@ -49,7 +49,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).single('file');
 const {
-  Country, EducationBoard, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy, QualificationCourse, CourseSectors , Center
+  Country, EducationBoard, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy, QualificationCourse, CourseSectors, Center
 } = require('../../models');
 const Candidate = require('../../models/candidateProfile');
 
@@ -117,7 +117,7 @@ module.exports.sendCompanyOtp = async (req, res) => {
 module.exports.sendOtp = async (req, res) => {
   try {
 
-   const { userInput, module } = req.body;
+    const { userInput, module } = req.body;
 
     let role = 3;
     if (module === 'college') {
@@ -128,7 +128,7 @@ module.exports.sendOtp = async (req, res) => {
       role = 1;
     }
 
-    console.log('userInput',userInput, 'module',module)
+    console.log('userInput', userInput, 'module', module)
     let user = null;
     const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
 
@@ -611,45 +611,50 @@ module.exports.loginAsCandidate = async (req, res) => {
 module.exports.loginAsCollege = async (req, res) => {
   try {
 
-      const { mobile, otp } = req.body;
-      
-      const auth = authKey
-      const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
-      const result = await axios.get(url);
-      if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
-        
-        const query = {
-          mobile,
-          role: 2
-        }        
-        const user = await User.findOne(query);
-        
-        if (!user) {
-          return res.json({ status: false, error: "User not found" });
-        }
-  
-        const userId = new mongoose.Types.ObjectId(user._id);
-        const college = await College.findOne({ _concernPerson: { $in: [userId] } }, "name");
-        
-        if (!college || college === null) {
-          return res.json({ status: false, message: 'Missing College!' });
-  
-        };
-        const token = await user.generateAuthToken();  
-  
-        userData = {
-          _id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token
-        };
-        return res.json({ status: true, message: "Login successful", userData });
-      } else {
-        return res.send({
-          status: false,
-          message: 'Invalid OTP!'
-        });
+    const { mobile, otp } = req.body;
+
+    const auth = authKey
+    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
+    const result = await axios.get(url);
+    if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
+
+      const query = {
+        mobile,
+        role: 2
+      }
+      const user = await User.findOne(query);
+
+      if (!user) {
+        return res.json({ status: false, error: "User not found" });
       }
 
-    
-    
+      const userId = new mongoose.Types.ObjectId(user._id);
+      const college = await College.findOne({ _concernPerson: { $in: [{id: userId}] } }, "name");
+
+      if (!college || college === null) {
+        return res.json({ status: false, message: 'Missing College!' });
+
+      };
+
+      // Extract isDefaultAdmin from _concernPerson
+      const concernPersonData = college._concernPerson.find(p => p.id.toString() === userId.toString());
+      const isDefaultAdmin = concernPersonData?.isDefaultAdmin || false;
+
+      const token = await user.generateAuthToken();
+
+      userData = {
+        _id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token, isDefaultAdmin
+      };
+      return res.json({ status: true, message: "Login successful", userData });
+    } else {
+      return res.send({
+        status: false,
+        message: 'Invalid OTP!'
+      });
+    }
+
+
+
   }
   catch (err) {
     req.flash("error", err.message || "Something went wrong!");
@@ -886,9 +891,9 @@ module.exports.sectorList = async (req, res) => {
     const sector = await CourseSectors.find({
       status: true
     });
-console.log('res', sector)
+    console.log('res', sector)
     res.send(sector);
-    
+
 
   } catch (err) {
     return req.errFunc(err);
@@ -900,9 +905,9 @@ module.exports.centerList = async (req, res) => {
     const sector = await Center.find({
       status: true
     });
-console.log('res Center :- ', Center)
+    console.log('res Center :- ', Center)
     res.send(sector);
-    
+
 
   } catch (err) {
     return req.errFunc(err);
