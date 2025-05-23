@@ -246,7 +246,7 @@ function CollegeLayout({ children }) {
                       <i class="fas fa-user-friends" style={{
                         color: location.pathname === '/institute/registration' ? 'white' : 'black'
                       }}></i>
-                      <span className="menu-title">Registration</span>
+                      <span className="menu-title">Admission Cycle</span>
                     </Link>
                   </li>
                 </ul>

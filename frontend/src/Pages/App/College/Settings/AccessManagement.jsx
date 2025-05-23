@@ -217,6 +217,26 @@ const AccessManagementSystem = () => {
         { key: 'VERIFY_DOCUMENT', description: 'Can verify course documents', contextRequired: true },
       ]
     },
+    {
+      name: 'Batch Management',
+      permissions: [
+        { key: 'VIEW_BATCH', description: 'Can view Batch' },
+        { key: 'CREATE_BATCH', description: 'Can create Batch' },
+        { key: 'EDIT_Batch', description: 'Can edit Batch details', contextRequired: true },
+        { key: 'MANAGE_COURSE_CONTENT', description: 'Can manage course content', contextRequired: true },
+        { key: 'VERIFY_DOCUMENT', description: 'Can verify course documents', contextRequired: true },
+      ]
+    },
+    {
+      name: 'Lead Management',
+      permissions: [
+        { key: 'VIEW_LEAD', description: 'Can view lead' },
+        { key: 'CREATE_LEAD', description: 'Can create lead' },
+        { key: 'EDIT_Lead', description: 'Can edit lead details', contextRequired: true },
+        { key: 'MANAGE_COURSE_CONTENT', description: 'Can manage course content', contextRequired: true },
+        { key: 'VERIFY_DOCUMENT', description: 'Can verify course documents', contextRequired: true },
+      ]
+    },
 
   ];
 
