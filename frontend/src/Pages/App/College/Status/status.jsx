@@ -232,6 +232,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
     index,
     title,
     _id,
+    milestone,
     description,
     substatuses,
     isSelected,
@@ -341,6 +342,9 @@ const handleMoveRight = async (statusId, currentIndex) => {
             <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: 6 }}>
               {description}
             </div>
+            {milestone &&(<div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: 6 }}>
+              {milestone}
+            </div>)}
             <div
               style={{
                 textAlign: 'center',
@@ -534,6 +538,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
   const StatusModal = ({ isOpen, onClose, onSave, editMode, initialData, isSubstatus, editingStatus }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [milestone, setMilestone] = useState('');
     const [hasRemarks, setHasRemarks] = useState(false);
     const [hasFollowup, setHasFollowup] = useState(false);
     const [hasAttachment, setHasAttachment] = useState(false);
@@ -543,6 +548,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
       if (editMode && initialData) {
         setTitle(initialData.title || '');
         setDescription(initialData.description || '');
+        setMilestone(initialData.milestone || '');
         if (isSubstatus) {
           setHasRemarks(initialData.hasRemarks || false);
           setHasFollowup(initialData.hasFollowup || false);
@@ -551,6 +557,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
       } else {
         setTitle('');
         setDescription('');
+        setMilestone('');
         setHasRemarks(false);
         setHasFollowup(false);
         setHasAttachment(false);
@@ -587,7 +594,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
           if (editMode && statusId) {
             // Edit status
             const response = await axios.put(`${backendUrl}/college/status/edit/${statusId}`, {
-              title, description
+              title, description, milestone
             }, { headers: { 'x-auth': token } });
 
             if (response.data.success) {
@@ -597,7 +604,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
           } else {
             // Add status
             const response = await axios.post(`${backendUrl}/college/status/add`, {
-              title, description
+              title, description,milestone
             }, { headers: { 'x-auth': token } });
 
             if (response.data.success) {
@@ -684,6 +691,27 @@ const handleMoveRight = async (statusId, currentIndex) => {
             />
           </div>
 
+          {!isSubstatus && (
+
+          <div style={{ marginBottom:  0 }}>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
+              Milestone:
+            </label>
+            <input
+              type="text"
+              value={milestone}
+              onChange={(e) => setMilestone(e.target.value)}
+              placeholder="Example: 1st Milestone"
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #ddd',
+                borderRadius: 4,
+                fontSize: 14
+              }}
+            />
+          </div>
+          )}
           {isSubstatus && (
             <div style={{
               marginTop: 20,
@@ -853,6 +881,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
           _id: r._id,
           id: r.index + 1,
           title: r.title,
+          milestone: r.milestone,
           description: r.description,
           substatuses: r.substatuses
         })));
@@ -1132,6 +1161,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 title={status.title}
                 _id={status._id}
                 description={status.description}
+                milestone={status.milestone}
                 substatuses={status.substatuses}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={handleDragOver}

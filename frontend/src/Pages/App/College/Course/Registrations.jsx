@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
+import axios from 'axios'
 import './CourseCrm.css';
 
 const CRMDashboard = () => {
@@ -25,18 +26,20 @@ const CRMDashboard = () => {
     sector: ''
   });
 
-  const crmFilters = [
-    { name: 'All', count: 4 },
-    { name: 'Untouched Lead', count: 1 },
-    { name: 'Not Connected', count: 1 },
-    { name: 'Junk', count: 0 },
-    { name: 'Not Interested', count: 0 },
-    { name: 'Warm', count: 1 },
-    { name: 'Hot', count: 1 },
-    { name: 'Job Joined', count: 1 },
-    { name: 'Missed Call', count: 1 },
-    { name: 'Lead For Future', count: 1 }
-  ];
+  const [crmFilters, setCrmFilters] = useState([
+    {_id: '', name: '', count: 0, milestone:'' },
+    
+  ]);
+  const [statuses, setStatuses] = useState([
+    {_id: '', name: '', count: 0 },
+    
+  ]);
+  const [seletectedStatus, setSelectedStatus] = useState('');
+
+  const [subStatuses, setSubStatuses] = useState([
+    {_id: '', name: '', count: 0 },
+    
+  ]);
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -59,6 +62,84 @@ const CRMDashboard = () => {
 
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
+  useEffect(() => {
+    fetchStatus()
+    
+  }, []);
+
+  useEffect(() => {
+    fetchSubStatus()
+    
+  }, [seletectedStatus]);
+
+  const handleStatusChange = (e) => {
+    setSelectedStatus(e.target.value);
+  };
+
+  const fetchStatus = async () => {
+    try {
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(`${backendUrl}/college/status`, {
+        headers: { 'x-auth': token }
+      });
+
+      console.log('response', response)
+
+      if (response.data.success) {
+        const status = response.data.data;
+        const allFilter = { _id: 'all', name: 'All', count: status.reduce((acc, cur) => acc + (cur.count || 0), 0) || 15 };
+        setCrmFilters([allFilter, ...status.map(r => ({
+          _id: r._id,
+          name: r.title,
+          milestone:r.milestone,
+          count: r.count || 0,  // agar backend me count nahi hai to 0
+        }))]);
+
+        setStatuses(status.map(r => ({
+          _id: r._id,
+          name: r.title,
+          count: r.count || 0,  // agar backend me count nahi hai to 0
+        })));
+
+        
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      alert('Failed to fetch roles');
+    }
+  };
+  const fetchSubStatus = async () => {
+    try {
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
+        headers: { 'x-auth': token }
+      });
+
+      console.log('response', response)
+
+      if (response.data.success) {
+        const status = response.data.data;
+        
+
+        setSubStatuses(status.map(r => ({
+          _id: r._id,
+          name: r.title,
+          count: r.count || 0,  // agar backend me count nahi hai to 0
+        })));
+
+        
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      alert('Failed to fetch roles');
+    }
+  };
 
   const [profileData, setProfileData] = useState({
     personalInfo: {
@@ -223,31 +304,7 @@ const CRMDashboard = () => {
 
         <div className="card-body">
           <form>
-            <div className="mb-1">
-              <label htmlFor="leadCategory" className="form-label small fw-medium text-dark">
-                Lead Category<span className="text-danger">*</span>
-              </label>
-              <div className="d-flex">
-                <div className="form-floating flex-grow-1">
-                  <select
-                    className="form-select border-0 bgcolor"
-                    id="leadCategory"
-                    style={{
-                      height: '42px',
-                      paddingTop: '8px',
-                      paddingInline: '10px',
-                      width: '100%',
-                      backgroundColor: '#f1f2f6'
-                    }}
-                  >
-                    <option value="">Application</option>
-                    <option value="lead">Lead</option>
-                    <option value="b2b">B2B</option>
-                    <option value="rawdata">Raw Data</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+            
 
             <div className="mb-1">
               <label htmlFor="status" className="form-label small fw-medium text-dark">
@@ -265,14 +322,13 @@ const CRMDashboard = () => {
                       width: '100%',
                       backgroundColor: '#f1f2f6'
                     }}
+                    onChange={handleStatusChange}
                   >
                     <option value="">Select Status</option>
-                    <option value="03">03 - Junk (B2C)</option>
-                    <option value="01">01 - Untouched Lead</option>
-                    <option value="02">02 - Not Connected</option>
-                    <option value="04">04 - Not Interested</option>
-                    <option value="05">05 - Warm</option>
-                    <option value="06">06 - Hot</option>
+                    {statuses.map((filter, index) => (
+                    <option value={filter._id}>{filter.name}</option>))}
+                    
+                    
                   </select>
                 </div>
               </div>
@@ -296,10 +352,8 @@ const CRMDashboard = () => {
                     }}
                   >
                     <option value="">Select Sub-Status</option>
-                    <option value="not-relevant">Not Relevant</option>
-                    <option value="wrong-number">Wrong Number</option>
-                    <option value="duplicate">Duplicate</option>
-                    <option value="out-of-service">Out of Service</option>
+                    {subStatuses.map((filter, index) => (
+                    <option value={filter._id}>{filter.name}</option>))}
                   </select>
                 </div>
               </div>
@@ -601,20 +655,36 @@ const CRMDashboard = () => {
 
            
             <div className="card-body p-3">
-              <div className="d-flex flex-wrap gap-2">
-                {crmFilters.map((filter, index) => (
-                  <button
-                    key={index}
-                    className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                    onClick={() => handleCrmFilterClick(index)}
-                  >
-                    {filter.name}
-                    <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                      ({filter.count})
-                    </span>
-                  </button>
-                ))}
-              </div>
+             <div className="d-flex flex-wrap gap-2 align-items-center">
+  {crmFilters.map((filter, index) => (
+    <div key={index} className="d-flex align-items-center gap-1">
+      <div className='d-flex'>
+      <button
+        className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+        onClick={() => handleCrmFilterClick(index)}
+      >
+        {filter.name}
+        <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+          ({filter.count})
+        </span>
+      </button>
+
+      {/* Milestone flag OUTSIDE the button */}
+      {filter.milestone && (
+        <span
+          className="bg-success d-flex align-items-center"
+          style={{ fontSize: '0.75rem',color:'white', verticalAlign: 'middle', padding: '0.25em 0.5em', transform: 'translate(15%, -100%)',
+    position: 'absolute' }}
+          title={`Milestone: ${filter.milestone}`}
+        >
+          🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
+        </span>
+      )}
+      </div>
+    </div>
+  ))}
+</div>
+
             </div>
           
           </div>

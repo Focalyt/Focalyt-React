@@ -23,7 +23,7 @@ router.post('/add-role',logUserActivity('role-added'), async (req, res) => {
 		return res.status(400).json({ success: false, message: 'Role already exists' });
 	  }
   
-	  const role = new RoleManagement({
+	  const role = new Roles({
 		roleName,
 		description,
 		permissions: permissions.map(key => ({ key }))
@@ -106,7 +106,6 @@ router.post('/add-role',logUserActivity('role-added'), async (req, res) => {
   router.delete('/delete-role/:id', logUserActivity((req) => `Deleted role id: ${req.params.id}`), async (req, res) => {
 	try {
 	  let roleId = req.params.id;
-	  console.log('roleId',roleId);
 
 	  if (!roleId) {
 		return res.status(404).json({ success: false, message: 'Role id is not defined' });
@@ -234,7 +233,6 @@ router.get("/users/concern-persons/:collegeId", async (req, res) => {
 	try {
 	  const { collegeId } = req.params;
 
-	  console.log('collegeId',collegeId)
 	  if (!collegeId) return res.status(400).json({ success: false, message: "College ID missing" });
 
 	  if(typeof collegeId === 'string'){
@@ -250,7 +248,6 @@ router.get("/users/concern-persons/:collegeId", async (req, res) => {
 			select: "roleName"
 		  }
 	  });
-	  console.log('college',college)
   
 	  if (!college) {
 		return res.status(404).json({ success: false, message: "College not found" });
