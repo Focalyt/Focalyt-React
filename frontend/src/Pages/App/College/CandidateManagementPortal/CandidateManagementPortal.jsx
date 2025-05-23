@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import Project from '../../../../Component/Layouts/App/College/ProjectManagement/Project';
+import axios from 'axios'
 
 const CandidateManagementPortal = () => {
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
   const [activeVerticalTab, setActiveVerticalTab] = useState('Active Verticals');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -23,7 +27,7 @@ const CandidateManagementPortal = () => {
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    status: 'active'
+    status:false
   });
 
   const [verticals, setVerticals] = useState([
@@ -58,7 +62,7 @@ const CandidateManagementPortal = () => {
     setFormData({
       code: '',
       name: '',
-      status: 'active'
+      status: false
     });
   };
 
@@ -89,7 +93,7 @@ const CandidateManagementPortal = () => {
     setVerticalToDelete(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.code.trim() || !formData.name.trim()) {
       alert('Please fill in all required fields');
       return;
@@ -105,13 +109,14 @@ const CandidateManagementPortal = () => {
       setShowEditForm(false);
     } else {
       // Add new vertical
-      const newVertical = {
-        id: Date.now(),
-        ...formData,
-        projects: 0,
-        createdAt: new Date().toISOString().split('T')[0],
-        access: [{ name: 'admin@focalyt.com', role: 'Admin' }]
-      };
+      const newVertical =  await axios.post(`${backendUrl}/college/addVertical`, {
+                    formData
+                  }, { headers: { 'x-auth': token } });
+      
+                  if (newVertical.data.success) {
+                    alert("Status added successfully");
+                    
+                  }
       setVerticals(prev => [...prev, newVertical]);
       setShowAddForm(false);
     }
@@ -251,7 +256,7 @@ const CandidateManagementPortal = () => {
                     <i className="bi bi-folder-fill text-warning fs-3"></i>
                     <h5 className="card-title mt-2 mb-1">{vertical.code}</h5>
                     <p className="text-muted mb-1">{vertical.name}</p>
-                    <span className={`badge ${vertical.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>{vertical.status}</span>
+                    <span className={`${vertical.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>{vertical.status}</span>
                   </div>
                   <div className="text-end">
                     <button className="btn btn-sm btn-light me-1" title="Share" onClick={(e) => {e.stopPropagation(); handleShare(vertical);}}>
@@ -327,10 +332,15 @@ const CandidateManagementPortal = () => {
                   <select
                     className="form-select"
                     value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    onChange={(e) =>
+    setFormData(prev => ({
+      ...prev,
+      status: e.target.value === 'true'  // string ko boolean mein convert kar rahe hain
+    }))
+  }
                   >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
+                    <option value='true'>Active</option>
+                    <option value='false'>Inactive</option>
                   </select>
                 </div>
               </div>
@@ -424,7 +434,6 @@ const CandidateManagementPortal = () => {
 
 export default CandidateManagementPortal;
 
-// import React, { useState } from 'react';
 // import Project from '../../../../Component/Layouts/App/College/ProjectManagement/Project';
 
 

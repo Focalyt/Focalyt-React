@@ -6,13 +6,15 @@ const verticalSchema = new Schema({
     required: true,
     trim: true
   },
+  code: {
+    type: String,
+    trim: true
+  },
   description: {
     type: String,
-  },
-  
+  },  
   status: {
     type: Boolean,
-    
     default: true,
   },
   createdBy: {

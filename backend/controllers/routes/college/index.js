@@ -1639,17 +1639,18 @@ router.post("/courses/add", async (req, res) => {
   }
 });
 
-router.post('/addVertical', async (req, res) => {
+router.post('/addVertical',[isCollege], async (req, res) => {
   try {
     const body = req.body;
+	const user = req.user;
     console.log("📥 Incoming vertical data:", body);
+    console.log("📥 Incoming user data:", user);
 
     // Default value handling
     const newVertical = new Vertical({
       name: body.name,
       description: body.description,
       status: body.status || 'active',
-      projects: 0,
       createdBy: body.createdBy || null,
       approvedBy: body.approvedBy || null
     });
