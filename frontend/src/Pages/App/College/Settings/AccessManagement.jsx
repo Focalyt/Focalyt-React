@@ -308,8 +308,9 @@ const AccessManagementSystem = () => {
       // Step-by-step context permissions
       { key: 'VIEW_VERTICALS_SPECIFIC', description: 'Can view vertical details', contextRequired: true, level: 1 },
       { key: 'EDIT_VERTICALS', description: 'Can edit vertical details', contextRequired: true, requiresPermission: 'VIEW_VERTICALS_SPECIFIC', level: 2 },
-      { key: 'ADD_VERTICALS', description: 'Can add vertical', contextRequired: true, requiresPermission: 'EDIT_VERTICALS', level: 3 },
-      { key: 'DELETE_VERTICALS', description: 'Can delete vertical', contextRequired: true, requiresPermission: 'EDIT_VERTICALS', level: 3 }
+      { key: 'ADD_VERTICALS', description: 'Can add project', contextRequired: true, requiresPermission: 'EDIT_VERTICALS', level: 3 },
+      { key: 'DELETE_VERTICALS', description: 'Can delete project', contextRequired: true, requiresPermission: 'EDIT_VERTICALS', level: 3 },
+      { key: 'DELETE_PROJECT', description: 'Can delete project', contextRequired: true, requiresPermission: 'VIEW_VERTICALS_SPECIFIC', level: 2 },
     ]
   },
   {
@@ -321,8 +322,10 @@ const AccessManagementSystem = () => {
       // Step-by-step context permissions
       { key: 'VIEW_PROJECTS_SPECIFIC', description: 'Can view project details', contextRequired: true, level: 1 },
       { key: 'EDIT_PROJECTS', description: 'Can edit project details', contextRequired: true, requiresPermission: 'VIEW_PROJECTS_SPECIFIC', level: 2 },
-      { key: 'ADD_PROJECTS', description: 'Can add project', contextRequired: true, requiresPermission: 'EDIT_PROJECTS', level: 3 },
-      { key: 'DELETE_PROJECTS', description: 'Can delete project', contextRequired: true, requiresPermission: 'EDIT_PROJECTS', level: 3 }
+      { key: 'ADD_CENTER', description: 'Can add center', contextRequired: true, requiresPermission: 'EDIT_PROJECTS', level: 3 },
+      { key: 'DELETE_CENTER', description: 'Can delete center', contextRequired: true, requiresPermission: 'EDIT_PROJECTS', level: 3 },
+      { key: 'DELETE_BATCH', description: 'Can edit project details', contextRequired: true, requiresPermission: 'DELETE_PROJECTS_SPECIFIC' },
+       { key: 'DELETE_BRANCH', description: 'Can delete branch', contextRequired: true, requiresPermission: 'VIEW_PROJECTS_SPECIFIC', level: 2 },
     ]
   },
   {
@@ -334,8 +337,9 @@ const AccessManagementSystem = () => {
       // Step-by-step context permissions
       { key: 'VIEW_CENTERS_SPECIFIC', description: 'Can view center details', contextRequired: true, level: 1 },
       { key: 'EDIT_CENTERS', description: 'Can edit center details', contextRequired: true, requiresPermission: 'VIEW_CENTERS_SPECIFIC', level: 2 },
-      { key: 'ADD_CENTERS', description: 'Can add center', contextRequired: true, requiresPermission: 'EDIT_CENTERS', level: 3 },
-      { key: 'DELETE_CENTERS', description: 'Can delete center', contextRequired: true, requiresPermission: 'EDIT_CENTERS', level: 3 }
+      { key: 'ADD_CENTERS', description: 'Can add course', contextRequired: true, requiresPermission: 'EDIT_CENTERS', level: 3 },
+      { key: 'DELETE_CENTERS', description: 'Can delete course', contextRequired: true, requiresPermission: 'EDIT_CENTERS', level: 3 },
+      { key: 'DELETE_COURSE', description: 'Can delete course', contextRequired: true, requiresPermission: 'VIEW_CENTERS_SPECIFIC', level: 2 },
     ]
   },
   {
