@@ -6,10 +6,6 @@ const verticalSchema = new Schema({
     required: true,
     trim: true
   },
-  code: {
-    type: String,
-    trim: true
-  },
   description: {
     type: String,
   },  
@@ -24,6 +20,10 @@ const verticalSchema = new Schema({
   approvedBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',
+  },
+  isApproved:{
+    type:Boolean,
+    default:false
   }
 }, { timestamps: true });
 

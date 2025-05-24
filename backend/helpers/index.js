@@ -103,9 +103,11 @@ module.exports.isCollege = async (req, res, next) => {
 
       // ✅ Else check for token in headers (for React SPA project)
       const token = req.header('x-auth');
+      
     
       if (!token) throw error;
       const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+      
       user = await User.findById(decoded.id);     
 
       req.user = user;

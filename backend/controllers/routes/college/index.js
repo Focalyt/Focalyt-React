@@ -1648,21 +1648,45 @@ router.post("/courses/add", async (req, res) => {
 	}
 });
 
+//Vertical APIS
+
+router.get('/getVerticals', [isCollege], async (req, res) => {
+	try {
+		
+
+		const verticals = await Vertical.find().sort({ createdAt: -1 });
+
+		console.log(verticals)
+
+		return res.json({
+			status: true,
+			message: "Verticals fetched successfully",
+			data: verticals
+		});
+	} catch (err) {
+		console.error("❌ Get Verticals Error:", err.message);
+		return res.status(500).json({
+			status: false,
+			message: err.message || "Failed to fetch verticals"
+		});
+	}
+});
+
 router.post('/addVertical', [isCollege], async (req, res) => {
 	try {
-		const body = req.body;
+		const {formData} = req.body;
 		const user = req.user;
-		console.log("📥 Incoming vertical data:", body);
+		console.log("📥 Incoming vertical data:", formData);
 		console.log("📥 Incoming user data:", user);
 
 		// Default value handling
 		const newVertical = new Vertical({
-			name: body.name,
-			description: body.description,
-			status: body.status || 'active',
-			createdBy: body.createdBy || null,
-			approvedBy: body.approvedBy || null
-		});
+      name: formData.name,
+      description: formData.description,
+      status: formData.status !== undefined ? formData.status : true,
+      createdBy: user._id,
+    });
+
 
 		const savedVertical = await newVertical.save();
 
@@ -1680,21 +1704,20 @@ router.post('/addVertical', [isCollege], async (req, res) => {
 		});
 	}
 });
-router.post('/editVertical/:id', async (req, res) => {
+router.put('/editVertical/:id',[isCollege], async (req, res) => {
 	try {
 		const verticalId = req.params.id;
-		const body = req.body;
+		const {formData} = req.body;
 
 		console.log("📝 Editing vertical:", verticalId);
-		console.log("📦 Updated data:", body);
+		console.log("📦 Updated data:", formData);
 
 		const updated = await Vertical.findByIdAndUpdate(
 			verticalId,
 			{
-				name: body.name,
-				description: body.description,
-				status: body.status || 'active',
-				approvedBy: body.approvedBy || null
+				name: formData.name,
+				description: formData.description,
+				status: formData.status
 			},
 			{ new: true } // return updated document
 		);
@@ -1720,5 +1743,36 @@ router.post('/editVertical/:id', async (req, res) => {
 		});
 	}
 });
+
+router.delete('/deleteVertical/:id', [isCollege], async (req, res) => {
+	try {
+		const verticalId = req.params.id;
+
+		console.log("🗑 Deleting vertical:", verticalId);
+
+		const deleted = await Vertical.findByIdAndDelete(verticalId);
+
+		if (!deleted) {
+			return res.status(404).json({
+				status: false,
+				message: "Vertical not found"
+			});
+		}
+
+		return res.json({
+			status: true,
+			message: "Vertical deleted successfully",
+			data: deleted
+		});
+
+	} catch (err) {
+		console.error("❌ Delete Vertical Error:", err.message);
+		return res.status(500).json({
+			status: false,
+			message: err.message || "Failed to delete vertical"
+		});
+	}
+});
+
 
 module.exports = router;

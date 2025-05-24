@@ -330,6 +330,13 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                 </small>
               )}
             </div> */}
+            <div className='d-flex align-items-center'>
+            <h4  onClick={onBackToVerticals} className="me-2">Verticals</h4>
+            <span className="mx-2"> &gt; </span>
+            <h5 className="breadcrumb-item mb-0" aria-current="page">
+              {selectedVertical.name} Projects
+            </h5>
+          </div>
           </div>
         </div>
         <div>
@@ -344,6 +351,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
               <span>Back</span>
             </button>
           )}
+          
           
 
           <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
