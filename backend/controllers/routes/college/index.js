@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
-const { User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
+const {AppliedCourses, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
@@ -48,9 +48,7 @@ router.route('/')
 		}
 	})
 router.route("/login")
-	.get(async (req, res) => {
-		res.render(`${req.vPath}/app/college/login`);
-	})
+	
 	.post(async (req, res) => {
 		try {
 			console.log('body data', req.body)
@@ -117,9 +115,7 @@ router.route("/login")
 	});
 
 router.route("/register")
-	.get(async (req, res) => {
-		res.render(`${req.vPath}/app/college/register`);
-	})
+	
 	.post(async (req, res) => {
 		try {
 			console.log('recieved data', req.body)
@@ -186,6 +182,26 @@ router.route("/register")
 			return res.send({ status: false, error: err.message });
 		}
 	});
+router.route("/appliedCandidates")
+	.get(async (req, res) => {
+
+		try {
+        const students = await AppliedCourses.find().populate('_candidate').populate('_course');
+        res.status(200).json({
+            success: true,
+            count: students.length,
+            data: students
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch applied candidates",
+            error: error.message
+        });
+    }
+		
+	})
+	
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
 	console.log('User', req.user)

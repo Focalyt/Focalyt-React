@@ -13,7 +13,7 @@ const courseSchema = new Schema({
   duration: String,
   students: { type: Number, default: 0 }, // ✅ Added to track enrollment count
 
-  status: { type: String, enum: ['active', 'inactive'], default: 'active' }, // ✅ Added to reflect course status
+  status: { type: Boolean, default:true}, // ✅ Added to reflect course status
 
   courseFeeType: {
     type: String,
