@@ -23,7 +23,7 @@ const {
 	authKey,
 	msg91WelcomeTemplate,
 } = require("../../../config");
-const courses = require("../../models/courses");
+
 
 AWS.config.update({
 	accessKeyId,
@@ -99,15 +99,8 @@ router.route("/").get(async (req, res) => {
 		let canEdit = false
 		const user = req.user
 		console.log("user", user)
-		if (user.role === 0) {
-
-			canEdit = true
-		}
-
-		if (user.role === 10) {
-			view = true;
-
-		}
+		
+		
 		const data = req.query;
 		const fields = {
 			isDeleted: false
@@ -171,18 +164,21 @@ router.route("/").get(async (req, res) => {
 			courses = filteredCourses;
 			console.log("filteredCourses:", filteredCourses);
 		} else {
+			console.log('fields',fields)
 			courses = await Courses.find(fields).populate("sectors");
 		}
+		
 
 
-		console.log(courses, "this is courses")
+		console.log(status, "this is status")
 		return res.json( {
 			
 			view,
 			courses,
 			isChecked,
 			data,
-			canEdit
+			canEdit,
+			status
 		});
 
 	} catch (err) {
@@ -319,6 +315,7 @@ router
 			console.log('edit api');
 			const { id } = req.params;
 			let course = await Courses.findById(id);
+			console.log('course',course)
 			if (!course) throw req.ykError("course not found!");
 			const sectors = await CourseSectors.find({
 				status: true, _id: {
@@ -346,33 +343,120 @@ router
 			return res.redirect("back");
 		}
 	})
-	.post(async (req, res) => {
-		try {
-			let { id } = req.params
-			console.log('edit api');
-			let body = req.body;
-			console.log("body data", body)
-			body.photos = req.body.photos?.split(',')
-			body.videos = req.body.videos?.split(',')
-			body.testimonialvideos = req.body.testimonialvideos?.split(',')
-			if (req.body.center === "") {
-				body.center = null;  // Center remove कर दो
-			} else {
-				body.center = req.body.center;
-			}
-			const updateCourse = await Courses.findByIdAndUpdate(id, { $set: body }, { new: true });
-			if (updateCourse) {
-				req.flash("success", "Course updated successfully!");
-				return res.json({ status: true, message: "Record added!" })
-			} else {
-				return res.json({ status: false, message: "Record not added!" })
-			}
-		} catch (err) {
-			console.log('err: ', err);
-			req.flash("error", err.message || "Something went wrong!");
-			return res.redirect("back");
+	.put(async (req, res) => {
+	try {
+		const courseId = req.params.id;
+		const { files } = req;
+		let body = req.body;
+
+		const bucketName = process.env.AWS_BUCKET_NAME;
+
+		// Find existing course
+		const existingCourse = await Courses.findById(courseId);
+		if (!existingCourse) {
+			return res.status(404).json({ status: false, message: "Course not found" });
 		}
-	});
+
+		if (Object.keys(body).length === 1 && body.status !== undefined) {
+			existingCourse.status = body.status;
+			await existingCourse.save();
+			return res.json({ status: true, message: "Course status updated!", data: existingCourse });
+		}
+
+		const courseName = body.name || existingCourse.name || 'unnamed';
+
+		// Parse JSON fields (if present in body)
+		if (body.docsRequired) {
+			body.docsRequired = JSON.parse(body.docsRequired);
+		}
+		if (body.questionAnswers) {
+			body.questionAnswers = JSON.parse(body.questionAnswers);
+		}
+		if (body.createdBy) {
+			body.createdBy = JSON.parse(body.createdBy);
+		}
+
+		// Upload new files if provided, else keep old
+		if (files?.photos) {
+			const photoUrls = await uploadFilesToS3({
+				files: files.photos,
+				folder: 'Courses',
+				courseName,
+				s3,
+				bucketName,
+				allowedExtensions: allowedImageExtensions
+			});
+			body.photos = photoUrls;
+		} else {
+			body.photos = existingCourse.photos;
+		}
+
+		if (files?.videos) {
+			const videoUrls = await uploadFilesToS3({
+				files: files.videos,
+				folder: 'Courses',
+				courseName,
+				s3,
+				bucketName,
+				allowedExtensions: allowedVideoExtensions
+			});
+			body.videos = videoUrls;
+		} else {
+			body.videos = existingCourse.videos;
+		}
+
+		if (files?.testimonialvideos) {
+			const testimonialVideoUrls = await uploadFilesToS3({
+				files: files.testimonialvideos,
+				folder: 'Courses',
+				courseName,
+				s3,
+				bucketName,
+				allowedExtensions: allowedVideoExtensions
+			});
+			body.testimonialvideos = testimonialVideoUrls;
+		} else {
+			body.testimonialvideos = existingCourse.testimonialvideos;
+		}
+
+		if (files?.thumbnail) {
+			const [thumbnailUrl] = await uploadFilesToS3({
+				files: files.thumbnail,
+				folder: 'Courses',
+				courseName,
+				s3,
+				bucketName,
+				allowedExtensions: allowedImageExtensions
+			});
+			body.thumbnail = thumbnailUrl;
+		} else {
+			body.thumbnail = existingCourse.thumbnail;
+		}
+
+		if (files?.brochure) {
+			const [brochureUrl] = await uploadFilesToS3({
+				files: files.brochure,
+				folder: 'Courses',
+				courseName,
+				s3,
+				bucketName,
+				allowedExtensions: allowedDocumentExtensions
+			});
+			body.brochure = brochureUrl;
+		} else {
+			body.brochure = existingCourse.brochure;
+		}
+
+		// Update the course
+		const updatedCourse = await Courses.findByIdAndUpdate(courseId, body, { new: true });
+
+		res.json({ status: true, message: "Record updated!", data: updatedCourse });
+	} catch (err) {
+		console.error("Error in course update:", err);
+		res.status(400).json({ status: false, message: err.message || "Something went wrong!" });
+	}
+});
+
 
 
 router
@@ -843,6 +927,7 @@ router.route("/:courseId/:candidateId/docsview")
 			return res.status(500).json({ message: "Internal server error", error });
 		}
 	})
+	
 
 router.route("/assignCourses/:id")
 	.put(async (req, res) => {

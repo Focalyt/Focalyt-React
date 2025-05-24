@@ -103,8 +103,12 @@ const EditCourse = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+         const user = JSON.parse(sessionStorage.getItem('user'));
+      const headers = {
+        'x-auth': user.token,
+      };
         // Fetch course data
-        const courseRes = await axios.get(`${backendUrl}/college/courses/edit/${id}`);
+        const courseRes = await axios.get(`${backendUrl}/college/courses/edit/${id}` , { headers });
         console.log('courseRes' , courseRes)
         // Fetch sectors and centers data
         const sectorsRes = await axios.get(`${backendUrl}/api/sectorList`);
@@ -200,7 +204,7 @@ const EditCourse = () => {
     };
     
     fetchData();
-  }, [id, backendUrl]);
+  }, []);
 
   // Initialize Choices.js for multi-select fields when training center is visible
   useEffect(() => {
@@ -560,7 +564,7 @@ const EditCourse = () => {
       }))));
       
       
-      const response = await axios.post(`${backendUrl}/college/courses/edit/${id}`, form, {
+      const response = await axios.put(`${backendUrl}/college/courses/edit/${id}`, form, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'x-auth': user?.token || sessionStorage.getItem('token')
@@ -570,7 +574,7 @@ const EditCourse = () => {
       if (response.data.status) {
         setSubmitSuccess(true);
         alert('Course updated successfully');
-        navigate('/institute/courses');
+        navigate('/institute/viewcourse');
       } else {
         alert(response.data.message || 'Failed to update course');
       }

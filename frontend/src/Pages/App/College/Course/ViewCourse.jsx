@@ -22,6 +22,7 @@ const ViewCourses = () => {
 
   // State variables
   const [courses, setCourses] = useState([]);
+  const [status, setStatus] = useState(false);
   const [isArchived, setIsArchived] = useState(false);
   const [filterData, setFilterData] = useState({
     name: '',
@@ -57,9 +58,8 @@ const ViewCourses = () => {
       const headers = {
         'x-auth': user.token,
       };
+const queryString = qs.stringify(params);
 
-      // Build query string from params
-      const queryString = qs.stringify(params);
       const response = await axios.get(`${backendUrl}/college/courses?${queryString}`, { headers });
 
       console.log("Fetched courses:", response.data.course);
@@ -68,6 +68,7 @@ const ViewCourses = () => {
 
       if (response.data) {
         setCourses(response.data.courses || []);
+        setStatus(response.data.status || []);
       }
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -78,18 +79,33 @@ const ViewCourses = () => {
   const handleArchivedChange = () => {
     const newArchived = !isArchived;
     setIsArchived(newArchived);
-    navigate(`/college/courses?status=${!newArchived}`);
+    navigate(`/institute/viewcourse?status=${!newArchived}`);
   };
 
   // Handle toggle status
-  const handleToggleStatus = async (id, status) => {
+  const handleToggleStatus = async (id, currentStatus) => {
+    
     try {
-      const data = { id, status: !(status === 'true') };
-      const headers = { 'x-auth': localStorage.getItem('token') };
+      
+      console.log('status',currentStatus)
+      const user = JSON.parse(sessionStorage.getItem('user'));
 
-      await axios.patch(`${backendUrl}/college/courses/changeStatus`, data, { headers });
+      // Toggle status
+    const newStatus = !(currentStatus === 'true' || currentStatus === true);
+      console.log('newStatus',newStatus)
+
+
+    const form = { status: newStatus };
+ 
+
+      await axios.put(`${backendUrl}/college/courses/edit/${id}`, form, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'x-auth': user?.token || sessionStorage.getItem('token')
+        }
+      });
       // Reload data after status change
-      fetchCourses(qs.parse(location.search));
+      fetchCourses();
     } catch (error) {
       console.error('Error changing course status:', error);
     }
@@ -126,12 +142,12 @@ const ViewCourses = () => {
       }
     });
 
-    navigate(`/college/courses?${qs.stringify(queryParams)}`);
+    navigate(`/institute/viewcourse?${qs.stringify(queryParams)}`);
   };
 
   // Handle reset filters
   const handleResetFilters = () => {
-    navigate('/college/courses');
+    navigate('/institute/viewcourse');
   };
 
   return (
@@ -270,7 +286,8 @@ const ViewCourses = () => {
                           <th>Course Level</th>
                           <th>Course Name</th>
                           <th>Duration</th>
-                          <th>Add Leads</th>
+                          {(status === 'true' ||status ===true) &&(
+                          <th>Add Leads</th>)}
                           <th>Status</th>
                           <th>Action</th>
 
@@ -279,7 +296,7 @@ const ViewCourses = () => {
                       <tbody>
                         {courses.map((course, i) => (
                           <tr key={course._id}>
-                            <td style={{padding: '14px'}}>
+                            <td style={{ padding: '14px' }}>
                               {course.sectors?.map((sector, i) => (
                                 <div key={sector._id}>{sector.name}</div>
                               ))}
@@ -287,23 +304,24 @@ const ViewCourses = () => {
                             <td>{course.courseLevel}</td>
                             <td>{course.name}</td>
                             <td>{course.duration}</td>
+                            {(course.status ==='true' || course.status === true)&& (
                             <td className="text-capitalize text-nowrap">
                               <Link
-                                to={`/college/courses/${course._id}/candidate/addleads`}
+                                to={`/institute/viewcourse/${course._id}/candidate/addleads`}
                                 className="btn btn-danger waves-effect waves-light text-white d-inline btn-sm"
                                 style={{ padding: '7px' }}
                               >
                                 Add leads
                               </Link>
-                            </td>
+                            </td>)}
                             <td >
-                              
+
                               <div className="custom-control custom-switch custom-control-inline p-0">
-                                <input type="checkbox" id="customSwitch1" className="custom-control-input" onChange={() => handleToggleStatus(course._id, String(course.status))} checked={course.status} />
+                                <input type="checkbox" id="customSwitch1" className="custom-control-input" onChange={() => handleToggleStatus(course._id, course.status)} checked={course.status} />
                                 <label for="customSwitch1" class="toggleSwitch"></label>
                               </div>
                             </td>
-                            <td valign="middle" className="qualification-action-custom-class d-flex justify-content-center border-0" style={{padding: "14px"}}>
+                            <td valign="middle" className="qualification-action-custom-class d-flex justify-content-center border-0" style={{ padding: "14px" }}>
                               <Link to={`/institute/courses/edit/${course._id}`}>
                                 <Edit size={20} className="primary" />
                               </Link>
