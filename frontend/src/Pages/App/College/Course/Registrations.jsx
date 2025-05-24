@@ -171,22 +171,25 @@ const fetchProfileData = async () => {
         'x-auth': token,
       },
     });
-
+ console.log('Backend profile data:', response.data);
     if (response.data.success && response.data.data) {
-      const data = response.data.data;
+      const data = response.data.data[0]; // create array 
 
       // Assuming your API returns data structured similar to your state
       // Adjust this mapping as per your API response structure
 
       setProfileData({
         personalInfo: {
-          name: data.personalInfo?.name || '',
-          professionalTitle: data.personalInfo?.professionalTitle || '',
+          // name: data._candidate?.personalInfo?.name || '',
+          name: data._candidate?.name || '',
+          mobile: data._candidate?.mobile || '',
+          professionalTitle: data._candidate?.professionalTitle || '',
           currentAddress: data.personalInfo?.currentAddress || { fullAddress: '' },
           permanentAddress: data.personalInfo?.permanentAddress || { fullAddress: '' },
           summary: data.personalInfo?.summary || '',
+          sex: data._candidate?.sex || '',
         },
-        mobile: data.mobile || '',
+        mobile: data._candidate?.mobile || '',
         email: data.email || '',
         dob: data.dob || '',
         sex: data.sex || '',
@@ -904,8 +907,10 @@ const fetchProfileData = async () => {
                                   </div>
                                 </div>
                                 <div>
-                                  <h6 className="mb-0 fw-bold">Akash Gaurav</h6>
-                                  <small className="text-muted">9027486847</small>
+                                  {/* <h6 className="mb-0 fw-bold">Akash Gaurav</h6> */}
+                                  <h6 className="mb-0 fw-bold">{profileData?.personalInfo?.name || user?.name || 'Your Name'}
+</h6>
+                                  <small className="text-muted">{profileData?.personalInfo?.mobile || user?.mobile || 'Mobile Number'}</small>
                                 </div>
                                 <div style={{ marginLeft: '15px' }}>
                                   <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
@@ -1279,7 +1284,7 @@ const fetchProfileData = async () => {
                                           {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
                                         </p>
                                         <p className="resume-title">
-                                          {profileData?.sex || 'Sex'}
+                                          {profileData?.personalInfo?.sex || 'Sex'}
                                         </p>
 
                                         <div className="resume-contact-details">
