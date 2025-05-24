@@ -21,12 +21,10 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
 
   // Form states
   const [formData, setFormData] = useState({
-    code: '',
     name: '',
     description: '',
     vertical: selectedVertical?.code || '',
     status: 'active',
-    priority: 'medium'
   });
 
   // Sample verticals for dropdown
@@ -164,7 +162,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   };
 
   const handleSubmit = () => {
-    if (!formData.code.trim() || !formData.name.trim() || !formData.vertical.trim()) {
+    if ( !formData.name.trim() || !formData.vertical.trim()) {
       alert('Please fill in all required fields');
       return;
     }
@@ -224,8 +222,6 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   const getPriorityColor = (priority) => {
     switch(priority) {
       case 'high': return 'bg-danger';
-      case 'medium': return 'bg-warning';
-      case 'low': return 'bg-info';
       default: return 'bg-secondary';
     }
   };
@@ -269,7 +265,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     return (
       <div>
         {/* Breadcrumb Navigation */}
-        <div className="container py-2">
+        {/* <div className="container py-2 d-none">
           <nav aria-label="breadcrumb">
             <ol className="breadcrumb">
               {onBackToVerticals && (
@@ -295,7 +291,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
               </li>
             </ol>
           </nav>
-        </div>
+        </div> */}
         
         {/* Center Component with filtered data */}
         <Center selectedProject={selectedProjectForCenters} />
@@ -309,29 +305,9 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
           <div className="d-flex align-items-center gap-3">
-            {/* <ol className="breadcrumb">
-              {onBackToVerticals && (
-                <li className="breadcrumb-item">
-                  <button 
-                    className="btn btn-link p-0 text-decoration-none"
-                    onClick={onBackToVerticals}
-                  >
-                    Verticals
-                  </button>
-                </li>
-              )}
-              
-            </ol> */}
-            {/* <div>
-              <h4 className="mb-0">Projects</h4>
-              {selectedVertical && (
-                <small className="text-muted">
-                  Showing projects for: <strong>{selectedVertical.name} ({selectedVertical.code})</strong>
-                </small>
-              )}
-            </div> */}
+          
             <div className='d-flex align-items-center'>
-            <h4  onClick={onBackToVerticals} className="me-2">Verticals</h4>
+            <h4 onClick={onBackToVerticals}  className="me-2">Verticals</h4>
             <span className="mx-2"> &gt; </span>
             <h5 className="breadcrumb-item mb-0" aria-current="page">
               {selectedVertical.name} Projects
@@ -408,10 +384,6 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                         <span className={`${project.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
                           {project.status}
                         </span>
-                        <span className={`${getPriorityColor(project.priority)}`}>
-                          {project.priority} priority
-                        </span>
-                        <span className="bg-info">{project.vertical}</span>
                       </div>
                     </div>
                     <div className="text-end">
@@ -490,38 +462,8 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                 <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
               </div>
               <div className="modal-body">
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Project Code *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.code}
-                      onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                      placeholder="Enter project code (e.g., PROJ001)"
-                    />
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Vertical *</label>
-                    <select
-                      className="form-select"
-                      value={formData.vertical}
-                      onChange={(e) => setFormData(prev => ({ ...prev, vertical: e.target.value }))}
-                      disabled={selectedVertical ? true : false}
-                    >
-                      <option value="">Select Vertical</option>
-                      {availableVerticals.map(vertical => (
-                        <option key={vertical.id} value={vertical.code}>
-                          {vertical.code} - {vertical.name}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedVertical && (
-                      <small className="text-muted">Vertical is pre-selected based on your current selection</small>
-                    )}
-                  </div>
-                </div>
-                <div className="mb-3">
+              <div className="row">
+                <div className="col-md-6 mb-3">
                   <label className="form-label">Project Name *</label>
                   <input
                     type="text"
@@ -531,7 +473,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                     placeholder="Enter project name"
                   />
                 </div>
-                <div className="mb-3">
+                <div className="col-md-6 mb-3">
                   <label className="form-label">Description</label>
                   <textarea
                     className="form-control"
@@ -540,6 +482,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Enter project description"
                   ></textarea>
+                </div>
                 </div>
                 <div className="row">
                   <div className="col-md-6 mb-3">
@@ -553,18 +496,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                       <option value="inactive">Inactive</option>
                     </select>
                   </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Priority</label>
-                    <select
-                      className="form-select"
-                      value={formData.priority}
-                      onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  </div>
+                  
                 </div>
               </div>
               <div className="modal-footer">

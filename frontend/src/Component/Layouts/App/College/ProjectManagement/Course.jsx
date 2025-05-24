@@ -220,7 +220,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
   };
 
   const handleSubmit = () => {
-    if (!formData.code.trim() || !formData.name.trim() || !formData.category.trim() || !formData.instructor.trim()) {
+    if (!formData.name.trim() || !formData.category.trim() || !formData.instructor.trim()) {
       alert('Please fill in all required fields');
       return;
     }
@@ -339,7 +339,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
     return (
       <div>
         {/* Breadcrumb Navigation */}
-        <div className="container py-2">
+        {/* <div className="container py-2">
           <nav aria-label="breadcrumb">
             <ol className="breadcrumb">
               {onBackToCenters && (
@@ -365,7 +365,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
               </li>
             </ol>
           </nav>
-        </div>
+        </div> */}
         
         {/* Batch Component with filtered data */}
         <Batch selectedCourse={selectedCourseForBatches} />
@@ -391,21 +391,16 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
             )}
             <div>
               <h4 className="mb-0">Courses</h4>
-              {selectedCenter && (
+              {/* {selectedCenter && (
                 <small className="text-muted">
                   Showing courses for: <strong>{selectedCenter.name} ({selectedCenter.code})</strong>
                 </small>
-              )}
+              )} */}
             </div>
           </div>
         </div>
         <div>
-            <button 
-                    className="btn btn-link p-0 text-decoration-none"
-                    onClick={onBackToCenters}
-                  ><i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
-                    {selectedCenter ? `${selectedCenter.name} Centers` : 'Centers'}
-                  </button>
+         
           <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
@@ -462,9 +457,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
                         <span className={`${course.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
                           {course.status}
                         </span>
-                        <span className={`${getLevelColor(course.level)}`}>
-                          {course.level}
-                        </span>
+                       
                         <span className="bg-primary">{course.category}</span>
                         {/* ======== ADD THIS: Show center code badge ======== */}
                         {selectedCenter && (
@@ -524,23 +517,20 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
 
                   {/* ======== MODIFY THIS: Add batches display in stats ======== */}
                   <div className="row small text-muted">
-                    <div className="col-2 text-center">
+                    {/* <div className="col-2 text-center">
                       <div className="fw-bold text-primary">{course.credits}</div>
                       <div>Credits</div>
-                    </div>
-                    <div className="col-2 text-center">
+                    </div> */}
+                    {/* <div className="col-2 text-center">
                       <div className="fw-bold text-info">{course.duration}</div>
                       <div>Duration</div>
-                    </div>
-                    <div className="col-2 text-center">
+                    </div> */}
+                    {/* <div className="col-2 text-center">
                       <div className="fw-bold text-warning">{course.enrolledStudents}</div>
                       <div>Enrolled</div>
-                    </div>
-                    <div className="col-2 text-center">
-                      <div className="fw-bold text-success">{course.completedStudents}</div>
-                      <div>Completed</div>
-                    </div>
-                    <div className="col-2 text-center">
+                    </div> */}
+                    
+                    {/* <div className="col-2 text-center">
                       <span 
                         className="fw-bold text-danger" 
                         style={{ cursor: 'pointer', textDecoration: 'underline' }}
@@ -549,7 +539,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
                         {course.batches}
                       </span>
                       <div>Batches</div>
-                    </div>
+                    </div> */}
                   </div>
 
                   <div className="small text-muted mt-3">
@@ -583,7 +573,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
 
       {/* Add/Edit Modal */}
       {(showAddForm || showEditForm) && (
-        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content">
               <div className="modal-header bg-info text-white">
@@ -593,14 +583,15 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
               <div className="modal-body">
                 <div className="row">
                   <div className="col-md-6 mb-3">
-                    <label className="form-label">Course Code *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.code}
-                      onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                      placeholder="Enter course code (e.g., CS101)"
-                    />
+                  <label className="form-label">Course Name *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter course name"
+                  />
+                
                   </div>
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Category *</label>
@@ -613,32 +604,12 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
                     />
                   </div>
                 </div>
-                <div className="mb-3">
-                  <label className="form-label">Course Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter course name"
-                  />
-                </div>
+                
                 {/* ======== ADD THIS: Show center information in form ======== */}
-                {selectedCenter && (
-                  <div className="mb-3">
-                    <label className="form-label">Center</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={`${selectedCenter.code} - ${selectedCenter.name}`}
-                      readOnly
-                      disabled
-                    />
-                    <small className="text-muted">Course will be linked to the current center</small>
-                  </div>
-                )}
-                <div className="mb-3">
-                  <label className="form-label">Description</label>
+               
+                <div className="row">
+                    <div className="col-md-6 mb-3">
+                          <label className="form-label">Description</label>
                   <textarea
                     className="form-control"
                     rows="3"
@@ -646,8 +617,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Enter course description"
                   ></textarea>
-                </div>
-                <div className="row">
+                    </div>
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Instructor *</label>
                     <input
@@ -658,52 +628,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
                       placeholder="Enter instructor name"
                     />
                   </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Level</label>
-                    <select
-                      className="form-select"
-                      value={formData.level}
-                      onChange={(e) => setFormData(prev => ({ ...prev, level: e.target.value }))}
-                    >
-                      <option value="beginner">Beginner</option>
-                      <option value="intermediate">Intermediate</option>
-                      <option value="advanced">Advanced</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-md-4 mb-3">
-                    <label className="form-label">Duration</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.duration}
-                      onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
-                      placeholder="e.g., 12 weeks"
-                    />
-                  </div>
-                  <div className="col-md-4 mb-3">
-                    <label className="form-label">Credits</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      value={formData.credits}
-                      onChange={(e) => setFormData(prev => ({ ...prev, credits: e.target.value }))}
-                      placeholder="Enter credits"
-                      min="1"
-                    />
-                  </div>
-                  <div className="col-md-4 mb-3">
-                    <label className="form-label">Max Students</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      value={formData.maxStudents}
-                      onChange={(e) => setFormData(prev => ({ ...prev, maxStudents: e.target.value }))}
-                      placeholder="Enter max students"
-                      min="1"
-                    />
-                  </div>
+                 
                 </div>
                 <div className="mb-3">
                   <label className="form-label">Status</label>
@@ -801,6 +726,13 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
           </div>
         </div>
       )}
+      <style>
+        {`
+        .overflowY{
+        overflow-y :scroll !important;
+        } 
+        `}
+      </style>
     </div>
   );
 };
