@@ -4,7 +4,8 @@ import axios from 'axios'
 import './CourseCrm.css';
 
 const CRMDashboard = () => {
-  const [activeTab, setActiveTab] = useState(0);
+  // const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState({});
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
@@ -176,27 +177,26 @@ const CRMDashboard = () => {
       if (response.data.success && response.data.data) {
         const data = response.data.data; // create array 
         setAllProfiles(response.data.data);
-        // Assuming your API returns data structured similar to your state
-        // Adjust this mapping as per your API response structure
+
 
         setProfileData({
           personalInfo: {
             // name: data._candidate?.personalInfo?.name || '',
             name: data._candidate?.name || '',
             mobile: data._candidate?.mobile || '',
-            professionalTitle: data._candidate?.professionalTitle || '',
+            professionalTitle: data._candidate?.personalInfo?.professionalTitle || '',
             currentAddress: data.personalInfo?.currentAddress || { fullAddress: '' },
             permanentAddress: data.personalInfo?.permanentAddress || { fullAddress: '' },
-            summary: data.personalInfo?.summary || '',
+            summary: data._candidate?.personalInfo?.summary || '',
             sex: data._candidate?.sex || '',
           },
           mobile: data._candidate?.mobile || '',
-          email: data.email || '',
-          dob: data.dob || '',
-          sex: data.sex || '',
-          experienceType: data.experienceType || '',
-          fresherDetails: data.fresherDetails || '',
-          isExperienced: data.isExperienced || '',
+          email: data._candidate?.email || '',
+          dob: data._candidate?.dob || '',
+          sex: data._candidate?.sex || '',
+          experienceType: data._candidate?.experienceType || '',
+          fresherDetails: data._candidate?.fresherDetails || '',
+          isExperienced: data._candidate?.isExperienced || '',
         });
 
         setUser({
@@ -222,13 +222,13 @@ const CRMDashboard = () => {
 
 
   const [experiences, setExperiences] = useState([{
-     jobTitle: '',
-     companyName: '',
-     from: null,
-     to: null,
-     jobDescription: '',
-     currentlyWorking: false
-   }]);
+    jobTitle: '',
+    companyName: '',
+    from: null,
+    to: null,
+    jobDescription: '',
+    currentlyWorking: false
+  }]);
 
   const [educations, setEducations] = useState([
     {
@@ -275,28 +275,28 @@ const CRMDashboard = () => {
   ]);
 
   const [skills, setSkills] = useState([{
-     skillName: '',
-     skillPercent: 0
-   }]);
+    skillName: '',
+    skillPercent: 0
+  }]);
 
- const [languages, setLanguages] = useState([{
+  const [languages, setLanguages] = useState([{
     name: '',
     level: 0
   }]);
 
-   const [certificates, setCertificates] = useState([{
-     certificateName: '',
-     orgName: '',
-     month: '',
-     year: '',
-     orgLocation: {
-       type: 'Point',
-       coordinates: [],
-       city: '',
-       state: '',
-       fullAddress: ''
-     }
-   }]);
+  const [certificates, setCertificates] = useState([{
+    certificateName: '',
+    orgName: '',
+    month: '',
+    year: '',
+    orgLocation: {
+      type: 'Point',
+      coordinates: [],
+      city: '',
+      state: '',
+      fullAddress: ''
+    }
+  }]);
 
   const [projects, setProjects] = useState([{
     projectName: '',
@@ -304,7 +304,7 @@ const CRMDashboard = () => {
     proDescription: ''
   }]);
 
-   const [interests, setInterests] = useState(['']);
+  const [interests, setInterests] = useState(['']);
 
   const [declaration, setDeclaration] = useState({
     text: 'I hereby declare that the above information is true to the best of my knowledge.'
@@ -336,10 +336,17 @@ const CRMDashboard = () => {
     setActiveCrmFilter(index);
   };
 
-  const handleTabClick = (index) => {
-    setActiveTab(index);
-    console.log('Tab clicked:', index);
+  const handleTabClick = (profileIndex, tabIndex) => {
+    setActiveTab(prevTabs => ({
+      ...prevTabs,
+      [profileIndex]: tabIndex
+    }));
   };
+
+  // const handleTabClick = (index) => {
+  //   setActiveTab(index);
+  //   console.log('Tab clicked:', index);
+  // };
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -1043,7 +1050,7 @@ const CRMDashboard = () => {
                                 {tabs.map((tab, tabIndex) => (
                                   <li className="nav-item" key={tabIndex}>
                                     <button
-                                     className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
+                                      className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
                                       onClick={() => handleTabClick(profileIndex, tabIndex)}
                                     >
                                       {tab}
@@ -1058,7 +1065,8 @@ const CRMDashboard = () => {
                               <div className="tab-content">
 
                                 {/* Lead Details Tab */}
-                                {activeTab === 0 && (
+                                {/* {activeTab === 0 && ( */}
+                                {(activeTab[profileIndex] || 0) === 0 && (
                                   <div className="tab-pane active" id="lead-details">
                                     {/* Your lead details content here */}
                                     <div className="scrollable-container">
@@ -1066,49 +1074,52 @@ const CRMDashboard = () => {
                                         <div className="info-card">
                                           <div className="info-group">
                                             <div className="info-label">LEAD AGE</div>
-                                            <div className="info-value">282 Days</div>
+                                            <div className="info-value">{profile.createdAt ?
+                                              Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                              : 'N/A'}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">Lead Owner</div>
-                                            <div className="info-value">Meta Ads Inbound IVR Inbound Call</div>
+                                            <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">COURSE / JOB NAME</div>
-                                            <div className="info-value">Operator</div>
+                                            <div className="info-value">{profile._course?.name}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">BATCH NAME</div>
-                                            <div className="info-value">-</div>
+                                            <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                           </div>
                                         </div>
 
                                         <div className="info-card">
                                           <div className="info-group">
                                             <div className="info-label">TYPE OF PROJECT</div>
-                                            <div className="info-value">Job</div>
+                                            <div className="info-value">{profile._course?.typeOfProject}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">PROJECT</div>
-                                            <div className="info-value">Job</div>
+                                            <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">SECTOR</div>
-                                            <div className="info-value">Retail</div>
+                                            <div className="info-value">{profile._course?.sectors}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">LEAD CREATION DATE</div>
-                                            <div className="info-value">Jan 15, 2024 9:29 AM</div>
+                                            <div className="info-value">{profile.createdAt ?
+                                              new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
                                           </div>
                                         </div>
 
                                         <div className="info-card">
                                           <div className="info-group">
                                             <div className="info-label">STATE</div>
-                                            <div className="info-value">Uttar Pradesh</div>
+                                            <div className="info-value">{profile._course?.state}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">City</div>
-                                            <div className="info-value">Chandauli</div>
+                                            <div className="info-value">{profile._course?.city}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">BRANCH NAME</div>
@@ -1116,7 +1127,8 @@ const CRMDashboard = () => {
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">LEAD MODIFICATION DATE</div>
-                                            <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                            <div className="info-value">{profile.updatedAt ?
+                                              new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                           </div>
                                         </div>
                                       </div>
@@ -1136,49 +1148,52 @@ const CRMDashboard = () => {
                                               <div className="info-card">
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD AGE</div>
-                                                  <div className="info-value">282 Days</div>
+                                                  <div className="info-value">{profile.createdAt ?
+                                                    Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                    : 'N/A'}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">Lead Owner</div>
-                                                  <div className="info-value">Meta Ads Inbound IVR Inbound Call</div>
+                                                  <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">COURSE / JOB NAME</div>
-                                                  <div className="info-value">Operator</div>
+                                                  <div className="info-value">{profile._course?.name}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">BATCH NAME</div>
-                                                  <div className="info-value"></div>
+                                                  <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                                 </div>
                                               </div>
 
                                               <div className="info-card">
                                                 <div className="info-group">
                                                   <div className="info-label">TYPE OF PROJECT</div>
-                                                  <div className="info-value">Job</div>
+                                                  <div className="info-value">{profile._course?.typeOfProject}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">PROJECT</div>
-                                                  <div className="info-value">Job</div>
+                                                  <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">SECTOR</div>
-                                                  <div className="info-value">Retail</div>
+                                                  <div className="info-value">{profile._course?.sectors}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD CREATION DATE</div>
-                                                  <div className="info-value">Jan 15, 2024 9:29 AM</div>
+                                                  <div className="info-value">{profile.createdAt ?
+                                                    new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
                                                 </div>
                                               </div>
 
                                               <div className="info-card">
                                                 <div className="info-group">
                                                   <div className="info-label">STATE</div>
-                                                  <div className="info-value">Uttar Pradesh</div>
+                                                  <div className="info-value">{profile._course?.state}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">City</div>
-                                                  <div className="info-value">Job</div>
+                                                  <div className="info-value">{profile._course?.city}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">BRANCH NAME</div>
@@ -1186,7 +1201,8 @@ const CRMDashboard = () => {
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                  <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                  <div className="info-value">{profile.updatedAt ?
+                                                    new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD MODIFICATION By</div>
@@ -1194,7 +1210,7 @@ const CRMDashboard = () => {
                                                 </div>
                                                 <div className="info-group">
                                                   <div className="info-label">Counsellor Name</div>
-                                                  <div className="info-value">Name</div>
+                                                  <div className="info-value">{profile._course?.counslername}</div>
                                                 </div>
                                               </div>
                                             </div>
@@ -1207,62 +1223,64 @@ const CRMDashboard = () => {
                                               <div className="col-xl-3 col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD AGE</div>
-                                                  <div className="info-value">282 Days</div>
+                                                  <div className="info-value">{profile.createdAt ?
+                                                    Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                    : 'N/A'}</div>
                                                 </div>
                                               </div>
 
                                               <div className="col-xl-3 col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">STATE</div>
-                                                  <div className="info-value">Uttar Pradesh</div>
+                                                  <div className="info-value">{profile._course?.state}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">CITY</div>
-                                                  <div className="info-value"></div>
+                                                  <div className="info-value">{profile._course?.city}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">TYPE OF PROJECT</div>
-                                                  <div className="info-value">Job</div>
+                                                  <div className="info-value">{profile._course?.typeOfProject}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">PROJECT</div>
-                                                  <div className="info-value">Job</div>
+                                                  <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">Sector</div>
-                                                  <div className="info-value">Retail</div>
+                                                  <div className="info-value">{profile._course?.sectors}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">COURSE / JOB NAME</div>
-                                                  <div className="info-value">Operator</div>
+                                                  <div className="info-value">{profile._course?.name}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">BATCH NAME</div>
-                                                  <div className="info-value"></div>
+                                                  <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">SECTOR</div>
-                                                  <div className="info-value">Retail</div>
+                                                  <div className="info-value">{profile._course?.sectors}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">BRANCH NAME</div>
-                                                  <div className="info-value">PSD Chandauli Center</div>
+                                                  <div className="info-value">{profile._course?.college || 'N/A'}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
@@ -1275,13 +1293,15 @@ const CRMDashboard = () => {
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD CREATION DATE</div>
-                                                  <div className="info-value">Jan 15, 2024 9:29 AM</div>
+                                                  <div className="info-value">{profile.createdAt ?
+                                                    new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                  <div className="info-value">Mar 21, 2025  col-3:32 PM</div>
+                                                  <div className="info-value">{profile.updatedAt ?
+                                                    new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
@@ -1293,13 +1313,13 @@ const CRMDashboard = () => {
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">Counsellor Name</div>
-                                                  <div className="info-value">Name</div>
+                                                  <div className="info-value">{profile._course?.counslername}</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD OWNER</div>
-                                                  <div className="info-value">Rahul Sharma</div>
+                                                  <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
                                                 </div>
                                               </div>
                                             </div>
@@ -1311,7 +1331,8 @@ const CRMDashboard = () => {
                                 )}
 
                                 {/* Profile Tab */}
-                                {activeTab === 1 && (
+                                {/* {activeTab === 1 && ( */}
+                                {(activeTab[profileIndex] || 0) === 1 && (
                                   <div className="tab-pane active" id="profile">
                                     <div className="resume-preview-body">
                                       <div id="resume-download" className="resume-document">
@@ -1332,48 +1353,48 @@ const CRMDashboard = () => {
 
                                             <div className="resume-header-content">
                                               <h1 className="resume-name">
-                                                {profileData?.personalInfo?.name || user?.name || 'Your Name'}
+                                                {profile._candidate?.name || 'Your Name'}
                                               </h1>
                                               <p className="resume-title">
-                                                {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
                                               </p>
                                               <p className="resume-title">
-                                                {profileData?.personalInfo?.sex || 'Sex'}
+                                                {profile._candidate?.sex || 'Sex'}
                                               </p>
 
                                               <div className="resume-contact-details">
-                                                {profileData?.mobile && (
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-telephone-fill"></i>
-                                                    <span>{profileData.mobile}</span>
-                                                  </div>
-                                                )}
-                                                {profileData?.email && (
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-envelope-fill"></i>
-                                                    <span>{profileData.email}</span>
-                                                  </div>
-                                                )}
-                                                {profileData?.dob && (
+
+                                                <div className="resume-contact-item">
+                                                  <i className="bi bi-telephone-fill"></i>
+                                                  <span>{profile._candidate?.mobile}</span>
+                                                </div>
+
+
+                                                <div className="resume-contact-item">
+                                                  <i className="bi bi-envelope-fill"></i>
+                                                  <span>{profile._candidate?.email}</span>
+                                                </div>
+
+                                                {profile._candidate?.dob && (
                                                   <div className="resume-contact-item">
                                                     <i className="bi bi-calendar-heart-fill"></i>
-                                                    {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
+                                                    {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
                                                       day: '2-digit',
                                                       month: 'long',
                                                       year: 'numeric'
-                                                    }) : ''}
+                                                    })}
                                                   </div>
                                                 )}
-                                                {profileData?.personalInfo?.currentAddress?.fullAddress && (
+                                                {profile._candidate?.personalInfo?.currentAddress?.city && (
                                                   <div className="resume-contact-item">
                                                     <i className="bi bi-geo-alt-fill"></i>
-                                                    <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
+                                                    <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
                                                   </div>
                                                 )}
-                                                {profileData?.personalInfo?.permanentAddress && (
+                                                {profile._candidate?.personalInfo?.permanentAddress?.city && (
                                                   <div className="resume-contact-item">
                                                     <i className="bi bi-house-fill"></i>
-                                                    <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
+                                                    <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
                                                   </div>
                                                 )}
                                               </div>
@@ -1382,7 +1403,7 @@ const CRMDashboard = () => {
 
                                           <div className="resume-summary">
                                             <h2 className="resume-section-title">Professional Summary</h2>
-                                            <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
+                                            <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
                                           </div>
                                         </div>
 
@@ -1391,140 +1412,127 @@ const CRMDashboard = () => {
 
                                           <div className="resume-column resume-left-column">
 
-                                            {profileData?.experienceType === 'fresher' ? (
+                                            {profile._candidate?.isExperienced === false ? (
                                               <div className="resume-section">
                                                 <h2 className="resume-section-title">Work Experience</h2>
                                                 <div className="resume-experience-item">
                                                   <div className="resume-item-header">
                                                     <h3 className="resume-item-title">Fresher</h3>
                                                   </div>
-                                                  {profileData?.fresherDetails && (
-                                                    <div className="resume-item-content">
-                                                      <p>{profileData.isExperienced}</p>
-                                                    </div>
-                                                  )}
+                                                  <div className="resume-item-content">
+                                                    <p>Looking for opportunities to start my career</p>
+                                                  </div>
                                                 </div>
                                               </div>
                                             ) : (
-                                              experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                              profile._candidate?.experiences?.length > 0 && (
                                                 <div className="resume-section">
                                                   <h2 className="resume-section-title">Work Experience</h2>
-                                                  {experiences.map((exp, index) => (
-                                                    (exp.jobTitle || exp.companyName || exp.jobDescription) && (
-                                                      <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          {exp.jobTitle && (
-                                                            <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                          )}
-                                                          {exp.companyName && (
-                                                            <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                          )}
-                                                          {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                            <p className="resume-item-period">
-                                                              {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                  {profile._candidate.experiences.map((exp, index) => (
+                                                    <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                      <div className="resume-item-header">
+                                                        {exp.jobTitle && (
+                                                          <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                        )}
+                                                        {exp.companyName && (
+                                                          <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                        )}
+                                                        {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                          <p className="resume-item-period">
+                                                            {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                              year: 'numeric',
+                                                              month: 'short',
+                                                            }) : 'Start Date'}
+                                                            {" - "}
+                                                            {exp.currentlyWorking ? 'Present' :
+                                                              exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
                                                                 year: 'numeric',
                                                                 month: 'short',
-                                                              }) : 'Start Date'}
-                                                              {" - "}
-                                                              {exp.currentlyWorking ? 'Present' :
-                                                                exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                }) : 'End Date'}
-                                                            </p>
-                                                          )}
-                                                        </div>
-                                                        {exp.jobDescription && (
-                                                          <div className="resume-item-content">
-                                                            <p>{exp.jobDescription}</p>
-                                                          </div>
+                                                              }) : 'End Date'}
+                                                          </p>
                                                         )}
                                                       </div>
-                                                    )
+                                                      {exp.jobDescription && (
+                                                        <div className="resume-item-content">
+                                                          <p>{exp.jobDescription}</p>
+                                                        </div>
+                                                      )}
+                                                    </div>
                                                   ))}
                                                 </div>
                                               )
                                             )}
 
-
-                                            {educations.length > 0 && educations.some(edu =>
-                                              edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
-                                            ) && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Education</h2>
-                                                  {educations.map((edu, index) => (
-                                                    (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
-                                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          {edu.education && (
-                                                            <h3 className="resume-item-title">
-                                                              {educationList.find(e => e._id === edu.education)?.name || 'Education'}
-                                                            </h3>
-                                                          )}
-                                                          {typeof edu.course === 'string' && edu.course && (
-                                                            <h3 className="resume-item-title">
-                                                              {coursesList[index]?.find(course => course._id === edu.course)?.name || edu.course}
-                                                            </h3>
-                                                          )}
-                                                          {edu.universityName && (
-                                                            <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                          )}
-                                                          {(edu.schoolName && !edu.universityName) && (
-                                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                          )}
-                                                          {edu.collegeName && (
-                                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                          )}
-                                                          {edu.currentlypursuing ? (
-                                                            <p className="resume-item-period highlight-text">Currently Pursuing</p>
-                                                          ) : edu.passingYear ? (
-                                                            <p className="resume-item-period">{edu.passingYear}</p>
-                                                          ) : null}
-                                                        </div>
-                                                        <div className="resume-item-content">
-                                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                          {edu.specialization && <p>Specialization: {typeof edu.specialization === 'string' ? edu.specialization : 'Specialization'}</p>}
-                                                        </div>
-                                                      </div>
-                                                    )
-                                                  ))}
-                                                </div>
-                                              )}
+                                            {profile._candidate?.qualifications?.length > 0 && (
+                                              <div className="resume-section">
+                                                <h2 className="resume-section-title">Education</h2>
+                                                {profile._candidate.qualifications.map((edu, index) => (
+                                                  <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                    <div className="resume-item-header">
+                                                      {edu.education && (
+                                                        <h3 className="resume-item-title">{edu.education}</h3>
+                                                      )}
+                                                      {edu.course && (
+                                                        <h3 className="resume-item-title">{edu.course}</h3>
+                                                      )}
+                                                      {edu.universityName && (
+                                                        <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                      )}
+                                                      {edu.schoolName && (
+                                                        <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                      )}
+                                                      {edu.collegeName && (
+                                                        <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                      )}
+                                                      {edu.passingYear && (
+                                                        <p className="resume-item-period">{edu.passingYear}</p>
+                                                      )}
+                                                    </div>
+                                                    <div className="resume-item-content">
+                                                      {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                      {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
 
 
                                           <div className="resume-column resume-right-column">
 
-                                            {skills.length > 0 && skills.some(skill => skill.skillName) && (
+                                            {profile._candidate?.personalInfo?.skills?.length > 0 && (
                                               <div className="resume-section">
                                                 <h2 className="resume-section-title">Skills</h2>
                                                 <div className="resume-skills-list">
-                                                  {skills.map((skill, index) => (
-                                                    skill.skillName && (
-                                                      <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                        <div className="resume-skill-name">{skill.skillName}</div>
+                                                  {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                    <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                      <div className="resume-skill-name">{skill.skillName || skill}</div>
+                                                      {skill.skillPercent && (
                                                         <div className="resume-skill-bar-container">
                                                           <div
                                                             className="resume-skill-bar"
-                                                            style={{ width: `${skill.skillPercent || 0}%` }}
+                                                            style={{ width: `${skill.skillPercent}%` }}
                                                           ></div>
+                                                          <span className="resume-skill-percent">{skill.skillPercent}%</span>
                                                         </div>
-                                                      </div>
-                                                    )
+                                                      )}
+                                                    </div>
                                                   ))}
                                                 </div>
                                               </div>
                                             )}
 
 
-                                            {languages.length > 0 && languages.some(lang => lang.lname) && (
+
+                                            {profile._candidate?.personalInfo?.languages?.length > 0 && (
                                               <div className="resume-section">
                                                 <h2 className="resume-section-title">Languages</h2>
                                                 <div className="resume-languages-list">
-                                                  {languages.map((lang, index) => (
-                                                    lang.lname && (
-                                                      <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                        <div className="resume-language-name">{lang.lname}</div>
+                                                  {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                    <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                      <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                      {lang.level && (
                                                         <div className="resume-language-level">
                                                           {[1, 2, 3, 4, 5].map(dot => (
                                                             <span
@@ -1533,15 +1541,17 @@ const CRMDashboard = () => {
                                                             ></span>
                                                           ))}
                                                         </div>
-                                                      </div>
-                                                    )
+                                                      )}
+                                                    </div>
                                                   ))}
                                                 </div>
                                               </div>
                                             )}
 
 
-                                            {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
+
+
+                                            {/* {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
                                               <div className="resume-section">
                                                 <h2 className="resume-section-title">Certifications</h2>
                                                 <ul className="resume-certifications-list">
@@ -1572,38 +1582,63 @@ const CRMDashboard = () => {
                                                   ))}
                                                 </ul>
                                               </div>
+                                            )} */}
+
+                                            {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                              <div className="resume-section">
+                                                <h2 className="resume-section-title">Certifications</h2>
+                                                <ul className="resume-certifications-list">
+                                                  {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                    <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                      <strong>{cert.certificateName || cert.name}</strong>
+                                                      {cert.orgName && (
+                                                        <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                      )}
+                                                      {(cert.month || cert.year) && (
+                                                        <span className="resume-cert-date">
+                                                          {cert.month && cert.year ?
+                                                            ` (${cert.month}/${cert.year})` :
+                                                            cert.month ?
+                                                              ` (${cert.month})` :
+                                                              cert.year ?
+                                                                ` (${cert.year})` :
+                                                                ''}
+                                                        </span>
+                                                      )}
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              </div>
                                             )}
 
 
-                                            {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                                            {profile._candidate?.personalInfo?.projects?.length > 0 && (
                                               <div className="resume-section">
                                                 <h2 className="resume-section-title">Projects</h2>
-                                                {projects.map((proj, index) => (
-                                                  (proj.projectName || proj.proDescription) && (
-                                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                      <div className="resume-item-header">
-                                                        <h3 className="resume-project-title">
-                                                          {proj.projectName || 'Project'}
-                                                          {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
-                                                        </h3>
-                                                      </div>
-                                                      {proj.proDescription && (
-                                                        <div className="resume-item-content">
-                                                          <p>{proj.proDescription}</p>
-                                                        </div>
-                                                      )}
+                                                {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                  <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                    <div className="resume-item-header">
+                                                      <h3 className="resume-project-title">
+                                                        {proj.projectName || 'Project'}
+                                                        {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                      </h3>
                                                     </div>
-                                                  )
+                                                    {proj.description && (
+                                                      <div className="resume-item-content">
+                                                        <p>{proj.description}</p>
+                                                      </div>
+                                                    )}
+                                                  </div>
                                                 ))}
                                               </div>
                                             )}
 
 
-                                            {interests.filter(i => i.trim() !== '').length > 0 && (
+                                            {profile._candidate?.personalInfo?.interest?.length > 0 && (
                                               <div className="resume-section">
                                                 <h2 className="resume-section-title">Interests</h2>
                                                 <div className="resume-interests-tags">
-                                                  {interests.filter(i => i.trim() !== '').map((interest, index) => (
+                                                  {profile._candidate.personalInfo.interest.map((interest, index) => (
                                                     <span className="resume-interest-tag" key={`resume-interest-${index}`}>
                                                       {interest}
                                                     </span>
@@ -1611,14 +1646,16 @@ const CRMDashboard = () => {
                                                 </div>
                                               </div>
                                             )}
+
                                           </div>
                                         </div>
 
 
-                                        {declaration?.text && (
+                                        {profile._candidate?.personalInfo?.declaration?.text && (
                                           <div className="resume-declaration">
                                             <h2 className="resume-section-title">Declaration</h2>
-                                            <p>{declaration.text}</p>
+                                            <p>{profile._candidate.personalInfo.declaration.text}</p>
+
                                           </div>
                                         )}
                                       </div>
@@ -1627,7 +1664,8 @@ const CRMDashboard = () => {
                                 )}
 
                                 {/* Job History Tab */}
-                                {activeTab === 2 && (
+                                {/* {activeTab === 2 && ( */}
+                                {(activeTab[profileIndex] || 0) === 2 && (
                                   <div className="tab-pane active" id="job-history">
                                     <div className="section-card">
                                       <div className="table-responsive">
@@ -1664,7 +1702,8 @@ const CRMDashboard = () => {
                                 )}
 
                                 {/* Course History Tab */}
-                                {activeTab === 3 && (
+                                {/* {activeTab === 3 && ( */}
+                                {(activeTab[profileIndex] || 0) === 3 && (
                                   <div className="tab-pane active" id="course-history">
                                     <div className="section-card">
                                       <div className="table-responsive">

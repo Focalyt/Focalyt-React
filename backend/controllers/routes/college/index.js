@@ -186,7 +186,7 @@ router.route("/appliedCandidates")
 	.get(async (req, res) => {
 
 		try {
-        const students = await AppliedCourses.find().populate('_candidate').populate('_course');
+        const students = await AppliedCourses.find().populate('_candidate').populate('_course').sort({ createdAt: -1 }).limit(50);
         res.status(200).json({
             success: true,
             count: students.length,
