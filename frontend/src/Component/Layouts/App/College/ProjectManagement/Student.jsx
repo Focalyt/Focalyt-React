@@ -852,7 +852,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
             </div>
             <div className="col-md-6">
               <div className="d-flex justify-content-end align-items-center gap-2">
-                <div className="input-group" style={{ maxWidth: '300px' }}>
+                {/* <div className="input-group" style={{ maxWidth: '300px' }}>
                   <span className="input-group-text bg-white border-end-0">
                     <i className="bi bi-search text-muted"></i>
                   </span>
@@ -863,7 +863,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                </div>
+                </div> */}
                 <button
                   onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
                   className="btn btn-outline-primary"
