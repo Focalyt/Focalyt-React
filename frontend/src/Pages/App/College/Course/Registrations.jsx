@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import DatePicker from 'react-date-picker';
+import 'react-date-picker/dist/DatePicker.css';
+import 'react-calendar/dist/Calendar.css'; 
 import moment from 'moment';
 import axios from 'axios'
 import './CourseCrm.css';
@@ -6,10 +9,12 @@ import './CourseCrm.css';
 const CRMDashboard = () => {
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
+    const [showPopup, setShowPopup] = useState(false);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
   const [mainContentClass, setMainContentClass] = useState('col-12');
+    const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [leadDetailsVisible, setLeadDetailsVisible] = useState(true);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
@@ -18,6 +23,16 @@ const CRMDashboard = () => {
   const [allProfiles, setAllProfiles] = useState([]);
   const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
+
+  //Date picker
+const today = new Date();  // Current date
+  
+
+  // Toggle POPUP
+
+  const togglePopup = () => {
+    setShowPopup(prev => !prev);
+  };
 
   // Filter state from Registration component
   const [filterData, setFilterData] = useState({
@@ -91,6 +106,37 @@ const CRMDashboard = () => {
   const handleStatusChange = (e) => {
     setSelectedStatus(e.target.value);
   };
+
+ const handleTimeChange = (e) => {
+  if (!followupDate) {
+    alert('Select date first');
+    return;  // Yahan return lagao
+  }
+
+  const time = e.target.value; // "HH:mm"
+
+  const [hours, minutes] = time.split(':');
+
+  const selectedDateTime = new Date(followupDate);
+  selectedDateTime.setHours(parseInt(hours, 10));
+  selectedDateTime.setMinutes(parseInt(minutes, 10));
+  selectedDateTime.setSeconds(0);
+  selectedDateTime.setMilliseconds(0);
+
+  const now = new Date();
+
+  if (selectedDateTime < now) {
+    alert('Select future time');
+    return;  // Yahan bhi return lagao
+  }
+
+  // Agar yaha aaya to time sahi hai
+  setFollowupTime(time);
+};
+
+
+  
+  
   const handleSubStatusChange = (e) => {
   const selectedSubStatusId = e.target.value;
   
@@ -442,6 +488,21 @@ const CRMDashboard = () => {
     }
   };
 
+    const openleadHistoryPanel = () => {
+    setLeadHistoryPanel(true)
+    setShowWhatsappPanel(false);
+    setShowEditPanel(false);
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+  };
+  const closeleadHistoryPanel = () => {
+    setLeadHistoryPanel(false)
+    if (!isMobile) {
+      setMainContentClass(showEditPanel || showWhatsappPanel ? 'col-8' : 'col-12');
+    }
+  };
+
   const scrollLeft = () => {
     const container = document.querySelector('.scrollable-content');
     if (container) {
@@ -544,13 +605,22 @@ const CRMDashboard = () => {
                   Next Action Date <span className="text-danger">*</span>
                 </label>
                 <div className="input-group">
-                  <input
+                  {/* <input
                     type="date"
                     className="form-control border-0  bgcolor"
                     id="nextActionDate"
                     style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                     onChange={(e) => setFollowupDate(e.target.value)}
-                  />
+                  /> */}
+                  <DatePicker
+                  className="form-control border-0  bgcolor"
+        onChange={setFollowupDate}
+        
+        value={followupDate}
+        format="dd/MM/yyyy"
+        minDate={today}   // Isse past dates disable ho jayengi
+        
+      />
                 </div>
               </div>
 
@@ -563,7 +633,8 @@ const CRMDashboard = () => {
                     type="time"
                     className="form-control border-0  bgcolor"
                     id="actionTime"
-                    onChange={(e) => setFollowupTime(e.target.value)}
+                    onChange={handleTimeChange}
+                    value={followupTime}
 
                     
                     style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
@@ -780,8 +851,88 @@ const CRMDashboard = () => {
     ) : null;
   };
 
+   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
+  const renderLeadHistoryPanel = () => {
+    const panelContent = (
+      <div className="card border-0 shadow-sm">
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-history text-secondary"></i>
+            </div>
+            <h6 className="mb-0 followUp fw-medium">Lead History</h6>
+            <div className="bottom-border"></div>
+          </div>
+          <div>
+            <button className="btn-close" type="button" onClick={closeleadHistoryPanel}>
+              {/* <i className="fa-solid fa-xmark"></i> */}
+            </button>
+          </div>
+        </div>
+
+        <div className="card-body">
+          {/* Add your lead history content here */}
+          <div className="history-content">
+
+            <div className='history-list'>
+              <li>
+                <span className=''>Action Date: <span className="cr-list"></span></span>
+              </li>
+              <li>
+                <span className=''>Action : <span className="cr-list">--</span></span>
+              </li>
+              <li>
+                <span className=''>Action By: <span className="cr-list">-</span></span>
+              </li>
+              <li>
+                <span className=''>Remark: <span className="cr-list">--</span></span>
+              </li>
+
+            </div>
+
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn"
+                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                onClick={closeleadHistoryPanel}
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
+        </div>
+        </div>
+        );
+
+        if (isMobile) {
+      return (
+        <div
+          className={`modal overflowY ${leadHistoryPanel ? 'show d-block' : 'd-none'}`}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeleadHistoryPanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+            <div className="modal-content">
+              {panelContent}
+            </div>
+          </div>
+        </div>
+        );
+    }
+
+        return leadHistoryPanel ? (
+        <div className="col-12 transition-col" id="leadHistoryPanel">
+          {panelContent}
+        </div>
+        ) : null;
+  };
+
   return (
-    <div className="container-fluid row">
+    <div className="container-fluid">
+      <div className="row">
       <div className={isMobile ? 'col-12' : mainContentClass}>
 
         {/* Header */}
@@ -1045,14 +1196,14 @@ const CRMDashboard = () => {
                                       <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
                                         <i className="fas fa-phone"></i>
                                       </button>
-                                      <button
+                                      {/* <button
                                         className="btn btn-outline-success btn-sm border-0"
                                         onClick={openWhatsappPanel}
                                         style={{ fontSize: '20px' }}
                                         title="WhatsApp"
                                       >
                                         <i className="fab fa-whatsapp"></i>
-                                      </button>
+                                      </button> */}
                                     </div>
                                   </div>
                                 </div>
@@ -1101,8 +1252,120 @@ const CRMDashboard = () => {
                                   </div>
                                 </div>
 
-                                <div className="col-md-1 text-end">
+                                <div className="col-md-1 text-end d-md-none d-sm-block d-block">
                                   <div className="btn-group">
+
+ <div style={{ position: "relative", display: "inline-block" }}>
+                                            <button
+                                              className="btn btn-sm btn-outline-secondary border-0"
+                                              onClick={togglePopup}
+                                              aria-label="Options"
+                                            >
+                                              <i className="fas fa-ellipsis-v"></i>
+                                            </button>
+
+                                            {/* Overlay for click outside */}
+                                            {showPopup && (
+                                              <div
+                                                onClick={() => setShowPopup(false)}
+                                                style={{
+                                                  position: "fixed",
+                                                  top: 0,
+                                                  left: 0,
+                                                  width: "100vw",
+                                                  height: "100vh",
+                                                  backgroundColor: "transparent",
+                                                  zIndex: 999,
+                                                }}
+                                              ></div>
+                                            )}
+
+                                            <div
+                                              style={{
+                                                position: "absolute",
+                                                top: "28px", // button ke thoda niche
+                                                right: "-100px",
+                                                width: "170px",
+                                                backgroundColor: "white",
+                                                border: "1px solid #ddd",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                borderRadius: "4px",
+                                                padding: "8px 0",
+                                                zIndex: 1000,
+                                                transform: showPopup ? "translateX(-70px)" : "translateX(100%)",
+                                                transition: "transform 0.3s ease-in-out",
+                                                pointerEvents: showPopup ? "auto" : "none",
+                                                display: showPopup ? "block" : "none"
+                                              }}
+                                            >
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                              >
+                                                Move To Admission List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => alert("Reffer")}
+                                              >
+                                                Reffer
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={openleadHistoryPanel}
+                                              >
+                                                History List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={openleadHistoryPanel}
+                                              >
+                                                Set Followup
+                                              </button>
+
+
+                                            </div>
+                                          </div>
+
                                     <button
                                       className="btn btn-sm btn-outline-secondary border-0"
                                       onClick={() => setLeadDetailsVisible(!leadDetailsVisible)}
@@ -1115,6 +1378,135 @@ const CRMDashboard = () => {
                                     </button>
                                   </div>
                                 </div>
+
+                                <div className="col-md-1 text-end d-md-block d-sm-none d-none">
+                                        <div className="btn-group">
+
+                                          <div style={{ position: "relative", display: "inline-block" }}>
+                                            <button
+                                              className="btn btn-sm btn-outline-secondary border-0"
+                                              onClick={togglePopup}
+                                              aria-label="Options"
+                                            >
+                                              <i className="fas fa-ellipsis-v"></i>
+                                            </button>
+
+                                            {/* Overlay for click outside */}
+                                            {showPopup && (
+                                              <div
+                                                onClick={() => setShowPopup(false)}
+                                                style={{
+                                                  position: "fixed",
+                                                  top: 0,
+                                                  left: 0,
+                                                  width: "100vw",
+                                                  height: "100vh",
+                                                  backgroundColor: "transparent",
+                                                  zIndex: 999,
+                                                }}
+                                              ></div>
+                                            )}
+
+                                            <div
+                                              style={{
+                                                position: "absolute",
+                                                top: "28px", // button ke thoda niche
+                                                right: "-100px",
+                                                width: "170px",
+                                                backgroundColor: "white",
+                                                border: "1px solid #ddd",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                borderRadius: "4px",
+                                                padding: "8px 0",
+                                                zIndex: 1000,
+                                                transform: showPopup ? "translateX(-70px)" : "translateX(100%)",
+                                                transition: "transform 0.3s ease-in-out",
+                                                pointerEvents: showPopup ? "auto" : "none",
+                                                display: showPopup ? "block" : "none"
+                                              }}
+                                            >
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                              >
+                                                Move To Admission List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => alert("Reffer")}
+                                              >
+                                                Reffer
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={openleadHistoryPanel}
+                                              >
+                                                History List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={openleadHistoryPanel}
+                                              >
+                                                Set Followup
+                                              </button>
+
+
+                                            </div>
+                                          </div>
+
+
+
+                                          <button
+                                            className="btn btn-sm btn-outline-secondary border-0"
+                                            onClick={() => setLeadDetailsVisible(!leadDetailsVisible)}
+                                          >
+                                            {leadDetailsVisible ? (
+                                              <i className="fas fa-chevron-up"></i>
+                                            ) : (
+                                              <i className="fas fa-chevron-down"></i>
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
                               </div>
                             </div>
                           </div>
@@ -1832,6 +2224,7 @@ const CRMDashboard = () => {
           <div className="row sticky-top stickyBreakpoints">
             {renderEditPanel()}
             {renderWhatsAppPanel()}
+            {renderLeadHistoryPanel()}
           </div>
         </div>
       )}
@@ -1839,7 +2232,8 @@ const CRMDashboard = () => {
       {/* Mobile Modals */}
       {isMobile && renderEditPanel()}
       {isMobile && renderWhatsAppPanel()}
-
+      {isMobile && renderLeadHistoryPanel()}
+</div>
       <style jsx>
         {`
         html body .content .content-wrapper {
@@ -1858,6 +2252,22 @@ const CRMDashboard = () => {
   top: 20px;  /* default top */
   z-index: 1020;
 }
+.react-date-picker__wrapper{
+border:none;
+}
+.react-date-picker__inputGroup input{
+border: none !important
+}
+
+.react-date-picker__inputGroup{
+    width: 100%;
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+}
+    .react-date-picker__clear-button{
+    display:none;
+    }
         @media(max-width:1920px){
           .stickyBreakpoints{
             top: 20%
