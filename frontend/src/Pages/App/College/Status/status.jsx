@@ -309,6 +309,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
 
                 <button
                   onClick={() => onEdit(index)}
+                  disabled={index === 0}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -323,6 +324,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 </button>
                 <button
                   onClick={() => onDelete(_id)}
+                  disabled={index === 0}
                   style={{
                     background: 'none',
                     border: 'none',

@@ -1,42 +1,5 @@
-// const { Schema, model } = require("mongoose");
-
-// const { ObjectId } = Schema.Types;
-
-// const appliedCoursesSchema = new Schema({
-//         _candidate: { type: ObjectId, ref: 'Candidate' },
-//         _course: { type: ObjectId, ref: 'courses' },
-//         courseStatus: {
-//                 type: Number,
-//                 enum: [0, 1], /* 0 for due and 1 for assigned */
-//                 default: 0
-//         },
-//         registrationFee: {
-//                 type: String,
-//                 enum:['Paid', 'Unpaid'],
-//                 default: 'Unpaid'
-//         },
-//         url: {
-//                 type: String,
-//                 default: ""
-//         },
-//         remarks: {
-//                 type: String,
-//                 default: ""
-//         },
-//         assignDate : {
-//                 type : Date
-//         }
-// }, { timestamps: true });
-
-
-// module.exports = model("AppliedCourses", appliedCoursesSchema);
-
-
-
-
-
+const mongoose = require('mongoose');
 const { Schema, model } = require("mongoose");
-
 const { ObjectId } = Schema.Types;
 
 const appliedCoursesSchema = new Schema(
@@ -44,77 +7,105 @@ const appliedCoursesSchema = new Schema(
     _candidate: {
       type: ObjectId,
       ref: "CandidateProfile",
-      description: "Reference to the Candidate who applied for the course",
     },
     _course: {
       type: ObjectId,
       ref: "courses",
-      description: "Reference to the specific course applied for",
     },
     _center: {
       type: ObjectId,
       ref: "Center",
-      description: "Reference to the specific course applied for",
     },
-    registeredBy:{
+   _leadStatus: {
+        type: ObjectId,
+        ref: "Status",
+        default:new mongoose.Types.ObjectId('64ab1234abcd5678ef901234')
+      },
+   _leadSubStatus: {
+        type: ObjectId,
+        default:new mongoose.Types.ObjectId('64ab1234abcd5678ef901235')
+      },
+    _initialStatus: {
+      type: String,
+      enum:['Hot', 'Warm', 'Cold'],
+    },
+    registeredBy: {
       type: ObjectId,
       ref: "User",
-      description: "Reference to the specific course applied for"
     },
-    courseStatus: { 
+    // Current Status
+    courseStatus: {
       type: Number,
-      enum: [0, 1], // 0: due, 1: assigned
+      enum: [0, 1], // e.g. 0: Due, 1: Assigned, etc.
       default: 0,
-      description: "The status of the course application: 0 (due) or 1 (assigned)",
     },
+
+    // Followup info (optional, alag se track karenge)
+    followupDate: {
+      type: Date,
+    },
+    counsellorName: [{
+      type: ObjectId,
+      ref: "User",
+    }],
+    // Detailed activity logs with free text description
+    logs: [
+      {
+        user: {
+          type: ObjectId,
+          ref: "User",
+          required: true,
+        },
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+        action: {
+          type: String,
+          required: true,
+          // Example: "Status changed from Due to Assigned", "Followup set for 10 Oct", "Lead referred to John"
+        },
+        remarks: {
+          type: String,
+          // Example: "Status changed from Due to Assigned", "Followup set for 10 Oct", "Lead referred to John"
+        }
+      }
+    ],
+
     registrationFee: {
       type: String,
       enum: ["Paid", "Unpaid"],
       default: "Unpaid",
-      description: "Indicates whether the registration fee is Paid or Unpaid",
     },
     url: {
       type: String,
       default: "",
-      description: "URL associated with the applied course, if applicable",
     },
-    
     remarks: {
       type: String,
       default: "",
-      description: "Additional comments or remarks about the applied course",
     },
     assignDate: {
       type: Date,
-      description: "Date when the course was assigned to the candidate",
-    }, 
-    selectedCenter: 
-      {       
-        centerId: { type: ObjectId, ref: "Center" }, // Changed from type to courseId        
-      },
-             
+    },
+    selectedCenter: {
+      centerId: { type: ObjectId, ref: "Center" },
+    },
     uploadedDocs: [
-          {
-            docsId: { type: ObjectId, ref: "courses.docsRequired" },
-            fileUrl: String,
-            status: { type: String, enum: ["Pending", "Verified", "Rejected"], default: "Pending" }, // Verification Status
-            reason: { type: String }, // Rejection ka reason
-            verifiedBy: { type: ObjectId, ref: "User" },
-            verifiedDate: { type: Date },
-            uploadedAt: { type: Date, default: Date.now } // Upload Timestamp
-          }
-        ]
-      
+      {
+        docsId: { type: ObjectId, ref: "courses.docsRequired" },
+        fileUrl: String,
+        status: { type: String, enum: ["Pending", "Verified", "Rejected"], default: "Pending" },
+        reason: { type: String },
+        verifiedBy: { type: ObjectId, ref: "User" },
+        verifiedDate: { type: Date },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
-    timestamps: true, // Automatically adds `createdAt` and `updatedAt` fields
+    timestamps: true,
   }
 );
 
-// Attach descriptions for `timestamps`
-appliedCoursesSchema.paths.createdAt.options.description = "Timestamp when the document was created";
-appliedCoursesSchema.paths.updatedAt.options.description = "Timestamp when the document was last updated";
-
-// Export the model
 module.exports = model("AppliedCourses", appliedCoursesSchema);
-

@@ -7,14 +7,34 @@ const router = express.Router();
 
 // Status Model
 const Status = require('../../models/status');
+const AppliedCourses = require('../../models/appliedCourses');
 
 // @route   GET api/statuses
 // @desc    Get All Statuses
 // @access  Public
 router.get('/', async (req, res) => {
-  try {
+ try {
     const statuses = await Status.find().sort({ index: 1 });
-    return res.status(201).json({ success: true, message: 'Role created successfully', data: statuses });
+
+    // For each status, get count of AppliedCourses with _leadStatus = status._id
+    const statusesWithCount = await Promise.all(
+      statuses.map(async (status) => {
+        const count = await AppliedCourses.countDocuments({ _leadStatus: status._id });
+        return {
+          _id: status._id,
+          title: status.title,
+          description: status.description,
+          milestone: status.milestone,
+          index: status.index,
+          count,          // yaha count add kar diya
+          substatuses: status.substatuses,
+          createdAt: status.createdAt,
+          updatedAt: status.updatedAt
+        };
+      })
+    );
+
+    return res.status(200).json({ success: true, message: 'Statuses fetched successfully', data: statusesWithCount });
 
   } catch (err) {
     console.error(err.message);

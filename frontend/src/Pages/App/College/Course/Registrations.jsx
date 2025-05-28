@@ -16,6 +16,8 @@ const CRMDashboard = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [isMobile, setIsMobile] = useState(false);
   const [allProfiles, setAllProfiles] = useState([]);
+  const [allProfilesData, setAllProfilesData] = useState([]);
+  const [selectedProfile, setSelectedProfile] = useState(null);
 
   // Filter state from Registration component
   const [filterData, setFilterData] = useState({
@@ -36,10 +38,17 @@ const CRMDashboard = () => {
     { _id: '', name: '', count: 0 },
 
   ]);
+
+  // edit status and set followup
   const [seletectedStatus, setSelectedStatus] = useState('');
+  const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
+  const [followupDate, setFollowupDate] = useState('');
+  const [followupTime, setFollowupTime] = useState('');
+  const [remarks, setRemarks] = useState('');
+
 
   const [subStatuses, setSubStatuses] = useState([
-    { _id: '', name: '', count: 0 },
+   
 
   ]);
 
@@ -74,9 +83,23 @@ const CRMDashboard = () => {
 
   }, [seletectedStatus]);
 
+   useEffect(() => {
+    console.log('seletectedSubStatus',seletectedSubStatus)
+
+  }, [seletectedSubStatus]);
+
   const handleStatusChange = (e) => {
     setSelectedStatus(e.target.value);
   };
+  const handleSubStatusChange = (e) => {
+  const selectedSubStatusId = e.target.value;
+  
+  // ID से पूरा object find करें
+  const selectedSubStatusObject = subStatuses.find(status => status._id === selectedSubStatusId);
+  
+  // पूरा object set करें
+  setSelectedSubStatus(selectedSubStatusObject || null);
+};
 
   const fetchStatus = async () => {
     try {
@@ -110,7 +133,7 @@ const CRMDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
-      alert('Failed to fetch roles');
+      alert('Failed to fetch Status');
     }
   };
   const fetchSubStatus = async () => {
@@ -129,23 +152,62 @@ const CRMDashboard = () => {
         const status = response.data.data;
 
 
-        setSubStatuses(status.map(r => ({
-          _id: r._id,
-          name: r.title,
-          count: r.count || 0,  // agar backend me count nahi hai to 0
-        })));
+        setSubStatuses(response.data.data);
 
 
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
-      alert('Failed to fetch roles');
+      alert('Failed to fetch SubStatus');
     }
   };
 
-  const [profileData, setProfileData] = useState({
+  const handleUpdateStatus = async () => {
+  try {
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
+    
+    // Combine date and time into a single Date object (if both are set)
+    let followupDateTime = '';
+    if (followupDate && followupTime) {
+      followupDateTime = new Date(`${followupDate}T${followupTime}`);
+    }
 
-  });
+    // Prepare the request body
+    const data = {
+      _leadStatus: seletectedStatus?._id || seletectedStatus, // if it's an object or string
+      _leadSubStatus: seletectedSubStatus?._id || '',
+      followup: followupDateTime ? followupDateTime.toISOString() : '', // ISO string for backend
+      remarks
+    };
+
+    console.log('Sending data:', data);
+
+    // Send PUT request to backend API
+    const response = await axios.put(`${backendUrl}/college/lead/status_change/${selectedProfile._id}`, data, {
+      headers: {
+        'x-auth': token,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('API response:', response.data);
+
+    if (response.data.success) {
+      alert('Status updated successfully!');
+      // Optionally refresh data here
+      closeEditPanel();
+    } else {
+      alert('Failed to update status');
+    }
+  } catch (error) {
+    console.error('Error updating status:', error);
+    alert('An error occurred while updating status');
+  }
+};
+
+
+ 
 
   const [user, setUser] = useState({
     image: '',
@@ -177,41 +239,7 @@ const CRMDashboard = () => {
       if (response.data.success && response.data.data) {
         const data = response.data.data; // create array 
         setAllProfiles(response.data.data);
-
-
-        setProfileData({
-          personalInfo: {
-            // name: data._candidate?.personalInfo?.name || '',
-            name: data._candidate?.name || '',
-            mobile: data._candidate?.mobile || '',
-            professionalTitle: data._candidate?.personalInfo?.professionalTitle || '',
-            currentAddress: data.personalInfo?.currentAddress || { fullAddress: '' },
-            permanentAddress: data.personalInfo?.permanentAddress || { fullAddress: '' },
-            summary: data._candidate?.personalInfo?.summary || '',
-            sex: data._candidate?.sex || '',
-          },
-          mobile: data._candidate?.mobile || '',
-          email: data._candidate?.email || '',
-          dob: data._candidate?.dob || '',
-          sex: data._candidate?.sex || '',
-          experienceType: data._candidate?.experienceType || '',
-          fresherDetails: data._candidate?.fresherDetails || '',
-          isExperienced: data._candidate?.isExperienced || '',
-        });
-
-        setUser({
-          image: data.user?.image || '',
-          name: data.user?.name || '',
-        });
-
-        setExperiences(data.experiences || []);
-        setEducations(data.educations || []);
-        setSkills(data.skills || []);
-        setLanguages(data.languages || []);
-        setCertificates(data.certificates || []);
-        setProjects(data.projects || []);
-        setInterests(data.interests || []);
-        setDeclaration(data.declaration || { text: '' });
+        setAllProfilesData(response.data.data)
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -332,9 +360,23 @@ const CRMDashboard = () => {
     });
   }, []);
 
-  const handleCrmFilterClick = (index) => {
-    setActiveCrmFilter(index);
-  };
+  const handleCrmFilterClick = (_id, index) => {
+  if (_id === 'all') {
+    // Agar "all" filter select hua hai to pura data set kar do
+    setAllProfiles(allProfilesData);
+     setActiveCrmFilter(index)
+  } else {
+    // Filter karo jisme leadStatus._id match ho
+    const filteredProfiles = allProfilesData.filter(profile => {
+      return profile._leadStatus && profile._leadStatus._id === _id;
+    });
+
+    
+    setActiveCrmFilter(index)
+    setAllProfiles(filteredProfiles);
+  }
+};
+
 
   const handleTabClick = (profileIndex, tabIndex) => {
     setActiveTab(prevTabs => ({
@@ -353,13 +395,30 @@ const CRMDashboard = () => {
     setFilterData({ ...filterData, [name]: value });
   };
 
-  const openEditPanel = () => {
-    setShowEditPanel(true);
-    setShowWhatsappPanel(false);
-    if (!isMobile) {
-      setMainContentClass('col-8');
+ const openEditPanel = async (profile = null) => {
+  if (profile) {
+    // Set selected profile
+    setSelectedProfile(profile);
+
+    // Set status directly from the profile object
+    const newStatus = profile?._leadStatus?._id || '';
+    setSelectedStatus(newStatus);
+
+    // Now fetch substatus using the newly set status
+    if (newStatus) {
+      await fetchSubStatus(newStatus);
     }
-  };
+
+    // Set sub-status if it exists
+    setSelectedSubStatus(profile?.selectedSubstatus|| '');
+  }
+
+  setShowEditPanel(true);
+  setShowWhatsappPanel(false);
+  if (!isMobile) {
+    setMainContentClass('col-8');
+  }
+};
 
   const closeEditPanel = () => {
     setShowEditPanel(false);
@@ -408,7 +467,7 @@ const CRMDashboard = () => {
             <div className="me-2">
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
-            <h6 className="mb-0 followUp fw-medium">Edit Followup for AKASH GAURAV</h6>
+            <h6 className="mb-0 followUp fw-medium">Edit Status for {selectedProfile?._candidate?.name || 'Unknown'}</h6>
           </div>
           <div>
             <button className="btn-close" type="button" onClick={closeEditPanel}>
@@ -430,6 +489,7 @@ const CRMDashboard = () => {
                   <select
                     className="form-select border-0  bgcolor"
                     id="status"
+                    value={seletectedStatus}
                     style={{
                       height: '42px',
                       paddingTop: '8px',
@@ -458,6 +518,7 @@ const CRMDashboard = () => {
                   <select
                     className="form-select border-0  bgcolor"
                     id="subStatus"
+                   value={seletectedSubStatus?._id || ''}
                     style={{
                       height: '42px',
                       paddingTop: '8px',
@@ -465,14 +526,17 @@ const CRMDashboard = () => {
                       paddingInline: '10px',
                       width: '100%'
                     }}
+                    onChange={handleSubStatusChange}
                   >
                     <option value="">Select Sub-Status</option>
                     {subStatuses.map((filter, index) => (
-                      <option value={filter._id}>{filter.name}</option>))}
+                      <option value={filter._id}>{filter.title}</option>))}
                   </select>
                 </div>
               </div>
             </div>
+
+            { seletectedSubStatus && seletectedSubStatus.hasFollowup && (
 
             <div className="row mb-1">
               <div className="col-6">
@@ -484,8 +548,8 @@ const CRMDashboard = () => {
                     type="date"
                     className="form-control border-0  bgcolor"
                     id="nextActionDate"
-                    defaultValue="2025-01-13"
                     style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
+                    onChange={(e) => setFollowupDate(e.target.value)}
                   />
                 </div>
               </div>
@@ -499,12 +563,16 @@ const CRMDashboard = () => {
                     type="time"
                     className="form-control border-0  bgcolor"
                     id="actionTime"
-                    defaultValue="12:36"
+                    onChange={(e) => setFollowupTime(e.target.value)}
+
+                    
                     style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                   />
                 </div>
               </div>
-            </div>
+            </div>)}
+
+            {seletectedSubStatus && seletectedSubStatus.hasRemarks && (
 
             <div className="mb-1">
               <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
@@ -512,10 +580,13 @@ const CRMDashboard = () => {
                 className="form-control border-0 bgcolor"
                 id="comment"
                 rows="4"
+                onChange={(e) => setRemarks(e.target.value)}
+
                 style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-                defaultValue="wrong no."
+                
               ></textarea>
             </div>
+            )}
 
             <div className="d-flex justify-content-end gap-2 mt-4">
               <button
@@ -529,6 +600,7 @@ const CRMDashboard = () => {
               <button
                 type="submit"
                 className="btn text-white"
+                onClick={handleUpdateStatus}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
                 UPDATE STATUS
@@ -776,7 +848,7 @@ const CRMDashboard = () => {
                       <div className='d-flex'>
                         <button
                           className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                          onClick={() => handleCrmFilterClick(index)}
+                          onClick={() => handleCrmFilterClick(filter._id, index)}
                         >
                           {filter.name}
                           <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
@@ -1001,14 +1073,18 @@ const CRMDashboard = () => {
                                           height: '20px',
                                           fontSize: '10px'
                                         }}
-                                        value={crmFilters[activeCrmFilter].name}
+                                        value={profile._leadStatus?.title}
                                         readOnly
-                                        onClick={openEditPanel}
+                                        onClick={() => {
+                                          openEditPanel(profile);
+                                          console.log('selectedProfile', profile);
+                                        }}
+
                                       />
                                       <input
                                         type="text"
                                         className="form-control form-control-sm m-0"
-                                        value="Untouched Lead Long Text Example..."
+                                        value={profile.selectedSubstatus?.title}
                                         style={{
                                           cursor: 'pointer',
                                           border: '1px solid #ddd',
@@ -1103,13 +1179,13 @@ const CRMDashboard = () => {
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">SECTOR</div>
-                                            <div className="info-value">{profile._course?.sectors}</div>
+                                            <div className="info-value">{profile.sector}</div>
                                           </div>
                                           <div className="info-group">
                                             <div className="info-label">LEAD CREATION DATE</div>
                                             <div className="info-value">{profile.createdAt ?
                                               new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                          </div>
+                                          </div>  
                                         </div>
 
                                         <div className="info-card">
@@ -1271,12 +1347,7 @@ const CRMDashboard = () => {
                                                   <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                                 </div>
                                               </div>
-                                              <div className="col-xl- col-3">
-                                                <div className="info-group">
-                                                  <div className="info-label">SECTOR</div>
-                                                  <div className="info-value">{profile._course?.sectors}</div>
-                                                </div>
-                                              </div>
+                                              
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">BRANCH NAME</div>
@@ -1286,7 +1357,7 @@ const CRMDashboard = () => {
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">NEXT ACTION DATE</div>
-                                                  <div className="info-value"></div>
+                                                  <div className="info-value">{profile.followupDate  ? new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
                                                 </div>
                                               </div>
 
@@ -1307,7 +1378,8 @@ const CRMDashboard = () => {
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD MODIFICATION BY</div>
-                                                  <div className="info-value">Name</div>
+                                                  <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
+</div>
                                                 </div>
                                               </div>
                                               <div className="col-xl- col-3">
@@ -1319,7 +1391,7 @@ const CRMDashboard = () => {
                                               <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">LEAD OWNER</div>
-                                                  <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                                  <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
                                                 </div>
                                               </div>
                                             </div>
@@ -1745,764 +1817,7 @@ const CRMDashboard = () => {
 
                     </div>
 
-                    {/* <div className="row" id="crm-main-row">
-                    <div className={`card-content transition-col`} id="mainContent">
 
-
-
-                      <div className="card border-0 shadow-sm mb-0 mt-2">
-                        <div className="card-body px-1 py-0 my-2" >
-                          <div className="row align-items-center">
-                            <div className="col-md-6">
-                              <div className="d-flex align-items-center">
-                                <div className="form-check me-3">
-                                  <input className="form-check-input" type="checkbox" />
-                                </div>
-                                <div className="me-3">
-                                  <div className="circular-progress-container" data-percent="40">
-                                    <svg width="40" height="40">
-                                      <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
-                                      <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
-                                    </svg>
-                                    <div className="progress-text"></div>
-                                  </div>
-                                </div>
-                                <div>
-                                  
-                                  <h6 className="mb-0 fw-bold">{profileData?.personalInfo?.name || user?.name || 'Your Name'}
-</h6>
-                                  <small className="text-muted">{profileData?.personalInfo?.mobile || user?.mobile || 'Mobile Number'}</small>
-                                </div>
-                                <div style={{ marginLeft: '15px' }}>
-                                  <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                    <i className="fas fa-phone"></i>
-                                  </button>
-                                  <button
-                                    className="btn btn-outline-success btn-sm border-0"
-                                    onClick={openWhatsappPanel}
-                                    style={{ fontSize: '20px' }}
-                                    title="WhatsApp"
-                                  >
-                                    <i className="fab fa-whatsapp"></i>
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="col-md-5">
-                              <div className="d-flex gap-2">
-                                <div className="flex-grow-1">
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm m-0" style={{
-                                      cursor: 'pointer',
-                                      border: '1px solid #ddd',
-                                      borderRadius: '0px',
-                                      borderTopRightRadius: '5px',
-                                      borderTopLeftRadius: '5px', cursor: 'pointer',
-                                      width: '145px',
-                                      height: '20px', fontSize: '10px'
-                                    }}
-                                    value={crmFilters[activeCrmFilter].name}
-                                    readOnly
-                                    onClick={openEditPanel}
-                                  />
-                                  <input
-                                    type="text"
-                                    className="form-control form-control-sm m-0"
-                                    value="Untouched Lead Long Text Example..."
-                                    style={{
-                                      cursor: 'pointer',
-                                      border: '1px solid #ddd',
-                                      borderRadius: '0px',
-                                      borderBottomRightRadius: '5px',
-                                      borderBottomLeftRadius: '5px', cursor: 'pointer',
-                                      width: '145px',
-                                      height: '20px', fontSize: '10px'
-                                    }}
-                                    readOnly
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="col-md-1 text-end">
-                              <div className="btn-group">
-                                <button
-                                  className="btn btn-sm btn-outline-secondary border-0"
-                                  onClick={() => setLeadDetailsVisible(!leadDetailsVisible)} style={{ border: 'none' }}
-                                >
-                                  {leadDetailsVisible ? (
-                                    <i className="fas fa-chevron-up"></i>
-                                  ) : (
-                                    <i className="fas fa-chevron-down"></i>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      
-                      <div className="card border-0 shadow-sm mb-4">
-                        <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                          <div className="d-flex justify-content-between align-items-center">
-                            <ul className="nav nav-pills nav-pills-sm">
-                              {tabs.map((tab, index) => (
-                                <li className="nav-item" key={index}>
-                                  <button
-                                    className={`nav-link ${activeTab === index ? 'active' : ''}`}
-                                    onClick={() => handleTabClick(index)}
-                                  >
-                                    {tab}
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-
-                       
-                        {leadDetailsVisible && (
-                          <div>
-                           
-                            <div className={`tab-pane ${activeTab === 0 ? 'active' : ''}`} id="lead-details">
-
-                             
-                              <div className="scrollable-container">
-                                <div className="scrollable-content">
-                                  <div className="info-card">
-                                    <div className="info-group">
-                                      <div className="info-label">LEAD AGE</div>
-                                      <div className="info-value">282 Days</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">Lead Owner</div>
-                                      <div className="info-value">Meta Ads Inbound IVR Inbound Call</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">COURSE / JOB NAME</div>
-                                      <div className="info-value">Operator</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">BATCH NAME</div>
-                                      <div className="info-value">-</div>
-                                    </div>
-                                  </div>
-
-                                  <div className="info-card">
-                                    <div className="info-group">
-                                      <div className="info-label">TYPE OF PROJECT</div>
-                                      <div className="info-value">Job</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">PROJECT</div>
-                                      <div className="info-value">Job</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">SECTOR</div>
-                                      <div className="info-value">Retail</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">LEAD CREATION DATE</div>
-                                      <div className="info-value">Jan 15, 2024 9:29 AM</div>
-                                    </div>
-                                  </div>
-
-                                  <div className="info-card">
-                                    <div className="info-group">
-                                      <div className="info-label">STATE</div>
-                                      <div className="info-value">Uttar Pradesh</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">City</div>
-                                      <div className="info-value">Chandauli</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">BRANCH NAME</div>
-                                      <div className="info-value">PSD Chandauli Center</div>
-                                    </div>
-                                    <div className="info-group">
-                                      <div className="info-label">LEAD MODIFICATION DATE</div>
-                                      <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              
-                              <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                              <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
-
-                             
-                              <div className="desktop-view">
-                                <div className="row g-4">
-                                  
-                                  <div className="col-12">
-                                    <div className="scrollable-container">
-                                      <div className="scrollable-content">
-                                        <div className="info-card">
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD AGE</div>
-                                            <div className="info-value">282 Days</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">Lead Owner</div>
-                                            <div className="info-value">Meta Ads Inbound IVR Inbound Call</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">COURSE / JOB NAME</div>
-                                            <div className="info-value">Operator</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">BATCH NAME</div>
-                                            <div className="info-value"></div>
-                                          </div>
-                                        </div>
-
-                                        <div className="info-card">
-                                          <div className="info-group">
-                                            <div className="info-label">TYPE OF PROJECT</div>
-                                            <div className="info-value">Job</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">PROJECT</div>
-                                            <div className="info-value">Job</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">SECTOR</div>
-                                            <div className="info-value">Retail</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD CREATION DATE</div>
-                                            <div className="info-value">Jan 15, 2024 9:29 AM</div>
-                                          </div>
-                                        </div>
-
-                                        <div className="info-card">
-                                          <div className="info-group">
-                                            <div className="info-label">STATE</div>
-                                            <div className="info-value">Uttar Pradesh</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">City</div>
-                                            <div className="info-value">Job</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">BRANCH NAME</div>
-                                            <div className="info-value">PSD Chandauli Center</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD MODIFICATION DATE</div>
-                                            <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD MODIFICATION By</div>
-                                            <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                          </div>
-                                          <div className="info-group">
-                                            <div className="info-label">Counsellor Name</div>
-                                            <div className="info-value">Name</div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                    <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
-
-                                    <div className="desktop-view">
-                                      <div className="row">
-                                        <div className="col-xl-3 col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD AGE</div>
-                                            <div className="info-value">282 Days</div>
-                                          </div>
-                                        </div>
-
-                                        <div className="col-xl-3 col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">STATE</div>
-                                            <div className="info-value">Uttar Pradesh</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">CITY</div>
-                                            <div className="info-value"></div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">TYPE OF PROJECT</div>
-                                            <div className="info-value">Job</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">PROJECT</div>
-                                            <div className="info-value">Job</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">Sector</div>
-                                            <div className="info-value">Retail</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">COURSE / JOB NAME</div>
-                                            <div className="info-value">Operator</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">BATCH NAME</div>
-                                            <div className="info-value"></div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">SECTOR</div>
-                                            <div className="info-value">Retail</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">BRANCH NAME</div>
-                                            <div className="info-value">PSD Chandauli Center</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">NEXT ACTION DATE</div>
-                                            <div className="info-value"></div>
-                                          </div>
-                                        </div>
-
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD CREATION DATE</div>
-                                            <div className="info-value">Jan 15, 2024 9:29 AM</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD MODIFICATION DATE</div>
-                                            <div className="info-value">Mar 21, 2025  col-3:32 PM</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD MODIFICATION BY</div>
-                                            <div className="info-value">Name</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">Counsellor Name</div>
-                                            <div className="info-value">Name</div>
-                                          </div>
-                                        </div>
-                                        <div className="col-xl- col-3">
-                                          <div className="info-group">
-                                            <div className="info-label">LEAD OWNER</div>
-                                            <div className="info-value">Rahul Sharma</div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                           
-                            <div className={`tab-pane ${activeTab === 1 ? 'active' : ''}`} id="profile">
-                              <div className="resume-preview-body">
-                                <div id="resume-download" className="resume-document">
-                                 
-                                  <div className="resume-document-header">
-                                    <div className="resume-profile-section">
-                                      {user?.image ? (
-                                        <img
-                                          src={`${bucketUrl}/${user.image}`}
-                                          alt="Profile"
-                                          className="resume-profile-image"
-                                        />
-                                      ) : (
-                                        <div className="resume-profile-placeholder">
-                                          <i className="bi bi-person-circle"></i>
-                                        </div>
-                                      )}
-
-                                      <div className="resume-header-content">
-                                        <h1 className="resume-name">
-                                          {profileData?.personalInfo?.name || user?.name || 'Your Name'}
-                                        </h1>
-                                        <p className="resume-title">
-                                          {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
-                                        </p>
-                                        <p className="resume-title">
-                                          {profileData?.personalInfo?.sex || 'Sex'}
-                                        </p>
-
-                                        <div className="resume-contact-details">
-                                          {profileData?.mobile && (
-                                            <div className="resume-contact-item">
-                                              <i className="bi bi-telephone-fill"></i>
-                                              <span>{profileData.mobile}</span>
-                                            </div>
-                                          )}
-                                          {profileData?.email && (
-                                            <div className="resume-contact-item">
-                                              <i className="bi bi-envelope-fill"></i>
-                                              <span>{profileData.email}</span>
-                                            </div>
-                                          )}
-                                          {profileData?.dob && (
-                                            <div className="resume-contact-item">
-                                              <i className="bi bi-calendar-heart-fill"></i>
-                                              {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
-                                                day: '2-digit',
-                                                month: 'long',
-                                                year: 'numeric'
-                                              }) : ''}
-                                            </div>
-                                          )}
-                                          {profileData?.personalInfo?.currentAddress?.fullAddress && (
-                                            <div className="resume-contact-item">
-                                              <i className="bi bi-geo-alt-fill"></i>
-                                              <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
-                                            </div>
-                                          )}
-                                          {profileData?.personalInfo?.permanentAddress && (
-                                            <div className="resume-contact-item">
-                                              <i className="bi bi-house-fill"></i>
-                                              <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <div className="resume-summary">
-                                      <h2 className="resume-section-title">Professional Summary</h2>
-                                      <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
-                                    </div>
-                                  </div>
-
-                                 
-                                  <div className="resume-document-body">
-                                    
-                                    <div className="resume-column resume-left-column">
-                                      
-                                      {profileData?.experienceType === 'fresher' ? (
-                                        <div className="resume-section">
-                                          <h2 className="resume-section-title">Work Experience</h2>
-                                          <div className="resume-experience-item">
-                                            <div className="resume-item-header">
-                                              <h3 className="resume-item-title">Fresher</h3>
-                                            </div>
-                                            {profileData?.fresherDetails && (
-                                              <div className="resume-item-content">
-                                                <p>{profileData.isExperienced}</p>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
-                                          <div className="resume-section">
-                                            <h2 className="resume-section-title">Work Experience</h2>
-                                            {experiences.map((exp, index) => (
-                                              (exp.jobTitle || exp.companyName || exp.jobDescription) && (
-                                                <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                  <div className="resume-item-header">
-                                                    {exp.jobTitle && (
-                                                      <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                    )}
-                                                    {exp.companyName && (
-                                                      <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                    )}
-                                                    {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                      <p className="resume-item-period">
-                                                        {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                          year: 'numeric',
-                                                          month: 'short',
-                                                        }) : 'Start Date'}
-                                                        {" - "}
-                                                        {exp.currentlyWorking ? 'Present' :
-                                                          exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                            year: 'numeric',
-                                                            month: 'short',
-                                                          }) : 'End Date'}
-                                                      </p>
-                                                    )}
-                                                  </div>
-                                                  {exp.jobDescription && (
-                                                    <div className="resume-item-content">
-                                                      <p>{exp.jobDescription}</p>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              )
-                                            ))}
-                                          </div>
-                                        )
-                                      )}
-
-                                    
-                                      {educations.length > 0 && educations.some(edu =>
-                                        edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
-                                      ) && (
-                                          <div className="resume-section">
-                                            <h2 className="resume-section-title">Education</h2>
-                                            {educations.map((edu, index) => (
-                                              (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
-                                                <div className="resume-education-item" key={`resume-edu-${index}`}>
-                                                  <div className="resume-item-header">
-                                                    {edu.education && (
-                                                      <h3 className="resume-item-title">
-                                                        {educationList.find(e => e._id === edu.education)?.name || 'Education'}
-                                                      </h3>
-                                                    )}
-                                                    {typeof edu.course === 'string' && edu.course && (
-                                                      <h3 className="resume-item-title">
-                                                        {coursesList[index]?.find(course => course._id === edu.course)?.name || edu.course}
-                                                      </h3>
-                                                    )}
-                                                    {edu.universityName && (
-                                                      <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                    )}
-                                                    {(edu.schoolName && !edu.universityName) && (
-                                                      <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                    )}
-                                                    {edu.collegeName && (
-                                                      <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                    )}
-                                                    {edu.currentlypursuing ? (
-                                                      <p className="resume-item-period highlight-text">Currently Pursuing</p>
-                                                    ) : edu.passingYear ? (
-                                                      <p className="resume-item-period">{edu.passingYear}</p>
-                                                    ) : null}
-                                                  </div>
-                                                  <div className="resume-item-content">
-                                                    {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                    {edu.specialization && <p>Specialization: {typeof edu.specialization === 'string' ? edu.specialization : 'Specialization'}</p>}
-                                                  </div>
-                                                </div>
-                                              )
-                                            ))}
-                                          </div>
-                                        )}
-                                    </div>
-
-                                  
-                                    <div className="resume-column resume-right-column">
-                                      
-                                      {skills.length > 0 && skills.some(skill => skill.skillName) && (
-                                        <div className="resume-section">
-                                          <h2 className="resume-section-title">Skills</h2>
-                                          <div className="resume-skills-list">
-                                            {skills.map((skill, index) => (
-                                              skill.skillName && (
-                                                <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                  <div className="resume-skill-name">{skill.skillName}</div>
-                                                  <div className="resume-skill-bar-container">
-                                                    <div
-                                                      className="resume-skill-bar"
-                                                      style={{ width: `${skill.skillPercent || 0}%` }}
-                                                    ></div>
-                                                  </div>
-                                                </div>
-                                              )
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-
-                                     
-                                      {languages.length > 0 && languages.some(lang => lang.lname) && (
-                                        <div className="resume-section">
-                                          <h2 className="resume-section-title">Languages</h2>
-                                          <div className="resume-languages-list">
-                                            {languages.map((lang, index) => (
-                                              lang.lname && (
-                                                <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                  <div className="resume-language-name">{lang.lname}</div>
-                                                  <div className="resume-language-level">
-                                                    {[1, 2, 3, 4, 5].map(dot => (
-                                                      <span
-                                                        key={`resume-lang-dot-${index}-${dot}`}
-                                                        className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                      ></span>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-
-                                     
-                                      {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
-                                        <div className="resume-section">
-                                          <h2 className="resume-section-title">Certifications</h2>
-                                          <ul className="resume-certifications-list">
-                                            {certificates.map((cert, index) => (
-                                              (cert.certificateName || cert.orgName) && (
-                                                <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                  {cert.certificateName && (
-                                                    <strong>{cert.certificateName}</strong>
-                                                  )}
-                                                  {cert.orgName && (
-                                                    <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                  )}
-                                                  {cert.currentlypursuing ? (
-                                                    <span className="resume-cert-date highlight-text"> (Currently Pursuing)</span>
-                                                  ) : (cert.month || cert.year) && (
-                                                    <span className="resume-cert-date">
-                                                      {cert.month && cert.year ?
-                                                        ` (${cert.month}/${cert.year})` :
-                                                        cert.month ?
-                                                          ` (${cert.month})` :
-                                                          cert.year ?
-                                                            ` (${cert.year})` :
-                                                            ''}
-                                                    </span>
-                                                  )}
-                                                </li>
-                                              )
-                                            ))}
-                                          </ul>
-                                        </div>
-                                      )}
-
-                                      
-                                      {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
-                                        <div className="resume-section">
-                                          <h2 className="resume-section-title">Projects</h2>
-                                          {projects.map((proj, index) => (
-                                            (proj.projectName || proj.proDescription) && (
-                                              <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                <div className="resume-item-header">
-                                                  <h3 className="resume-project-title">
-                                                    {proj.projectName || 'Project'}
-                                                    {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
-                                                  </h3>
-                                                </div>
-                                                {proj.proDescription && (
-                                                  <div className="resume-item-content">
-                                                    <p>{proj.proDescription}</p>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )
-                                          ))}
-                                        </div>
-                                      )}
-
-                                      
-                                      {interests.filter(i => i.trim() !== '').length > 0 && (
-                                        <div className="resume-section">
-                                          <h2 className="resume-section-title">Interests</h2>
-                                          <div className="resume-interests-tags">
-                                            {interests.filter(i => i.trim() !== '').map((interest, index) => (
-                                              <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                {interest}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                 
-                                  {declaration?.text && (
-                                    <div className="resume-declaration">
-                                      <h2 className="resume-section-title">Declaration</h2>
-                                      <p>{declaration.text}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            
-                            <div className={`tab-pane ${activeTab === 2 ? 'active' : ''}`} id="job-history">
-                              <div className="section-card">
-                                <div className="table-responsive">
-                                  <table className="table table-hover table-bordered job-history-table">
-                                    <thead className="table-light">
-                                      <tr>
-                                        <th>S.No</th>
-                                        <th>Company Name</th>
-                                        <th>Position</th>
-                                        <th>Duration</th>
-                                        <th>Location</th>
-                                        <th>Status</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {experiences.map((job, index) => (
-                                        <tr key={index}>
-                                          <td>{index + 1}</td>
-                                          <td>{job.companyName}</td>
-                                          <td>{job.jobTitle}</td>
-                                          <td>
-                                            {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                            {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                          </td>
-                                          <td>Remote</td>
-                                          <td><span className="text-success">Completed</span></td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                            </div>
-
-                            
-                            <div className={`tab-pane ${activeTab === 3 ? 'active' : ''}`} id="course-history">
-                              <div className="section-card">
-                                <div className="table-responsive">
-                                  <table className="table table-hover table-bordered course-history-table">
-                                    <thead className="table-light">
-                                      <tr>
-                                        <th>S.No</th>
-                                        <th>Course Name</th>
-                                        <th>Institute</th>
-                                        <th>Completion Date</th>
-                                        <th>Certificate ID</th>
-                                        <th>Score</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {certificates.map((course, index) => (
-                                        <tr key={index}>
-                                          <td>{index + 1}</td>
-                                          <td>{course.certificateName}</td>
-                                          <td>{course.orgName}</td>
-                                          <td>{course.month} {course.year}</td>
-                                          <td>CRT{index + 1}001</td>
-                                          <td><span className="text-success">Completed</span></td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>  */}
                   </div>
                 </div>
               </div>
