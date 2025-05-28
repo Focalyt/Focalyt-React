@@ -363,9 +363,9 @@ const ApprovalManagement = () => {
                     {tab.id !== 'all' && <span className="me-2">{tab.label}</span>}
                     
                     <span className={`badge rounded-pill ${
-                      tab.id === 'pending' ? 'bg-warning text-dark' :
-                      tab.id === 'approved' ? 'bg-success' :
-                      tab.id === 'rejected' ? 'bg-danger' :
+                      tab.id === 'pending' ? 'text-warning' :
+                      tab.id === 'approved' ? 'text-success' :
+                      tab.id === 'rejected' ? 'text-danger' :
                       'bg-secondary'
                     }`}>
                       {statusCounts[tab.id]}
@@ -483,10 +483,10 @@ const ApprovalManagement = () => {
                           </td>
                           {activeTab === 'all' && (
                             <td>
-                              <span className={`badge ${
-                                request.status === 'pending' ? 'bg-warning text-dark' : 
-                                request.status === 'approved' ? 'bg-success' : 
-                                request.status === 'rejected' ? 'bg-danger' : 
+                              <span className={`${
+                                request.status === 'pending' ? 'text-warning' : 
+                                request.status === 'approved' ? 'text-success' : 
+                                request.status === 'rejected' ? 'text-danger' : 
                                 'bg-secondary'
                               }`}>
                                 {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
@@ -578,10 +578,10 @@ const ApprovalManagement = () => {
                             {selectedRequest.type === 'user_creation' && 'New User'}
                             {selectedRequest.type === 'permission_change' && 'Permission Change'}
                           </h5>
-                          <span className={`badge ${
-                            selectedRequest.status === 'pending' ? 'bg-warning text-dark' : 
-                            selectedRequest.status === 'approved' ? 'bg-success' : 
-                            selectedRequest.status === 'rejected' ? 'bg-danger' : 
+                          <span className={`${
+                            selectedRequest.status === 'pending' ? 'text-warning' : 
+                            selectedRequest.status === 'approved' ? 'text-success' : 
+                            selectedRequest.status === 'rejected' ? 'text-danger' : 
                             'bg-secondary'
                           }`}>
                             {selectedRequest.status.charAt(0).toUpperCase() + selectedRequest.status.slice(1)}

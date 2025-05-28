@@ -979,7 +979,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
       {/* Tab Navigation */}
       <div className="card mb-3">
         <div className="card-body p-3">
-          <div className="d-flex flex-wrap gap-2 align-items-center">
+          <div className="d-flex flex-wrap gap-2 align-items-center scrollable-tabs">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -1110,6 +1110,21 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           </div>
         </div>
       )}
+      <style>
+        {
+          `
+          @media (max-width: 767px) {
+  .scrollable-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    flex-wrap: nowrap!important;
+  }
+}
+
+
+          `
+        }
+      </style>
     </div>
   );
 };

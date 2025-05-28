@@ -102,9 +102,38 @@ function CollegeLayout({ children }) {
     }
   }
 
-  const toggleSidebar = () => {
-    setExpanded(!expanded);
+  // const toggleSidebar = () => {
+  //   setExpanded(!expanded);
+  // };
+
+   const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
   };
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 1199;
+      setIsMobile(mobile);
+      setIsSidebarOpen(!mobile); // Desktop: open, Mobile: close by default
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        isMobile &&
+        !e.target.closest('.main-menu') &&
+        !e.target.closest('.menu-toggle')
+      ) {
+        setIsSidebarOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isMobile]);
 
   const menuRefs = {
     profile: useRef(null),
@@ -243,7 +272,7 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
                     <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
                       {/* <FontAwesomeIcon icon={faForward} /> */}
-                      <i class="fas fa-user-friends" style={{
+                      <i class="fas fa-user-friends m-0" style={{
                         color: location.pathname === '/institute/registration' ? 'white' : 'black'
                       }}></i>
                       <span className="menu-title">Admission Cycle</span>
@@ -363,7 +392,7 @@ function CollegeLayout({ children }) {
           <div className="app-content content">
             <div className="content-overlay"></div>
             <div className="header-navbar-shadow"></div>
-            <CollegeHeader />
+            <CollegeHeader  toggleSidebar={handleSidebarToggle} isSidebarOpen={isSidebarOpen} />
             <div className="content-wrapper">
               <div className="content-body mb-4">
                 <Outlet />
@@ -397,7 +426,7 @@ function CollegeLayout({ children }) {
 }
 
 .chevron-icon {
-  font-size: 12px;
+  font-size: 12px!important;
   transition: transform 0.3s ease;
 }
 

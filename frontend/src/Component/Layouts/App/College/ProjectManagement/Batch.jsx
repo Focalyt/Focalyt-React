@@ -246,10 +246,10 @@ const Batch = ({selectedCourse = null, onBackToCourses = null, selectedCenter = 
 
   const getModeColor = (mode) => {
     switch(mode) {
-      case 'online': return 'bg-info';
-      case 'offline': return 'bg-success';
-      case 'hybrid': return 'bg-warning';
-      default: return 'bg-secondary';
+      case 'online': return 'text-info';
+      case 'offline': return 'text-success';
+      case 'hybrid': return 'text-warning';
+      default: return 'text-secondary';
     }
   };
 
@@ -352,7 +352,7 @@ const Batch = ({selectedCourse = null, onBackToCourses = null, selectedCenter = 
               <i className="bi bi-arrow-left"></i> Back
             </button>
           )}
-          <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+          <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
           <button className="btn btn-warning" onClick={handleAdd}>Add Batch</button>
@@ -419,7 +419,7 @@ const Batch = ({selectedCourse = null, onBackToCourses = null, selectedCenter = 
                        
                       </div>
                       <div className="d-flex flex-wrap gap-2 mb-2">
-                        <span className={` ${batch.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
+                        <span className={` ${batch.status === 'active' ? 'text-success' : 'text-secondary'}`}>
                           {batch.status}
                         </span>
                         <span className={`${getModeColor(batch.mode)}`}>
@@ -428,13 +428,13 @@ const Batch = ({selectedCourse = null, onBackToCourses = null, selectedCenter = 
                       </div>
                     </div>
                     <div className="text-end d-flex">
-                      <button className="btn btn-sm btn-light me-1" title="Share" onClick={(e) => {e.stopPropagation(); handleShare(batch);}}>
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => {e.stopPropagation(); handleShare(batch);}}>
                         <i className="bi bi-share-fill"></i>
                       </button>
-                      <button className="btn btn-sm btn-light me-1" title="Edit" onClick={(e) => {e.stopPropagation(); handleEdit(batch);}}>
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => {e.stopPropagation(); handleEdit(batch);}}>
                         <i className="bi bi-pencil-square"></i>
                       </button>
-                      <button className="btn btn-sm btn-light text-danger" title="Delete" onClick={(e) => {e.stopPropagation(); handleDelete(batch);}}>
+                      <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => {e.stopPropagation(); handleDelete(batch);}}>
                         <i className="bi bi-trash"></i>
                       </button>
                     </div>
@@ -478,7 +478,7 @@ const Batch = ({selectedCourse = null, onBackToCourses = null, selectedCenter = 
                     </div>
                     <div className="progress" style={{ height: '4px' }}>
                       <div 
-                        className="progress-bar bg-success" 
+                        className="progress-bar text-success" 
                         role="progressbar" 
                         style={{ width: `${completionPercentage}%` }}
                       ></div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Project from '../../../../Component/Layouts/App/College/ProjectManagement/Project';
 import axios from 'axios'
+import "./CandidateManagment.css"
 
 const CandidateManagementPortal = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -292,16 +293,16 @@ const CandidateManagementPortal = () => {
                     <i className="bi bi-folder-fill text-warning fs-3"></i>
                     <h3 className="mt-2 mb-1">{vertical.name}</h3>
                     <p className="text-muted mb-1">{vertical.code}</p>
-                    <span className={`${vertical.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>{vertical.status}</span>
+                    <span className={`${vertical.status === 'active' ? 'text-success' : 'text-secondary'}`}>{vertical.status}</span>
                   </div>
                   <div className="text-end">
-                    <button className="btn btn-sm btn-light me-1" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(vertical); }}>
+                    <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(vertical); }}>
                       <i className="bi bi-share-fill"></i>
                     </button>
-                    <button className="btn btn-sm btn-light me-1" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(vertical); }}>
+                    <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(vertical); }}>
                       <i className="bi bi-pencil-square"></i>
                     </button>
-                    <button className="btn btn-sm btn-light text-danger" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(vertical); }}>
+                    <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(vertical); }}>
                       <i className="bi bi-trash"></i>
                     </button>
                   </div>

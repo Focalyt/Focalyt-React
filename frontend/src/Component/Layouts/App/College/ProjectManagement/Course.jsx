@@ -401,10 +401,10 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
         </div>
         <div>
          
-          <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+          <button className="btn btn-outline-secondary me-2 border-0 bg-transparent" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
-          <button className="btn btn-info" onClick={handleAdd}>Add Course</button>
+          <button className="btn btn-info bg-transparent" onClick={handleAdd}>Add Course</button>
         </div>
       </div>
 
@@ -454,14 +454,14 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
                       </div>
                       <p className="text-muted small mb-2">{course.description}</p>
                       <div className="d-flex flex-wrap gap-2 mb-2">
-                        <span className={`${course.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
+                        <span className={`${course.status === 'active' ? 'text-success' : 'text-secondary'}`}>
                           {course.status}
                         </span>
                        
                         <span className="bg-primary">{course.category}</span>
                         {/* ======== ADD THIS: Show center code badge ======== */}
                         {selectedCenter && (
-                          <span className="bg-secondary">
+                          <span className="text-secondary">
                             {course.centerCode}
                           </span>
                         )}
@@ -473,13 +473,13 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
                     </div>
                     {/* ======== MODIFY THIS: Add stopPropagation to action buttons ======== */}
                     <div className="text-end">
-                      <button className="btn btn-sm btn-light me-1" title="Share" onClick={(e) => {e.stopPropagation(); handleShare(course);}}>
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => {e.stopPropagation(); handleShare(course);}}>
                         <i className="bi bi-share-fill"></i>
                       </button>
-                      <button className="btn btn-sm btn-light me-1" title="Edit" onClick={(e) => {e.stopPropagation(); handleEdit(course);}}>
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => {e.stopPropagation(); handleEdit(course);}}>
                         <i className="bi bi-pencil-square"></i>
                       </button>
-                      <button className="btn btn-sm btn-light text-danger" title="Delete" onClick={(e) => {e.stopPropagation(); handleDelete(course);}}>
+                      <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => {e.stopPropagation(); handleDelete(course);}}>
                         <i className="bi bi-trash"></i>
                       </button>
                     </div>

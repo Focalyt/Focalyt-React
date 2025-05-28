@@ -43,10 +43,14 @@ const AvailableJobs = () => {
         axios.get(`${backendUrl}/skills`, { headers })
       ]);
 
-      setAllQualification(qualificationRes.data || []);
-      setAllIndustry(industryRes.data || []);
-      setAllStates(statesRes.data || []);
-      setSkills(skillsRes.data || []);
+      // setAllQualification(qualificationRes.data || []);
+      // setAllIndustry(industryRes.data || []);
+      // setAllStates(statesRes.data || []);
+      // setSkills(skillsRes.data || []);
+      setAllQualification(Array.isArray(qualificationRes.data) ? qualificationRes.data : []);
+    setAllIndustry(Array.isArray(industryRes.data) ? industryRes.data : []);
+    setAllStates(Array.isArray(statesRes.data) ? statesRes.data : []);
+    setSkills(Array.isArray(skillsRes.data) ? skillsRes.data : []);  
     } catch (error) {
       console.error('Error fetching initial data:', error);
     }
@@ -269,7 +273,7 @@ const AvailableJobs = () => {
                           </button>
                           <button
                             type="button"
-                            className="extra-ss btn btn-danger d-inline waves-effect waves-light mb-2 text-white ml-xl-1 ml-lg-1 ml-md-0 ml-sm-1 ml-1"
+                            className="extra-ss btn btn-danger d-inline waves-effect waves-light ms-2 mb-0 text-white ml-xl-1 ml-lg-1 ml-md-0 ml-sm-1 ml-1"
                             onClick={handleReset}
                           >
                             RESET

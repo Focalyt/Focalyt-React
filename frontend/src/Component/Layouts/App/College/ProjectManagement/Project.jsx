@@ -307,15 +307,15 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           <div className="d-flex align-items-center gap-3">
           
             <div className='d-flex align-items-center'>
-            <h4 onClick={onBackToVerticals}  className="me-2">Verticals</h4>
+            <h4 onClick={onBackToVerticals}  className="verticals me-2">Verticals</h4>
             <span className="mx-2"> &gt; </span>
-            <h5 className="breadcrumb-item mb-0" aria-current="page">
+            <h5 className="breadcrumb-item mb-0 verticals" style={{whiteSpace: 'nowrap'}} aria-current="page">
               {selectedVertical.name} Projects
             </h5>
           </div>
           </div>
         </div>
-        <div>
+        <div className='d-flex'>
           
           {onBackToVerticals && (
             <button 
@@ -330,10 +330,10 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           
           
 
-          <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+          <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
-          <button className="btn btn-primary" onClick={handleAdd}>Add Project</button>
+          <button className="btn btn-primary" style={{whiteSpace: 'nowrap'}} onClick={handleAdd}>Add Project</button>
         </div>
       </div>
 
@@ -381,19 +381,19 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                       </div>
                       <p className="text-muted small mb-2">{project.description}</p>
                       <div className="d-flex flex-wrap gap-2 mb-2">
-                        <span className={`${project.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
+                        <span className={`${project.status === 'active' ? 'text-success' : 'bg-secondary'}`}>
                           {project.status}
                         </span>
                       </div>
                     </div>
                     <div className="text-end">
-                      <button className="btn btn-sm btn-light me-1" title="Share" onClick={(e) => {e.stopPropagation(); handleShare(project);}}>
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => {e.stopPropagation(); handleShare(project);}}>
                         <i className="bi bi-share-fill"></i>
                       </button>
-                      <button className="btn btn-sm btn-light me-1" title="Edit" onClick={(e) => {e.stopPropagation(); handleEdit(project);}}>
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => {e.stopPropagation(); handleEdit(project);}}>
                         <i className="bi bi-pencil-square"></i>
                       </button>
-                      <button className="btn btn-sm btn-light text-danger" title="Delete" onClick={(e) => {e.stopPropagation(); handleDelete(project);}}>
+                      <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => {e.stopPropagation(); handleDelete(project);}}>
                         <i className="bi bi-trash"></i>
                       </button>
                     </div>
@@ -407,7 +407,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                     </div>
                     <div className="progress" style={{ height: '6px' }}>
                       <div 
-                        className="progress-bar bg-success" 
+                        className="progress-bar text-success" 
                         role="progressbar" 
                         style={{ width: `${progressPercentage}%` }}
                       ></div>
@@ -583,6 +583,17 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           </div>
         </div>
       )}
+      <style>
+        {
+          `
+          @media(max-width:768px){
+          .verticals{
+          font-size:15px;
+          }
+          }
+          `
+        }
+      </style>
     </div>
   );
 };

@@ -1673,7 +1673,7 @@ const EditCourse = () => {
             </button>
             <button
               type="submit"
-              className="btn btn-success px-lg-4 waves-effect waves-light"
+              className="btn btn-success px-lg-4 waves-effect waves-light ms-2"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Saving...' : 'Save'}

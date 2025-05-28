@@ -291,11 +291,11 @@ const Center = ({ selectedProject = null, onBackToProjects = null }) => {
 
     const getTypeColor = (type) => {
         switch (type) {
-            case 'main': return 'bg-primary';
-            case 'regional': return 'bg-success';
+            case 'main': return 'text-primary';
+            case 'regional': return 'text-success';
             case 'research': return 'bg-info';
-            case 'branch': return 'bg-warning';
-            default: return 'bg-secondary';
+            case 'branch': return 'text-warning';
+            default: return 'text-secondary';
         }
     };
 
@@ -307,7 +307,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null }) => {
     const getOccupancyColor = (percentage) => {
         if (percentage >= 90) return 'bg-danger';
         if (percentage >= 75) return 'bg-warning';
-        return 'bg-success';
+        return 'text-success';
     };
 
     const DeleteModal = () => {
@@ -475,7 +475,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null }) => {
                                                 </p>
                                             </div>
                                             <div className="d-flex flex-wrap gap-2 mb-2">
-                                                <span className={` ${center.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
+                                                <span className={` ${center.status === 'active' ? 'text-success' : 'bg-secondary'}`}>
                                                     {center.status}
                                                 </span>
                                                 <span className={`${getTypeColor(center.type)}`}>
@@ -570,7 +570,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null }) => {
                 <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                     <div className="modal-dialog modal-dialog-centered modal-lg">
                         <div className="modal-content">
-                            <div className="modal-header bg-success text-white">
+                            <div className="modal-header text-success text-white">
                                 <h5 className="modal-title">{editingCenter ? 'Edit Center' : 'Add New Center'}</h5>
                                 <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
                             </div>
@@ -649,7 +649,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null }) => {
                 <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                     <div className="modal-dialog modal-dialog-centered modal-lg" onClick={() => setShowShareModal(false)}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
-                            <div className="modal-header bg-success text-white">
+                            <div className="modal-header text-success text-white">
                                 <h5 className="modal-title">Manage Access - {selectedCenter.code}</h5>
                                 <button type="button" className="btn-close btn-close-white" onClick={() => setShowShareModal(false)}></button>
                             </div>

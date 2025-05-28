@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect , useState} from 'react';
 import { useNavigate } from 'react-router-dom';
 import "./CollegeHeader.css";
-const CollegeHeader = () => {
+const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -55,8 +55,8 @@ const CollegeHeader = () => {
               <div className="mr-auto float-left bookmark-wrapper d-flex align-items-center">
                 <ul className="nav navbar-nav">
                   <li className="nav-item mobile-menu d-xl-none mr-auto">
-                    <a className="nav-link nav-menu-main menu-toggle hidden-xs" href="#">
-                      <i className="ficon feather icon-menu"></i>
+                    <a className="nav-link nav-menu-main menu-toggle hidden-xs" href="#" onClick={toggleSidebar}>
+                      <i class="fas fa-bars" style={{color: "white", fontSize: "30px"}}></i>
                     </a>
                   </li>
                 </ul>
@@ -70,7 +70,7 @@ const CollegeHeader = () => {
               </div>
 
               <ul className="nav navbar-nav float-right">
-                <li className="nav-item nav-search">
+                <li className="nav-item nav-search d-none">
                   <div className="search-input">
                     <div className="search-input-icon">
                       <i className="feather icon-search primary"></i>
@@ -101,7 +101,7 @@ const CollegeHeader = () => {
                     </div>
                     <span>
                       {/* <img src={`${bucketUrl}/images/loader.png`} alt="avatar" height="40" width="40" /> */}
-                      <img src="/Assets/images/confirm.png" alt="" style={{width:'35px'}}/>
+                      <img src="/Assets/images/confirm.png" alt="" style={{ width: '35px' }} />
                     </span>
                   </a>
 
@@ -125,6 +125,18 @@ const CollegeHeader = () => {
       <style>
         {
           `
+
+          .header-navbar .navbar-container ul.nav li.dropdown .dropdown-menu{
+          top:70px;
+          position: absolute;
+          left: -11px;
+          }
+
+          #navbar-mobile{
+          display: flex;
+    flex-direction: revert;
+    justify-content: space-between
+          }
           .user-nav {
     display: flex;
     flex-direction: column;
