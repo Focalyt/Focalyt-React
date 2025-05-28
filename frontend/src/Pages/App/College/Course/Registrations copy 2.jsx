@@ -1542,10 +1542,10 @@ const CRMDashboard = () => {
                                                   <div className="resume-education-item" key={`resume-edu-${index}`}>
                                                     <div className="resume-item-header">
                                                       {edu.education && (
-                                                        <h3 className="resume-item-title">{edu.education}</h3>
+                                                        <h3 className="resume-item-title">{edu.education.name}</h3>
                                                       )}
                                                       {edu.course && (
-                                                        <h3 className="resume-item-title">{edu.course}</h3>
+                                                        <h3 className="resume-item-title">{edu.course.name}</h3>
                                                       )}
                                                       {edu.universityName && (
                                                         <p className="resume-item-subtitle">{edu.universityName}</p>
