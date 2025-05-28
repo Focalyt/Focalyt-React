@@ -7,8 +7,8 @@ const mongoose = require('mongoose');
 const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
-const {AppliedCourses, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch } = require("../../models");
+const { AppliedCourses, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
+	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -48,7 +48,7 @@ router.route('/')
 		}
 	})
 router.route("/login")
-	
+
 	.post(async (req, res) => {
 		try {
 			console.log('body data', req.body)
@@ -115,7 +115,7 @@ router.route("/login")
 	});
 
 router.route("/register")
-	
+
 	.post(async (req, res) => {
 		try {
 			console.log('recieved data', req.body)
@@ -182,26 +182,84 @@ router.route("/register")
 			return res.send({ status: false, error: err.message });
 		}
 	});
-router.route("/appliedCandidates")
-	.get(async (req, res) => {
+router.route("/appliedCandidates").get(async (req, res) => {
+	try {
+		const page = parseInt(req.query.page) || 1;      // Default page 1
+		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+		const skip = (page - 1) * limit;
 
-		try {
-        const students = await AppliedCourses.find().populate('_candidate').populate('_course').sort({ createdAt: -1 }).limit(50);
-        res.status(200).json({
-            success: true,
-            count: students.length,
-            data: students
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: "Failed to fetch applied candidates",
-            error: error.message
-        });
-    }
-		
-	})
-	
+		const totalCount = await AppliedCourses.countDocuments();
+
+		const appliedCourses = await AppliedCourses.find()
+			.populate('_candidate')
+			.populate('_course')
+			.populate('_leadStatus').populate('registeredBy')
+			.populate({
+				path: '_course',
+				populate: {
+					path: 'sectors',
+					select: 'name'
+				}
+			})
+			.populate({
+				path: 'logs',
+				populate: {
+					path: 'user',
+					select: 'name'
+				}
+			})
+			.sort({ createdAt: -1 })
+			.skip(skip)
+			.limit(limit);
+
+		const result = appliedCourses.map(doc => {
+			let selectedSubstatus = null;
+
+
+
+			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+				selectedSubstatus = doc._leadStatus.substatuses.find(
+					sub => sub._id.toString() === doc._leadSubStatus.toString()
+				);
+			}
+
+			const docObj = doc.toObject();
+
+			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+			if (docObj._course) {
+				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+			}
+
+
+			
+
+			return {
+				...docObj,
+				selectedSubstatus
+			};
+		});
+
+		res.status(200).json({
+			success: true,
+			count: result.length,
+			page,
+			limit,
+			totalCount,
+			totalPages: Math.ceil(totalCount / limit),
+			data: result,
+		});
+
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
+
+
+
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
 	console.log('User', req.user)
@@ -1668,7 +1726,7 @@ router.post("/courses/add", async (req, res) => {
 
 router.get('/getVerticals', [isCollege], async (req, res) => {
 	try {
-		
+
 
 		const verticals = await Vertical.find().sort({ createdAt: -1 });
 
@@ -1690,18 +1748,18 @@ router.get('/getVerticals', [isCollege], async (req, res) => {
 
 router.post('/addVertical', [isCollege], async (req, res) => {
 	try {
-		const {formData} = req.body;
+		const { formData } = req.body;
 		const user = req.user;
 		console.log("📥 Incoming vertical data:", formData);
 		console.log("📥 Incoming user data:", user);
 
 		// Default value handling
 		const newVertical = new Vertical({
-      name: formData.name,
-      description: formData.description,
-      status: formData.status !== undefined ? formData.status : true,
-      createdBy: user._id,
-    });
+			name: formData.name,
+			description: formData.description,
+			status: formData.status !== undefined ? formData.status : true,
+			createdBy: user._id,
+		});
 
 
 		const savedVertical = await newVertical.save();
@@ -1720,10 +1778,10 @@ router.post('/addVertical', [isCollege], async (req, res) => {
 		});
 	}
 });
-router.put('/editVertical/:id',[isCollege], async (req, res) => {
+router.put('/editVertical/:id', [isCollege], async (req, res) => {
 	try {
 		const verticalId = req.params.id;
-		const {formData} = req.body;
+		const { formData } = req.body;
 
 		console.log("📝 Editing vertical:", verticalId);
 		console.log("📦 Updated data:", formData);
@@ -1789,6 +1847,87 @@ router.delete('/deleteVertical/:id', [isCollege], async (req, res) => {
 		});
 	}
 });
+
+//lead status change
+router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
+	try {
+		console.log('api hitting')
+		const { id } = req.params;
+		const {
+			_leadStatus,
+			_leadSubStatus,
+			remarks,
+			followup,  // combined date and time
+		} = req.body;
+
+		const userId = req.user._id;
+
+		// Find the AppliedCourse document by ID
+		const doc = await AppliedCourses.findById(id);
+		if (!doc) {
+			return res.status(404).json({ success: false, message: 'AppliedCourse not found' });
+		}
+
+		let actionParts = [];
+
+		// Fetch the current status document (including sub-statuses)
+		const oldStatusDoc = await Status.findById(doc._leadStatus).lean();
+		const oldStatusTitle = oldStatusDoc ? oldStatusDoc.title : 'Unknown';
+		const oldSubStatusTitle = oldStatusDoc?.substatuses?.find(s => s._id.toString() === doc._leadSubStatus?.toString())?.title || 'Unknown';
+
+		// Fetch the new status document (including sub-statuses)
+		const newStatusDoc = await Status.findById(_leadStatus).lean();
+		const newStatusTitle = newStatusDoc ? newStatusDoc.title : 'Unknown';
+		const newSubStatusTitle = newStatusDoc?.substatuses?.find(s => s._id.toString() === _leadSubStatus)?.title || 'Unknown';
+
+
+		// If lead sub-status is updated, log the change and update the sub-status
+		// Logging changes
+		if (_leadStatus && doc._leadStatus.toString() !== _leadStatus) {
+			actionParts.push(`Lead status changed from "${oldStatusTitle}" to "${newStatusTitle}"`);
+			doc._leadStatus = _leadStatus;
+		}
+
+		if (_leadSubStatus && doc._leadSubStatus.toString() !== _leadSubStatus) {
+			actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
+			doc._leadSubStatus = _leadSubStatus;
+		}
+
+		// If followup date and time is set or updated, log the change and update the followup
+		if (followup && doc.followup?.toISOString() !== new Date(followup).toISOString()) {
+			actionParts.push(`Followup updated to ${new Date(followup).toLocaleString()}`);
+			doc.followupDate = new Date(followup); // Update followup date and time
+		}
+
+		// If remarks are set or updated, log the change and update remarks
+		if (remarks && doc.remarks !== remarks) {
+			//   actionParts.push(`Remarks updated: "${remarks}"`);
+			actionParts.push(`Remarks updated`);  // Remarks included in action log
+			doc.remarks = remarks; // Update remarks
+		}
+
+		// If there are no changes, log a generic action
+		if (actionParts.length === 0) {
+			actionParts.push('No changes made to status or followup');
+		}
+
+		// Add a log entry for the update
+		doc.logs.push({
+			user: userId,
+			action: actionParts.join('; '), // Combine all actions in one log message
+			remarks: remarks || '' // Optional remarks in the log
+		});
+
+		// Save the updated document
+		await doc.save();
+
+		return res.json({ success: true, data: doc });
+	} catch (error) {
+		console.error('Error updating status and followup:', error);
+		return res.status(500).json({ success: false, message: 'Internal Server Error' });
+	}
+});
+
 
 
 module.exports = router;

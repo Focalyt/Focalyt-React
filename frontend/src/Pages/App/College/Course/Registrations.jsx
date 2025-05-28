@@ -19,34 +19,8 @@ const CRMDashboard = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [allProfiles, setAllProfiles] = useState([]);
 
-  // next action dates
-  const [nextActionDate, setNextActionDate] = useState('');
-  // Helper function to get today's date in YYYY-MM-DD format for min attribute
-  const getTodayDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  };
-  // Helper function to format date from YYYY-MM-DD to DD/MM/YYYY for display
-  const formatDateForDisplay = (dateString) => {
-    if (!dateString) return '';
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
-  };
-
-  // Helper function to convert DD/MM/YYYY back to YYYY-MM-DD for input value
-  const formatDateForInput = (displayDate) => {
-    if (!displayDate) return '';
-    const [day, month, year] = displayDate.split('/');
-    return `${year}-${month}-${day}`;
-  };
-
-  const handleDateChange = (e) => {
-    const selectedDate = e.target.value; // This will be in YYYY-MM-DD format
-    setNextActionDate(selectedDate);
-  };
-
-
   // Toggle POPUP
+
   const togglePopup = () => {
     setShowPopup(prev => !prev);
   };
@@ -412,7 +386,6 @@ const CRMDashboard = () => {
     }
   };
   const openleadHistoryPanel = () => {
-    console.log("Opening Lead History Panel...");
     setLeadHistoryPanel(true)
     setShowWhatsappPanel(false);
     setShowEditPanel(false);
@@ -532,25 +505,12 @@ const CRMDashboard = () => {
                 <div className="input-group">
                   <input
                     type="date"
-                    className="form-control border-0 bgcolor"
+                    className="form-control border-0  bgcolor"
                     id="nextActionDate"
-                    value={nextActionDate}
-                    min={getTodayDate()} // This prevents past dates
-                    onChange={handleDateChange}
-                    style={{
-                      backgroundColor: '#f1f2f6',
-                      height: '42px',
-                      paddingInline: '10px'
-                    }}
-                    required
+                    defaultValue="2025-01-13"
+                    style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                   />
                 </div>
-                {/* Display formatted date below input if needed */}
-                {nextActionDate && (
-                  <small className="text-muted">
-                    Selected: {formatDateForDisplay(nextActionDate)}
-                  </small>
-                )}
               </div>
 
               <div className="col-6">
@@ -560,14 +520,10 @@ const CRMDashboard = () => {
                 <div className="input-group">
                   <input
                     type="time"
-                    className="form-control border-0 bgcolor"
+                    className="form-control border-0  bgcolor"
                     id="actionTime"
-                    style={{
-                      backgroundColor: '#f1f2f6',
-                      height: '42px',
-                      paddingInline: '10px'
-                    }}
-                    required
+                    defaultValue="12:36"
+                    style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                   />
                 </div>
               </div>
@@ -580,6 +536,7 @@ const CRMDashboard = () => {
                 id="comment"
                 rows="4"
                 style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
+                defaultValue="wrong no."
               ></textarea>
             </div>
 
@@ -795,598 +752,590 @@ const CRMDashboard = () => {
           {/* Add your lead history content here */}
           <div className="history-content">
 
-            <ul className='history-list'>
+            <div className='history-list'>
               <li>
-                <span className=''>Action Date: <span className="cr-list"></span></span>
+                <span className=''>Action: <span className="cr-list"></span></span>
               </li>
               <li>
-                <span className=''>Action: <span className="cr-list">--</span></span>
+                <span className=''>Action Date: <span className="cr-list">--</span></span>
               </li>
               <li>
-                <span className=''>Action By: <span className="cr-list">-</span></span>
+                <span className=''>Remark: <span className="cr-list">-</span></span>
               </li>
               <li>
-                <span className=''>Remark: <span className="cr-list">--</span></span>
+                <span className=''>Phone: <span className="cr-list">--</span></span>
               </li>
-            </ul>
-          </div>
 
-          <div className="d-flex justify-content-end gap-2 mt-4">
-            <button
-              type="button"
-              className="btn"
-              style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-              onClick={closeleadHistoryPanel}
-            >
-              CLOSE
-            </button>
+            </div>
+
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn"
+                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                onClick={closeleadHistoryPanel}
+              >
+                CLOSE
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    );
+        </div>
+        );
 
-    if (isMobile) {
+        if (isMobile) {
       return (
-
         <div
-          className={`modal ${leadHistoryPanel ? 'show d-block' : 'd-none'}`}
+          className={`modal overflowY ${leadHistoryPanel ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
             if (e.target === e.currentTarget) closeleadHistoryPanel();
           }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
             <div className="modal-content">
               {panelContent}
             </div>
           </div>
         </div>
-      );
+        );
     }
 
-    return leadHistoryPanel ? (
-      <div className="col-12 transition-col" id="leadHistoryPanel">
-        {panelContent}
-      </div>
-    ) : null;
+        return leadHistoryPanel ? (
+        <div className="col-12 transition-col" id="leadHistoryPanel">
+          {panelContent}
+        </div>
+        ) : null;
   };
 
-  return (
-    <div className="container-fluid">
-      <div className="row">
-        <div className={isMobile ? 'col-12' : mainContentClass}>
+        return (
+        <div className="container-fluid">
+          <div className="row">
+            <div className={isMobile ? 'col-12' : mainContentClass}>
 
-          {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints" >
-            <div className="container-fluid py-2 " >
-              <div className="row align-items-center">
-                <div className="col-md-6 d-md-block d-sm-none">
-                  <div className="d-flex align-items-center">
-                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="#" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
-                      </ol>
-                    </nav>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="d-flex justify-content-end align-items-center gap-2">
-                    <div className="input-group newMaxWidth" style={{ maxWidth: '300px' }}>
-                      <span className="input-group-text bg-white border-end-0 input-height" >
-                        <i className="fas fa-search text-muted"></i>
-                      </span>
-                      <input
-                        type="text"
-                        name="name"
-                        className="form-control border-start-0 m-0"
-                        placeholder="Search name, mobile, email..."
-                        value={filterData.name}
-                        onChange={handleFilterChange}
-                      />
+              {/* Header */}
+              <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints" >
+                <div className="container-fluid py-2 " >
+                  <div className="row align-items-center">
+                    <div className="col-md-6 d-md-block d-sm-none">
+                      <div className="d-flex align-items-center">
+                        <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                        <nav aria-label="breadcrumb">
+                          <ol className="breadcrumb mb-0 small">
+                            <li className="breadcrumb-item">
+                              <a href="#" className="text-decoration-none">Home</a>
+                            </li>
+                            <li className="breadcrumb-item active">Admission Cycle</li>
+                          </ol>
+                        </nav>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                      className="btn btn-outline-primary" style={{ whiteSpace: 'nowrap' }}
-                    >
-                      <i className="fas fa-filter me-1"></i>
-                      Filters
-                    </button>
-                    <div className="btn-group">
-                      <button
-                        onClick={() => setViewMode('grid')}
-                        className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-th"></i>
-                      </button>
-                      <button
-                        onClick={() => setViewMode('list')}
-                        className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-list"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-
-                <div className="card-body p-3">
-                  <div className="d-flex flex-wrap gap-2 align-items-center">
-                    {crmFilters.map((filter, index) => (
-                      <div key={index} className="d-flex align-items-center gap-1">
-                        <div className='d-flex'>
+                    <div className="col-md-6">
+                      <div className="d-flex justify-content-end align-items-center gap-2">
+                        <div className="input-group newMaxWidth" style={{ maxWidth: '300px' }}>
+                          <span className="input-group-text bg-white border-end-0 input-height" >
+                            <i className="fas fa-search text-muted"></i>
+                          </span>
+                          <input
+                            type="text"
+                            name="name"
+                            className="form-control border-start-0 m-0"
+                            placeholder="Search name, mobile, email..."
+                            value={filterData.name}
+                            onChange={handleFilterChange}
+                          />
+                        </div>
+                        <button
+                          onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                          className="btn btn-outline-primary" style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className="fas fa-filter me-1"></i>
+                          Filters
+                        </button>
+                        <div className="btn-group">
                           <button
-                            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                            onClick={() => handleCrmFilterClick(index)}
+                            onClick={() => setViewMode('grid')}
+                            className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
                           >
-                            {filter.name}
-                            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                              ({filter.count})
-                            </span>
+                            <i className="fas fa-th"></i>
                           </button>
-
-                          {/* Milestone flag OUTSIDE the button */}
-                          {filter.milestone && (
-                            <span
-                              className="bg-success d-flex align-items-center"
-                              style={{
-                                fontSize: '0.75rem', color: 'white', verticalAlign: 'middle', padding: '0.25em 0.5em', transform: 'translate(15%, -100%)',
-                                position: 'absolute'
-                              }}
-                              title={`Milestone: ${filter.milestone}`}
-                            >
-                              🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
-                            </span>
-                          )}
+                          <button
+                            onClick={() => setViewMode('list')}
+                            className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                          >
+                            <i className="fas fa-list"></i>
+                          </button>
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+
+                    <div className="card-body p-3">
+                      <div className="d-flex flex-wrap gap-2 align-items-center">
+                        {crmFilters.map((filter, index) => (
+                          <div key={index} className="d-flex align-items-center gap-1">
+                            <div className='d-flex'>
+                              <button
+                                className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                                onClick={() => handleCrmFilterClick(index)}
+                              >
+                                {filter.name}
+                                <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                                  ({filter.count})
+                                </span>
+                              </button>
+
+                              {/* Milestone flag OUTSIDE the button */}
+                              {filter.milestone && (
+                                <span
+                                  className="bg-success d-flex align-items-center"
+                                  style={{
+                                    fontSize: '0.75rem', color: 'white', verticalAlign: 'middle', padding: '0.25em 0.5em', transform: 'translate(15%, -100%)',
+                                    position: 'absolute'
+                                  }}
+                                  title={`Milestone: ${filter.milestone}`}
+                                >
+                                  🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                    </div>
+
                   </div>
-
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-          {/* Advanced Filters */}
-          {!isFilterCollapsed && (
-            <div className="bg-white border-bottom">
-              <div className="container-fluid py-3">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className="fw-bold mb-0">Advanced Filters</h6>
-                  <button
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={() => setIsFilterCollapsed(true)}
-                  >
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
-
-                <div className="row g-3">
-                  <div className="col-md-3">
-                    <label className="form-label small fw-medium">Lead Category</label>
-                    <select
-                      className="form-select form-select-sm"
-                      name="leadStatus"
-                      value={filterData.leadStatus}
-                      onChange={handleFilterChange}
-                    >
-                      <option value="">All Categories</option>
-                      <option value="Application">Application</option>
-                      <option value="Lead">Lead</option>
-                      <option value="Prospect">Prospect</option>
-                    </select>
-                  </div>
-
-                  <div className="col-md-3">
-                    <label className="form-label small fw-medium">Status</label>
-                    <select
-                      className="form-select form-select-sm"
-                      name="status"
-                      value={filterData.status}
-                      onChange={handleFilterChange}
-                    >
-                      <option value="">All Status</option>
-                      <option value="Hot">Hot</option>
-                      <option value="Warm">Warm</option>
-                      <option value="Cold">Cold</option>
-                    </select>
-                  </div>
-
-                  <div className="col-md-3">
-                    <label className="form-label small fw-medium">Course Type</label>
-                    <select
-                      className="form-select form-select-sm"
-                      name="courseType"
-                      value={filterData.courseType}
-                      onChange={handleFilterChange}
-                    >
-                      <option value="">All Types</option>
-                      <option value="Free">Free</option>
-                      <option value="Paid">Paid</option>
-                    </select>
-                  </div>
-
-                  <div className="col-md-3">
-                    <label className="form-label small fw-medium">Sector</label>
-                    <select
-                      className="form-select form-select-sm"
-                      name="sector"
-                      value={filterData.sector}
-                      onChange={handleFilterChange}
-                    >
-                      <option value="">All Sectors</option>
-                      <option value="Tourism and Hospitality">Tourism & Hospitality</option>
-                      <option value="Information Technology">Information Technology</option>
-                      <option value="Healthcare">Healthcare</option>
-                      <option value="Finance">Finance</option>
-                    </select>
-                  </div>
-
-                  <div className="col-md-3">
-                    <label className="form-label small fw-medium">From Date</label>
-                    <input
-                      type="date"
-                      className="form-control form-control-sm"
-                      name="FromDate"
-                      value={filterData.FromDate}
-                      onChange={handleFilterChange}
-                    />
-                  </div>
-
-                  <div className="col-md-3">
-                    <label className="form-label small fw-medium">To Date</label>
-                    <input
-                      type="date"
-                      className="form-control form-control-sm"
-                      name="ToDate"
-                      value={filterData.ToDate}
-                      onChange={handleFilterChange}
-                    />
-                  </div>
-                </div>
-
-                <div className="d-flex justify-content-end gap-2 mt-3">
-                  <button
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={() => {
-                      setFilterData({
-                        name: '',
-                        courseType: '',
-                        FromDate: '',
-                        ToDate: '',
-                        status: '',
-                        leadStatus: '',
-                        sector: ''
-                      });
-                    }}
-                  >
-                    Reset
-                  </button>
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={() => setIsFilterCollapsed(true)}
-                  >
-                    Apply Filters
-                  </button>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Main Content */}
-          <div className="content-body">
-            <section className="list-view">
+              {/* Advanced Filters */}
+              {!isFilterCollapsed && (
+                <div className="bg-white border-bottom">
+                  <div className="container-fluid py-3">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <h6 className="fw-bold mb-0">Advanced Filters</h6>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => setIsFilterCollapsed(true)}
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
 
-              <div className='row'>
-                <div>
-                  <div className="col-12 rounded equal-height-2 coloumn-2">
-                    <div className="card px-3">
-                      <div className="row" id="crm-main-row">
+                    <div className="row g-3">
+                      <div className="col-md-3">
+                        <label className="form-label small fw-medium">Lead Category</label>
+                        <select
+                          className="form-select form-select-sm"
+                          name="leadStatus"
+                          value={filterData.leadStatus}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="">All Categories</option>
+                          <option value="Application">Application</option>
+                          <option value="Lead">Lead</option>
+                          <option value="Prospect">Prospect</option>
+                        </select>
+                      </div>
 
-                        {allProfiles.map((profile, profileIndex) => (
-                          <div className={`card-content transition-col mb-2`} key={profileIndex}>
+                      <div className="col-md-3">
+                        <label className="form-label small fw-medium">Status</label>
+                        <select
+                          className="form-select form-select-sm"
+                          name="status"
+                          value={filterData.status}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="">All Status</option>
+                          <option value="Hot">Hot</option>
+                          <option value="Warm">Warm</option>
+                          <option value="Cold">Cold</option>
+                        </select>
+                      </div>
 
-                            {/* Profile Header Card */}
-                            <div className="card border-0 shadow-sm mb-0 mt-2">
-                              <div className="card-body px-1 py-0 my-2">
-                                <div className="row align-items-center">
-                                  <div className="col-md-6">
-                                    <div className="d-flex align-items-center">
-                                      <div className="form-check me-3">
-                                        <input className="form-check-input" type="checkbox" />
-                                      </div>
-                                      <div className=" me-md-3 me-0">
-                                        <div className="circular-progress-container" data-percent="40">
-                                          <svg width="40" height="40">
-                                            <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
-                                            <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
-                                          </svg>
-                                          <div className="progress-text"></div>
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
-                                        <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
-                                      </div>
-                                      <div className="marginLeft">
-                                        <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                          <i className="fas fa-phone"></i>
-                                        </button>
-                                        {/* <button
-                                          className="btn btn-outline-success btn-sm border-0"
-                                          onClick={openWhatsappPanel}
-                                          style={{ fontSize: '20px' }}
-                                          title="WhatsApp"
-                                        >
-                                          <i className="fab fa-whatsapp"></i>
-                                        </button> */}
-                                      </div>
-                                    </div>
-                                  </div>
+                      <div className="col-md-3">
+                        <label className="form-label small fw-medium">Course Type</label>
+                        <select
+                          className="form-select form-select-sm"
+                          name="courseType"
+                          value={filterData.courseType}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="">All Types</option>
+                          <option value="Free">Free</option>
+                          <option value="Paid">Paid</option>
+                        </select>
+                      </div>
 
-                                  <div className="col-md-4">
-                                    <div className="d-flex gap-2">
-                                      <div className="flex-grow-1">
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm m-0"
-                                          style={{
-                                            cursor: 'pointer',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '0px',
-                                            borderTopRightRadius: '5px',
-                                            borderTopLeftRadius: '5px',
-                                            width: '145px',
-                                            height: '20px',
-                                            fontSize: '10px'
-                                          }}
-                                          value={crmFilters[activeCrmFilter].name}
-                                          readOnly
-                                          onClick={openEditPanel}
-                                        />
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm m-0"
-                                          value="Untouched Lead Long Text Example..."
-                                          style={{
-                                            cursor: 'pointer',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '0px',
-                                            borderBottomRightRadius: '5px',
-                                            borderBottomLeftRadius: '5px',
-                                            width: '145px',
-                                            height: '20px',
-                                            fontSize: '10px'
-                                          }}
-                                          readOnly
-                                        />
-                                      </div>
+                      <div className="col-md-3">
+                        <label className="form-label small fw-medium">Sector</label>
+                        <select
+                          className="form-select form-select-sm"
+                          name="sector"
+                          value={filterData.sector}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="">All Sectors</option>
+                          <option value="Tourism and Hospitality">Tourism & Hospitality</option>
+                          <option value="Information Technology">Information Technology</option>
+                          <option value="Healthcare">Healthcare</option>
+                          <option value="Finance">Finance</option>
+                        </select>
+                      </div>
 
-                                    </div>
-                                  </div>
+                      <div className="col-md-3">
+                        <label className="form-label small fw-medium">From Date</label>
+                        <input
+                          type="date"
+                          className="form-control form-control-sm"
+                          name="FromDate"
+                          value={filterData.FromDate}
+                          onChange={handleFilterChange}
+                        />
+                      </div>
 
-                                  <div className="col-md-2 text-end d-md-block d-sm-none d-none">
-                                    <div className="btn-group">
+                      <div className="col-md-3">
+                        <label className="form-label small fw-medium">To Date</label>
+                        <input
+                          type="date"
+                          className="form-control form-control-sm"
+                          name="ToDate"
+                          value={filterData.ToDate}
+                          onChange={handleFilterChange}
+                        />
+                      </div>
+                    </div>
 
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={togglePopup}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                          
-                                        </button>
+                    <div className="d-flex justify-content-end gap-2 mt-3">
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => {
+                          setFilterData({
+                            name: '',
+                            courseType: '',
+                            FromDate: '',
+                            ToDate: '',
+                            status: '',
+                            leadStatus: '',
+                            sector: ''
+                          });
+                        }}
+                      >
+                        Reset
+                      </button>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => setIsFilterCollapsed(true)}
+                      >
+                        Apply Filters
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                                        {/* Overlay for click outside */}
-                                        {showPopup && (
-                                          <div
-                                            onClick={() => setShowPopup(false)}
-                                            style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 999,
-                                            }}
-                                          ></div>
-                                        )}
+              {/* Main Content */}
+              <div className="content-body">
+                <section className="list-view">
 
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px", // button ke thoda niche
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 11,
-                                            transform: showPopup ? "translateX(-70px)" : "translateX(100%)",
-                                            transition: "transform 0.3s ease-in-out",
-                                            pointerEvents: showPopup ? "auto" : "none",
-                                            display: showPopup ? "block" : "none"
-                                          }}
-                                        >
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                          >
-                                            Move To Admission List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => alert("Reffer")}
-                                          >
-                                            Reffer
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={openleadHistoryPanel}
-                                          >
-                                            History List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                           
-                                          >
-                                            Set Follow Up
-                                          </button>
+                  <div className='row'>
+                    <div>
+                      <div className="col-12 rounded equal-height-2 coloumn-2">
+                        <div className="card px-3">
+                          <div className="row" id="crm-main-row">
 
+                            {allProfiles.map((profile, profileIndex) => (
+                              <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
-                                        </div>
-                                      </div>
-
-
-
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => setLeadDetailsVisible(!leadDetailsVisible)}
+                                {/* Profile Header Card */}
+                                <div className="card border-0 shadow-sm mb-0 mt-2">
+                                  <div className="card-body px-1 py-0 my-2">
+                                    <div className="row align-items-center">
+                                      <div className="col-md-6">
+                                        <div className="d-flex align-items-center">
+                                          <div className="form-check me-3">
+                                            <input className="form-check-input" type="checkbox" />
+                                          </div>
+                                          <div className=" me-md-3 me-0">
+                                            <div className="circular-progress-container" data-percent="40">
+                                              <svg width="40" height="40">
+                                                <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
+                                                <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
+                                              </svg>
+                                              <div className="progress-text"></div>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
+                                            <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
+                                          </div>
+                                          <div className="marginLeft">
+                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                              <i className="fas fa-phone"></i>
+                                            </button>
+                                            {/* <button
+                                        className="btn btn-outline-success btn-sm border-0"
+                                        onClick={openWhatsappPanel}
+                                        style={{ fontSize: '20px' }}
+                                        title="WhatsApp"
                                       >
-                                        {leadDetailsVisible ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-                                  <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                    <div className="btn-group">
+                                        <i className="fab fa-whatsapp"></i>
+                                      </button> */}
+                                          </div>
+                                        </div>
+                                      </div>
 
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={togglePopup}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                        </button>
+                                      <div className="col-md-5">
+                                        <div className="d-flex gap-2">
+                                          <div className="flex-grow-1">
+                                            <input
+                                              type="text"
+                                              className="form-control form-control-sm m-0"
+                                              style={{
+                                                cursor: 'pointer',
+                                                border: '1px solid #ddd',
+                                                borderRadius: '0px',
+                                                borderTopRightRadius: '5px',
+                                                borderTopLeftRadius: '5px',
+                                                width: '145px',
+                                                height: '20px',
+                                                fontSize: '10px'
+                                              }}
+                                              value={crmFilters[activeCrmFilter].name}
+                                              readOnly
+                                              onClick={openEditPanel}
+                                            />
+                                            <input
+                                              type="text"
+                                              className="form-control form-control-sm m-0"
+                                              value="Untouched Lead Long Text Example..."
+                                              style={{
+                                                cursor: 'pointer',
+                                                border: '1px solid #ddd',
+                                                borderRadius: '0px',
+                                                borderBottomRightRadius: '5px',
+                                                borderBottomLeftRadius: '5px',
+                                                width: '145px',
+                                                height: '20px',
+                                                fontSize: '10px'
+                                              }}
+                                              readOnly
+                                            />
+                                          </div>
+                                          <div className="btn-group d-md-none d-block">
 
-                                        {/* Overlay for click outside */}
-                                        {showPopup && (
-                                          <div
-                                            onClick={() => setShowPopup(false)}
+                                            <div style={{ position: "relative", display: "inline-block" }}>
+                                              <button
+                                                className="btn btn-sm btn-outline-secondary border-0"
+                                                onClick={togglePopup}
+                                                aria-label="Options"
+                                              >
+                                                <i className="fas fa-ellipsis-v"></i>
+                                              </button>
 
-                                          ></div>
-                                        )}
+                                              {/* Overlay for click outside */}
+                                              {showPopup && (
+                                                <div
+                                                  onClick={() => setShowPopup(false)}
+                                                  style={{
+                                                    position: "fixed",
+                                                    top: 0,
+                                                    left: 0,
+                                                    width: "100vw",
+                                                    height: "100vh",
+                                                    backgroundColor: "transparent",
+                                                    zIndex: 999,
+                                                  }}
+                                                ></div>
+                                              )}
 
-                                        <div className='d-flex'>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "40%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600",
-                                              whiteSpace: "normal"
-                                            }}
+                                              <div
+                                                style={{
+                                                  position: "absolute",
+                                                  top: "28px", // button ke thoda niche
+                                                  right: "-100px",
+                                                  width: "165px",
+                                                  backgroundColor: "white",
+                                                  border: "1px solid #ddd",
+                                                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                  borderRadius: "4px",
+                                                  padding: "8px 0",
+                                                  zIndex: 1000,
+                                                  transform: showPopup ? "translateX(-70px)" : "translateX(100%)",
+                                                  transition: "transform 0.3s ease-in-out",
+                                                  pointerEvents: showPopup ? "auto" : "none",
+                                                  display: showPopup ? "block" : "none"
+                                                }}
+                                              >
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
 
-                                          >
-                                            Move To Admission List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "40%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600",
-                                              whiteSpace: "normal"
-                                            }}
-                                            onClick={() => alert("Reffer")}
-                                          >
-                                            Reffer
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "40%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600",
-                                              whiteSpace: "normal"
-                                            }}
-                                            onClick={openleadHistoryPanel}
-                                          >
-                                            History List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "40%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600",
-                                              whiteSpace: "normal"
-                                            }}
-                                          >
-                                            Set Follow Up
-                                          </button>
+                                                >
+                                                  Move To Admission List
+                                                </button>
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
+                                                  onClick={() => alert("Reffer")}
+                                                >
+                                                  Reffer
+                                                </button>
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
+                                                  onClick={openleadHistoryPanel}
+                                                >
+                                                  History List
+                                                </button>
+
+                                              </div>
+                                            </div>
+
+
+
+                                            <button
+                                              className="btn btn-sm btn-outline-secondary border-0"
+                                              onClick={() => setLeadDetailsVisible(!leadDetailsVisible)}
+                                            >
+                                              {leadDetailsVisible ? (
+                                                <i className="fas fa-chevron-up"></i>
+                                              ) : (
+                                                <i className="fas fa-chevron-down"></i>
+                                              )}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="col-md-1 text-end d-md-block d-sm-none d-none">
+                                        <div className="btn-group">
+
+                                          <div style={{ position: "relative", display: "inline-block" }}>
+                                            <button
+                                              className="btn btn-sm btn-outline-secondary border-0"
+                                              onClick={togglePopup}
+                                              aria-label="Options"
+                                            >
+                                              <i className="fas fa-ellipsis-v"></i>
+                                            </button>
+
+                                            {/* Overlay for click outside */}
+                                            {showPopup && (
+                                              <div
+                                                onClick={() => setShowPopup(false)}
+                                                style={{
+                                                  position: "fixed",
+                                                  top: 0,
+                                                  left: 0,
+                                                  width: "100vw",
+                                                  height: "100vh",
+                                                  backgroundColor: "transparent",
+                                                  zIndex: 999,
+                                                }}
+                                              ></div>
+                                            )}
+
+                                            <div
+                                              style={{
+                                                position: "absolute",
+                                                top: "28px", // button ke thoda niche
+                                                right: "-100px",
+                                                width: "170px",
+                                                backgroundColor: "white",
+                                                border: "1px solid #ddd",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                borderRadius: "4px",
+                                                padding: "8px 0",
+                                                zIndex: 1000,
+                                                transform: showPopup ? "translateX(-70px)" : "translateX(100%)",
+                                                transition: "transform 0.3s ease-in-out",
+                                                pointerEvents: showPopup ? "auto" : "none",
+                                                display: showPopup ? "block" : "none"
+                                              }}
+                                            >
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                              >
+                                                Move To Admission List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => alert("Reffer")}
+                                              >
+                                                Reffer
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={openleadHistoryPanel}
+                                              >
+                                                History List
+                                              </button>
+
+
+                                            </div>
+                                          </div>
+
+
+
                                           <button
                                             className="btn btn-sm btn-outline-secondary border-0"
                                             onClick={() => setLeadDetailsVisible(!leadDetailsVisible)}
@@ -1402,527 +1351,532 @@ const CRMDashboard = () => {
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            </div>
 
-                            {/* Tab Navigation and Content Card */}
-                            <div className="card border-0 shadow-sm mb-4">
-                              <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                <ul className="nav nav-pills nav-pills-sm">
-                                  {tabs.map((tab, tabIndex) => (
-                                    <li className="nav-item" key={tabIndex}>
-                                      <button
-                                        className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                        onClick={() => handleTabClick(profileIndex, tabIndex)}
-                                      >
-                                        {tab}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
+                                {/* Tab Navigation and Content Card */}
+                                <div className="card border-0 shadow-sm mb-4">
+                                  <div className="card-header bg-white border-bottom-0 py-3 mb-3">
+                                    <ul className="nav nav-pills nav-pills-sm">
+                                      {tabs.map((tab, tabIndex) => (
+                                        <li className="nav-item" key={tabIndex}>
+                                          <button
+                                            className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
+                                            onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                          >
+                                            {tab}
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
 
-                              {/* Tab Content - Only show if leadDetailsVisible is true */}
-                              {leadDetailsVisible && (
-                                <div className="tab-content">
+                                  {/* Tab Content - Only show if leadDetailsVisible is true */}
+                                  {leadDetailsVisible && (
+                                    <div className="tab-content">
 
-                                  {/* Lead Details Tab */}
-                                  {/* {activeTab === 0 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 0 && (
-                                    <div className="tab-pane active" id="lead-details">
-                                      {/* Your lead details content here */}
-                                      <div className="scrollable-container">
-                                        <div className="scrollable-content">
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD AGE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                : 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Lead Owner</div>
-                                              <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">COURSE / JOB NAME</div>
-                                              <div className="info-value">{profile._course?.name}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">BATCH NAME</div>
-                                              <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                            </div>
-                                          </div>
-
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">TYPE OF PROJECT</div>
-                                              <div className="info-value">{profile._course?.typeOfProject}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">PROJECT</div>
-                                              <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">SECTOR</div>
-                                              <div className="info-value">{profile._course?.sectors}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD CREATION DATE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                          </div>
-
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">STATE</div>
-                                              <div className="info-value">{profile._course?.state}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">City</div>
-                                              <div className="info-value">{profile._course?.city}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">BRANCH NAME</div>
-                                              <div className="info-value">PSD Chandauli Center</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD MODIFICATION DATE</div>
-                                              <div className="info-value">{profile.updatedAt ?
-                                                new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-
-
-                                      <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                      <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
-
-
-                                      <div className="desktop-view">
-                                        <div className="row g-4">
-
-                                          <div className="col-12">
-                                            <div className="scrollable-container">
-                                              <div className="scrollable-content">
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Owner</div>
-                                                    <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                  </div>
+                                      {/* Lead Details Tab */}
+                                      {/* {activeTab === 0 && ( */}
+                                      {(activeTab[profileIndex] || 0) === 0 && (
+                                        <div className="tab-pane active" id="lead-details">
+                                          {/* Your lead details content here */}
+                                          <div className="scrollable-container">
+                                            <div className="scrollable-content">
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD AGE</div>
+                                                  <div className="info-value">{profile.createdAt ?
+                                                    Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                    : 'N/A'}</div>
                                                 </div>
-
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">SECTOR</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">Lead Owner</div>
+                                                  <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
                                                 </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">COURSE / JOB NAME</div>
+                                                  <div className="info-value">{profile._course?.name}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">BATCH NAME</div>
+                                                  <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                </div>
+                                              </div>
 
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._course?.state}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">City</div>
-                                                    <div className="info-value">{profile._course?.city}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">PSD Chandauli Center</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ?
-                                                      new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION By</div>
-                                                    <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile._course?.counslername}</div>
-                                                  </div>
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">TYPE OF PROJECT</div>
+                                                  <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">PROJECT</div>
+                                                  <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">SECTOR</div>
+                                                  <div className="info-value">{profile._course?.sectors}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD CREATION DATE</div>
+                                                  <div className="info-value">{profile.createdAt ?
+                                                    new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                </div>
+                                              </div>
+
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">STATE</div>
+                                                  <div className="info-value">{profile._course?.state}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">City</div>
+                                                  <div className="info-value">{profile._course?.city}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">BRANCH NAME</div>
+                                                  <div className="info-value">PSD Chandauli Center</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                  <div className="info-value">{profile.updatedAt ?
+                                                    new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                 </div>
                                               </div>
                                             </div>
-                                            <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                            <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
+                                          </div>
 
-                                            <div className="desktop-view">
-                                              <div className="row">
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
-                                                  </div>
-                                                </div>
 
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._course?.state}</div>
+                                          <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                                          <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+
+
+                                          <div className="desktop-view">
+                                            <div className="row g-4">
+
+                                              <div className="col-12">
+                                                <div className="scrollable-container">
+                                                  <div className="scrollable-content">
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD AGE</div>
+                                                        <div className="info-value">{profile.createdAt ?
+                                                          Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                          : 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">Lead Owner</div>
+                                                        <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">COURSE / JOB NAME</div>
+                                                        <div className="info-value">{profile._course?.name}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">BATCH NAME</div>
+                                                        <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">TYPE OF PROJECT</div>
+                                                        <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">PROJECT</div>
+                                                        <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">SECTOR</div>
+                                                        <div className="info-value">{profile._course?.sectors}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD CREATION DATE</div>
+                                                        <div className="info-value">{profile.createdAt ?
+                                                          new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">STATE</div>
+                                                        <div className="info-value">{profile._course?.state}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">City</div>
+                                                        <div className="info-value">{profile._course?.city}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">BRANCH NAME</div>
+                                                        <div className="info-value">PSD Chandauli Center</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                        <div className="info-value">{profile.updatedAt ?
+                                                          new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION By</div>
+                                                        <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">Counsellor Name</div>
+                                                        <div className="info-value">{profile._course?.counslername}</div>
+                                                      </div>
+                                                    </div>
                                                   </div>
                                                 </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">CITY</div>
-                                                    <div className="info-value">{profile._course?.city}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Sector</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                {/* <div className="col-xl- col-3">
+                                                <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                                <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
+
+                                                <div className="desktop-view">
+                                                  <div className="row">
+                                                    <div className="col-xl-3 col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD AGE</div>
+                                                        <div className="info-value">{profile.createdAt ?
+                                                          Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                          : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="col-xl-3 col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">STATE</div>
+                                                        <div className="info-value">{profile._course?.state}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">CITY</div>
+                                                        <div className="info-value">{profile._course?.city}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">TYPE OF PROJECT</div>
+                                                        <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">PROJECT</div>
+                                                        <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">Sector</div>
+                                                        <div className="info-value">{profile._course?.sectors}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">COURSE / JOB NAME</div>
+                                                        <div className="info-value">{profile._course?.name}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">BATCH NAME</div>
+                                                        <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    {/* <div className="col-xl- col-3">
                                                 <div className="info-group">
                                                   <div className="info-label">SECTOR</div>
                                                   <div className="info-value">{profile._course?.sectors}</div>
                                                 </div>
                                               </div> */}
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._candidate?.appliedCourses?.centerId || 'NA'}
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">BRANCH NAME</div>
+                                                        <div className="info-value">{profile._candidate?.appliedCourses?.centerId || 'NA'}
+                                                        </div>
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">NEXT ACTION DATE</div>
-                                                    <div className="info-value"></div>
-                                                  </div>
-                                                </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">NEXT ACTION DATE</div>
+                                                        <div className="info-value"></div>
+                                                      </div>
+                                                    </div>
 
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ?
-                                                      new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION BY</div>
-                                                    <div className="info-value">Name</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile._course?.counslername}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD OWNER</div>
-                                                    <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD CREATION DATE</div>
+                                                        <div className="info-value">{profile.createdAt ?
+                                                          new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                        <div className="info-value">{profile.updatedAt ?
+                                                          new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION BY</div>
+                                                        <div className="info-value">Name</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">Counsellor Name</div>
+                                                        <div className="info-value">{profile._course?.counslername}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD OWNER</div>
+                                                        <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
                                                   </div>
                                                 </div>
                                               </div>
                                             </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  )}
+                                      )}
 
-                                  {/* Profile Tab */}
-                                  {/* {activeTab === 1 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 1 && (
-                                    <div className="tab-pane active" id="profile">
-                                      <div className="resume-preview-body">
-                                        <div id="resume-download" className="resume-document">
+                                      {/* Profile Tab */}
+                                      {/* {activeTab === 1 && ( */}
+                                      {(activeTab[profileIndex] || 0) === 1 && (
+                                        <div className="tab-pane active" id="profile">
+                                          <div className="resume-preview-body">
+                                            <div id="resume-download" className="resume-document">
 
-                                          <div className="resume-document-header">
-                                            <div className="resume-profile-section">
-                                              {user?.image ? (
-                                                <img
-                                                  src={`${bucketUrl}/${user.image}`}
-                                                  alt="Profile"
-                                                  className="resume-profile-image"
-                                                />
-                                              ) : (
-                                                <div className="resume-profile-placeholder">
-                                                  <i className="bi bi-person-circle"></i>
+                                              <div className="resume-document-header">
+                                                <div className="resume-profile-section">
+                                                  {user?.image ? (
+                                                    <img
+                                                      src={`${bucketUrl}/${user.image}`}
+                                                      alt="Profile"
+                                                      className="resume-profile-image"
+                                                    />
+                                                  ) : (
+                                                    <div className="resume-profile-placeholder">
+                                                      <i className="bi bi-person-circle"></i>
+                                                    </div>
+                                                  )}
+
+                                                  <div className="resume-header-content">
+                                                    <h1 className="resume-name">
+                                                      {profile._candidate?.name || 'Your Name'}
+                                                    </h1>
+                                                    <p className="resume-title">
+                                                      {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                    </p>
+                                                    <p className="resume-title">
+                                                      {profile._candidate?.sex || 'Sex'}
+                                                    </p>
+
+                                                    <div className="resume-contact-details">
+
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-telephone-fill"></i>
+                                                        <span>{profile._candidate?.mobile}</span>
+                                                      </div>
+
+
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-envelope-fill"></i>
+                                                        <span>{profile._candidate?.email}</span>
+                                                      </div>
+
+                                                      {profile._candidate?.dob && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-calendar-heart-fill"></i>
+                                                          {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
+                                                            day: '2-digit',
+                                                            month: 'long',
+                                                            year: 'numeric'
+                                                          })}
+                                                        </div>
+                                                      )}
+                                                      {profile._candidate?.personalInfo?.currentAddress?.city && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-geo-alt-fill"></i>
+                                                          <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                        </div>
+                                                      )}
+                                                      {profile._candidate?.personalInfo?.permanentAddress?.city && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-house-fill"></i>
+                                                          <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </div>
                                                 </div>
-                                              )}
 
-                                              <div className="resume-header-content">
-                                                <h1 className="resume-name">
-                                                  {profile._candidate?.name || 'Your Name'}
-                                                </h1>
-                                                <p className="resume-title">
-                                                  {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                                </p>
-                                                <p className="resume-title">
-                                                  {profile._candidate?.sex || 'Sex'}
-                                                </p>
-
-                                                <div className="resume-contact-details">
-
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-telephone-fill"></i>
-                                                    <span>{profile._candidate?.mobile}</span>
-                                                  </div>
-
-
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-envelope-fill"></i>
-                                                    <span>{profile._candidate?.email}</span>
-                                                  </div>
-
-                                                  {profile._candidate?.dob && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-calendar-heart-fill"></i>
-                                                      {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
-                                                        day: '2-digit',
-                                                        month: 'long',
-                                                        year: 'numeric'
-                                                      })}
-                                                    </div>
-                                                  )}
-                                                  {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-geo-alt-fill"></i>
-                                                      <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
-                                                    </div>
-                                                  )}
-                                                  {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-house-fill"></i>
-                                                      <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
-                                                    </div>
-                                                  )}
+                                                <div className="resume-summary">
+                                                  <h2 className="resume-section-title">Professional Summary</h2>
+                                                  <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
                                                 </div>
                                               </div>
-                                            </div>
-
-                                            <div className="resume-summary">
-                                              <h2 className="resume-section-title">Professional Summary</h2>
-                                              <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                            </div>
-                                          </div>
 
 
-                                          <div className="resume-document-body">
+                                              <div className="resume-document-body">
 
-                                            <div className="resume-column resume-left-column">
+                                                <div className="resume-column resume-left-column">
 
-                                              {profile._candidate?.isExperienced === false ? (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Work Experience</h2>
-                                                  <div className="resume-experience-item">
-                                                    <div className="resume-item-header">
-                                                      <h3 className="resume-item-title">Fresher</h3>
-                                                    </div>
-                                                    <div className="resume-item-content">
-                                                      <p>Looking for opportunities to start my career</p>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              ) : (
-                                                profile._candidate?.experiences?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Work Experience</h2>
-                                                    {profile._candidate.experiences.map((exp, index) => (
-                                                      <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                  {profile._candidate?.isExperienced === false ? (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Work Experience</h2>
+                                                      <div className="resume-experience-item">
                                                         <div className="resume-item-header">
-                                                          {exp.jobTitle && (
-                                                            <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                          )}
-                                                          {exp.companyName && (
-                                                            <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                          )}
-                                                          {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                            <p className="resume-item-period">
-                                                              {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                                year: 'numeric',
-                                                                month: 'short',
-                                                              }) : 'Start Date'}
-                                                              {" - "}
-                                                              {exp.currentlyWorking ? 'Present' :
-                                                                exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                }) : 'End Date'}
-                                                            </p>
-                                                          )}
+                                                          <h3 className="resume-item-title">Fresher</h3>
                                                         </div>
-                                                        {exp.jobDescription && (
-                                                          <div className="resume-item-content">
-                                                            <p>{exp.jobDescription}</p>
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )
-                                              )}
-
-                                              {profile._candidate?.qualifications?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Education</h2>
-                                                  {profile._candidate.qualifications.map((edu, index) => (
-                                                    <div className="resume-education-item" key={`resume-edu-${index}`}>
-                                                      <div className="resume-item-header">
-                                                        {edu.education && (
-                                                          <h3 className="resume-item-title">{edu.education}</h3>
-                                                        )}
-                                                        {edu.course && (
-                                                          <h3 className="resume-item-title">{edu.course}</h3>
-                                                        )}
-                                                        {edu.universityName && (
-                                                          <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                        )}
-                                                        {edu.schoolName && (
-                                                          <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                        )}
-                                                        {edu.collegeName && (
-                                                          <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                        )}
-                                                        {edu.passingYear && (
-                                                          <p className="resume-item-period">{edu.passingYear}</p>
-                                                        )}
-                                                      </div>
-                                                      <div className="resume-item-content">
-                                                        {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                        {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                        <div className="resume-item-content">
+                                                          <p>Looking for opportunities to start my career</p>
+                                                        </div>
                                                       </div>
                                                     </div>
-                                                  ))}
-                                                </div>
-                                              )}
-                                            </div>
-
-
-                                            <div className="resume-column resume-right-column">
-
-                                              {profile._candidate?.personalInfo?.skills?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Skills</h2>
-                                                  <div className="resume-skills-list">
-                                                    {profile._candidate.personalInfo.skills.map((skill, index) => (
-                                                      <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                        <div className="resume-skill-name">{skill.skillName || skill}</div>
-                                                        {skill.skillPercent && (
-                                                          <div className="resume-skill-bar-container">
-                                                            <div
-                                                              className="resume-skill-bar"
-                                                              style={{ width: `${skill.skillPercent}%` }}
-                                                            ></div>
-                                                            <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                  ) : (
+                                                    profile._candidate?.experiences?.length > 0 && (
+                                                      <div className="resume-section">
+                                                        <h2 className="resume-section-title">Work Experience</h2>
+                                                        {profile._candidate.experiences.map((exp, index) => (
+                                                          <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                            <div className="resume-item-header">
+                                                              {exp.jobTitle && (
+                                                                <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                              )}
+                                                              {exp.companyName && (
+                                                                <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                              )}
+                                                              {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                                <p className="resume-item-period">
+                                                                  {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                  }) : 'Start Date'}
+                                                                  {" - "}
+                                                                  {exp.currentlyWorking ? 'Present' :
+                                                                    exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                      year: 'numeric',
+                                                                      month: 'short',
+                                                                    }) : 'End Date'}
+                                                                </p>
+                                                              )}
+                                                            </div>
+                                                            {exp.jobDescription && (
+                                                              <div className="resume-item-content">
+                                                                <p>{exp.jobDescription}</p>
+                                                              </div>
+                                                            )}
                                                           </div>
-                                                        )}
+                                                        ))}
                                                       </div>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
+                                                    )
+                                                  )}
 
-
-
-                                              {profile._candidate?.personalInfo?.languages?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Languages</h2>
-                                                  <div className="resume-languages-list">
-                                                    {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                      <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                        <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
-                                                        {lang.level && (
-                                                          <div className="resume-language-level">
-                                                            {[1, 2, 3, 4, 5].map(dot => (
-                                                              <span
-                                                                key={`resume-lang-dot-${index}-${dot}`}
-                                                                className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                              ></span>
-                                                            ))}
+                                                  {profile._candidate?.qualifications?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Education</h2>
+                                                      {profile._candidate.qualifications.map((edu, index) => (
+                                                        <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {edu.education && (
+                                                              <h3 className="resume-item-title">{edu.education}</h3>
+                                                            )}
+                                                            {edu.course && (
+                                                              <h3 className="resume-item-title">{edu.course}</h3>
+                                                            )}
+                                                            {edu.universityName && (
+                                                              <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                            )}
+                                                            {edu.schoolName && (
+                                                              <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                            )}
+                                                            {edu.collegeName && (
+                                                              <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                            )}
+                                                            {edu.passingYear && (
+                                                              <p className="resume-item-period">{edu.passingYear}</p>
+                                                            )}
                                                           </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
+                                                          <div className="resume-item-content">
+                                                            {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                            {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                          </div>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
                                                 </div>
-                                              )}
 
 
-                                              {profile._candidate?.personalInfo?.certifications?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Certifications</h2>
-                                                  <ul className="resume-certifications-list">
-                                                    {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                <div className="resume-column resume-right-column">
+
+                                                  {profile._candidate?.personalInfo?.skills?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Skills</h2>
+                                                      <div className="resume-skills-list">
+                                                        {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                          <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                            <div className="resume-skill-name">{skill.skillName || skill}</div>
+                                                            {skill.skillPercent && (
+                                                              <div className="resume-skill-bar-container">
+                                                                <div
+                                                                  className="resume-skill-bar"
+                                                                  style={{ width: `${skill.skillPercent}%` }}
+                                                                ></div>
+                                                                <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+
+
+                                                  {profile._candidate?.personalInfo?.languages?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Languages</h2>
+                                                      <div className="resume-languages-list">
+                                                        {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                          <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                            <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                            {lang.level && (
+                                                              <div className="resume-language-level">
+                                                                {[1, 2, 3, 4, 5].map(dot => (
+                                                                  <span
+                                                                    key={`resume-lang-dot-${index}-${dot}`}
+                                                                    className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                                  ></span>
+                                                                ))}
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+
+
+
+                                                  {/* {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
+                                              <div className="resume-section">
+                                                <h2 className="resume-section-title">Certifications</h2>
+                                                <ul className="resume-certifications-list">
+                                                  {certificates.map((cert, index) => (
+                                                    (cert.certificateName || cert.orgName) && (
                                                       <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                        <strong>{cert.certificateName || cert.name}</strong>
+                                                        {cert.certificateName && (
+                                                          <strong>{cert.certificateName}</strong>
+                                                        )}
                                                         {cert.orgName && (
                                                           <span className="resume-cert-org"> - {cert.orgName}</span>
                                                         )}
-                                                        {(cert.month || cert.year) && (
+                                                        {cert.currentlypursuing ? (
+                                                          <span className="resume-cert-date highlight-text"> (Currently Pursuing)</span>
+                                                        ) : (cert.month || cert.year) && (
                                                           <span className="resume-cert-date">
                                                             {cert.month && cert.year ?
                                                               ` (${cert.month}/${cert.year})` :
@@ -1934,183 +1888,969 @@ const CRMDashboard = () => {
                                                           </span>
                                                         )}
                                                       </li>
-                                                    ))}
-                                                  </ul>
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.projects?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Projects</h2>
-                                                  {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                      <div className="resume-item-header">
-                                                        <h3 className="resume-project-title">
-                                                          {proj.projectName || 'Project'}
-                                                          {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                        </h3>
-                                                      </div>
-                                                      {proj.description && (
-                                                        <div className="resume-item-content">
-                                                          <p>{proj.description}</p>
-                                                        </div>
-                                                      )}
-                                                    </div>
+                                                    )
                                                   ))}
+                                                </ul>
+                                              </div>
+                                            )} */}
+
+                                                  {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Certifications</h2>
+                                                      <ul className="resume-certifications-list">
+                                                        {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                          <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                            <strong>{cert.certificateName || cert.name}</strong>
+                                                            {cert.orgName && (
+                                                              <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                            )}
+                                                            {(cert.month || cert.year) && (
+                                                              <span className="resume-cert-date">
+                                                                {cert.month && cert.year ?
+                                                                  ` (${cert.month}/${cert.year})` :
+                                                                  cert.month ?
+                                                                    ` (${cert.month})` :
+                                                                    cert.year ?
+                                                                      ` (${cert.year})` :
+                                                                      ''}
+                                                              </span>
+                                                            )}
+                                                          </li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+
+
+                                                  {profile._candidate?.personalInfo?.projects?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Projects</h2>
+                                                      {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                        <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            <h3 className="resume-project-title">
+                                                              {proj.projectName || 'Project'}
+                                                              {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                            </h3>
+                                                          </div>
+                                                          {proj.description && (
+                                                            <div className="resume-item-content">
+                                                              <p>{proj.description}</p>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
+
+
+                                                  {profile._candidate?.personalInfo?.interest?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Interests</h2>
+                                                      <div className="resume-interests-tags">
+                                                        {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                          <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                            {interest}
+                                                          </span>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                </div>
+                                              </div>
+
+
+                                              {profile._candidate?.personalInfo?.declaration?.text && (
+                                                <div className="resume-declaration">
+                                                  <h2 className="resume-section-title">Declaration</h2>
+                                                  <p>{profile._candidate.personalInfo.declaration.text}</p>
+
                                                 </div>
                                               )}
-
-
-                                              {profile._candidate?.personalInfo?.interest?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Interests</h2>
-                                                  <div className="resume-interests-tags">
-                                                    {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                      <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                        {interest}
-                                                      </span>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
                                             </div>
                                           </div>
+                                        </div>
+                                      )}
+
+                                      {/* Job History Tab */}
+                                      {/* {activeTab === 2 && ( */}
+                                      {(activeTab[profileIndex] || 0) === 2 && (
+                                        <div className="tab-pane active" id="job-history">
+                                          <div className="section-card">
+                                            <div className="table-responsive">
+                                              <table className="table table-hover table-bordered job-history-table">
+                                                <thead className="table-light">
+                                                  <tr>
+                                                    <th>S.No</th>
+                                                    <th>Company Name</th>
+                                                    <th>Position</th>
+                                                    <th>Duration</th>
+                                                    <th>Location</th>
+                                                    <th>Status</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {experiences.map((job, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{job.companyName}</td>
+                                                      <td>{job.jobTitle}</td>
+                                                      <td>
+                                                        {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                        {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                      </td>
+                                                      <td>Remote</td>
+                                                      <td><span className="text-success">Completed</span></td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Course History Tab */}
+                                      {/* {activeTab === 3 && ( */}
+                                      {(activeTab[profileIndex] || 0) === 3 && (
+                                        <div className="tab-pane active" id="course-history">
+                                          <div className="section-card">
+                                            <div className="table-responsive">
+                                              <table className="table table-hover table-bordered course-history-table">
+                                                <thead className="table-light">
+                                                  <tr>
+                                                    <th>S.No</th>
+                                                    <th>Course Name</th>
+                                                    <th>Institute</th>
+                                                    <th>Completion Date</th>
+                                                    <th>Certificate ID</th>
+                                                    <th>Score</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {certificates.map((course, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{course.certificateName}</td>
+                                                      <td>{course.orgName}</td>
+                                                      <td>{course.month} {course.year}</td>
+                                                      <td>CRT{index + 1}001</td>
+                                                      <td><span className="text-success">Completed</span></td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* pagination  */}
+                            <nav aria-label="Page navigation example">
+                              <ul className="pagination">
+                                <li className="page-item">
+                                  <a className="page-link" href="#" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                  </a>
+                                </li>
+                                <li className="page-item"><a className="page-link" href="#">1</a></li>
+                                <li className="page-item"><a className="page-link" href="#">2</a></li>
+                                <li className="page-item"><a className="page-link" href="#">3</a></li>
+                                <li className="page-item">
+                                  <a className="page-link" href="#" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                  </a>
+                                </li>
+                              </ul>
+                            </nav>
+
+                          </div>
+
+                          {/* <div className="row" id="crm-main-row">
+                    <div className={`card-content transition-col`} id="mainContent">
 
 
-                                          {profile._candidate?.personalInfo?.declaration?.text && (
-                                            <div className="resume-declaration">
-                                              <h2 className="resume-section-title">Declaration</h2>
-                                              <p>{profile._candidate.personalInfo.declaration.text}</p>
 
+                      <div className="card border-0 shadow-sm mb-0 mt-2">
+                        <div className="card-body px-1 py-0 my-2" >
+                          <div className="row align-items-center">
+                            <div className="col-md-6">
+                              <div className="d-flex align-items-center">
+                                <div className="form-check me-3">
+                                  <input className="form-check-input" type="checkbox" />
+                                </div>
+                                <div className="me-3">
+                                  <div className="circular-progress-container" data-percent="40">
+                                    <svg width="40" height="40">
+                                      <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
+                                      <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
+                                    </svg>
+                                    <div className="progress-text"></div>
+                                  </div>
+                                </div>
+                                <div>
+                                  
+                                  <h6 className="mb-0 fw-bold">{profileData?.personalInfo?.name || user?.name || 'Your Name'}
+</h6>
+                                  <small className="text-muted">{profileData?.personalInfo?.mobile || user?.mobile || 'Mobile Number'}</small>
+                                </div>
+                                <div style={{ marginLeft: '15px' }}>
+                                  <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                    <i className="fas fa-phone"></i>
+                                  </button>
+                                  <button
+                                    className="btn btn-outline-success btn-sm border-0"
+                                    onClick={openWhatsappPanel}
+                                    style={{ fontSize: '20px' }}
+                                    title="WhatsApp"
+                                  >
+                                    <i className="fab fa-whatsapp"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-md-5">
+                              <div className="d-flex gap-2">
+                                <div className="flex-grow-1">
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm m-0" style={{
+                                      cursor: 'pointer',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '0px',
+                                      borderTopRightRadius: '5px',
+                                      borderTopLeftRadius: '5px', cursor: 'pointer',
+                                      width: '145px',
+                                      height: '20px', fontSize: '10px'
+                                    }}
+                                    value={crmFilters[activeCrmFilter].name}
+                                    readOnly
+                                    onClick={openEditPanel}
+                                  />
+                                  <input
+                                    type="text"
+                                    className="form-control form-control-sm m-0"
+                                    value="Untouched Lead Long Text Example..."
+                                    style={{
+                                      cursor: 'pointer',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '0px',
+                                      borderBottomRightRadius: '5px',
+                                      borderBottomLeftRadius: '5px', cursor: 'pointer',
+                                      width: '145px',
+                                      height: '20px', fontSize: '10px'
+                                    }}
+                                    readOnly
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-md-1 text-end">
+                              <div className="btn-group">
+                                <button
+                                  className="btn btn-sm btn-outline-secondary border-0"
+                                  onClick={() => setLeadDetailsVisible(!leadDetailsVisible)} style={{ border: 'none' }}
+                                >
+                                  {leadDetailsVisible ? (
+                                    <i className="fas fa-chevron-up"></i>
+                                  ) : (
+                                    <i className="fas fa-chevron-down"></i>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      
+                      <div className="card border-0 shadow-sm mb-4">
+                        <div className="card-header bg-white border-bottom-0 py-3 mb-3">
+                          <div className="d-flex justify-content-between align-items-center">
+                            <ul className="nav nav-pills nav-pills-sm">
+                              {tabs.map((tab, index) => (
+                                <li className="nav-item" key={index}>
+                                  <button
+                                    className={`nav-link ${activeTab === index ? 'active' : ''}`}
+                                    onClick={() => handleTabClick(index)}
+                                  >
+                                    {tab}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+
+                       
+                        {leadDetailsVisible && (
+                          <div>
+                           
+                            <div className={`tab-pane ${activeTab === 0 ? 'active' : ''}`} id="lead-details">
+
+                             
+                              <div className="scrollable-container">
+                                <div className="scrollable-content">
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD AGE</div>
+                                      <div className="info-value">282 Days</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">Lead Owner</div>
+                                      <div className="info-value">Meta Ads Inbound IVR Inbound Call</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">COURSE / JOB NAME</div>
+                                      <div className="info-value">Operator</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">BATCH NAME</div>
+                                      <div className="info-value">-</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">TYPE OF PROJECT</div>
+                                      <div className="info-value">Job</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">PROJECT</div>
+                                      <div className="info-value">Job</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">SECTOR</div>
+                                      <div className="info-value">Retail</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD CREATION DATE</div>
+                                      <div className="info-value">Jan 15, 2024 9:29 AM</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="info-card">
+                                    <div className="info-group">
+                                      <div className="info-label">STATE</div>
+                                      <div className="info-value">Uttar Pradesh</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">City</div>
+                                      <div className="info-value">Chandauli</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">BRANCH NAME</div>
+                                      <div className="info-value">PSD Chandauli Center</div>
+                                    </div>
+                                    <div className="info-group">
+                                      <div className="info-label">LEAD MODIFICATION DATE</div>
+                                      <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              
+                              <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                              <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+
+                             
+                              <div className="desktop-view">
+                                <div className="row g-4">
+                                  
+                                  <div className="col-12">
+                                    <div className="scrollable-container">
+                                      <div className="scrollable-content">
+                                        <div className="info-card">
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD AGE</div>
+                                            <div className="info-value">282 Days</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">Lead Owner</div>
+                                            <div className="info-value">Meta Ads Inbound IVR Inbound Call</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">COURSE / JOB NAME</div>
+                                            <div className="info-value">Operator</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">BATCH NAME</div>
+                                            <div className="info-value"></div>
+                                          </div>
+                                        </div>
+
+                                        <div className="info-card">
+                                          <div className="info-group">
+                                            <div className="info-label">TYPE OF PROJECT</div>
+                                            <div className="info-value">Job</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">PROJECT</div>
+                                            <div className="info-value">Job</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">SECTOR</div>
+                                            <div className="info-value">Retail</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD CREATION DATE</div>
+                                            <div className="info-value">Jan 15, 2024 9:29 AM</div>
+                                          </div>
+                                        </div>
+
+                                        <div className="info-card">
+                                          <div className="info-group">
+                                            <div className="info-label">STATE</div>
+                                            <div className="info-value">Uttar Pradesh</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">City</div>
+                                            <div className="info-value">Job</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">BRANCH NAME</div>
+                                            <div className="info-value">PSD Chandauli Center</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD MODIFICATION DATE</div>
+                                            <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD MODIFICATION By</div>
+                                            <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                          </div>
+                                          <div className="info-group">
+                                            <div className="info-label">Counsellor Name</div>
+                                            <div className="info-value">Name</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                    <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
+
+                                    <div className="desktop-view">
+                                      <div className="row">
+                                        <div className="col-xl-3 col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD AGE</div>
+                                            <div className="info-value">282 Days</div>
+                                          </div>
+                                        </div>
+
+                                        <div className="col-xl-3 col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">STATE</div>
+                                            <div className="info-value">Uttar Pradesh</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">CITY</div>
+                                            <div className="info-value"></div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">TYPE OF PROJECT</div>
+                                            <div className="info-value">Job</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">PROJECT</div>
+                                            <div className="info-value">Job</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">Sector</div>
+                                            <div className="info-value">Retail</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">COURSE / JOB NAME</div>
+                                            <div className="info-value">Operator</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">BATCH NAME</div>
+                                            <div className="info-value"></div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">SECTOR</div>
+                                            <div className="info-value">Retail</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">BRANCH NAME</div>
+                                            <div className="info-value">PSD Chandauli Center</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">NEXT ACTION DATE</div>
+                                            <div className="info-value"></div>
+                                          </div>
+                                        </div>
+
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD CREATION DATE</div>
+                                            <div className="info-value">Jan 15, 2024 9:29 AM</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD MODIFICATION DATE</div>
+                                            <div className="info-value">Mar 21, 2025  col-3:32 PM</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD MODIFICATION BY</div>
+                                            <div className="info-value">Name</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">Counsellor Name</div>
+                                            <div className="info-value">Name</div>
+                                          </div>
+                                        </div>
+                                        <div className="col-xl- col-3">
+                                          <div className="info-group">
+                                            <div className="info-label">LEAD OWNER</div>
+                                            <div className="info-value">Rahul Sharma</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                           
+                            <div className={`tab-pane ${activeTab === 1 ? 'active' : ''}`} id="profile">
+                              <div className="resume-preview-body">
+                                <div id="resume-download" className="resume-document">
+                                 
+                                  <div className="resume-document-header">
+                                    <div className="resume-profile-section">
+                                      {user?.image ? (
+                                        <img
+                                          src={`${bucketUrl}/${user.image}`}
+                                          alt="Profile"
+                                          className="resume-profile-image"
+                                        />
+                                      ) : (
+                                        <div className="resume-profile-placeholder">
+                                          <i className="bi bi-person-circle"></i>
+                                        </div>
+                                      )}
+
+                                      <div className="resume-header-content">
+                                        <h1 className="resume-name">
+                                          {profileData?.personalInfo?.name || user?.name || 'Your Name'}
+                                        </h1>
+                                        <p className="resume-title">
+                                          {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
+                                        </p>
+                                        <p className="resume-title">
+                                          {profileData?.personalInfo?.sex || 'Sex'}
+                                        </p>
+
+                                        <div className="resume-contact-details">
+                                          {profileData?.mobile && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-telephone-fill"></i>
+                                              <span>{profileData.mobile}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.email && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-envelope-fill"></i>
+                                              <span>{profileData.email}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.dob && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-calendar-heart-fill"></i>
+                                              {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
+                                                day: '2-digit',
+                                                month: 'long',
+                                                year: 'numeric'
+                                              }) : ''}
+                                            </div>
+                                          )}
+                                          {profileData?.personalInfo?.currentAddress?.fullAddress && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-geo-alt-fill"></i>
+                                              <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
+                                            </div>
+                                          )}
+                                          {profileData?.personalInfo?.permanentAddress && (
+                                            <div className="resume-contact-item">
+                                              <i className="bi bi-house-fill"></i>
+                                              <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
                                             </div>
                                           )}
                                         </div>
                                       </div>
                                     </div>
-                                  )}
 
-                                  {/* Job History Tab */}
-                                  {/* {activeTab === 2 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 2 && (
-                                    <div className="tab-pane active" id="job-history">
-                                      <div className="section-card">
-                                        <div className="table-responsive">
-                                          <table className="table table-hover table-bordered job-history-table">
-                                            <thead className="table-light">
-                                              <tr>
-                                                <th>S.No</th>
-                                                <th>Company Name</th>
-                                                <th>Position</th>
-                                                <th>Duration</th>
-                                                <th>Location</th>
-                                                <th>Status</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {experiences.map((job, index) => (
-                                                <tr key={index}>
-                                                  <td>{index + 1}</td>
-                                                  <td>{job.companyName}</td>
-                                                  <td>{job.jobTitle}</td>
-                                                  <td>
-                                                    {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                    {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                  </td>
-                                                  <td>Remote</td>
-                                                  <td><span className="text-success">Completed</span></td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
+                                    <div className="resume-summary">
+                                      <h2 className="resume-section-title">Professional Summary</h2>
+                                      <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
+                                    </div>
+                                  </div>
+
+                                 
+                                  <div className="resume-document-body">
+                                    
+                                    <div className="resume-column resume-left-column">
+                                      
+                                      {profileData?.experienceType === 'fresher' ? (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Work Experience</h2>
+                                          <div className="resume-experience-item">
+                                            <div className="resume-item-header">
+                                              <h3 className="resume-item-title">Fresher</h3>
+                                            </div>
+                                            {profileData?.fresherDetails && (
+                                              <div className="resume-item-content">
+                                                <p>{profileData.isExperienced}</p>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
+                                      ) : (
+                                        experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                          <div className="resume-section">
+                                            <h2 className="resume-section-title">Work Experience</h2>
+                                            {experiences.map((exp, index) => (
+                                              (exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                                <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                  <div className="resume-item-header">
+                                                    {exp.jobTitle && (
+                                                      <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                    )}
+                                                    {exp.companyName && (
+                                                      <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                    )}
+                                                    {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                      <p className="resume-item-period">
+                                                        {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                          year: 'numeric',
+                                                          month: 'short',
+                                                        }) : 'Start Date'}
+                                                        {" - "}
+                                                        {exp.currentlyWorking ? 'Present' :
+                                                          exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                            year: 'numeric',
+                                                            month: 'short',
+                                                          }) : 'End Date'}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                  {exp.jobDescription && (
+                                                    <div className="resume-item-content">
+                                                      <p>{exp.jobDescription}</p>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        )
+                                      )}
+
+                                    
+                                      {educations.length > 0 && educations.some(edu =>
+                                        edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
+                                      ) && (
+                                          <div className="resume-section">
+                                            <h2 className="resume-section-title">Education</h2>
+                                            {educations.map((edu, index) => (
+                                              (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
+                                                <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                  <div className="resume-item-header">
+                                                    {edu.education && (
+                                                      <h3 className="resume-item-title">
+                                                        {educationList.find(e => e._id === edu.education)?.name || 'Education'}
+                                                      </h3>
+                                                    )}
+                                                    {typeof edu.course === 'string' && edu.course && (
+                                                      <h3 className="resume-item-title">
+                                                        {coursesList[index]?.find(course => course._id === edu.course)?.name || edu.course}
+                                                      </h3>
+                                                    )}
+                                                    {edu.universityName && (
+                                                      <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                    )}
+                                                    {(edu.schoolName && !edu.universityName) && (
+                                                      <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                    )}
+                                                    {edu.collegeName && (
+                                                      <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                    )}
+                                                    {edu.currentlypursuing ? (
+                                                      <p className="resume-item-period highlight-text">Currently Pursuing</p>
+                                                    ) : edu.passingYear ? (
+                                                      <p className="resume-item-period">{edu.passingYear}</p>
+                                                    ) : null}
+                                                  </div>
+                                                  <div className="resume-item-content">
+                                                    {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                    {edu.specialization && <p>Specialization: {typeof edu.specialization === 'string' ? edu.specialization : 'Specialization'}</p>}
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        )}
+                                    </div>
+
+                                  
+                                    <div className="resume-column resume-right-column">
+                                      
+                                      {skills.length > 0 && skills.some(skill => skill.skillName) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Skills</h2>
+                                          <div className="resume-skills-list">
+                                            {skills.map((skill, index) => (
+                                              skill.skillName && (
+                                                <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                  <div className="resume-skill-name">{skill.skillName}</div>
+                                                  <div className="resume-skill-bar-container">
+                                                    <div
+                                                      className="resume-skill-bar"
+                                                      style={{ width: `${skill.skillPercent || 0}%` }}
+                                                    ></div>
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                     
+                                      {languages.length > 0 && languages.some(lang => lang.lname) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Languages</h2>
+                                          <div className="resume-languages-list">
+                                            {languages.map((lang, index) => (
+                                              lang.lname && (
+                                                <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                  <div className="resume-language-name">{lang.lname}</div>
+                                                  <div className="resume-language-level">
+                                                    {[1, 2, 3, 4, 5].map(dot => (
+                                                      <span
+                                                        key={`resume-lang-dot-${index}-${dot}`}
+                                                        className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                      ></span>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                     
+                                      {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Certifications</h2>
+                                          <ul className="resume-certifications-list">
+                                            {certificates.map((cert, index) => (
+                                              (cert.certificateName || cert.orgName) && (
+                                                <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                  {cert.certificateName && (
+                                                    <strong>{cert.certificateName}</strong>
+                                                  )}
+                                                  {cert.orgName && (
+                                                    <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                  )}
+                                                  {cert.currentlypursuing ? (
+                                                    <span className="resume-cert-date highlight-text"> (Currently Pursuing)</span>
+                                                  ) : (cert.month || cert.year) && (
+                                                    <span className="resume-cert-date">
+                                                      {cert.month && cert.year ?
+                                                        ` (${cert.month}/${cert.year})` :
+                                                        cert.month ?
+                                                          ` (${cert.month})` :
+                                                          cert.year ?
+                                                            ` (${cert.year})` :
+                                                            ''}
+                                                    </span>
+                                                  )}
+                                                </li>
+                                              )
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+
+                                      
+                                      {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Projects</h2>
+                                          {projects.map((proj, index) => (
+                                            (proj.projectName || proj.proDescription) && (
+                                              <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                <div className="resume-item-header">
+                                                  <h3 className="resume-project-title">
+                                                    {proj.projectName || 'Project'}
+                                                    {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
+                                                  </h3>
+                                                </div>
+                                                {proj.proDescription && (
+                                                  <div className="resume-item-content">
+                                                    <p>{proj.proDescription}</p>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      
+                                      {interests.filter(i => i.trim() !== '').length > 0 && (
+                                        <div className="resume-section">
+                                          <h2 className="resume-section-title">Interests</h2>
+                                          <div className="resume-interests-tags">
+                                            {interests.filter(i => i.trim() !== '').map((interest, index) => (
+                                              <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                {interest}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                 
+                                  {declaration?.text && (
+                                    <div className="resume-declaration">
+                                      <h2 className="resume-section-title">Declaration</h2>
+                                      <p>{declaration.text}</p>
                                     </div>
                                   )}
-
-                                  {/* Course History Tab */}
-                                  {/* {activeTab === 3 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 3 && (
-                                    <div className="tab-pane active" id="course-history">
-                                      <div className="section-card">
-                                        <div className="table-responsive">
-                                          <table className="table table-hover table-bordered course-history-table">
-                                            <thead className="table-light">
-                                              <tr>
-                                                <th>S.No</th>
-                                                <th>Course Name</th>
-                                                <th>Institute</th>
-                                                <th>Completion Date</th>
-                                                <th>Certificate ID</th>
-                                                <th>Score</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {certificates.map((course, index) => (
-                                                <tr key={index}>
-                                                  <td>{index + 1}</td>
-                                                  <td>{course.certificateName}</td>
-                                                  <td>{course.orgName}</td>
-                                                  <td>{course.month} {course.year}</td>
-                                                  <td>CRT{index + 1}001</td>
-                                                  <td><span className="text-success">Completed</span></td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
                                 </div>
-                              )}
+                              </div>
+                            </div>
+
+                            
+                            <div className={`tab-pane ${activeTab === 2 ? 'active' : ''}`} id="job-history">
+                              <div className="section-card">
+                                <div className="table-responsive">
+                                  <table className="table table-hover table-bordered job-history-table">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>S.No</th>
+                                        <th>Company Name</th>
+                                        <th>Position</th>
+                                        <th>Duration</th>
+                                        <th>Location</th>
+                                        <th>Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {experiences.map((job, index) => (
+                                        <tr key={index}>
+                                          <td>{index + 1}</td>
+                                          <td>{job.companyName}</td>
+                                          <td>{job.jobTitle}</td>
+                                          <td>
+                                            {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                            {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                          </td>
+                                          <td>Remote</td>
+                                          <td><span className="text-success">Completed</span></td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+
+                            
+                            <div className={`tab-pane ${activeTab === 3 ? 'active' : ''}`} id="course-history">
+                              <div className="section-card">
+                                <div className="table-responsive">
+                                  <table className="table table-hover table-bordered course-history-table">
+                                    <thead className="table-light">
+                                      <tr>
+                                        <th>S.No</th>
+                                        <th>Course Name</th>
+                                        <th>Institute</th>
+                                        <th>Completion Date</th>
+                                        <th>Certificate ID</th>
+                                        <th>Score</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {certificates.map((course, index) => (
+                                        <tr key={index}>
+                                          <td>{index + 1}</td>
+                                          <td>{course.certificateName}</td>
+                                          <td>{course.orgName}</td>
+                                          <td>{course.month} {course.year}</td>
+                                          <td>CRT{index + 1}001</td>
+                                          <td><span className="text-success">Completed</span></td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        ))}
-
-                        {/* pagination  */}
-                        <nav aria-label="Page navigation example">
-                          <ul className="pagination">
-                            <li className="page-item">
-                              <a className="page-link" href="#" aria-label="Previous">
-                                <span aria-hidden="true">&laquo;</span>
-                              </a>
-                            </li>
-                            <li className="page-item"><a className="page-link" href="#">1</a></li>
-                            <li className="page-item"><a className="page-link" href="#">2</a></li>
-                            <li className="page-item"><a className="page-link" href="#">3</a></li>
-                            <li className="page-item">
-                              <a className="page-link" href="#" aria-label="Next">
-                                <span aria-hidden="true">&raquo;</span>
-                              </a>
-                            </li>
-                          </ul>
-                        </nav>
-
+                        )}
                       </div>
-
+                    </div>
+                  </div>  */}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </section>
+              </div>
+            </div>
+            {!isMobile && (
+              <div className="col-4">
+                <div className="row sticky-top stickyBreakpoints">
+                  {renderEditPanel()}
+                  {renderWhatsAppPanel()}
+                  {renderLeadHistoryPanel()}
                 </div>
               </div>
-            </section>
+            )}
           </div>
-        </div>
-        {!isMobile && (
-          <div className="col-4">
-            <div className="row sticky-top stickyBreakpoints">
-              {renderEditPanel()}
-              {renderWhatsAppPanel()}
-              {renderLeadHistoryPanel()}
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Right Sidebar for Desktop - Panels */}
-      {/* {!isMobile && (
+          {/* Right Sidebar for Desktop - Panels */}
+          {/* {!isMobile && (
         <div className="col-4">
           <div className="row sticky-top stickyBreakpoints">
             {renderEditPanel()}
@@ -2119,13 +2859,13 @@ const CRMDashboard = () => {
         </div>
       )} */}
 
-      {/* Mobile Modals */}
-      {isMobile && renderEditPanel()}
-      {isMobile && renderWhatsAppPanel()}
-      {isMobile && renderLeadHistoryPanel()}
+          {/* Mobile Modals */}
+          {isMobile && renderEditPanel()}
+          {isMobile && renderWhatsAppPanel()}
+          {isMobile && renderLeadHistoryPanel()}
 
-      <style jsx>
-        {`
+          <style jsx>
+            {`
         html body .content .content-wrapper {
           padding: calc(0.9rem - 0.1rem) 1.2rem
         }
@@ -2385,10 +3125,10 @@ const CRMDashboard = () => {
     margin: 0;
 }
 
-
-#nextActionDate{
-background-color: rgb(241, 242, 246)!important
+.overflowY{
+overflow-y:scroll!important;
 }
+
 /* Page links styling */
 .pagination .page-link {
     position: relative;
@@ -2687,9 +3427,10 @@ background-color: rgb(241, 242, 246)!important
 
         `}
 
-      </style>
-    </div>
-  );
+          </style>
+        </div>
+        );
 };
 
-export default CRMDashboard;
+        export default CRMDashboard;
+
