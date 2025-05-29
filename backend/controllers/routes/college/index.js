@@ -193,7 +193,9 @@ router.route("/appliedCandidates").get(async (req, res) => {
 		const appliedCourses = await AppliedCourses.find()
 			.populate('_candidate')
 			.populate('_course')
-			.populate('_leadStatus').populate('registeredBy')
+			.populate('_leadStatus')
+			
+			.populate('registeredBy')
 			.populate({
 				path: '_course',
 				populate: {

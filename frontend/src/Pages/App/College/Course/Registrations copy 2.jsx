@@ -163,7 +163,10 @@ const CRMDashboard = () => {
   };
 
   const handleUpdateStatus = async () => {
+    console.log('Function called');
   try {
+
+    console.log('onclick working')
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
     
@@ -202,7 +205,7 @@ const CRMDashboard = () => {
     }
   } catch (error) {
     console.error('Error updating status:', error);
-    alert('An error occurred while updating status');
+    // alert('An error occurred while updating status');
   }
 };
 

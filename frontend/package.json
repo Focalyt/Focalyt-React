@@ -19,7 +19,6 @@
     "axios": "^1.7.9",
     "bootstrap": "^5.3.3",
     "choices.js": "^11.1.0",
-    "date-fns": "^4.1.0",
     "feather-icons": "^4.29.2",
     "file-saver": "^2.0.5",
     "formik": "^2.4.6",
