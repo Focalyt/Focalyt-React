@@ -11,14 +11,11 @@ const projectSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'inactive'],
+    enum: ['active', 'inactive', 'completed'],
     default: 'active',
   },
-  centers: {
-    type: Number,
-    default: 0,
-  },
-  verticalId: {
+  
+  vertical: {
     type: Schema.Types.ObjectId,
     ref: 'Vertical',
     required: true,

@@ -9,19 +9,13 @@ const centerSchema = new Schema({
   address: {
     type: String,
   },
-  contact: {
-    type: String,
-  },
-  candidates: {
-    type: Number,
-    default: 0,
-  },
+ 
   status: {
     type: String,
     enum: ['active', 'inactive'],
     default: 'active',
   },
-  projectId: {
+  project: {
     type: Schema.Types.ObjectId,
     ref: 'Project',
     required: true,

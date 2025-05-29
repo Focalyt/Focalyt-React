@@ -239,7 +239,8 @@ const CandidateManagementPortal = () => {
 
 
         {/* Project Component with filtered data */}
-        <Project selectedVertical={selectedVerticalForProjects} />
+       <Project selectedVertical={selectedVerticalForProjects} onBackToVerticals={handleBackToVerticals} />
+
       </div>
     );
   }

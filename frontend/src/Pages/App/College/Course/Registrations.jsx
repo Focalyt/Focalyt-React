@@ -23,8 +23,36 @@ const CRMDashboard = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [isMobile, setIsMobile] = useState(false);
   const [allProfiles, setAllProfiles] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
+
+  //Pagination
+
+  const getPaginationPages = () => {
+    const delta = 2;
+    const range = [];
+    let start = Math.max(1, currentPage - delta);
+    let end = Math.min(totalPages, currentPage + delta);
+
+    if (end - start < 4) {
+      if (start === 1) {
+        end = Math.min(totalPages, start + 4);
+      } else {
+        start = Math.max(1, end - 4);
+      }
+    }
+
+    for (let i = start; i <= end; i++) {
+      range.push(i);
+    }
+    return range;
+  };
+
+
+
 
   //Date picker
   const today = new Date();  // Current date
@@ -623,6 +651,10 @@ const CRMDashboard = () => {
     fetchProfileData();
   }, []);
 
+  useEffect(() => {
+    fetchProfileData();
+  }, [currentPage]);
+
   const fetchProfileData = async () => {
     try {
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -633,7 +665,7 @@ const CRMDashboard = () => {
       }
 
       // Replace with your actual profile API endpoint
-      const response = await axios.get(`${backendUrl}/college/appliedCandidates`, {
+      const response = await axios.get(`${backendUrl}/college/appliedCandidates?page=${currentPage}`, {
         headers: {
           'x-auth': token,
         },
@@ -643,6 +675,7 @@ const CRMDashboard = () => {
         const data = response.data.data; // create array 
         setAllProfiles(response.data.data);
         setAllProfilesData(response.data.data)
+        setTotalPages(response.data.totalPages)
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -2939,30 +2972,30 @@ const CRMDashboard = () => {
                                             <thead className="table-light">
                                               <tr>
                                                 <th>S.No</th>
-                                                <th>Applied Date</th>                                                
-                                                <th>Course Name</th>                                                
+                                                <th>Applied Date</th>
+                                                <th>Course Name</th>
                                                 <th>Lead Added By</th>
-                                                <th>Counsellor</th>                                                
+                                                <th>Counsellor</th>
                                                 <th>Status</th>
                                               </tr>
                                             </thead>
                                             <tbody>
                                               {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-  profile._candidate._appliedCourses.map((course, index) => (
-    <tr key={index}>
-      <td>{index + 1}</td>
-      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-      <td>{course._course?.name || 'N/A'}</td>
-      <td>{course.registeredBy?.name || 'Self Registered'}</td>
-      <td>{course.month || ''} {course.year || ''}</td>
-      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
-    </tr>
-  ))
-) : (
-  <tr>
-    <td colSpan={6} className="text-center">No course history available</td>
-  </tr>
-)}
+                                                profile._candidate._appliedCourses.map((course, index) => (
+                                                  <tr key={index}>
+                                                    <td>{index + 1}</td>
+                                                    <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                    <td>{course._course?.name || 'N/A'}</td>
+                                                    <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                    <td>{course.month || ''} {course.year || ''}</td>
+                                                    <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                  </tr>
+                                                ))
+                                              ) : (
+                                                <tr>
+                                                  <td colSpan={6} className="text-center">No course history available</td>
+                                                </tr>
+                                              )}
 
                                             </tbody>
                                           </table>
@@ -2985,23 +3018,61 @@ const CRMDashboard = () => {
                   </div>
                 </div>
               </div>
-              <nav aria-label="Page navigation example">
-                <ul className="pagination">
-                  <li className="page-item">
-                    <a className="page-link" href="#" aria-label="Previous">
-                      <span aria-hidden="true">&laquo;</span>
-                    </a>
-                  </li>
-                  <li className="page-item"><a className="page-link" href="#">1</a></li>
-                  <li className="page-item"><a className="page-link" href="#">2</a></li>
-                  <li className="page-item"><a className="page-link" href="#">3</a></li>
-                  <li className="page-item">
-                    <a className="page-link" href="#" aria-label="Next">
-                      <span aria-hidden="true">&raquo;</span>
-                    </a>
-                  </li>
-                </ul>
-              </nav>
+              <nav aria-label="Page navigation" className="mt-4">
+  <div className="d-flex justify-content-between align-items-center mb-3">
+    <small className="text-muted">
+      Page {currentPage} of {totalPages} ({allProfiles.length} results)
+    </small>
+  </div>
+  
+  <ul className="pagination justify-content-center">
+    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+      <button
+        className="page-link"
+        onClick={() => setCurrentPage(currentPage - 1)}
+        disabled={currentPage === 1}
+      >
+        &laquo;
+      </button>
+    </li>
+
+    {currentPage > 3 && (
+      <>
+        <li className="page-item">
+          <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
+        </li>
+        {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+      </>
+    )}
+
+    {getPaginationPages().map((pageNumber) => (
+      <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
+        <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
+          {pageNumber}
+        </button>
+      </li>
+    ))}
+
+    {currentPage < totalPages - 2 && (
+      <>
+        {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+        <li className="page-item">
+          <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
+        </li>
+      </>
+    )}
+
+    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+      <button
+        className="page-link"
+        onClick={() => setCurrentPage(currentPage + 1)}
+        disabled={currentPage === totalPages}
+      >
+        &raquo;
+      </button>
+    </li>
+  </ul>
+</nav>
             </section>
           </div>
         </div>
