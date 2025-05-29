@@ -8,7 +8,7 @@ const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { AppliedCourses, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status } = require("../../models");
+	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status,Center } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -191,9 +191,6 @@ router.route("/appliedCandidates").get(async (req, res) => {
 		const totalCount = await AppliedCourses.countDocuments();
 
 		const appliedCourses = await AppliedCourses.find()
-			.populate('_course')
-			.populate('_leadStatus')
-			.populate('registeredBy')
 			.populate({
 				path: '_course',
 				populate: {
@@ -202,7 +199,13 @@ router.route("/appliedCandidates").get(async (req, res) => {
 				}
 			})
 			.populate({
-				path: '_candidate',				
+				path: '_course',
+				select: 'name description docsRequired'   // docsRequired bhi laao
+			})
+			.populate('_leadStatus')
+			.populate('registeredBy')
+			.populate({
+				path: '_candidate',
 				populate: {
 					path: '_appliedCourses',
 					populate: [
@@ -242,12 +245,74 @@ router.route("/appliedCandidates").get(async (req, res) => {
 				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
 			}
 
+			const requiredDocs = docObj._course?.docsRequired || [];
+			const uploadedDocs = docObj.uploadedDocs || [];
+
+			// Map uploaded docs by docsId for quick lookup
+			const uploadedDocsMap = {};
+			uploadedDocs.forEach(d => {
+				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+			});
+
+			// Prepare combined docs array
+			const combinedDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					// Agar uploaded hai to uploadedDoc details bhejo
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						_id: reqDoc._id
+					};
+				} else {
+					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
+
+			// Count calculations
+			let verifiedCount = 0;
+			let pendingVerificationCount = 0;
+			let notUploadedCount = 0;
+
+			combinedDocs.forEach(doc => {
+				if (doc.status === "Verified") verifiedCount++;
+				else if (doc.status === "Pending") pendingVerificationCount++;
+				else if (doc.status === "Not Uploaded") notUploadedCount++;
+			});
+
+			const totalRequired = combinedDocs.length;
+			const uploadedCount = combinedDocs.filter(doc => doc.status !== "Not Uploaded").length;
+			const uploadPercentage = totalRequired > 0
+				? Math.round((uploadedCount / totalRequired) * 100)
+				: 0;
+
+
+
 
 
 
 			return {
 				...docObj,
-				selectedSubstatus
+				selectedSubstatus,
+				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				docCounts: {
+					totalRequired,
+					uploadedCount,
+					verifiedCount,
+					pendingVerificationCount,
+					notUploadedCount,
+					uploadPercentage
+				}
 			};
 		});
 
@@ -1859,6 +1924,202 @@ router.delete('/deleteVertical/:id', [isCollege], async (req, res) => {
 		});
 	}
 });
+
+/// Project
+// POST /api/projects/add
+router.post('/add_project', [isCollege], async (req, res) => {
+  try {
+
+    let { name, description, vertical, status } = req.body;
+	const user = req.user
+
+
+    // Basic validation
+    if (!name || !vertical) {
+		
+      return res.status(400).json({ success: false, message: 'Name and verticalId are required.' });
+    }
+    // Create new project document
+    const newProject = new Project({
+      name,
+      description,
+      vertical,
+      createdBy:user._id,      
+      status: status !== undefined ? status : 'active',
+    });
+
+    const savedProject = await newProject.save();
+
+    return res.status(201).json({ success: true, message: 'Project added successfully', data: savedProject });
+  } catch (error) {
+    console.error('Error adding project:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.put('/edit_project/:id', [isCollege], async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { name, description, vertical, status } = req.body;
+    const user = req.user;
+
+    // Validation
+    if (!name || !vertical) {
+      return res.status(400).json({ success: false, message: 'Name and verticalId are required.' });
+    }
+
+    // Find project by id
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ success: false, message: 'Project not found.' });
+    }
+
+    // Update fields
+    project.name = name;
+    project.description = description || project.description;
+    project.vertical = vertical;
+    project.status = status !== undefined ? status : project.status;
+    project.updatedBy = user._id; // Optional: agar aap update karne wale user ko track karna chahte hain
+
+    const updatedProject = await project.save();
+
+    return res.status(200).json({ success: true, message: 'Project updated successfully', data: updatedProject });
+  } catch (error) {
+    console.error('Error updating project:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.delete('/delete_project/:id', [isCollege], async (req, res) => {
+  try {
+    const projectId = req.params.id;
+
+    const deletedProject = await Project.findByIdAndDelete(projectId);
+    if (!deletedProject) {
+      return res.status(404).json({ success: false, message: 'Project not found' });
+    }
+
+    return res.status(200).json({ success: true, message: 'Project deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+
+
+router.get('/list-projects', async (req, res) => {
+  try {
+    let filter = {};
+    const vertical = req.query.vertical;
+
+    if (vertical) {
+      if (mongoose.Types.ObjectId.isValid(vertical)) {
+        filter.vertical = new mongoose.Types.ObjectId(vertical);
+      } else {
+        // Agar vertical string ObjectId nahi hai, toh error ya empty filter kar sakte hain
+        return res.status(400).json({ success: false, message: 'Invalid vertical id' });
+      }
+    }
+
+    const projects = await Project.find(filter).sort({ createdAt: -1 });
+    res.json({ success: true, data: projects });
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+//Center Api
+
+// POST /api/centers/add
+router.post('/add_canter',[isCollege], async (req, res) => {
+  try {
+    const { name, location, status, project } = req.body;
+    const user = req.user; // agar aap authentication middleware laga rahe hain
+
+    // Validation
+    if (!name || !project) {
+      return res.status(400).json({ success: false, message: 'Name and project are required.' });
+    }
+
+    const newCenter = new Center({
+      name,
+      address:location,
+      status: status || 'active',
+      project,
+      createdBy: user ? user._id : null,
+    });
+
+    const savedCenter = await newCenter.save();
+
+    res.status(201).json({ success: true, message: 'Center added successfully', data: savedCenter });
+  } catch (error) {
+    console.error('Error adding center:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.put('/edit_center/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const updatedCenter = await Center.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedCenter) {
+      return res.status(404).json({ success: false, message: 'Center not found' });
+    }
+
+    res.json({ success: true, data: updatedCenter });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+
+router.get('/list-centers', async (req, res) => {
+  try {
+    const projectId = req.query.projectId;
+
+    if (!projectId) {
+      return res.status(400).json({ success: false, message: 'Project ID is required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({ success: false, message: 'Invalid Project ID' });
+    }
+
+    const centers = await Center.find({ project: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
+	console.log('centers',centers)
+
+    res.json({ success: true, data: centers });
+  } catch (error) {
+    console.error('Error fetching centers by project:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+router.delete('/center_delete/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedCenter = await Center.findByIdAndDelete(id);
+    if (!deletedCenter) {
+      return res.status(404).json({ success: false, message: 'Center not found' });
+    }
+
+    res.json({ success: true, message: 'Center deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
 
 //lead status change
 router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
