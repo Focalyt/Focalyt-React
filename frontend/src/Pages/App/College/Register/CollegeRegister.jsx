@@ -34,6 +34,7 @@ const CollegeRegister = () => {
     const [showResendBtn, setShowResendBtn] = useState(false);
     const [isResendDisabled, setIsResendDisabled] = useState(false);
     const [resendBtnText, setResendBtnText] = useState('Resend OTP');
+    const [showOtpInput, setShowOtpInput] = useState(false);
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
@@ -197,6 +198,7 @@ const CollegeRegister = () => {
                 setShowGenerateOTP(false);
                 setShowSignupBtn(true);
                 setShowResendBtn(true);
+                setShowOtpInput(true);
                 startResendTimer();
 
                 if (otpInputRef.current) {
@@ -274,25 +276,25 @@ const CollegeRegister = () => {
                     const registerRes = await axios.post(`${backendUrl}/college/register`, body);
 
                     if (registerRes.data.status) {
-                        body = { userInput: phoneNumber, password  };
-                        const loginRes = await axios.post(`${backendUrl}/college/login`,body);
+                        body = { userInput: phoneNumber, password };
+                        const loginRes = await axios.post(`${backendUrl}/college/login`, body);
 
                         if (loginRes.data.status === true) {
                             sessionStorage.setItem("user", JSON.stringify(loginRes.data.userData));
-                            
+
                             if (returnUrl) {
                                 window.location.href = decodeURIComponent(returnUrl);
                             } else {
                                 window.location.href = "/institute/dashboard";
                             }
-                            
+
                         } else {
                             setSuccessMessage('');
                             setErrorMessage('Login failed !!!');
                             window.location.href = "/institute/login";
                         }
                     } else {
-                        console.log('error',registerRes.data)
+                        console.log('error', registerRes.data)
                         setSuccessMessage('');
                         setErrorMessage(registerRes.data.error);
                         toast.error(registerRes.data.error);
@@ -586,24 +588,25 @@ const CollegeRegister = () => {
                                                                                             )}
                                                                                         </div>
                                                                                     </fieldset>
+                                                                                    {showOtpInput && (
+                                                                                        <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                className="form-control"
+                                                                                                id="user-otp"
+                                                                                                placeholder="Enter your OTP"
+                                                                                                value={otp}
+                                                                                                onChange={handleOtpChange}
+                                                                                                disabled={otpDisabled}
+                                                                                                ref={otpInputRef}
+                                                                                                onKeyPress={handleKeyPress}
+                                                                                            />
+                                                                                            <div className="form-control-position">
+                                                                                                <i className="fa-solid fa-lock"></i>
+                                                                                            </div>
 
-                                                                                    <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input
-                                                                                            type="number"
-                                                                                            className="form-control"
-                                                                                            id="user-otp"
-                                                                                            placeholder="Enter your OTP"
-                                                                                            value={otp}
-                                                                                            onChange={handleOtpChange}
-                                                                                            disabled={otpDisabled}
-                                                                                            ref={otpInputRef}
-                                                                                            onKeyPress={handleKeyPress}
-                                                                                        />
-                                                                                        <div className="form-control-position">
-                                                                                            <i className="fa-solid fa-lock"></i>
-                                                                                        </div>
-
-                                                                                    </fieldset>
+                                                                                        </fieldset>
+                                                                                    )}
 
                                                                                     <p className="pt-0 px-1">
                                                                                         I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.

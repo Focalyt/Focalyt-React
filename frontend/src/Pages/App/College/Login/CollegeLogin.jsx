@@ -19,7 +19,7 @@ const CollegeLogin = () => {
     const [otp, setOtp] = useState('');
     const [showOtpField, setShowOtpField] = useState(false);
     const [isUserInputDisabled, setIsUserInputDisabled] = useState(false);
-    
+
     // Forgot password states
     const [showForgotModal, setShowForgotModal] = useState(false);
     const [forgotStep, setForgotStep] = useState(1); // 1: mobile input, 2: OTP verify, 3: new password
@@ -28,7 +28,7 @@ const CollegeLogin = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showNewPassword, setShowNewPassword] = useState(false);
-    
+
     // Logo URL
     const logoUrl = "/Assets/images/logo/logo.png";
 
@@ -85,12 +85,12 @@ const CollegeLogin = () => {
             // Verify OTP here
             try {
                 const body = {
-                    mobile:userInput,
+                    mobile: userInput,
                     otp
                 };
-                
+
                 const verifyRes = await axios.post(`${backendUrl}/api/otpCollegeLogin`, body);
-                
+
                 if (verifyRes.data.status === true) {
                     setErrorMessage('');
                     setSuccessMessage('OTP verified');
@@ -102,7 +102,7 @@ const CollegeLogin = () => {
                     }
                 } else {
                     setSuccessMessage('');
-                    console.log('response',verifyRes )
+                    console.log('response', verifyRes)
                     setErrorMessage('OTP verification failed !!!');
                 }
             } catch (err) {
@@ -119,18 +119,18 @@ const CollegeLogin = () => {
                 setErrorMessage('Please enter mobile number or email');
                 return;
             }
-            
+
             const body = {
                 userInput,
                 module: 'college'
             };
-            
-            const sendRes = await axios.post(`${backendUrl}/api/sendOtp`, body);
-            
-            if (sendRes.data.status === true) {
-                            toast.success(sendRes.data.message);
 
-               
+            const sendRes = await axios.post(`${backendUrl}/api/sendOtp`, body);
+
+            if (sendRes.data.status === true) {
+                toast.success(sendRes.data.message);
+
+
                 setShowOtpField(true); // Show OTP field after successful OTP send
                 setIsUserInputDisabled(true); // Disable the mobile/email input
             } else {
@@ -143,13 +143,13 @@ const CollegeLogin = () => {
             setErrorMessage('Failed to send OTP !!!');
         }
     };
-    
+
     const handleChangeNumber = () => {
         setIsUserInputDisabled(false);
         setShowOtpField(false);
         setOtp('');
     };
-    
+
     // Forgot password functions
     const openForgotModal = () => {
         setShowForgotModal(true);
@@ -161,11 +161,11 @@ const CollegeLogin = () => {
         setErrorMessage('');
         setSuccessMessage('');
     };
-    
+
     const closeForgotModal = () => {
         setShowForgotModal(false);
     };
-    
+
     const sendForgotOtp = async () => {
         try {
             // Validate mobile/email
@@ -173,20 +173,20 @@ const CollegeLogin = () => {
                 setErrorMessage('Please enter mobile number or email');
                 return;
             }
-            
+
             const body = {
                 userInput: forgotMobile,
                 module: 'college',
             };
-            
+
             const sendRes = await axios.post(`${backendUrl}/api/sendOtp`, body);
-            
+
             if (sendRes.data.status === true) {
-                            toast.success(sendRes.data.message);
+                toast.success(sendRes.data.message);
 
                 setForgotStep(2);
             } else {
-            toast.error(sendRes.data.message);
+                toast.error(sendRes.data.message);
 
             }
         } catch (err) {
@@ -194,7 +194,7 @@ const CollegeLogin = () => {
             setErrorMessage('Failed to send OTP !!!');
         }
     };
-    
+
     const verifyForgotOtp = async () => {
         try {
             // Validate OTP
@@ -202,16 +202,16 @@ const CollegeLogin = () => {
                 setErrorMessage('Please enter OTP');
                 return;
             }
-            
+
             const body = {
                 userInput: forgotMobile,
                 otp: forgotOtp,
                 module: 'college',
                 purpose: 'reset_password'
             };
-            
+
             const verifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, body);
-            
+
             if (verifyRes.data.status === true) {
                 setErrorMessage('');
                 setSuccessMessage('OTP verified successfully');
@@ -225,7 +225,7 @@ const CollegeLogin = () => {
             setErrorMessage('OTP verification failed !!!');
         }
     };
-    
+
     const resetPassword = async () => {
         try {
             // Validate password
@@ -233,20 +233,20 @@ const CollegeLogin = () => {
                 setErrorMessage('Please enter new password');
                 return;
             }
-            
+
             if (newPassword !== confirmPassword) {
                 setErrorMessage('Passwords do not match');
                 return;
             }
-            
+
             const body = {
                 userInput: forgotMobile,
                 password: newPassword,
                 module: 'college'
             };
-            
+
             const resetRes = await axios.post(`${backendUrl}/college/reset-password`, body);
-            
+
             if (resetRes.data.status === true) {
                 setErrorMessage('');
                 setSuccessMessage('Password reset successfully');
@@ -277,12 +277,12 @@ const CollegeLogin = () => {
                 <div className="logo-container">
                     <img src={logoUrl} alt="Focalyt Logo" className="logo" />
                 </div>
-                
+
                 <h3 className="title">Institute Portal</h3>
                 <p className="subtitle">Please login to your account</p>
-                
+
                 <div className="login-tabs">
-                    <span 
+                    <span
                         className={`tab ${activeTab === 'login' ? 'active' : ''}`}
                         onClick={() => setActiveTab('login')}
                     >
@@ -295,7 +295,7 @@ const CollegeLogin = () => {
                         Signup
                     </span>
                 </div>
-                
+
                 <div className="login-content">
                     <div className="login-method">
                         <label className="radio-container">
@@ -323,7 +323,7 @@ const CollegeLogin = () => {
                             <span className="radio-label">OTP Login</span>
                         </label>
                     </div>
-                    
+
                     <div className="input-field">
                         <span className="input-icon">
                             <i className="fa-regular fa-user"></i>
@@ -336,7 +336,7 @@ const CollegeLogin = () => {
                             disabled={loginMethod === 'otp' && isUserInputDisabled}
                         />
                     </div>
-                    
+
                     {loginMethod === 'password' ? (
                         <div className="input-field">
                             <span className="input-icon">
@@ -357,7 +357,7 @@ const CollegeLogin = () => {
                         <div>
                             {loginMethod === 'otp' && isUserInputDisabled && (
                                 <div className="change-number-container">
-                                    <button 
+                                    <button
                                         className="change-number-btn"
                                         onClick={handleChangeNumber}
                                     >
@@ -365,7 +365,7 @@ const CollegeLogin = () => {
                                     </button>
                                 </div>
                             )}
-                        
+
                             {showOtpField && (
                                 <div className="input-field">
                                     <span className="input-icon">
@@ -381,9 +381,9 @@ const CollegeLogin = () => {
                                     />
                                 </div>
                             )}
-                            
+
                             <div className="otp-btn-container">
-                                <button 
+                                <button
                                     className="send-otp-btn"
                                     onClick={sendOtp}
                                 >
@@ -392,11 +392,11 @@ const CollegeLogin = () => {
                             </div>
                         </div>
                     )}
-                    
+
                     {loginMethod === 'password' && (
                         <div className="forgot-password">
-                            <a 
-                                href="#" 
+                            <a
+                                href="#"
                                 onClick={(e) => {
                                     e.preventDefault();
                                     openForgotModal();
@@ -406,29 +406,29 @@ const CollegeLogin = () => {
                             </a>
                         </div>
                     )}
-                    
+
                     <div className="terms">
                         I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
                     </div>
-                    
-                    <button 
+
+                    <button
                         className="login-btn"
                         onClick={handleLogin}
                         ref={loginBtnRef}
                     >
                         Login
                     </button>
-                    
+
                     {errorMessage && (
                         <div className="error-message">{errorMessage}</div>
                     )}
-                    
+
                     {successMessage && (
                         <div className="success-message">{successMessage}</div>
                     )}
                 </div>
             </div>
-            
+
             {/* Forgot Password Modal */}
             {showForgotModal && (
                 <div className="modal-overlay">
@@ -437,7 +437,7 @@ const CollegeLogin = () => {
                             <h4>Forgot Password</h4>
                             <button className="close-btn" onClick={closeForgotModal}>×</button>
                         </div>
-                        
+
                         <div className="modal-body">
                             {forgotStep === 1 && (
                                 <div>
@@ -500,7 +500,7 @@ const CollegeLogin = () => {
                                             <i className={`fa-regular ${showNewPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                                         </span>
                                     </div>
-                                    
+
                                     <div className="input-field">
                                         <span className="input-icon">
                                             <i className="fa-regular fa-lock"></i>
@@ -512,7 +512,7 @@ const CollegeLogin = () => {
                                             onChange={(e) => setConfirmPassword(e.target.value)}
                                         />
                                     </div>
-                                    
+
                                     <button
                                         className="modal-btn"
                                         onClick={resetPassword}
@@ -525,7 +525,7 @@ const CollegeLogin = () => {
                             {errorMessage && (
                                 <div className="error-message">{errorMessage}</div>
                             )}
-                            
+
                             {successMessage && (
                                 <div className="success-message">{successMessage}</div>
                             )}
@@ -533,7 +533,7 @@ const CollegeLogin = () => {
                     </div>
                 </div>
             )}
-            
+
             <style jsx>{`
                 .login-page-container {
                     display: flex;

@@ -149,39 +149,39 @@ const CRMDashboard = () => {
 
   // Date range handlers
   const handleDateFilterChange = (date, fieldName) => {
-  const newFilterData = {
-    ...filterData,
-    [fieldName]: date
+    const newFilterData = {
+      ...filterData,
+      [fieldName]: date
+    };
+    setFilterData(newFilterData);
+
+    // Apply filters immediately
+    setTimeout(() => applyFilters(newFilterData), 100);
   };
-  setFilterData(newFilterData);
-  
-  // Apply filters immediately
-  setTimeout(() => applyFilters(newFilterData), 100);
-};
-const formatDate = (date) => {
-  if (!date) return '';
-  return date.toLocaleDateString('en-GB');
-};
+  const formatDate = (date) => {
+    if (!date) return '';
+    return date.toLocaleDateString('en-GB');
+  };
 
 
-// 5. Clear functions
-const clearDateFilter = (filterType) => {
-  let newFilterData = { ...filterData };
-  
-  if (filterType === 'created') {
-    newFilterData.createdFromDate = null;
-    newFilterData.createdToDate = null;
-  } else if (filterType === 'modified') {
-    newFilterData.modifiedFromDate = null;
-    newFilterData.modifiedToDate = null;
-  } else if (filterType === 'nextAction') {
-    newFilterData.nextActionFromDate = null;
-    newFilterData.nextActionToDate = null;
-  }
-  
-  setFilterData(newFilterData);
-  setTimeout(() => applyFilters(newFilterData), 100);
-};
+  // 5. Clear functions
+  const clearDateFilter = (filterType) => {
+    let newFilterData = { ...filterData };
+
+    if (filterType === 'created') {
+      newFilterData.createdFromDate = null;
+      newFilterData.createdToDate = null;
+    } else if (filterType === 'modified') {
+      newFilterData.modifiedFromDate = null;
+      newFilterData.modifiedToDate = null;
+    } else if (filterType === 'nextAction') {
+      newFilterData.nextActionFromDate = null;
+      newFilterData.nextActionToDate = null;
+    }
+
+    setFilterData(newFilterData);
+    setTimeout(() => applyFilters(newFilterData), 100);
+  };
   const handleDateChange = (date, fieldName) => {
     setFilterData(prev => ({
       ...prev,
@@ -266,162 +266,162 @@ const clearDateFilter = (filterType) => {
   };
 
   const applyFilters = (filters = filterData) => {
-  console.log('Applying filters with data:', filters);
-  
-  let filtered = [...allProfilesData];
+    console.log('Applying filters with data:', filters);
 
-  try {
-    // Search filter
-    if (filters.name && filters.name.trim()) {
-      const searchTerm = filters.name.toLowerCase();
-      filtered = filtered.filter(profile => {
-        try {
-          const name = profile._candidate?.name ? String(profile._candidate.name).toLowerCase() : '';
-          const mobile = profile._candidate?.mobile ? String(profile._candidate.mobile).toLowerCase() : '';
-          const email = profile._candidate?.email ? String(profile._candidate.email).toLowerCase() : '';
-          
-          return name.includes(searchTerm) || 
-                 mobile.includes(searchTerm) || 
-                 email.includes(searchTerm);
-        } catch (error) {
-          return false;
-        }
-      });
-    }
+    let filtered = [...allProfilesData];
 
-    // Course type filter
-    if (filters.courseType) {
-      filtered = filtered.filter(profile => {
-        try {
-          const courseType = profile._course?.courseType ? String(profile._course.courseType).toLowerCase() : '';
-          return courseType === filters.courseType.toLowerCase();
-        } catch (error) {
-          return false;
-        }
-      });
-    }
+    try {
+      // Search filter
+      if (filters.name && filters.name.trim()) {
+        const searchTerm = filters.name.toLowerCase();
+        filtered = filtered.filter(profile => {
+          try {
+            const name = profile._candidate?.name ? String(profile._candidate.name).toLowerCase() : '';
+            const mobile = profile._candidate?.mobile ? String(profile._candidate.mobile).toLowerCase() : '';
+            const email = profile._candidate?.email ? String(profile._candidate.email).toLowerCase() : '';
 
-    // Lead status filter
-    if (filters.leadStatus) {
-      filtered = filtered.filter(profile => 
-        profile._leadStatus?._id === filters.leadStatus
-      );
-    }
-
-    // Status filter
-    if (filters.status && filters.status !== 'true') {
-      filtered = filtered.filter(profile => 
-        profile._leadStatus?._id === filters.status
-      );
-    }
-
-    // Sector filter
-    if (filters.sector) {
-      filtered = filtered.filter(profile => {
-        try {
-          const sectors = profile._course?.sectors ? String(profile._course.sectors).toLowerCase() : '';
-          return sectors === filters.sector.toLowerCase();
-        } catch (error) {
-          return false;
-        }
-      });
-    }
-
-    // CREATED DATE filter
-    if (filters.createdFromDate || filters.createdToDate) {
-      filtered = filtered.filter(profile => {
-        try {
-          if (!profile.createdAt) return false;
-          
-          const profileDate = new Date(profile.createdAt);
-          
-          // From date check
-          if (filters.createdFromDate) {
-            const fromDate = new Date(filters.createdFromDate);
-            fromDate.setHours(0, 0, 0, 0);
-            if (profileDate < fromDate) return false;
+            return name.includes(searchTerm) ||
+              mobile.includes(searchTerm) ||
+              email.includes(searchTerm);
+          } catch (error) {
+            return false;
           }
-          
-          // To date check
-          if (filters.createdToDate) {
-            const toDate = new Date(filters.createdToDate);
-            toDate.setHours(23, 59, 59, 999);
-            if (profileDate > toDate) return false;
+        });
+      }
+
+      // Course type filter
+      if (filters.courseType) {
+        filtered = filtered.filter(profile => {
+          try {
+            const courseType = profile._course?.courseType ? String(profile._course.courseType).toLowerCase() : '';
+            return courseType === filters.courseType.toLowerCase();
+          } catch (error) {
+            return false;
           }
-          
-          return true;
-        } catch (error) {
-          return false;
-        }
-      });
+        });
+      }
+
+      // Lead status filter
+      if (filters.leadStatus) {
+        filtered = filtered.filter(profile =>
+          profile._leadStatus?._id === filters.leadStatus
+        );
+      }
+
+      // Status filter
+      if (filters.status && filters.status !== 'true') {
+        filtered = filtered.filter(profile =>
+          profile._leadStatus?._id === filters.status
+        );
+      }
+
+      // Sector filter
+      if (filters.sector) {
+        filtered = filtered.filter(profile => {
+          try {
+            const sectors = profile._course?.sectors ? String(profile._course.sectors).toLowerCase() : '';
+            return sectors === filters.sector.toLowerCase();
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // CREATED DATE filter
+      if (filters.createdFromDate || filters.createdToDate) {
+        filtered = filtered.filter(profile => {
+          try {
+            if (!profile.createdAt) return false;
+
+            const profileDate = new Date(profile.createdAt);
+
+            // From date check
+            if (filters.createdFromDate) {
+              const fromDate = new Date(filters.createdFromDate);
+              fromDate.setHours(0, 0, 0, 0);
+              if (profileDate < fromDate) return false;
+            }
+
+            // To date check
+            if (filters.createdToDate) {
+              const toDate = new Date(filters.createdToDate);
+              toDate.setHours(23, 59, 59, 999);
+              if (profileDate > toDate) return false;
+            }
+
+            return true;
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // MODIFIED DATE filter
+      if (filters.modifiedFromDate || filters.modifiedToDate) {
+        filtered = filtered.filter(profile => {
+          try {
+            if (!profile.updatedAt) return false;
+
+            const profileDate = new Date(profile.updatedAt);
+
+            // From date check
+            if (filters.modifiedFromDate) {
+              const fromDate = new Date(filters.modifiedFromDate);
+              fromDate.setHours(0, 0, 0, 0);
+              if (profileDate < fromDate) return false;
+            }
+
+            // To date check
+            if (filters.modifiedToDate) {
+              const toDate = new Date(filters.modifiedToDate);
+              toDate.setHours(23, 59, 59, 999);
+              if (profileDate > toDate) return false;
+            }
+
+            return true;
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // NEXT ACTION DATE filter
+      if (filters.nextActionFromDate || filters.nextActionToDate) {
+        filtered = filtered.filter(profile => {
+          try {
+            if (!profile.followupDate) return false;
+
+            const profileDate = new Date(profile.followupDate);
+
+            // From date check
+            if (filters.nextActionFromDate) {
+              const fromDate = new Date(filters.nextActionFromDate);
+              fromDate.setHours(0, 0, 0, 0);
+              if (profileDate < fromDate) return false;
+            }
+
+            // To date check
+            if (filters.nextActionToDate) {
+              const toDate = new Date(filters.nextActionToDate);
+              toDate.setHours(23, 59, 59, 999);
+              if (profileDate > toDate) return false;
+            }
+
+            return true;
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      console.log('Filter results:', filtered.length, 'out of', allProfilesData.length);
+      setAllProfiles(filtered);
+
+    } catch (error) {
+      console.error('Filter error:', error);
+      setAllProfiles(allProfilesData);
     }
-
-    // MODIFIED DATE filter
-    if (filters.modifiedFromDate || filters.modifiedToDate) {
-      filtered = filtered.filter(profile => {
-        try {
-          if (!profile.updatedAt) return false;
-          
-          const profileDate = new Date(profile.updatedAt);
-          
-          // From date check
-          if (filters.modifiedFromDate) {
-            const fromDate = new Date(filters.modifiedFromDate);
-            fromDate.setHours(0, 0, 0, 0);
-            if (profileDate < fromDate) return false;
-          }
-          
-          // To date check
-          if (filters.modifiedToDate) {
-            const toDate = new Date(filters.modifiedToDate);
-            toDate.setHours(23, 59, 59, 999);
-            if (profileDate > toDate) return false;
-          }
-          
-          return true;
-        } catch (error) {
-          return false;
-        }
-      });
-    }
-
-    // NEXT ACTION DATE filter
-    if (filters.nextActionFromDate || filters.nextActionToDate) {
-      filtered = filtered.filter(profile => {
-        try {
-          if (!profile.followupDate) return false;
-          
-          const profileDate = new Date(profile.followupDate);
-          
-          // From date check
-          if (filters.nextActionFromDate) {
-            const fromDate = new Date(filters.nextActionFromDate);
-            fromDate.setHours(0, 0, 0, 0);
-            if (profileDate < fromDate) return false;
-          }
-          
-          // To date check
-          if (filters.nextActionToDate) {
-            const toDate = new Date(filters.nextActionToDate);
-            toDate.setHours(23, 59, 59, 999);
-            if (profileDate > toDate) return false;
-          }
-          
-          return true;
-        } catch (error) {
-          return false;
-        }
-      });
-    }
-
-    console.log('Filter results:', filtered.length, 'out of', allProfilesData.length);
-    setAllProfiles(filtered);
-
-  } catch (error) {
-    console.error('Filter error:', error);
-    setAllProfiles(allProfilesData);
-  }
-};
+  };
 
   // Helper function for status icons
   const getStatusIcon = (statusName) => {
@@ -793,22 +793,22 @@ const clearDateFilter = (filterType) => {
   //   console.log('Tab clicked:', index);
   // };
 
- const handleFilterChange = (e) => {
-  try {
-    const { name, value } = e.target;
-    const newFilterData = { ...filterData, [name]: value };
-    setFilterData(newFilterData);
-    
-    // Apply search if there's a search term
-    if (newFilterData.name) {
-      handleSearch(newFilterData.name);
-    } else {
-      applyFilters(newFilterData);
+  const handleFilterChange = (e) => {
+    try {
+      const { name, value } = e.target;
+      const newFilterData = { ...filterData, [name]: value };
+      setFilterData(newFilterData);
+
+      // Apply search if there's a search term
+      if (newFilterData.name) {
+        handleSearch(newFilterData.name);
+      } else {
+        applyFilters(newFilterData);
+      }
+    } catch (error) {
+      console.error('Filter change error:', error);
     }
-  } catch (error) {
-    console.error('Filter change error:', error);
-  }
-};
+  };
 
 
   const openEditPanel = async (profile = null, panel) => {
@@ -1684,247 +1684,247 @@ const clearDateFilter = (filterType) => {
                   {/* Date Range */}
                   {/* Date Filters Section */}
                   {/* REPLACE your existing Date Filters Section with this */}
-{/* Date Filters Section - Facebook Style */}
-<div className="col-12">
-  <div className="row g-4">
-    {/* Created Date Range */}
-    <div className="col-md-4">
-      <label className="form-label small fw-bold text-dark">
-        <i className="fas fa-calendar-plus me-1 text-success"></i>
-        Lead Creation Date Range
-      </label>
-      <div className="card border-0 bg-light p-3">
-        <div className="row g-2">
-          <div className="col-6">
-            <label className="form-label small">From Date</label>
-            <DatePicker
-              onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
-              value={filterData.createdFromDate}
-              format="dd/MM/yyyy"
-              className="form-control"
-              clearIcon={null}
-              calendarIcon={<i className="fas fa-calendar text-success"></i>}
-              maxDate={filterData.createdToDate || new Date()}
-            />
-          </div>
-          <div className="col-6">
-            <label className="form-label small">To Date</label>
-            <DatePicker
-              onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
-              value={filterData.createdToDate}
-              format="dd/MM/yyyy"
-              className="form-control"
-              clearIcon={null}
-              calendarIcon={<i className="fas fa-calendar text-success"></i>}
-              minDate={filterData.createdFromDate}
-              maxDate={new Date()}
-            />
-          </div>
-        </div>
-        
-        {/* Show selected dates */}
-        {(filterData.createdFromDate || filterData.createdToDate) && (
-          <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
-            <small className="text-success">
-              <i className="fas fa-info-circle me-1"></i>
-              <strong>Selected:</strong>
-              {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-              {filterData.createdFromDate && filterData.createdToDate && ' |'}
-              {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
-            </small>
-          </div>
-        )}
-        
-        {/* Clear button */}
-        <div className="mt-2">
-          <button
-            className="btn btn-sm btn-outline-danger w-100"
-            onClick={() => clearDateFilter('created')}
-            disabled={!filterData.createdFromDate && !filterData.createdToDate}
-          >
-            <i className="fas fa-times me-1"></i>
-            Clear Created Date
-          </button>
-        </div>
-      </div>
-    </div>
+                  {/* Date Filters Section - Facebook Style */}
+                  <div className="col-12">
+                    <div className="row g-4">
+                      {/* Created Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-plus me-1 text-success"></i>
+                          Lead Creation Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
+                                value={filterData.createdFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                maxDate={filterData.createdToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
+                                value={filterData.createdToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                minDate={filterData.createdFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
 
-    {/* Modified Date Range */}
-    <div className="col-md-4">
-      <label className="form-label small fw-bold text-dark">
-        <i className="fas fa-calendar-edit me-1 text-warning"></i>
-        Lead Modification Date Range
-      </label>
-      <div className="card border-0 bg-light p-3">
-        <div className="row g-2">
-          <div className="col-6">
-            <label className="form-label small">From Date</label>
-            <DatePicker
-              onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
-              value={filterData.modifiedFromDate}
-              format="dd/MM/yyyy"
-              className="form-control"
-              clearIcon={null}
-              calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-              maxDate={filterData.modifiedToDate || new Date()}
-            />
-          </div>
-          <div className="col-6">
-            <label className="form-label small">To Date</label>
-            <DatePicker
-              onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
-              value={filterData.modifiedToDate}
-              format="dd/MM/yyyy"
-              className="form-control"
-              clearIcon={null}
-              calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-              minDate={filterData.modifiedFromDate}
-              maxDate={new Date()}
-            />
-          </div>
-        </div>
-        
-        {/* Show selected dates */}
-        {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-          <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
-            <small className="text-warning">
-              <i className="fas fa-info-circle me-1"></i>
-              <strong>Selected:</strong>
-              {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-              {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
-              {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
-            </small>
-          </div>
-        )}
-        
-        {/* Clear button */}
-        <div className="mt-2">
-          <button
-            className="btn btn-sm btn-outline-danger w-100"
-            onClick={() => clearDateFilter('modified')}
-            disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
-          >
-            <i className="fas fa-times me-1"></i>
-            Clear Modified Date
-          </button>
-        </div>
-      </div>
-    </div>
+                          {/* Show selected dates */}
+                          {(filterData.createdFromDate || filterData.createdToDate) && (
+                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
+                              <small className="text-success">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
+                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
+                              </small>
+                            </div>
+                          )}
 
-    {/* Next Action Date Range */}
-    <div className="col-md-4">
-      <label className="form-label small fw-bold text-dark">
-        <i className="fas fa-calendar-check me-1 text-info"></i>
-        Next Action Date Range
-      </label>
-      <div className="card border-0 bg-light p-3">
-        <div className="row g-2">
-          <div className="col-6">
-            <label className="form-label small">From Date</label>
-            <DatePicker
-              onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
-              value={filterData.nextActionFromDate}
-              format="dd/MM/yyyy"
-              className="form-control"
-              clearIcon={null}
-              calendarIcon={<i className="fas fa-calendar text-info"></i>}
-              maxDate={filterData.nextActionToDate}
-            />
-          </div>
-          <div className="col-6">
-            <label className="form-label small">To Date</label>
-            <DatePicker
-              onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
-              value={filterData.nextActionToDate}
-              format="dd/MM/yyyy"
-              className="form-control"
-              clearIcon={null}
-              calendarIcon={<i className="fas fa-calendar text-info"></i>}
-              minDate={filterData.nextActionFromDate}
-            />
-          </div>
-        </div>
-        
-        {/* Show selected dates */}
-        {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-          <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
-            <small className="text-info">
-              <i className="fas fa-info-circle me-1"></i>
-              <strong>Selected:</strong>
-              {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-              {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
-              {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
-            </small>
-          </div>
-        )}
-        
-        {/* Clear button */}
-        <div className="mt-2">
-          <button
-            className="btn btn-sm btn-outline-danger w-100"
-            onClick={() => clearDateFilter('nextAction')}
-            disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
-          >
-            <i className="fas fa-times me-1"></i>
-            Clear Next Action Date
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('created')}
+                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Created Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
 
-{/* Update the Clear All button in your existing filters section */}
-<button
-  className="btn btn-sm btn-outline-danger"
-  onClick={clearAllFilters}
->
-  <i className="fas fa-times-circle me-1"></i>
-  Clear All Filters
-</button>
+                      {/* Modified Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
+                          Lead Modification Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
+                                value={filterData.modifiedFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                maxDate={filterData.modifiedToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
+                                value={filterData.modifiedToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                minDate={filterData.modifiedFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
 
-{/* Update the results summary section */}
-<div className="text-muted small">
-  <i className="fas fa-info-circle me-1"></i>
-  Showing {allProfiles.length} of {allProfilesData.length} results
-  
-  {/* Active filter indicators */}
-  {(filterData.createdFromDate || filterData.createdToDate) && (
-    <div className="mt-1">
-      <span className="badge bg-success me-2">
-        <i className="fas fa-calendar-plus me-1"></i>
-        Created: 
-        {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-        {filterData.createdFromDate && filterData.createdToDate && ' to '}
-        {filterData.createdToDate && formatDate(filterData.createdToDate)}
-      </span>
-    </div>
-  )}
-  
-  {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-    <div className="mt-1">
-      <span className="badge bg-warning me-2">
-        <i className="fas fa-calendar-edit me-1"></i>
-        Modified: 
-        {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-        {filterData.modifiedFromDate && filterData.modifiedToDate && ' to '}
-        {filterData.modifiedToDate && formatDate(filterData.modifiedToDate)}
-      </span>
-    </div>
-  )}
-  
-  {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-    <div className="mt-1">
-      <span className="badge bg-info me-2">
-        <i className="fas fa-calendar-check me-1"></i>
-        Next Action: 
-        {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-        {filterData.nextActionFromDate && filterData.nextActionToDate && ' to '}
-        {filterData.nextActionToDate && formatDate(filterData.nextActionToDate)}
-      </span>
-    </div>
-  )}
-</div>
+                          {/* Show selected dates */}
+                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
+                              <small className="text-warning">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
+                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
+                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('modified')}
+                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Modified Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Next Action Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-check me-1 text-info"></i>
+                          Next Action Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
+                                value={filterData.nextActionFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                maxDate={filterData.nextActionToDate}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
+                                value={filterData.nextActionToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                minDate={filterData.nextActionFromDate}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
+                              <small className="text-info">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
+                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('nextAction')}
+                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Next Action Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Update the Clear All button in your existing filters section */}
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={clearAllFilters}
+                  >
+                    <i className="fas fa-times-circle me-1"></i>
+                    Clear All Filters
+                  </button>
+
+                  {/* Update the results summary section */}
+                  <div className="text-muted small">
+                    <i className="fas fa-info-circle me-1"></i>
+                    Showing {allProfiles.length} of {allProfilesData.length} results
+
+                    {/* Active filter indicators */}
+                    {(filterData.createdFromDate || filterData.createdToDate) && (
+                      <div className="mt-1">
+                        <span className="badge bg-success me-2">
+                          <i className="fas fa-calendar-plus me-1"></i>
+                          Created:
+                          {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                          {filterData.createdFromDate && filterData.createdToDate && ' to '}
+                          {filterData.createdToDate && formatDate(filterData.createdToDate)}
+                        </span>
+                      </div>
+                    )}
+
+                    {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                      <div className="mt-1">
+                        <span className="badge bg-warning me-2">
+                          <i className="fas fa-calendar-edit me-1"></i>
+                          Modified:
+                          {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
+                          {filterData.modifiedFromDate && filterData.modifiedToDate && ' to '}
+                          {filterData.modifiedToDate && formatDate(filterData.modifiedToDate)}
+                        </span>
+                      </div>
+                    )}
+
+                    {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                      <div className="mt-1">
+                        <span className="badge bg-info me-2">
+                          <i className="fas fa-calendar-check me-1"></i>
+                          Next Action:
+                          {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                          {filterData.nextActionFromDate && filterData.nextActionToDate && ' to '}
+                          {filterData.nextActionToDate && formatDate(filterData.nextActionToDate)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <div className="d-flex gap-2">
                     <button
                       className="btn btn-outline-secondary"
@@ -3013,6 +3013,23 @@ const clearDateFilter = (filterType) => {
                   </div>
                 </div>
               </div>
+              <nav aria-label="Page navigation example">
+                <ul className="pagination">
+                  <li className="page-item">
+                    <a className="page-link" href="#" aria-label="Previous">
+                      <span aria-hidden="true">&laquo;</span>
+                    </a>
+                  </li>
+                  <li className="page-item"><a className="page-link" href="#">1</a></li>
+                  <li className="page-item"><a className="page-link" href="#">2</a></li>
+                  <li className="page-item"><a className="page-link" href="#">3</a></li>
+                  <li className="page-item">
+                    <a className="page-link" href="#" aria-label="Next">
+                      <span aria-hidden="true">&raquo;</span>
+                    </a>
+                  </li>
+                </ul>
+              </nav>
             </section>
           </div>
         </div>
