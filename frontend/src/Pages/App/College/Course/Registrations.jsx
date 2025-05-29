@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect ,useRef} from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -6,6 +6,7 @@ import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
 import './CourseCrm.css';
+import './crm.css';
 
 const CRMDashboard = () => {
   // const [activeTab, setActiveTab] = useState(0);
@@ -25,6 +26,317 @@ const CRMDashboard = () => {
   const [allProfiles, setAllProfiles] = useState([]);
   const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
+
+  // Documents specific state
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [documentZoom, setDocumentZoom] = useState(1);
+  const [documentRotation, setDocumentRotation] = useState(0);
+  const [showRejectionForm, setShowRejectionForm] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [uploadingDoc, setUploadingDoc] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // Static document data for demonstration
+  const staticDocuments = [
+    {
+      _id: 'doc1',
+      Name: 'Aadhaar Card',
+      uploads: [{
+        _id: 'upload1',
+        fileUrl: 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=400',
+        uploadedAt: new Date('2024-01-15'),
+        status: 'Pending'
+      }]
+    },
+    {
+      _id: 'doc2',
+      Name: 'PAN Card',
+      uploads: [{
+        _id: 'upload2',
+        fileUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400',
+        uploadedAt: new Date('2024-01-16'),
+        status: 'Verified'
+      }]
+    },
+    {
+      _id: 'doc3',
+      Name: '10th Marksheet',
+      uploads: [{
+        _id: 'upload3',
+        fileUrl: 'https://images.unsplash.com/photo-1586953208448-b95a79798f07?w=400',
+        uploadedAt: new Date('2024-01-17'),
+        status: 'Rejected'
+      }]
+    },
+    {
+      _id: 'doc4',
+      Name: '12th Marksheet',
+      uploads: []
+    },
+    {
+      _id: 'doc5',
+      Name: 'Passport Photo',
+      uploads: [{
+        _id: 'upload5',
+        fileUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        uploadedAt: new Date('2024-01-18'),
+        status: 'Verified'
+      }]
+    }
+  ];
+
+  // Static profile data
+  const staticProfileData = [
+    {
+      _id: 'profile1',
+      _candidate: {
+        name: 'Rahul Sharma',
+        mobile: '+91 9876543210',
+        email: 'rahul.sharma@email.com',
+        documents: staticDocuments
+      },
+      _leadStatus: { _id: 'status1', title: 'Hot Lead' },
+      createdAt: new Date('2024-01-10'),
+      updatedAt: new Date('2024-01-20'),
+      _course: {
+        name: 'Full Stack Development',
+        sectors: 'Information Technology'
+      }
+    }
+  ];
+
+  // Initialize data
+  useEffect(() => {
+    setAllProfiles(staticProfileData);
+    setAllProfilesData(staticProfileData);
+  }, []);
+
+  // Document functions
+  const openDocumentModal = (document) => {
+    setSelectedDocument(document);
+    setShowDocumentModal(true);
+    setDocumentZoom(1);
+    setDocumentRotation(0);
+    document.body?.classList.add('no-scroll');
+  };
+
+  const closeDocumentModal = () => {
+    setShowDocumentModal(false);
+    setSelectedDocument(null);
+    setShowRejectionForm(false);
+    setRejectionReason('');
+    document.body?.classList.remove('no-scroll');
+  };
+
+  const zoomIn = () => {
+    setDocumentZoom(prev => prev + 0.1);
+  };
+
+  const zoomOut = () => {
+    setDocumentZoom(prev => prev > 0.5 ? prev - 0.1 : prev);
+  };
+
+  const rotateDocument = () => {
+    setDocumentRotation(prev => (prev + 90) % 360);
+  };
+
+  const updateDocumentStatus = (uploadId, status) => {
+    // In real app, this would make an API call
+    console.log(`Updating document ${uploadId} to ${status}`);
+    if (status === 'Rejected' && !rejectionReason.trim()) {
+      alert('Please provide a rejection reason');
+      return;
+    }
+    alert(`Document ${status} successfully!`);
+    closeDocumentModal();
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending': return 'text-dark';
+      case 'verified': return 'text-sucess';
+      case 'rejected': return 'text-danger';
+      default: return 'text-secondary';
+    }
+  };
+
+  const filterDocuments = (documents) => {
+    if (statusFilter === 'all') return documents;
+    return documents.filter(doc => {
+      if (doc.uploads.length === 0) return statusFilter === 'none';
+      return doc.uploads[doc.uploads.length - 1].status.toLowerCase() === statusFilter;
+    });
+  };
+
+  const getDocumentCounts = (documents) => {
+    const totalDocs = documents.length;
+    const uploadedDocs = documents.filter(doc => doc.uploads.length > 0).length;
+    const pendingDocs = documents.filter(doc =>
+      doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Pending'
+    ).length;
+    const verifiedDocs = documents.filter(doc =>
+      doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Verified'
+    ).length;
+    const rejectedDocs = documents.filter(doc =>
+      doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Rejected'
+    ).length;
+
+    return { totalDocs, uploadedDocs, pendingDocs, verifiedDocs, rejectedDocs };
+  };
+
+
+  // Document Modal Component
+  const DocumentModal = () => {
+    if (!showDocumentModal || !selectedDocument) return null;
+
+    const latestUpload = selectedDocument.uploads.length > 0 ? selectedDocument.uploads[selectedDocument.uploads.length - 1] : null;
+
+    return (
+      <div className="document-modal-overlay" onClick={closeDocumentModal}>
+        <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>{selectedDocument.Name} Verification</h3>
+            <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
+          </div>
+
+          <div className="modal-body">
+            <div className="document-preview-section">
+              <div className="document-preview-container">
+                {latestUpload ? (
+                  <>
+                    <img
+                      src={latestUpload.fileUrl}
+                      alt="Document Preview"
+                      style={{
+                        transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                        transition: 'transform 0.3s ease',
+                        maxWidth: '100%',
+                        objectFit: 'contain'
+                      }}
+                    />
+                    <div className="preview-controls">
+                      <button onClick={() => setDocumentZoom(prev => prev + 0.1)} className="control-btn" style={{whiteSpace: 'nowrap'}}>
+                        <i className="fas fa-search-plus"></i> Zoom In
+                      </button>
+                      <button onClick={() => setDocumentZoom(prev => prev - 0.1)}lassName="control-btn" style={{whiteSpace: 'nowrap'}}>
+                        <i className="fas fa-search-minus"></i> Zoom Out
+                      </button>
+                      <button onClick={() => setDocumentRotation(prev => prev + 90)} className="control-btn" style={{whiteSpace: 'nowrap'}}>
+                        <i className="fas fa-redo"></i> Rotate
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="no-document">
+                    <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+                    <p>No document uploaded</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="document-info-section">
+              <div className="info-card">
+                <h4>Document Information</h4>
+                <div className="info-row">
+                  <strong>Document Name:</strong> {selectedDocument.Name}
+                </div>
+                <div className="info-row">
+                  <strong>Upload Date:</strong> {latestUpload ? formatDate(latestUpload.uploadedAt) : 'N/A'}
+                </div>
+                <div className="info-row">
+                  <strong>Status:</strong>
+                  <span className={`${getStatusBadgeClass(latestUpload?.status)} ms-2`}>
+                    {latestUpload?.status || 'No Uploads'}
+                  </span>
+                </div>
+              </div>
+
+              {latestUpload?.status === 'Pending' && (
+                <div className="verification-section">
+                  <div className="info-card">
+                    <h4>Verification Steps</h4>
+                    <ol className="verification-steps">
+                      <li>Check if the document is clearly visible</li>
+                      <li>Verify the document belongs to the candidate</li>
+                      <li>Confirm all required details are present</li>
+                      <li>Check the document validity dates</li>
+                      <li>Ensure there are no signs of tampering</li>
+                    </ol>
+                  </div>
+
+                  {!showRejectionForm ? (
+                    <div className="action-buttons">
+                      <button
+                        className="btn btn-success me-2"
+                        onClick={() => updateDocumentStatus(latestUpload._id, 'Verified')}
+                      >
+                        <i className="fas fa-check"></i> Approve Document
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => setShowRejectionForm(true)}
+                      >
+                        <i className="fas fa-times"></i> Reject Document
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="rejection-form">
+                      <h4>Provide Rejection Reason</h4>
+                      <textarea
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        placeholder="Please provide a detailed reason for rejection..."
+                        rows="4"
+                        className="form-control mb-3"
+                      />
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => updateDocumentStatus(latestUpload._id, 'Rejected')}
+                        >
+                          Confirm Rejection
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => setShowRejectionForm(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedDocument.uploads.length > 0 && (
+                <div className="info-card">
+                  <h4>Document History</h4>
+                  <div className="document-history">
+                    {selectedDocument.uploads.map((upload, index) => (
+                      <div key={index} className="history-item">
+                        <div className="history-date">
+                          {formatDate(upload.uploadedAt)}
+                        </div>
+                        <div className="history-status">
+                          <span className={`${getStatusBadgeClass(upload.status)}`}>
+                            {upload.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
 
   //Date picker
   const today = new Date();  // Current date
@@ -86,7 +398,8 @@ const CRMDashboard = () => {
     'Lead Details',
     'Profile',
     'Job History',
-    'Course History'
+    'Course History',
+    'Documents'
   ];
 
   // Check if device is mobile
@@ -1295,7 +1608,7 @@ const CRMDashboard = () => {
                       <div className="card border-0 shadow-sm">
                         <div className="card-body p-3">
                           <div className="d-flex justify-content-between align-items-start mb-2">
-                            <span className="badge bg-light text-dark border">
+                            <span className="bg-light text-dark border">
                               {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
                                 day: '2-digit',
                                 month: 'short',
@@ -1449,7 +1762,7 @@ const CRMDashboard = () => {
                       <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
                       Filters
                       {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                        <span className="badge bg-light text-dark ms-1">
+                        <span className="bg-light text-dark ms-1">
                           {Object.values(filterData).filter(val => val && val !== 'true').length}
                         </span>
                       )}
@@ -1520,7 +1833,7 @@ const CRMDashboard = () => {
                   <div className="d-flex align-items-center">
                     <i className="fas fa-filter text-primary me-2"></i>
                     <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                    <span className="badge bg-light text-dark ms-2">
+                    <span className="bg-light text-dark ms-2">
                       {Object.values(filterData).filter(val => val && val !== 'true').length} Active
                     </span>
                   </div>
@@ -1891,7 +2204,7 @@ const CRMDashboard = () => {
                     {/* Active filter indicators */}
                     {(filterData.createdFromDate || filterData.createdToDate) && (
                       <div className="mt-1">
-                        <span className="badge bg-success me-2">
+                        <span className="bg-success me-2">
                           <i className="fas fa-calendar-plus me-1"></i>
                           Created:
                           {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
@@ -1903,7 +2216,7 @@ const CRMDashboard = () => {
 
                     {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
                       <div className="mt-1">
-                        <span className="badge bg-warning me-2">
+                        <span className="bg-warning me-2">
                           <i className="fas fa-calendar-edit me-1"></i>
                           Modified:
                           {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
@@ -1915,7 +2228,7 @@ const CRMDashboard = () => {
 
                     {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
                       <div className="mt-1">
-                        <span className="badge bg-info me-2">
+                        <span className="bg-info me-2">
                           <i className="fas fa-calendar-check me-1"></i>
                           Next Action:
                           {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
@@ -2939,35 +3252,348 @@ const CRMDashboard = () => {
                                             <thead className="table-light">
                                               <tr>
                                                 <th>S.No</th>
-                                                <th>Applied Date</th>                                                
-                                                <th>Course Name</th>                                                
+                                                <th>Applied Date</th>
+                                                <th>Course Name</th>
                                                 <th>Lead Added By</th>
-                                                <th>Counsellor</th>                                                
+                                                <th>Counsellor</th>
                                                 <th>Status</th>
                                               </tr>
                                             </thead>
                                             <tbody>
                                               {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-  profile._candidate._appliedCourses.map((course, index) => (
-    <tr key={index}>
-      <td>{index + 1}</td>
-      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-      <td>{course._course?.name || 'N/A'}</td>
-      <td>{course.registeredBy?.name || 'Self Registered'}</td>
-      <td>{course.month || ''} {course.year || ''}</td>
-      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
-    </tr>
-  ))
-) : (
-  <tr>
-    <td colSpan={6} className="text-center">No course history available</td>
-  </tr>
-)}
+                                                profile._candidate._appliedCourses.map((course, index) => (
+                                                  <tr key={index}>
+                                                    <td>{index + 1}</td>
+                                                    <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                    <td>{course._course?.name || 'N/A'}</td>
+                                                    <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                    <td>{course.month || ''} {course.year || ''}</td>
+                                                    <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                  </tr>
+                                                ))
+                                              ) : (
+                                                <tr>
+                                                  <td colSpan={6} className="text-center">No course history available</td>
+                                                </tr>
+                                              )}
 
                                             </tbody>
                                           </table>
                                         </div>
                                       </div>
+                                    </div>
+                                  )}
+
+                                  {/* Documents Tab */}
+                                  {/* {activeTab === 4 && ( */}
+
+                                  {(activeTab[profileIndex] || 0) === 4 && (
+                                    <div className="tab-pane active" id='studentsDocuments'>
+                                      <div className="enhanced-documents-panel">
+                                      
+
+                                        {/* Candidate Info Header */}
+                                        <div className="candidate-header-section">
+                                          <div className="candidate-info-card">
+                                            <div className="candidate-avatar-large">
+                                              {profile._candidate?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                            </div>
+                                            <div className="candidate-details">
+                                              <h3>{profile._candidate?.name}</h3>
+                                              <div className="contact-details">
+                                                <span><i className="fas fa-envelope text-primary"></i> {profile._candidate?.email}</span>
+                                                <span><i className="fas fa-phone text-success"></i> {profile._candidate?.mobile}</span>
+                                              </div>
+                                            </div>
+                                            <div className="completion-ring">
+                                              {(() => {
+                                                const counts = getDocumentCounts(profile._candidate?.documents || staticDocuments);
+                                                const percentage = Math.round((counts.verifiedDocs / counts.totalDocs) * 100);
+                                                return (
+                                                  <div className="circular-progress" data-percentage={percentage}>
+                                                    <svg className="progress-ring" width="80" height="80">
+                                                      <circle
+                                                        cx="40"
+                                                        cy="40"
+                                                        r="35"
+                                                        fill="none"
+                                                        stroke="#e6e6e6"
+                                                        strokeWidth="6"
+                                                      />
+                                                      <circle
+                                                        cx="40"
+                                                        cy="40"
+                                                        r="35"
+                                                        fill="none"
+                                                        stroke="#4facfe"
+                                                        strokeWidth="6"
+                                                        strokeLinecap="round"
+                                                        strokeDasharray={`${(percentage / 100) * 220} 220`}
+                                                        transform="rotate(-90 40 40)"
+                                                        className="progress-bar"
+                                                      />
+                                                    </svg>
+                                                    <div className="percentage-text">
+                                                      <span className="percentage">{percentage}%</span>
+                                                      <span className="label">Complete</span>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })()}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Enhanced Stats Grid */}
+                                        <div className="stats-grid">
+                                          {(() => {
+                                            const counts = getDocumentCounts(profile._candidate?.documents || staticDocuments);
+                                            return (
+                                              <>
+                                                <div className="stat-card total-docs">
+                                                  <div className="stat-icon">
+                                                    <i className="fas fa-file-alt"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4>{counts.totalDocs}</h4>
+                                                    <p>Total Required</p>
+                                                  </div>
+                                                  <div className="stat-trend">
+                                                    <i className="fas fa-list"></i>
+                                                  </div>
+                                                </div>
+
+                                                <div className="stat-card uploaded-docs">
+                                                  <div className="stat-icon">
+                                                    <i className="fas fa-cloud-upload-alt"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4>{counts.uploadedDocs}</h4>
+                                                    <p>Uploaded</p>
+                                                  </div>
+                                                  <div className="stat-trend">
+                                                    <i className="fas fa-arrow-up"></i>
+                                                  </div>
+                                                </div>
+
+                                                <div className="stat-card pending-docs">
+                                                  <div className="stat-icon">
+                                                    <i className="fas fa-clock"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4>{counts.pendingDocs}</h4>
+                                                    <p>Pending Review</p>
+                                                  </div>
+                                                  <div className="stat-trend">
+                                                    <i className="fas fa-exclamation-triangle"></i>
+                                                  </div>
+                                                </div>
+
+                                                <div className="stat-card verified-docs">
+                                                  <div className="stat-icon">
+                                                    <i className="fas fa-check-circle"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4>{counts.verifiedDocs}</h4>
+                                                    <p>Approved</p>
+                                                  </div>
+                                                  <div className="stat-trend">
+                                                    <i className="fas fa-thumbs-up"></i>
+                                                  </div>
+                                                </div>
+
+                                                <div className="stat-card rejected-docs">
+                                                  <div className="stat-icon">
+                                                    <i className="fas fa-times-circle"></i>
+                                                  </div>
+                                                  <div className="stat-info">
+                                                    <h4>{counts.rejectedDocs}</h4>
+                                                    <p>Rejected</p>
+                                                  </div>
+                                                  <div className="stat-trend">
+                                                    <i className="fas fa-arrow-down"></i>
+                                                  </div>
+                                                </div>
+                                                
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
+
+                                        {/* Enhanced Filter Section */}
+                                        <div className="filter-section-enhanced">
+                                          <div className="filter-tabs-container">
+                                            <h5 className="filter-title">
+                                              <i className="fas fa-filter me-2"></i>
+                                              Filter Documents
+                                            </h5>
+                                            <div className="filter-tabs">
+                                              <button
+                                                className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                onClick={() => setStatusFilter('all')}
+                                              >
+                                                <i className="fas fa-list-ul"></i>
+                                                All Documents
+                                                <span className="badge">{getDocumentCounts(profile._candidate?.documents || staticDocuments).totalDocs}</span>
+                                              </button>
+                                              <button
+                                                className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                onClick={() => setStatusFilter('pending')}
+                                              >
+                                                <i className="fas fa-clock"></i>
+                                                Pending
+                                                <span className="badge">{getDocumentCounts(profile._candidate?.documents || staticDocuments).pendingDocs}</span>
+                                              </button>
+                                              <button
+                                                className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                onClick={() => setStatusFilter('verified')}
+                                              >
+                                                <i className="fas fa-check-circle"></i>
+                                                Verified
+                                                <span className="badge">{getDocumentCounts(profile._candidate?.documents || staticDocuments).verifiedDocs}</span>
+                                              </button>
+                                              <button
+                                                className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                onClick={() => setStatusFilter('rejected')}
+                                              >
+                                                <i className="fas fa-times-circle"></i>
+                                                Rejected
+                                                <span className="badge">{getDocumentCounts(profile._candidate?.documents || staticDocuments).rejectedDocs}</span>
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Enhanced Documents Grid */}
+                                        <div className="documents-grid-enhanced">
+                                          {filterDocuments(profile._candidate?.documents || staticDocuments).map((doc, index) => {
+                                            const latestUpload = doc.uploads.length > 0 ? doc.uploads[doc.uploads.length - 1] : null;
+
+                                            return (
+                                              <div key={doc._id} className="document-card-enhanced">
+                                                <div className="document-image-container">
+                                                  {latestUpload ? (
+                                                    <>
+                                                      <img
+                                                        src={latestUpload.fileUrl}
+                                                        alt="Document Preview"
+                                                        className="document-image"
+                                                      />
+                                                      <div className="image-overlay">
+                                                        <button
+                                                          className="preview-btn"
+                                                          onClick={() => openDocumentModal(doc)}
+                                                        >
+                                                          <i className="fas fa-search-plus"></i>
+                                                          Preview
+                                                        </button>
+                                                      </div>
+                                                    </>
+                                                  ) : (
+                                                    <div className="no-document-placeholder">
+                                                      <i className="fas fa-file-upload"></i>
+                                                      <p>No Document</p>
+                                                    </div>
+                                                  )}
+
+                                                  {/* Status Badge Overlay */}
+                                                  <div className="status-badge-overlay">
+                                                    {latestUpload?.status === 'Pending' && (
+                                                      <span className="status-badge-new pending">
+                                                        <i className="fas fa-clock"></i>
+                                                        Pending
+                                                      </span>
+                                                    )}
+                                                    {latestUpload?.status === 'Verified' && (
+                                                      <span className="status-badge-new verified">
+                                                        <i className="fas fa-check-circle"></i>
+                                                        Verified
+                                                      </span>
+                                                    )}
+                                                    {latestUpload?.status === 'Rejected' && (
+                                                      <span className="status-badge-new rejected">
+                                                        <i className="fas fa-times-circle"></i>
+                                                        Rejected
+                                                      </span>
+                                                    )}
+                                                    {!latestUpload && (
+                                                      <span className="status-badge-new not-uploaded">
+                                                        <i className="fas fa-upload"></i>
+                                                        Required
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </div>
+
+                                                <div className="document-info-section">
+                                                  <div className="document-header">
+                                                    <h4 className="document-title">{doc.Name}</h4>
+                                                    <div className="document-actions">
+                                                      {!latestUpload ? (
+                                                        <button className="action-btn upload-btn" title="Upload Document">
+                                                          <i className="fas fa-cloud-upload-alt"></i>
+                                                          Upload
+                                                        </button>
+                                                      ) : latestUpload.status === 'Pending' ? (
+                                                        <button
+                                                          className="action-btn verify-btn"
+                                                          onClick={() => openDocumentModal(doc)}
+                                                          title="Verify Document"
+                                                        >
+                                                          <i className="fas fa-search"></i>
+                                                          Verify
+                                                        </button>
+                                                      ) : (
+                                                        <button
+                                                          className="action-btn view-btn"
+                                                          onClick={() => openDocumentModal(doc)}
+                                                          title="View Document"
+                                                        >
+                                                          <i className="fas fa-eye"></i>
+                                                          View
+                                                        </button>
+                                                      )}
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="document-meta">
+                                                    <div className="meta-item">
+                                                      <i className="fas fa-calendar-alt text-muted"></i>
+                                                      <span className="meta-text">
+                                                        {latestUpload ?
+                                                          new Date(latestUpload.uploadedAt).toLocaleDateString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric'
+                                                          }) :
+                                                          'Not uploaded'
+                                                        }
+                                                      </span>
+                                                    </div>
+
+                                                    {latestUpload && (
+                                                      <div className="meta-item">
+                                                        <i className="fas fa-clock text-muted"></i>
+                                                        <span className="meta-text">
+                                                          {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                          })}
+                                                        </span>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+
+
+                                        <DocumentModal />
+                                      </div>
+
+
                                     </div>
                                   )}
 
@@ -3022,352 +3648,61 @@ const CRMDashboard = () => {
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
       </div>
-      <style jsx>
-        {`
+     <style>
+      {
+        `
         html body .content .content-wrapper {
-          padding: calc(0.9rem - 0.1rem) 1.2rem
-        }
+    padding: calc(0.9rem - 0.1rem) 1.2rem
+}
 
-        .container-fluid.py-2 {
-          position: sticky!important;
-          top: 0;
-          z-index: 1020;
-          background-color: white;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
+.container-fluid.py-2 {
+    position: sticky !important;
+    top: 0;
+    z-index: 1020;
+    background-color: white;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
 .stickyBreakpoints {
-  position: sticky;
-  top: 20px;  /* default top */
-  z-index: 1020;
-}
-.react-date-picker__wrapper{
-border:none;
-}
-.react-date-picker__inputGroup input{
-border: none !important
+    position: sticky;
+    top: 20px;
+    /* default top */
+    z-index: 1020;
 }
 
-.react-date-picker__inputGroup{
+.react-date-picker__wrapper {
+    border: none;
+}
+
+.react-date-picker__inputGroup input {
+    border: none !important
+}
+
+.react-date-picker__inputGroup {
     width: 100%;
     white-space: nowrap;
     background: transparent;
     border: none;
 }
-    .react-date-picker__clear-button{
-    display:none;
-    }
-        @media(max-width:1920px){
-          .stickyBreakpoints{
-            top: 20%
-          }
-        }
-        
-        @media(max-width:1400px){
-          .stickyBreakpoints{
-            top: 17%
-          }
-        }
-
-        /* Mobile Modal Styles */
-        .modal {
-          z-index: 1050;
-        }
-
-        .modal-dialog {
-          margin: 1rem;
-        }
-
-        /* WhatsApp Panel Mobile Styles */
-        .whatsapp-chat {
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .topbar-container {
-          flex-shrink: 0;
-          padding: 1rem;
-          border-bottom: 1px solid #e0e0e0;
-          background-color: #f8f9fa;
-        }
-
-        .left-topbar {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .small-avatar {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background-color: #007bff;
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-        }
-
-        .lead-name {
-          font-weight: 600;
-          font-size: 1rem;
-        }
-
-        .selected-number {
-          color: #666;
-          font-size: 0.9rem;
-        }
-
-        .right-topbar {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          margin-top: 0.5rem;
-        }
-
-        .chat-view {
-          flex: 1;
-          overflow-y: auto;
-          padding: 1rem;
-          background-color: #f0f0f0;
-        }
-
-        .chat-container {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-        }
-
-        .counselor-msg-container {
-          margin-bottom: 1.5rem;
-        }
-
-        .chatgroupdate {
-          text-align: center;
-          margin-bottom: 1rem;
-        }
-
-        .chatgroupdate span {
-          background-color: #e3f2fd;
-          padding: 0.25rem 0.75rem;
-          border-radius: 1rem;
-          font-size: 0.8rem;
-          color: #666;
-        }
-
-        .counselor-msg {
-          background-color: #dcf8c6;
-          padding: 0.75rem;
-          border-radius: 0.5rem;
-          margin-bottom: 0.5rem;
-          max-width: 80%;
-          margin-left: auto;
-        }
-
-        .text-message {
-          white-space: pre-wrap;
-          margin: 0;
-          font-family: inherit;
-        }
-
-        .message-header-name {
-          font-weight: 600;
-          color: #1976d2;
-        }
-
-        .student-messages {
-          color: #2e7d32;
-        }
-
-        .messageTime {
-          font-size: 0.75rem;
-          color: #666;
-          display: block;
-          text-align: right;
-        }
-
-        .sessionExpiredMsg {
-          text-align: center;
-          padding: 1rem;
-          background-color: #fff3cd;
-          border: 1px solid #ffeaa7;
-          border-radius: 0.5rem;
-          margin-top: 1rem;
-          color: #856404;
-        }
-
-        .footer-container {
-          flex-shrink: 0;
-          border-top: 1px solid #e0e0e0;
-          background-color: white;
-        }
-
-        .footer-box {
-          padding: 1rem;
-        }
-
-        .message-container {
-          margin-bottom: 0.5rem;
-        }
-
-        .message-input {
-          width: 100%;
-          border: 1px solid #ddd;
-          border-radius: 0.5rem;
-          padding: 0.5rem;
-          resize: none;
-          background-color: #f8f9fa;
-        }
-
-        .disabled-style {
-          opacity: 0.6;
-        }
-
-        .divider {
-          margin: 0.5rem 0;
-          border-color: #e0e0e0;
-        }
-
-        .message-container-input {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .bgcolor{
-        background-color:#f1f2f6!important;
-        }
-        .left-footer {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .margin-right-10 {
-          margin-right: 10px;
-        }
-
-        .margin-bottom-5 {
-          margin-bottom: 5px;
-        }
-
-        .margin-horizontal-4 {
-          margin: 0 4px;
-        }
-
-        .margin-horizontal-5 {
-          margin: 0 5px;
-        }
-
-        .fileUploadIcon {
-          width: 20px;
-          height: 20px;
-          opacity: 0;
-          position: absolute;
-          cursor: pointer;
-        }
-
-        .input-template {
-          cursor: pointer;
-        }
-
-        .send-button {
-          text-decoration: none;
-        }
-
-        .send-img {
-          width: 20px;
-          height: 20px;
-        }
-
-        #whatsappPanel{
-        height: 73dvh;
-        }
-          .info-group{
-          padding:8px;}
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-          .modal-dialog {
-            margin: 0.5rem;
-            max-width: calc(100% - 1rem);
-          }
-
-          .whatsapp-chat .modal-content {
-            height: 90vh;
-          }
-
-          .col-md-6, .col-md-5, .col-md-1 {
-            flex: 0 0 100%;
-            max-width: 100%;
-            margin-bottom: 1rem;
-          }
-
-          .nav-pills {
-            flex-wrap: wrap;
-          }
-
-          .nav-pills .nav-link {
-            font-size: 0.9rem;
-            padding: 0.5rem 0.75rem;
-          }
-        }
-
-        /* Additional mobile optimizations */
-        @media (max-width: 576px) {
-          .container-fluid.py-2 {
-            padding: 0.5rem !important;
-          }
-
-          .card-body.px-1.py-0.my-2 {
-            padding: 0.5rem !important;
-          }
-
-          .d-flex.align-items-center {
-            flex-wrap: wrap;
-            gap: 0.5rem;
-          }
-
-          .btn-group {
-            flex-wrap: wrap;
-          }
-
-          .input-group {
-            max-width: 100% !important;
-            margin-bottom: 0.5rem;
-          }
-        }
-          /* Add this to your existing style tag or CSS file */
-.react-date-picker__wrapper {
-  border: 1px solid #ced4da !important;
-  border-radius: 0.375rem !important;
-}
-
-.react-date-picker__inputGroup input {
-  border: none !important;
-  outline: none !important;
-}
 
 .react-date-picker__clear-button {
-  display: none !important;
+    display: none;
 }
 
-.react-date-picker__calendar-button {
-  padding: 4px !important;
+@media(max-width:1920px) {
+    .stickyBreakpoints {
+        top: 20%
+    }
 }
 
-/* Additional styling for better appearance */
-.react-date-picker__inputGroup {
-  width: 100%;
-  white-space: nowrap;
-  background: transparent;
-  border: none;
+@media(max-width:1400px) {
+    .stickyBreakpoints {
+        top: 17%
+    }
 }
-
-.react-date-picker__wrapper {
-  background: white !important;
-}
-        `}
-      </style>
+        `
+      }
+     </style>
     </div>
   );
 };
