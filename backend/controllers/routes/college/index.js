@@ -191,16 +191,26 @@ router.route("/appliedCandidates").get(async (req, res) => {
 		const totalCount = await AppliedCourses.countDocuments();
 
 		const appliedCourses = await AppliedCourses.find()
-			.populate('_candidate')
 			.populate('_course')
 			.populate('_leadStatus')
-			
 			.populate('registeredBy')
 			.populate({
 				path: '_course',
 				populate: {
 					path: 'sectors',
 					select: 'name'
+				}
+			})
+			.populate({
+				path: '_candidate',				
+				populate: {
+					path: '_appliedCourses',
+					populate: [
+						{ path: '_course', select: 'name description' },
+						{ path: 'registeredBy', select: 'name email' },
+						{ path: '_center', select: 'name location' },
+						{ path: '_leadStatus', select: 'title' }
+					]
 				}
 			})
 			.populate({
@@ -233,7 +243,7 @@ router.route("/appliedCandidates").get(async (req, res) => {
 			}
 
 
-			
+
 
 			return {
 				...docObj,

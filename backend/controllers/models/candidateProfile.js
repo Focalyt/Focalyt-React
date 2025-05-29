@@ -159,6 +159,9 @@ const candidateProfileSchema = new Schema(
         centerId: { type: ObjectId, ref: "Center" }, // Course reference
       }
     ],
+    _appliedCourses: [{type: ObjectId, ref: "AppliedCourses"}
+      
+    ],
 
     qualifications: [
       {

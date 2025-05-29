@@ -2812,41 +2812,6 @@ const clearDateFilter = (filterType) => {
                                               )}
 
 
-
-
-                                              {/* {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
-                                              <div className="resume-section">
-                                                <h2 className="resume-section-title">Certifications</h2>
-                                                <ul className="resume-certifications-list">
-                                                  {certificates.map((cert, index) => (
-                                                    (cert.certificateName || cert.orgName) && (
-                                                      <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                        {cert.certificateName && (
-                                                          <strong>{cert.certificateName}</strong>
-                                                        )}
-                                                        {cert.orgName && (
-                                                          <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                        )}
-                                                        {cert.currentlypursuing ? (
-                                                          <span className="resume-cert-date highlight-text"> (Currently Pursuing)</span>
-                                                        ) : (cert.month || cert.year) && (
-                                                          <span className="resume-cert-date">
-                                                            {cert.month && cert.year ?
-                                                              ` (${cert.month}/${cert.year})` :
-                                                              cert.month ?
-                                                                ` (${cert.month})` :
-                                                                cert.year ?
-                                                                  ` (${cert.year})` :
-                                                                  ''}
-                                                          </span>
-                                                        )}
-                                                      </li>
-                                                    )
-                                                  ))}
-                                                </ul>
-                                              </div>
-                                            )} */}
-
                                               {profile._candidate?.personalInfo?.certifications?.length > 0 && (
                                                 <div className="resume-section">
                                                   <h2 className="resume-section-title">Certifications</h2>
@@ -2974,24 +2939,31 @@ const clearDateFilter = (filterType) => {
                                             <thead className="table-light">
                                               <tr>
                                                 <th>S.No</th>
-                                                <th>Course Name</th>
-                                                <th>Institute</th>
-                                                <th>Completion Date</th>
-                                                <th>Certificate ID</th>
-                                                <th>Score</th>
+                                                <th>Applied Date</th>                                                
+                                                <th>Course Name</th>                                                
+                                                <th>Lead Added By</th>
+                                                <th>Counsellor</th>                                                
+                                                <th>Status</th>
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              {certificates.map((course, index) => (
-                                                <tr key={index}>
-                                                  <td>{index + 1}</td>
-                                                  <td>{course.certificateName}</td>
-                                                  <td>{course.orgName}</td>
-                                                  <td>{course.month} {course.year}</td>
-                                                  <td>CRT{index + 1}001</td>
-                                                  <td><span className="text-success">Completed</span></td>
-                                                </tr>
-                                              ))}
+                                              {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
+  profile._candidate._appliedCourses.map((course, index) => (
+    <tr key={index}>
+      <td>{index + 1}</td>
+      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+      <td>{course._course?.name || 'N/A'}</td>
+      <td>{course.registeredBy?.name || 'Self Registered'}</td>
+      <td>{course.month || ''} {course.year || ''}</td>
+      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+    </tr>
+  ))
+) : (
+  <tr>
+    <td colSpan={6} className="text-center">No course history available</td>
+  </tr>
+)}
+
                                             </tbody>
                                           </table>
                                         </div>
