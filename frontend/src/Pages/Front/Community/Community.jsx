@@ -467,70 +467,7 @@ function Community() {
         <div className="container-fluid p-0">
           <div className="mainContentLayout">
             <div className="mainContainer">
-              <div className="leftSidebar">
-                <div className="sidebar">
-                  {/* Notification Banner */}
-                  <div className="notification">
-                    <span className="close">×</span>
-                    <h4>New Lab Program!</h4>
-                    <p>Special offer available for Focalyt future technology labs</p>
-                  </div>
-
-                  {/* Lab Programs */}
-                  <div className="section">
-                    <div className="section-titles">
-                      🧪 Lab Programs
-                    </div>
-                    <div className="lab-card">
-                      <h4>Setup Future Technology Labs</h4>
-                      <p>Starting at ₹0</p>
-                    </div>
-                  </div>
-
-                  {/* Latest Updates */}
-                  <div className="section">
-                    <div className="section-titles">
-                      📰 Latest Updates
-                    </div>
-                    <div className="news-item">
-                      <h4>Organising Free 100% Scrollership Exam</h4>
-                      <p>One Year Free Classes</p>
-                    </div>
-                   
-                  </div>
-
-                  {/* Special Offers */}
-                  <div className="section">
-                    <div className="section-titles">
-                      🎁 Special Offers For Schools
-                    </div>
-                    <div className="offer-card green">
-                      <strong>100% OFF</strong>
-                      <span>on 1st 30 students enrollments</span>
-                    </div>
-                    <div className="offer-card orange">
-                      <strong>Free Training</strong>
-                      <span>with every lab installation</span>
-                    </div>
-                  </div>
-
-                  {/* Success Stories */}
-                  <div className="section">
-                    <div className="section-titles">
-                      🏆 Success Stories
-                    </div>
-                    <div className="success-item">
-                      <span>🏫</span>
-                      <span>DPS School - 5 Labs</span>
-                    </div>
-                    <div className="success-item">
-                      <span>🏫</span>
-                      <span>St. Xavier's - 3 Labs</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
+             x
               <div className="mainBody">
                 <div className="filter-section container my-4">
                   <div className="row align-items-center">

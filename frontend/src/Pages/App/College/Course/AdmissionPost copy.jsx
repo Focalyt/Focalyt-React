@@ -30,6 +30,9 @@ const CRMDashboard = () => {
   const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
 
+
+
+
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
@@ -42,6 +45,8 @@ const CRMDashboard = () => {
   const fileInputRef = useRef(null);
 
   // Static document data for demonstration
+ const [mainTab, setMainTab] = useState('Ekyc');
+
   const staticDocuments = [
     {
       _id: 'doc1',
@@ -395,10 +400,16 @@ const CRMDashboard = () => {
   const [showModifiedDatePicker, setShowModifiedDatePicker] = useState(false);
   const [showNextActionDatePicker, setShowNextActionDatePicker] = useState(false);
 
-  const [crmFilters, setCrmFilters] = useState([
-    { _id: '', name: '', count: 0, milestone: '' },
+  // const [crmFilters, setCrmFilters] = useState([
+  //   { _id: '', name: '', count: 0, milestone: '' },
 
-  ]);
+  // ]);
+  const [crmFilters, setCrmFilters] = useState([
+  { _id: 'pendingEkyc', name: 'Ekyc Pending', count: 1771, milestone: '' },
+  { _id: 'doneEkyc', name: 'Ekyc Done', count: 1770, milestone: '' },
+  { _id: 'All', name: 'All', count: 1, milestone: 'Priority' },
+]);
+
   const [statuses, setStatuses] = useState([
     { _id: '', name: '', count: 0 },
 
@@ -439,10 +450,10 @@ const CRMDashboard = () => {
 
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
-  useEffect(() => {
-    fetchStatus()
+  // useEffect(() => {
+  //   fetchStatus()
 
-  }, []);
+  // }, []);
 
   useEffect(() => {
     fetchSubStatus()
@@ -1108,7 +1119,7 @@ const CRMDashboard = () => {
   }, []);
 
   const handleCrmFilterClick = (_id, index) => {
-    if (_id === 'all') {
+    if (_id === 'pendingEkyc') {
       // Agar "all" filter select hua hai to pura data set kar do
       setAllProfiles(allProfilesData);
       setActiveCrmFilter(index)
@@ -1747,13 +1758,13 @@ const CRMDashboard = () => {
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
                   <div className="d-flex align-items-center">
-                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle Post</h4>
                     <nav aria-label="breadcrumb">
                       <ol className="breadcrumb mb-0 small">
                         <li className="breadcrumb-item">
                           <a href="#" className="text-decoration-none">Home</a>
                         </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
+                        <li className="breadcrumb-item active">Admission Cycle Post</li>
                       </ol>
                     </nav>
                   </div>
@@ -1832,7 +1843,7 @@ const CRMDashboard = () => {
                           </button>
 
                           {/* Milestone flag OUTSIDE the button */}
-                          {filter.milestone && (
+                          {/* {filter.milestone && (
                             <span
                               className="bg-success d-flex align-items-center"
                               style={{
@@ -1843,7 +1854,7 @@ const CRMDashboard = () => {
                             >
                               🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
                             </span>
-                          )}
+                          )} */}
                         </div>
                       </div>
                     ))}
@@ -1901,42 +1912,7 @@ const CRMDashboard = () => {
                 </div>
 
                 <div className="row g-4">
-                  {/* Search Section */}
-                  {/* <div className="col-12">
-                    <div className="card border-0 bg-light">
-                      <div className="card-body p-3">
-                        <label className="form-label small fw-bold text-dark mb-2">
-                          <i className="fas fa-search me-1"></i>
-                          Quick Search
-                        </label>
-                        <div className="input-group">
-                          <span className="input-group-text bg-white border-end-0">
-                            <i className="fas fa-search text-muted"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="name"
-                            className="form-control border-start-0"
-                            placeholder="Type to search by name, mobile, or email..."
-                            value={filterData.name}
-                            onChange={handleFilterChange}
-                          />
-                          {filterData.name && (
-                            <button
-                              className="btn btn-outline-secondary"
-                              type="button"
-                              onClick={() => {
-                                setFilterData(prev => ({ ...prev, name: '' }));
-                                setAllProfiles(allProfilesData);
-                              }}
-                            >
-                              <i className="fas fa-times"></i>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div> */}
+                
 
                   {/* Category Filters */}
                   <div className="col-md-4">

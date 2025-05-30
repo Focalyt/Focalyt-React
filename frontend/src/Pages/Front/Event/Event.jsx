@@ -148,7 +148,7 @@ function Event() {
 
                                 <div className="flag">
                                   <h4
-                                    className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
+                                    className="text-center text-black fw-bolder mb-2 mx-auto text-capitalize ellipsis"
                                     title={event.eventTitle}
                                   >
                                     {event.eventType}
