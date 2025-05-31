@@ -340,7 +340,7 @@ fetchCenters()
                 </div> */}
 
                 {/* Course Component with filtered data */}
-                <Course selectedCenter={selectedCenterForCourses} onBackToCenters={handleBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals}/>
+                <Course selectedCenter={selectedCenterForCourses} />
             </div>
         );
     }
@@ -356,9 +356,9 @@ fetchCenters()
                     <div className="d-flex align-items-center gap-3">
 
                         <div className='d-flex align-items-center'>
-                            <h4 style={{cursor:'pointer'}} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h4>
+                            <h4 onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h4>
                             <span className="mx-2"> &gt; </span>
-                            <h5 style={{cursor:'pointer'}} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+                            <h5 onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
                                 {selectedProject.name} Project
                             </h5>
                             <span className="mx-2"> &gt; </span>
