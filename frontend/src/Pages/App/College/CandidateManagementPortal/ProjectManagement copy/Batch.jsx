@@ -551,20 +551,42 @@ const Batch = ({selectedCourse = null, onBackToCourses = null, selectedCenter = 
                     placeholder="Enter batch name"
                   />
                   </div>
-                   <div className="col-md-6 mb-3">
-                  <label className="form-label">Description *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Enter batch name"
-                  />
-                  </div>
                  
                 </div>
                
-               
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Center</label>
+                    <select
+                      className="form-select"
+                      value={formData.center}
+                      onChange={(e) => setFormData(prev => ({ ...prev, center: e.target.value }))}
+                    >
+                      <option value="">Select Center (Online if empty)</option>
+                      {selectedCenter ? (
+                        <option value={selectedCenter.code} selected>{selectedCenter.code} - {selectedCenter.name}</option>
+                      ) : (
+                        availableCenters.map(center => (
+                          <option key={center.id} value={center.code}>
+                            {center.code} - {center.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Mode</label>
+                    <select
+                      className="form-select"
+                      value={formData.mode}
+                      onChange={(e) => setFormData(prev => ({ ...prev, mode: e.target.value }))}
+                    >
+                      <option value="offline">Offline</option>
+                      <option value="online">Online</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                  </div>
+                </div>
                 <div className="row">
                   <div className="col-md-6 mb-3">
                     <label className="form-label">Instructor *</label>
@@ -585,26 +607,6 @@ const Batch = ({selectedCourse = null, onBackToCourses = null, selectedCenter = 
                       onChange={(e) => setFormData(prev => ({ ...prev, maxStudents: e.target.value }))}
                       placeholder="Enter max students"
                       min="1"
-                    />
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Zero Period Start Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, zeroPeriodStartDate: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Zero Period End Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={formData.endDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, zeroPeriodEndDate: e.target.value }))}
                     />
                   </div>
                 </div>

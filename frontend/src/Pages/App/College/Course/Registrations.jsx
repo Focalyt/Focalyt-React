@@ -51,6 +51,10 @@ const CRMDashboard = () => {
     return range;
   };
 
+  useEffect(() => {
+    getPaginationPages()
+  }, [totalPages])
+
 
 
 
@@ -694,85 +698,7 @@ const CRMDashboard = () => {
     currentlyWorking: false
   }]);
 
-  const [educations, setEducations] = useState([
-    {
-      education: '',          // ObjectId of Qualification (e.g., 10th, UG)
-      universityName: '',
-      boardName: '',
-      collegeName: '',
-      schoolName: '',
-      course: '',             // ObjectId of QualificationCourse
-      specialization: '',
-      passingYear: '',
-      marks: '',
 
-      universityLocation: {
-        type: 'Point',
-        coordinates: [0, 0],
-        city: '',
-        state: '',
-        fullAddress: ''
-      },
-      collegeLocation: {
-        type: 'Point',
-        coordinates: [0, 0],
-        city: '',
-        state: '',
-        fullAddress: ''
-      },
-      schoolLocation: {
-        type: 'Point',
-        coordinates: [0, 0],
-        city: '',
-        state: '',
-        fullAddress: ''
-      }
-    }
-  ]);
-
-  const [educationList, setEducationList] = useState([
-    { _id: '1', name: 'Bachelor of Science' }
-  ]);
-
-  const [coursesList, setCoursesList] = useState([
-    [{ _id: '1', name: 'Computer Science' }]
-  ]);
-
-  const [skills, setSkills] = useState([{
-    skillName: '',
-    skillPercent: 0
-  }]);
-
-  const [languages, setLanguages] = useState([{
-    name: '',
-    level: 0
-  }]);
-
-  const [certificates, setCertificates] = useState([{
-    certificateName: '',
-    orgName: '',
-    month: '',
-    year: '',
-    orgLocation: {
-      type: 'Point',
-      coordinates: [],
-      city: '',
-      state: '',
-      fullAddress: ''
-    }
-  }]);
-
-  const [projects, setProjects] = useState([{
-    projectName: '',
-    proyear: '',
-    proDescription: ''
-  }]);
-
-  const [interests, setInterests] = useState(['']);
-
-  const [declaration, setDeclaration] = useState({
-    text: 'I hereby declare that the above information is true to the best of my knowledge.'
-  });
 
   useEffect(() => {
     // Initialize circular progress
@@ -796,11 +722,26 @@ const CRMDashboard = () => {
     });
   }, []);
 
+  // यह logs add करें अपने code में
+useEffect(() => {
+  console.log('Current State:', {
+    totalProfiles: allProfiles.length,
+    totalPages: totalPages,
+    currentPage: currentPage,
+    pageSize: pageSize
+  });
+}, [allProfiles, totalPages, currentPage, pageSize]);
+
   const handleCrmFilterClick = (_id, index) => {
+
+    setCurrentPage(1);
     if (_id === 'all') {
       // Agar "all" filter select hua hai to pura data set kar do
       setAllProfiles(allProfilesData);
+
       setActiveCrmFilter(index)
+      fetchProfileData();
+
     } else {
       // Filter karo jisme leadStatus._id match ho
       const filteredProfiles = allProfilesData.filter(profile => {
@@ -810,6 +751,10 @@ const CRMDashboard = () => {
 
       setActiveCrmFilter(index)
       setAllProfiles(filteredProfiles);
+      // Calculate total pages
+      const totalPages = Math.ceil(filteredProfiles.length / pageSize);
+      setTotalPages(totalPages > 0 ? totalPages : 1);
+
     }
   };
 
@@ -3019,60 +2964,60 @@ const CRMDashboard = () => {
                 </div>
               </div>
               <nav aria-label="Page navigation" className="mt-4">
-  <div className="d-flex justify-content-between align-items-center mb-3">
-    <small className="text-muted">
-      Page {currentPage} of {totalPages} ({allProfiles.length} results)
-    </small>
-  </div>
-  
-  <ul className="pagination justify-content-center">
-    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-      <button
-        className="page-link"
-        onClick={() => setCurrentPage(currentPage - 1)}
-        disabled={currentPage === 1}
-      >
-        &laquo;
-      </button>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <small className="text-muted">
+                    Page {currentPage} of {totalPages} ({allProfiles.length} results)
+                  </small>
+                </div>
+
+                <ul className="pagination justify-content-center">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      &laquo;
+                    </button>
+                  </li>
+
+                  {currentPage > 3 && (
+                    <>
+                      <li className="page-item">
+                        <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
+                      </li>
+                      {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+                    </>
+                  )}
+
+                  {getPaginationPages().map((pageNumber) => (
+                    <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
+                      <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
+                        {pageNumber}
+                      </button>
+                    </li>
+                  ))}
+
+                  {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
+  <>
+    {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+    <li className="page-item">
+      <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
     </li>
+  </>
+)}
 
-    {currentPage > 3 && (
-      <>
-        <li className="page-item">
-          <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
-        </li>
-        {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-      </>
-    )}
-
-    {getPaginationPages().map((pageNumber) => (
-      <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-        <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
-          {pageNumber}
-        </button>
-      </li>
-    ))}
-
-    {currentPage < totalPages - 2 && (
-      <>
-        {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-        <li className="page-item">
-          <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
-        </li>
-      </>
-    )}
-
-    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-      <button
-        className="page-link"
-        onClick={() => setCurrentPage(currentPage + 1)}
-        disabled={currentPage === totalPages}
-      >
-        &raquo;
-      </button>
-    </li>
-  </ul>
-</nav>
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      &raquo;
+                    </button>
+                  </li>
+                </ul>
+              </nav>
             </section>
           </div>
         </div>

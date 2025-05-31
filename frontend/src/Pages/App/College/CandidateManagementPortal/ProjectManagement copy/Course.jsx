@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Batch from '../../../../Layouts/App/College/ProjectManagement/Batch';
 import qs from 'query-string';
-const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject = null, onBackToProjects = null, selectedVertical = null, onBackToVerticals = null }) => {
+const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -251,38 +251,28 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
       {/* ======== ADD THIS: Back Button and Header ======== */}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
-                    <div className="d-flex align-items-center gap-3">
-
-                        <div className='d-flex align-items-center'>
-                            <h5 style={{cursor:'pointer'}} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
-                            <span className="mx-2"> &gt; </span>
-                            <h5 style={{cursor:'pointer'}} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
-                                {selectedProject.name} Project
-                            </h5>
-                            <span className="mx-2"> &gt; </span>
-                            <h5 style={{cursor:'pointer'}} onClick={onBackToCenters}  className="breadcrumb-item mb-0" aria-current="page">
-                                {selectedCenter.name} Centers
-                            </h5>
-                            <span className="mx-2"> &gt; </span>
-                            <h5  className="breadcrumb-item mb-0" aria-current="page">
-                                All Courses
-                            </h5>
-                        </div>
-                    </div>
-                </div>
-
+          <div className="d-flex align-items-center gap-3">
+            {onBackToCenters && (
+              <button
+                className="btn btn-outline-secondary"
+                onClick={onBackToCenters}
+                title="Back to Centers"
+              >
+                <i className="bi bi-arrow-left me-1"></i>
+                Back
+              </button>
+            )}
+            <div>
+              <h4 className="mb-0">Courses</h4>
+              {/* {selectedCenter && (
+                <small className="text-muted">
+                  Showing courses for: <strong>{selectedCenter.name} ({selectedCenter.code})</strong>
+                </small>
+              )} */}
+            </div>
+          </div>
+        </div>
         <div>
-
-          {onBackToCenters && (
-                        <button
-                            onClick={onBackToCenters}
-                            className="btn btn-light"
-                            title="Back to Verticals"
-                        >
-                            <i className="bi bi-arrow-left"></i>
-                            <span>Back</span>
-                        </button>
-                    )}
 
           <button className="btn btn-outline-secondary me-2 border-0 bg-transparent" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
@@ -342,7 +332,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                         </span>
 
                         <span className="bg-primary">{course.sectors && course.sectors.length > 0 ? course.sectors[0].name : 'N/A'}
-                        </span>
+</span>
                         {/* ======== ADD THIS: Show center code badge ======== */}
                         {selectedCenter && (
                           <span className="text-secondary">
