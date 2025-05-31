@@ -124,8 +124,8 @@ const CRMDashboard = () => {
   // ========================================
   const [ekycFilters] = useState([
     { _id: 'pendingEkyc', name: 'Ekyc Pending', count: 1771, milestone: '' },
-    { _id: 'doneEkyc', name: 'Ekyc Done', count: 1770, milestone: '' },
-    { _id: 'All', name: 'All', count: 1, milestone: 'Priority' },
+    { _id: 'doneEkyc', name: 'Ekyc Done', count: 1770, milestone: 'Ekyc Done' },
+    { _id: 'All', name: 'All', count: 1, milestone: '' },
   ]);
 
   // ========================================
@@ -134,8 +134,8 @@ const CRMDashboard = () => {
   // ========================================
   const [admissionFilters] = useState([
     { _id: 'pendingDocs', name: 'Pending For Batch Assign', count: 856, milestone: '' },
-    { _id: 'documentDone', name: 'Batch Assign', count: 624, milestone: '' },
-    { _id: 'dropout', name: 'Dropout', count: 1480, milestone: 'Complete' },
+    { _id: 'documentDone', name: 'Batch Assigned', count: 624, milestone: 'Completed' },
+    { _id: 'dropout', name: 'Dropout', count: 1480, milestone: '' },
     { _id: 'alladmission', name: 'All Lists', count: 1480, milestone: '' },
   ]);
 
@@ -188,9 +188,18 @@ const CRMDashboard = () => {
       alert('Please provide a rejection reason');
       return;
     }
+      if (status === 'Verified') {
+      // Update profile eKYC status to 'done'
+      setAllProfiles(prevProfiles => prevProfiles.map(profile =>
+        profile._id === selectedProfile._id
+          ? { ...profile, ekycStatus: 'done' }
+          : profile
+      ));
+    }
     alert(`Document ${status} successfully!`);
     closeDocumentModal();
   };
+
 
   const getStatusBadgeClass = (status) => {
     switch (status?.toLowerCase()) {
@@ -1531,17 +1540,36 @@ const CRMDashboard = () => {
             <div className="container-fluid py-2">
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
-                  <div className="d-flex align-items-center">
-                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle Post</h4>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="#" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">Admission Cycle Post</li>
-                      </ol>
-                    </nav>
-                  </div>
+                   <div className="main-tabs-container">
+                <ul className="nav nav-tabs nav-tabs-main border-0">
+                  {/* 🔹 eKYC Management Tab */}
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link main-tab ${mainTab === 'Ekyc' ? 'active' : ''}`}
+                      onClick={() => handleMainTabChange('Ekyc')}
+                    >
+                      <i className="fas fa-id-card me-2"></i>
+                      eKYC Management
+                      <span className="tab-badge">
+                        {ekycFilters.reduce((sum, filter) => sum + filter.count, 0)}
+                      </span>
+                    </button>
+                  </li>
+                  {/* 🔹 All Admission Tab */}
+                  <li className="nav-item">
+                    <button
+                      className={`nav-link main-tab ${mainTab === 'AllAdmission' ? 'active' : ''}`}
+                      onClick={() => handleMainTabChange('AllAdmission')}
+                    >
+                      <i className="fas fa-graduation-cap me-2"></i>
+                      All Admission
+                      <span className="tab-badge">
+                        {admissionFilters.reduce((sum, filter) => sum + filter.count, 0)}
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
                 </div>
 
                 <div className="col-md-6">
@@ -1610,46 +1638,17 @@ const CRMDashboard = () => {
                 Two main tabs: eKYC Management and All Admission
                 ======================================== */}
             <div className="container-fluid pb-2">
-              <div className="main-tabs-container">
-                <ul className="nav nav-tabs nav-tabs-main border-0">
-                  {/* 🔹 eKYC Management Tab */}
-                  <li className="nav-item">
-                    <button
-                      className={`nav-link main-tab ${mainTab === 'Ekyc' ? 'active' : ''}`}
-                      onClick={() => handleMainTabChange('Ekyc')}
-                    >
-                      <i className="fas fa-id-card me-2"></i>
-                      eKYC Management
-                      <span className="tab-badge">
-                        {ekycFilters.reduce((sum, filter) => sum + filter.count, 0)}
-                      </span>
-                    </button>
-                  </li>
-                  {/* 🔹 All Admission Tab */}
-                  <li className="nav-item">
-                    <button
-                      className={`nav-link main-tab ${mainTab === 'AllAdmission' ? 'active' : ''}`}
-                      onClick={() => handleMainTabChange('AllAdmission')}
-                    >
-                      <i className="fas fa-graduation-cap me-2"></i>
-                      All Admission
-                      <span className="tab-badge">
-                        {admissionFilters.reduce((sum, filter) => sum + filter.count, 0)}
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-              </div>
+             
 
               {/* ========================================
                   🎯 NEW: Dynamic Sub-filters Section (ADD THIS)
                   Shows different filters based on selected main tab
                   ======================================== */}
-              <div className="card-body p-3">
-                <div className="d-flex flex-wrap gap-2 align-items-center">
+              <div className="card-body p-3 mt-3">
+                <div className="d-flex flex-wrap gap-2 align-items-center mbResponsive">
                   {getCurrentFilters().map((filter, index) => (
                     <div key={index} className="d-flex align-items-center gap-1">
-                      <div className='d-flex'>
+                      <div className='d-flex position-relative'>
                         <button
                           className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
                           onClick={() => handleCrmFilterClick(filter._id, index)}
@@ -1672,7 +1671,7 @@ const CRMDashboard = () => {
                         {/* 🔹 Milestone Badge */}
                         {filter.milestone && (
                           <span
-                            className="bg-success d-flex align-items-center"
+                            className="bg-success d-flex align-items-center milestoneResponsive"
                             style={{
                               fontSize: '0.75rem',
                               color: 'white',
@@ -1772,14 +1771,15 @@ const CRMDashboard = () => {
                                         </button>
                                         <img
                                           src="/Assets/public_assets/images/ekyc_done.png"
-                                          alt="icon1"
-                                          style={{ width: 100, height: 'auto', marginLeft: 8 }}
+                                          alt="ekyc done"
+                                          style={{ width: 100, height: 'auto', marginLeft: 8, display: profile.ekycStatus === 'done' ? 'inline-block' : 'none' }}
                                         />
                                         <img
                                           src="/Assets/public_assets/images/ekyc_pending.png"
-                                          alt="icon2"
-                                          style={{ width: 100, height: 'auto',}}
+                                          alt="ekyc pending"
+                                          style={{ width: 100, height: 'auto', display: profile.ekycStatus === 'pending' ? 'inline-block' : 'none' }}
                                         />
+
                                         {/* <button
                                                     className="btn btn-outline-success btn-sm border-0"
                                                     onClick={openWhatsappPanel}
@@ -3249,7 +3249,7 @@ const CRMDashboard = () => {
 
         .nav-link.main-tab.active {
           color: #0d6efd;
-          background-color: rgba(13, 110, 253, 0.1);
+          background-color: rgba(13, 110, 253, 0.1)!important;
           border-bottom-color: #0d6efd;
         }
 
@@ -3311,6 +3311,14 @@ const CRMDashboard = () => {
         }
 
         @media(max-width: 768px) {
+        .mbResponsive{        
+        flex-direction:column;
+        align-items:flex-start!important;
+        }
+        .milestoneResponsive{        
+        right:-77px;
+        top:27px;
+        }
           .nav-link.main-tab {
             font-size: 14px;
             padding: 12px 15px;
