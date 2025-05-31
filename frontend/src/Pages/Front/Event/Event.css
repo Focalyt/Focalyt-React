@@ -3,8 +3,11 @@
 }
 .flag{
     position: absolute;
-    top: 5px;
+    top: 2px;
     left: 10px;
+}
+.flag h4{
+  font-size: 15px;
 }
 .share-Event{
     position: absolute;

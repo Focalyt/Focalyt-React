@@ -106,7 +106,7 @@ function CollegeLayout({ children }) {
   //   setExpanded(!expanded);
   // };
 
-   const toggleSidebar = () => {
+  const toggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);
   };
   useEffect(() => {
@@ -224,11 +224,11 @@ function CollegeLayout({ children }) {
                 </Link>
               </li>
               <li className={`nav-item ${location.pathname === '/institute/projectmanagment' ? 'active' : ''}`}>
-                    <Link to="/institute/projectmanagment" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faTasks} />
-                      <span className="menu-title">Project Management </span>
-                    </Link>
-                  </li>
+                <Link to="/institute/projectmanagment" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faTasks} />
+                  <span className="menu-title">Project Management </span>
+                </Link>
+              </li>
 
               {/* Courses */}
               <li className={`nav-item has-sub ${openSubmenu.courses ? 'open' : ''}`}>
@@ -269,16 +269,28 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">View Courses</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
-                    <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
-                      {/* <FontAwesomeIcon icon={faForward} /> */}
-                      <i class="fas fa-user-friends m-0" style={{
-                        color: location.pathname === '/institute/registration' ? 'white' : 'black'
-                      }}></i>
-                      <span className="menu-title">Admission Cycle</span>
-                    </Link>
-                  </li>
+
                 </ul>
+              </li>
+
+              {/* Admission list  */}
+              <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
+                <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
+                  {/* <FontAwesomeIcon icon={faForward} /> */}
+                  <i class="fas fa-user-friends m-0" style={{
+                    color: location.pathname === '/institute/registration' ? 'white' : 'black'
+                  }}></i>
+                  <span className="menu-title">Admission Cycle Pre</span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
+                <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
+                  {/* <FontAwesomeIcon icon={faForward} /> */}
+                  <i class="fas fa-user-friends m-0" style={{
+                    color: location.pathname === '/institute/admissionpost' ? 'white' : 'black'
+                  }}></i>
+                  <span className="menu-title">Admission Cycle Post</span>
+                </Link>
               </li>
 
               {/* Upload Candidates */}
@@ -336,12 +348,12 @@ function CollegeLayout({ children }) {
                   </li>
                 </ul>
               </li>
-               <li className={`nav-item ${location.pathname === '/institute/approvalManagement' ? 'active' : ''}`}>
-                    <Link to="/institute/approvalManagement" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faTasks} />
-                      <span className="menu-title">Approval Request </span>
-                    </Link>
-                  </li>
+              <li className={`nav-item ${location.pathname === '/institute/approvalManagement' ? 'active' : ''}`}>
+                <Link to="/institute/approvalManagement" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faTasks} />
+                  <span className="menu-title">Approval Request </span>
+                </Link>
+              </li>
 
               {/* Settings */}
               <li className={`nav-item has-sub ${openSubmenu.settings ? 'open' : ''}`}>
@@ -376,8 +388,8 @@ function CollegeLayout({ children }) {
                       <FontAwesomeIcon icon={farBookmark} />
                       <span className="menu-title">Status Design</span>
                     </Link>
-                  </li> 
-                 
+                  </li>
+
 
                 </ul>
               </li>
@@ -392,7 +404,7 @@ function CollegeLayout({ children }) {
           <div className="app-content content">
             <div className="content-overlay"></div>
             <div className="header-navbar-shadow"></div>
-            <CollegeHeader  toggleSidebar={handleSidebarToggle} isSidebarOpen={isSidebarOpen} />
+            <CollegeHeader toggleSidebar={handleSidebarToggle} isSidebarOpen={isSidebarOpen} />
             <div className="content-wrapper">
               <div className="content-body mb-4">
                 <Outlet />

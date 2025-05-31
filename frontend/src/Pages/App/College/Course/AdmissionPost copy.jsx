@@ -30,6 +30,9 @@ const CRMDashboard = () => {
   const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
 
+
+
+
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
@@ -42,6 +45,8 @@ const CRMDashboard = () => {
   const fileInputRef = useRef(null);
 
   // Static document data for demonstration
+ const [mainTab, setMainTab] = useState('Ekyc');
+
   const staticDocuments = [
     {
       _id: 'doc1',
@@ -361,10 +366,6 @@ const CRMDashboard = () => {
     return range;
   };
 
-  useEffect(() => {
-    getPaginationPages()
-  }, [totalPages])
-
 
 
 
@@ -399,10 +400,16 @@ const CRMDashboard = () => {
   const [showModifiedDatePicker, setShowModifiedDatePicker] = useState(false);
   const [showNextActionDatePicker, setShowNextActionDatePicker] = useState(false);
 
-  const [crmFilters, setCrmFilters] = useState([
-    { _id: '', name: '', count: 0, milestone: '' },
+  // const [crmFilters, setCrmFilters] = useState([
+  //   { _id: '', name: '', count: 0, milestone: '' },
 
-  ]);
+  // ]);
+  const [crmFilters, setCrmFilters] = useState([
+  { _id: 'pendingEkyc', name: 'Ekyc Pending', count: 1771, milestone: '' },
+  { _id: 'doneEkyc', name: 'Ekyc Done', count: 1770, milestone: '' },
+  { _id: 'All', name: 'All', count: 1, milestone: 'Priority' },
+]);
+
   const [statuses, setStatuses] = useState([
     { _id: '', name: '', count: 0 },
 
@@ -443,10 +450,10 @@ const CRMDashboard = () => {
 
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
-  useEffect(() => {
-    fetchStatus()
+  // useEffect(() => {
+  //   fetchStatus()
 
-  }, []);
+  // }, []);
 
   useEffect(() => {
     fetchSubStatus()
@@ -1009,7 +1016,85 @@ const CRMDashboard = () => {
     currentlyWorking: false
   }]);
 
+  const [educations, setEducations] = useState([
+    {
+      education: '',          // ObjectId of Qualification (e.g., 10th, UG)
+      universityName: '',
+      boardName: '',
+      collegeName: '',
+      schoolName: '',
+      course: '',             // ObjectId of QualificationCourse
+      specialization: '',
+      passingYear: '',
+      marks: '',
 
+      universityLocation: {
+        type: 'Point',
+        coordinates: [0, 0],
+        city: '',
+        state: '',
+        fullAddress: ''
+      },
+      collegeLocation: {
+        type: 'Point',
+        coordinates: [0, 0],
+        city: '',
+        state: '',
+        fullAddress: ''
+      },
+      schoolLocation: {
+        type: 'Point',
+        coordinates: [0, 0],
+        city: '',
+        state: '',
+        fullAddress: ''
+      }
+    }
+  ]);
+
+  const [educationList, setEducationList] = useState([
+    { _id: '1', name: 'Bachelor of Science' }
+  ]);
+
+  const [coursesList, setCoursesList] = useState([
+    [{ _id: '1', name: 'Computer Science' }]
+  ]);
+
+  const [skills, setSkills] = useState([{
+    skillName: '',
+    skillPercent: 0
+  }]);
+
+  const [languages, setLanguages] = useState([{
+    name: '',
+    level: 0
+  }]);
+
+  const [certificates, setCertificates] = useState([{
+    certificateName: '',
+    orgName: '',
+    month: '',
+    year: '',
+    orgLocation: {
+      type: 'Point',
+      coordinates: [],
+      city: '',
+      state: '',
+      fullAddress: ''
+    }
+  }]);
+
+  const [projects, setProjects] = useState([{
+    projectName: '',
+    proyear: '',
+    proDescription: ''
+  }]);
+
+  const [interests, setInterests] = useState(['']);
+
+  const [declaration, setDeclaration] = useState({
+    text: 'I hereby declare that the above information is true to the best of my knowledge.'
+  });
 
   useEffect(() => {
     // Initialize circular progress
@@ -1033,26 +1118,11 @@ const CRMDashboard = () => {
     });
   }, []);
 
-  // यह logs add करें अपने code में
-useEffect(() => {
-  console.log('Current State:', {
-    totalProfiles: allProfiles.length,
-    totalPages: totalPages,
-    currentPage: currentPage,
-    pageSize: pageSize
-  });
-}, [allProfiles, totalPages, currentPage, pageSize]);
-
   const handleCrmFilterClick = (_id, index) => {
-
-    setCurrentPage(1);
-    if (_id === 'all') {
+    if (_id === 'pendingEkyc') {
       // Agar "all" filter select hua hai to pura data set kar do
       setAllProfiles(allProfilesData);
-
       setActiveCrmFilter(index)
-      fetchProfileData();
-
     } else {
       // Filter karo jisme leadStatus._id match ho
       const filteredProfiles = allProfilesData.filter(profile => {
@@ -1062,10 +1132,6 @@ useEffect(() => {
 
       setActiveCrmFilter(index)
       setAllProfiles(filteredProfiles);
-      // Calculate total pages
-      const totalPages = Math.ceil(filteredProfiles.length / pageSize);
-      setTotalPages(totalPages > 0 ? totalPages : 1);
-
     }
   };
 
@@ -1692,13 +1758,13 @@ useEffect(() => {
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
                   <div className="d-flex align-items-center">
-                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle Post</h4>
                     <nav aria-label="breadcrumb">
                       <ol className="breadcrumb mb-0 small">
                         <li className="breadcrumb-item">
                           <a href="#" className="text-decoration-none">Home</a>
                         </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
+                        <li className="breadcrumb-item active">Admission Cycle Post</li>
                       </ol>
                     </nav>
                   </div>
@@ -1777,7 +1843,7 @@ useEffect(() => {
                           </button>
 
                           {/* Milestone flag OUTSIDE the button */}
-                          {filter.milestone && (
+                          {/* {filter.milestone && (
                             <span
                               className="bg-success d-flex align-items-center"
                               style={{
@@ -1788,7 +1854,7 @@ useEffect(() => {
                             >
                               🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
                             </span>
-                          )}
+                          )} */}
                         </div>
                       </div>
                     ))}
@@ -1846,42 +1912,7 @@ useEffect(() => {
                 </div>
 
                 <div className="row g-4">
-                  {/* Search Section */}
-                  {/* <div className="col-12">
-                    <div className="card border-0 bg-light">
-                      <div className="card-body p-3">
-                        <label className="form-label small fw-bold text-dark mb-2">
-                          <i className="fas fa-search me-1"></i>
-                          Quick Search
-                        </label>
-                        <div className="input-group">
-                          <span className="input-group-text bg-white border-end-0">
-                            <i className="fas fa-search text-muted"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="name"
-                            className="form-control border-start-0"
-                            placeholder="Type to search by name, mobile, or email..."
-                            value={filterData.name}
-                            onChange={handleFilterChange}
-                          />
-                          {filterData.name && (
-                            <button
-                              className="btn btn-outline-secondary"
-                              type="button"
-                              onClick={() => {
-                                setFilterData(prev => ({ ...prev, name: '' }));
-                                setAllProfiles(allProfilesData);
-                              }}
-                            >
-                              <i className="fas fa-times"></i>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div> */}
+                
 
                   {/* Category Filters */}
                   <div className="col-md-4">
@@ -3588,60 +3619,60 @@ useEffect(() => {
                 </div>
               </div>
               <nav aria-label="Page navigation" className="mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <small className="text-muted">
-                    Page {currentPage} of {totalPages} ({allProfiles.length} results)
-                  </small>
-                </div>
-
-                <ul className="pagination justify-content-center">
-                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                    <button
-                      className="page-link"
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                    >
-                      &laquo;
-                    </button>
-                  </li>
-
-                  {currentPage > 3 && (
-                    <>
-                      <li className="page-item">
-                        <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
-                      </li>
-                      {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-                    </>
-                  )}
-
-                  {getPaginationPages().map((pageNumber) => (
-                    <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-                      <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
-                        {pageNumber}
-                      </button>
-                    </li>
-                  ))}
-
-                  {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
-  <>
-    {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-    <li className="page-item">
-      <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
+  <div className="d-flex justify-content-between align-items-center mb-3">
+    <small className="text-muted">
+      Page {currentPage} of {totalPages} ({allProfiles.length} results)
+    </small>
+  </div>
+  
+  <ul className="pagination justify-content-center">
+    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+      <button
+        className="page-link"
+        onClick={() => setCurrentPage(currentPage - 1)}
+        disabled={currentPage === 1}
+      >
+        &laquo;
+      </button>
     </li>
-  </>
-)}
 
-                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                    <button
-                      className="page-link"
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                    >
-                      &raquo;
-                    </button>
-                  </li>
-                </ul>
-              </nav>
+    {currentPage > 3 && (
+      <>
+        <li className="page-item">
+          <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
+        </li>
+        {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+      </>
+    )}
+
+    {getPaginationPages().map((pageNumber) => (
+      <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
+        <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
+          {pageNumber}
+        </button>
+      </li>
+    ))}
+
+    {currentPage < totalPages - 2 && (
+      <>
+        {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+        <li className="page-item">
+          <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
+        </li>
+      </>
+    )}
+
+    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+      <button
+        className="page-link"
+        onClick={() => setCurrentPage(currentPage + 1)}
+        disabled={currentPage === totalPages}
+      >
+        &raquo;
+      </button>
+    </li>
+  </ul>
+</nav>
             </section>
           </div>
         </div>

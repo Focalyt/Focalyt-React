@@ -1088,7 +1088,7 @@ h1, h2, h3, h4, h5, h6 {
     padding-left: 128px;
   }
 }
-.pricing-card-6__badge {
+.pricing-card-6__badges {
   font-size: 16px;
   font-weight: 600;
   line-height: 1.67;
@@ -1097,7 +1097,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--black-2);
 }
 @media (min-width: 576px) {
-  .pricing-card-6__badge {
+  .pricing-card-6__badges {
     font-size: 18px;
   }
 }
@@ -1236,7 +1236,7 @@ h1, h2, h3, h4, h5, h6 {
 .blog-card__image img {
   width: 100%;
 }
-.blog-card__badge {
+.blog-card__badges {
   position: absolute;
   top: 3%;
   right: 2%;
@@ -4397,8 +4397,8 @@ h1, h2, h3, h4, h5, h6 {
   color: #0A102F;
 }
 
-/* ========== Component : Badge Style  ============= */
-.badge {
+/* ========== Component : badges Style  ============= */
+.badges {
   font-family: "Inter", sans-serif;
   font-style: normal;
   font-weight: 600;
@@ -4411,25 +4411,25 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 30px;
 }
 @media (max-width: 991px) {
-  .badge {
+  .badges {
     margin-bottom: 20px;
   }
 }
 
-.badge--white {
+.badges--white {
   padding: 5.5px 18.5px;
   background: #FFFFFF;
 }
 
-.badge--purple {
+.badges--purple {
   background: #B5A8F8;
 }
 
-.badge--yellow {
+.badges--yellow {
   background: #FFED88;
 }
 
-.badge--blue {
+.badges--blue {
   background: #A2DFF5;
 }
 

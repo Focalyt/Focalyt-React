@@ -1576,7 +1576,7 @@ span#notification {
   right: 9px;
   top: -10px;
 }
-.badge {
+.badges {
   position: absolute;
   top: 3px; 
   right: -10px;
@@ -1735,7 +1735,7 @@ span.yes-cross{
 }
 
 /* styling for shortlisted */
-.exp-badge {
+.exp-badges {
   /* position: absolute; */
   top: 3px;
   right: -10px;

@@ -364,7 +364,7 @@ const CandidatesEvents = () => {
             margin-top: 10px;
           }
 
-          .badge {
+          .badges {
             padding: 5px 10px;
             font-size: 14px;
             border-radius: 4px;
