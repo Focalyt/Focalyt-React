@@ -4544,7 +4544,7 @@ form:invalid + button {
   text-overflow: ellipsis;
   max-width: 200px;
 }
-.badge {
+.badges {
   position: absolute;
   top: 3px; 
   right: -10px;
@@ -5002,7 +5002,7 @@ border-color: #c5bcbc!important;
     width: 35px;
   }
 
-.exp-badge {
+.exp-badges {
   /* position: absolute; */
   background-color: #FC2B5A;
   color: white;

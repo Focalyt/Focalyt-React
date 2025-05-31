@@ -4543,7 +4543,7 @@ form:invalid + button {
   text-overflow: ellipsis;
   max-width: 200px;
 }
-.badge {
+.badges {
   position: absolute;
   top: 3px; 
   right: -10px;

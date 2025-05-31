@@ -121,7 +121,7 @@ span#notification {
     right: 9px;
     top: -10px;
 }
-.badge {
+.badges {
     position: absolute;
     top: 3px;
     right: -10px;

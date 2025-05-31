@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  UserPlus, 
-  Shield, 
-  Eye, 
-  Plus, 
-  Search, 
+import {
+  Users,
+  UserPlus,
+  Shield,
+  Eye,
+  Plus,
+  Search,
   Settings,
   CheckCircle,
   XCircle,
@@ -13,7 +13,13 @@ import {
   Filter,
   Download,
   Edit,
-  Trash2
+  EyeOff,
+  User,
+  Lock,
+  Trash2,
+  BookOpen,
+  GraduationCap,
+  Clock
 } from 'lucide-react';
 
 const PermissionAdminDashboard = () => {
@@ -30,7 +36,7 @@ const PermissionAdminDashboard = () => {
       entity_name: 'Delhi Center'
     },
     {
-      user_id: 'user_2', 
+      user_id: 'user_2',
       name: 'Priya Singh',
       email: 'priya@company.com',
       role: 'PROJECT_MANAGER',
@@ -43,7 +49,7 @@ const PermissionAdminDashboard = () => {
 
   const [roles] = useState([
     'SUPER_ADMIN',
-    'VERTICAL_ADMIN', 
+    'VERTICAL_ADMIN',
     'PROJECT_MANAGER',
     'CENTER_HEAD',
     'COURSE_COORDINATOR',
@@ -54,43 +60,47 @@ const PermissionAdminDashboard = () => {
 
   const [entities] = useState({
     VERTICAL: [
-      {id: 'vertical_1', name: 'Technology Vertical'},
-      {id: 'vertical_2', name: 'Business Vertical'}
+      { id: 'vertical_1', name: 'Technology Vertical' },
+      { id: 'vertical_2', name: 'Business Vertical' }
     ],
     PROJECT: [
-      {id: 'project_1', name: 'AI Development Project', parent_id: 'vertical_1'},
-      {id: 'project_2', name: 'Web Development Project', parent_id: 'vertical_1'},
-      {id: 'project_3', name: 'Mobile App Project', parent_id: 'vertical_2'},
-      {id: 'project_4', name: 'Data Science Project', parent_id: 'vertical_2'}
+      { id: 'project_1', name: 'AI Development Project', parent_id: 'vertical_1' },
+      { id: 'project_2', name: 'Web Development Project', parent_id: 'vertical_1' },
+      { id: 'project_3', name: 'Mobile App Project', parent_id: 'vertical_2' },
+      { id: 'project_4', name: 'Data Science Project', parent_id: 'vertical_2' }
     ],
     CENTER: [
-      {id: 'center_1', name: 'Delhi Center', parent_id: 'project_1'},
-      {id: 'center_2', name: 'Mumbai Center', parent_id: 'project_1'},
-      {id: 'center_3', name: 'Bangalore Center', parent_id: 'project_2'},
-      {id: 'center_4', name: 'Pune Center', parent_id: 'project_2'},
-      {id: 'center_5', name: 'Chennai Center', parent_id: 'project_3'},
-      {id: 'center_6', name: 'Hyderabad Center', parent_id: 'project_4'}
+      { id: 'center_1', name: 'Delhi Center', parent_id: 'project_1' },
+      { id: 'center_2', name: 'Mumbai Center', parent_id: 'project_1' },
+      { id: 'center_3', name: 'Bangalore Center', parent_id: 'project_2' },
+      { id: 'center_4', name: 'Pune Center', parent_id: 'project_2' },
+      { id: 'center_5', name: 'Chennai Center', parent_id: 'project_3' },
+      { id: 'center_6', name: 'Hyderabad Center', parent_id: 'project_4' }
     ],
     COURSE: [
-      {id: 'course_1', name: 'Python Fundamentals', parent_id: 'center_1'},
-      {id: 'course_2', name: 'React Development', parent_id: 'center_1'},
-      {id: 'course_3', name: 'Machine Learning', parent_id: 'center_2'},
-      {id: 'course_4', name: 'Data Structures', parent_id: 'center_3'},
-      {id: 'course_5', name: 'Mobile Development', parent_id: 'center_5'},
-      {id: 'course_6', name: 'Data Science Basics', parent_id: 'center_6'}
+      { id: 'course_1', name: 'Python Fundamentals', parent_id: 'center_1' },
+      { id: 'course_2', name: 'React Development', parent_id: 'center_1' },
+      { id: 'course_3', name: 'Machine Learning', parent_id: 'center_2' },
+      { id: 'course_4', name: 'Data Structures', parent_id: 'center_3' },
+      { id: 'course_5', name: 'Mobile Development', parent_id: 'center_5' },
+      { id: 'course_6', name: 'Data Science Basics', parent_id: 'center_6' }
     ],
     BATCH: [
-      {id: 'batch_1', name: 'Python Batch A', parent_id: 'course_1'},
-      {id: 'batch_2', name: 'Python Batch B', parent_id: 'course_1'},
-      {id: 'batch_3', name: 'React Batch A', parent_id: 'course_2'},
-      {id: 'batch_4', name: 'ML Batch A', parent_id: 'course_3'}
+      { id: 'batch_1', name: 'Python Batch A', parent_id: 'course_1' },
+      { id: 'batch_2', name: 'Python Batch B', parent_id: 'course_1' },
+      { id: 'batch_3', name: 'React Batch A', parent_id: 'course_2' },
+      { id: 'batch_4', name: 'ML Batch A', parent_id: 'course_3' }
     ]
   });
 
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showUserDetails, setShowUserDetails] = useState(false);
+  const [viewDetailsUser, setViewDetailsUser] = useState(null);
   const [showAddUser, setShowAddUser] = useState(false);
   const [addMode, setAddMode] = useState('user'); // 'user' or 'role'
   const [searchTerm, setSearchTerm] = useState('');
+
+
 
   // Form states
   const [userForm, setUserForm] = useState({
@@ -130,7 +140,6 @@ const PermissionAdminDashboard = () => {
 
   const tabs = [
     { id: 'users', label: 'User Management', icon: Users },
-    { id: 'roles', label: 'Role Management', icon: Shield },
     { id: 'analysis', label: 'Permission Analysis', icon: Eye },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
@@ -150,10 +159,12 @@ const PermissionAdminDashboard = () => {
   const getChildEntities = (childLevel, parentLevel, selectedParentIds) => {
     // If it's the same level as view access, return the selected entities from view access
     if (childLevel === parentLevel) {
-      return entities[childLevel]?.filter(entity => 
+      return entities[childLevel]?.filter(entity =>
         selectedParentIds.includes(entity.id)
       ) || [];
     }
+
+
 
     // Define the hierarchy levels
     const hierarchy = ['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'];
@@ -173,12 +184,12 @@ const PermissionAdminDashboard = () => {
     for (let i = parentIndex + 1; i <= childIndex; i++) {
       const nextLevel = hierarchy[i];
       const nextLevelEntities = entities[nextLevel] || [];
-      
+
       // Find entities whose parent_id is in currentLevelIds
-      const filteredEntities = nextLevelEntities.filter(entity => 
+      const filteredEntities = nextLevelEntities.filter(entity =>
         currentLevelIds.includes(entity.parent_id)
       );
-      
+
       if (i === childIndex) {
         // We've reached the target level, return these entities
         return filteredEntities;
@@ -191,19 +202,125 @@ const PermissionAdminDashboard = () => {
     return [];
   };
 
+  // View User Details functionality
+  const handleViewUserDetails = (user) => {
+
+    console.log('user', user)
+    setViewDetailsUser(user);
+    setShowUserDetails(true);
+  };
+
+  const viewRestrictionsOptions = [
+    { id: 'financial_data', label: 'Financial Data', icon: Lock },
+    { id: 'personal_details', label: 'Personal Details', icon: User },
+    { id: 'salary_info', label: 'Salary Information', icon: Lock },
+    { id: 'contact_details', label: 'Contact Details', icon: User },
+    { id: 'assessment_scores', label: 'Assessment Scores', icon: GraduationCap },
+    { id: 'internal_notes', label: 'Internal Notes', icon: BookOpen },
+    { id: 'admin_logs', label: 'Admin Activity Logs', icon: Clock },
+    { id: 'system_settings', label: 'System Settings', icon: Settings }
+  ];
+
+  // Get detailed view permissions for a user
+  const getDetailedViewPermissions = (user) => {
+    const viewableEntities = [];
+    const restrictedAreas = user.view_restrictions || [];
+
+    // Get hierarchy access based on user's level
+    const hierarchy = ['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'];
+    const userLevelIndex = hierarchy.indexOf(user.master_access);
+
+    // User can view their level and below
+    for (let i = userLevelIndex; i < hierarchy.length; i++) {
+      const level = hierarchy[i];
+      const entitiesAtLevel = entities[level] || [];
+
+      if (i === userLevelIndex) {
+        // At user's level - can only view their assigned entity
+        const userEntity = entitiesAtLevel.find(e => e.id === user.entity_id);
+        if (userEntity) {
+          viewableEntities.push({
+            level: level,
+            entity: userEntity,
+            access_type: 'FULL'
+          });
+        }
+      } else {
+        // Below user's level - can view children of their entity
+        const childEntities = getChildEntities(level, user.master_access, [user.entity_id]);
+        childEntities.forEach(entity => {
+          viewableEntities.push({
+            level: level,
+            entity: entity,
+            access_type: 'FULL'
+          });
+        });
+      }
+    }
+
+    // Add parent hierarchy as read-only
+    for (let i = 0; i < userLevelIndex; i++) {
+      const level = hierarchy[i];
+      const entitiesAtLevel = entities[level] || [];
+
+      // Find parent entities in the hierarchy
+      let parentEntity = null;
+      if (level === 'VERTICAL' && user.master_access !== 'VERTICAL') {
+        // Find the vertical that contains the user's entity
+        entitiesAtLevel.forEach(vertical => {
+          const hasChildren = entities['PROJECT']?.some(project =>
+            project.parent_id === vertical.id &&
+            getChildEntities(user.master_access, 'PROJECT', [project.id]).some(e => e.id === user.entity_id)
+          );
+          if (hasChildren) {
+            parentEntity = vertical;
+          }
+        });
+      } else if (level === 'PROJECT' && !['VERTICAL', 'PROJECT'].includes(user.master_access)) {
+        // Find the project that contains the user's entity
+        entitiesAtLevel.forEach(project => {
+          const hasChildren = getChildEntities(user.master_access, 'PROJECT', [project.id]).some(e => e.id === user.entity_id);
+          if (hasChildren) {
+            parentEntity = project;
+          }
+        });
+      }
+
+      if (parentEntity) {
+        viewableEntities.push({
+          level: level,
+          entity: parentEntity,
+          access_type: 'READ_ONLY'
+        });
+      }
+    }
+
+    return {
+      viewable_entities: viewableEntities,
+      restricted_areas: restrictedAreas,
+      access_summary: {
+        total_viewable: viewableEntities.length,
+        full_access: viewableEntities.filter(e => e.access_type === 'FULL').length,
+        read_only: viewableEntities.filter(e => e.access_type === 'READ_ONLY').length,
+        restrictions_count: restrictedAreas.length
+      }
+    };
+  };
+
+
   // Helper function to get allowed entity levels based on view access
   const getAllowedAddLevels = () => {
     if (roleForm.view_access_type === 'GLOBAL') {
       return ['VERTICAL', 'PROJECT', 'CENTER', 'COURSE'];
     }
-    
+
     if (roleForm.master_level) {
       const hierarchy = ['VERTICAL', 'PROJECT', 'CENTER', 'COURSE'];
       const masterIndex = hierarchy.indexOf(roleForm.master_level);
       // Return current level and all levels below it (children)
       return hierarchy.slice(masterIndex);
     }
-    
+
     return [];
   };
 
@@ -224,34 +341,42 @@ const PermissionAdminDashboard = () => {
     const newPermission = {
       id: Date.now(),
       edit_type: '',
-      permission_level: '',
-      selected_entities: []
+      permission_levels: [], // For option 2 - multi-select levels
+      with_child_levels: false, // For option 3
+      specific_entities: [], // For options 4 & 5
+      entity_names: [] // For options 4 & 5 - actual entity names
     };
-    
-    setRoleForm({
-      ...roleForm,
+
+    setRoleForm(prevForm => ({
+      ...prevForm,
       edit_permissions: {
-        ...roleForm.edit_permissions,
-        specific_permissions: [...roleForm.edit_permissions.specific_permissions, newPermission]
+        ...prevForm.edit_permissions,
+        specific_permissions: [...prevForm.edit_permissions.specific_permissions, newPermission]
       }
-    });
+    }));
   };
 
   // Helper function to update edit permission
   const updateEditPermission = (permissionId, field, value) => {
-    console.log('Updating edit permission:', permissionId, field, value); // Debug log
-    const updated = roleForm.edit_permissions.specific_permissions.map(permission => 
-      permission.id === permissionId 
-        ? { ...permission, [field]: value }
-        : permission
-    );
-    
-    setRoleForm({
-      ...roleForm,
-      edit_permissions: {
-        ...roleForm.edit_permissions,
-        specific_permissions: updated
-      }
+    console.log(`Updating permission ${permissionId}, field: ${field}, value:`, value);
+
+    setRoleForm(prevForm => {
+      const updated = prevForm.edit_permissions.specific_permissions.map(permission =>
+        permission.id === permissionId
+          ? { ...permission, [field]: value }
+          : permission
+      );
+
+      const newForm = {
+        ...prevForm,
+        edit_permissions: {
+          ...prevForm.edit_permissions,
+          specific_permissions: updated
+        }
+      };
+
+      console.log('Updated form:', newForm);
+      return newForm;
     });
   };
 
@@ -260,7 +385,7 @@ const PermissionAdminDashboard = () => {
     const updated = roleForm.edit_permissions.specific_permissions.filter(
       permission => permission.id !== permissionId
     );
-    
+
     setRoleForm({
       ...roleForm,
       edit_permissions: {
@@ -278,7 +403,7 @@ const PermissionAdminDashboard = () => {
       selected_entities: [],
       can_add_types: []
     };
-    
+
     setRoleForm({
       ...roleForm,
       add_permissions: {
@@ -290,12 +415,12 @@ const PermissionAdminDashboard = () => {
 
   // Helper function to update add permission
   const updateAddPermission = (permissionId, field, value) => {
-    const updated = roleForm.add_permissions.specific_permissions.map(permission => 
-      permission.id === permissionId 
+    const updated = roleForm.add_permissions.specific_permissions.map(permission =>
+      permission.id === permissionId
         ? { ...permission, [field]: value }
         : permission
     );
-    
+
     setRoleForm({
       ...roleForm,
       add_permissions: {
@@ -310,7 +435,7 @@ const PermissionAdminDashboard = () => {
     const updated = roleForm.add_permissions.specific_permissions.filter(
       permission => permission.id !== permissionId
     );
-    
+
     setRoleForm({
       ...roleForm,
       add_permissions: {
@@ -318,6 +443,21 @@ const PermissionAdminDashboard = () => {
         specific_permissions: updated
       }
     });
+  };
+
+  // Helper function to get all entities for specific entity selection
+  const getAllEntitiesForSelection = () => {
+    const allEntities = [];
+    Object.entries(entities).forEach(([type, entityList]) => {
+      entityList.forEach(entity => {
+        allEntities.push({
+          ...entity,
+          entity_type: type,
+          full_name: `${entity.name} (${type})`
+        });
+      });
+    });
+    return allEntities;
   };
 
   const generatePermissionMatrix = () => {
@@ -356,7 +496,7 @@ const PermissionAdminDashboard = () => {
       edit_permissions: roleForm.edit_permissions,
       verify_permissions: roleForm.verify_permissions
     };
-    
+
     console.log('New Role Created:', newRole);
     setRoleForm({
       name: '',
@@ -382,9 +522,9 @@ const PermissionAdminDashboard = () => {
       entity_id: userForm.entity_id,
       entity_name: getEntityName(userForm.entity_type, userForm.entity_id)
     };
-    
+
     setUsers([...users, newUser]);
-    setUserForm({name: '', email: '', role: '', entity_type: '', entity_id: '', multiple_entities: []});
+    setUserForm({ name: '', email: '', role: '', entity_type: '', entity_id: '', multiple_entities: [] });
     setShowAddUser(false);
   };
 
@@ -392,7 +532,7 @@ const PermissionAdminDashboard = () => {
     const levelMap = {
       'SUPER_ADMIN': 'GLOBAL',
       'VERTICAL_ADMIN': 'VERTICAL',
-      'PROJECT_MANAGER': 'PROJECT', 
+      'PROJECT_MANAGER': 'PROJECT',
       'CENTER_HEAD': 'CENTER',
       'COURSE_COORDINATOR': 'COURSE',
       'BATCH_COORDINATOR': 'BATCH',
@@ -431,7 +571,7 @@ const PermissionAdminDashboard = () => {
     if (user.role === 'SUPER_ADMIN') {
       return { type: 'GLOBAL', description: 'Can view all content across system' };
     }
-    
+
     return {
       type: 'SPECIFIC',
       master_level: user.master_access,
@@ -451,7 +591,7 @@ const PermissionAdminDashboard = () => {
       'AUDIT_USER': 'Cannot add any content',
       'REGIONAL_MANAGER': 'Can add Courses and Batches in assigned centers'
     };
-    
+
     return rolePermissions[user.role] || 'No add permissions';
   };
 
@@ -466,7 +606,7 @@ const PermissionAdminDashboard = () => {
       'AUDIT_USER': 'Cannot edit any content',
       'REGIONAL_MANAGER': 'Can edit assigned centers and their content'
     };
-    
+
     return rolePermissions[user.role] || 'No edit permissions';
   };
 
@@ -481,7 +621,7 @@ const PermissionAdminDashboard = () => {
       'AUDIT_USER': 'Cannot verify content',
       'REGIONAL_MANAGER': 'Can verify content in assigned centers'
     };
-    
+
     return rolePermissions[user.role] || 'No verify permissions';
   };
 
@@ -501,881 +641,1123 @@ const PermissionAdminDashboard = () => {
     };
   };
 
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Permission Management</h1>
-              <p className="text-gray-600">Manage users, roles, and analyze permissions</p>
-            </div>
-            <div className="flex space-x-3">
-              <button 
-                onClick={() => {
-                  setAddMode('user');
-                  setShowAddUser(true);
-                }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700"
-              >
-                <UserPlus size={16} />
-                <span>Add User</span>
-              </button>
-              <button 
-                onClick={() => {
-                  setAddMode('role');
-                  setShowAddUser(true);
-                }}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-green-700"
-              >
-                <Plus size={16} />
-                <span>Add Role</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
+
+      <div className="min-vh-100 bg-light">
+        {/* Header */}
+        <div className="bg-white shadow-sm border-bottom">
+          <div className="container-fluid">
+            <div className="d-flex justify-content-between align-items-center py-4">
+              <div>
+                <h1 className="h2 fw-bold text-dark mb-1">Permission Management</h1>
+                <p className="text-muted mb-0">Manage users, roles, and analyze permissions</p>
+              </div>
+              <div className="d-flex gap-3">
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  onClick={() => {
+                    setAddMode('role');
+                    setShowAddUser(true);
+                  }}
+                  className="btn btn-success d-flex align-items-center gap-2"
                 >
-                  <Icon size={16} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* User Management Tab */}
-        {activeTab === 'users' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                <input
-                  type="text"
-                  placeholder="Search users..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div className="flex space-x-2">
-                <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                  <Filter size={16} />
-                  <span>Filter</span>
-                </button>
-                <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                  <Download size={16} />
-                  <span>Export</span>
+                  <Plus size={16} />
+                  <span>Add User</span>
                 </button>
               </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Master Access</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.user_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {user.role.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.master_access === 'GLOBAL' ? 'bg-red-100 text-red-800' :
-                          user.master_access === 'VERTICAL' ? 'bg-purple-100 text-purple-800' :
-                          user.master_access === 'PROJECT' ? 'bg-green-100 text-green-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {user.master_access}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {user.entity_name || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {user.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                        <button 
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setAnalysisUser(user.user_id);
-                            const result = analyzeUserPermissions(user.user_id);
-                            setAnalysisResult(result);
-                          }}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button className="text-green-600 hover:text-green-900">
-                          <Edit size={16} />
-                        </button>
-                        <button className="text-red-600 hover:text-red-900">
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Permission Analysis Tab */}
-        {activeTab === 'analysis' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Permission Analysis</h3>
-                <div className="flex bg-gray-100 rounded-lg p-1">
-                  <button
-                    onClick={() => setAnalysisView('single')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      analysisView === 'single' 
-                        ? 'bg-white text-blue-600 shadow-sm' 
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Single User
+        <div className="container-fluid py-4">
+          {/* Tabs */}
+          <div className="border-bottom mb-4">
+            <ul className="nav nav-tabs">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <li className="nav-item" key={tab.id}>
+                    <button
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`nav-link d-flex align-items-center gap-2 ${activeTab === tab.id ? 'active' : ''
+                        }`}
+                      style={{ border: 'none', background: 'none' }}
+                    >
+                      <Icon size={16} />
+                      <span>{tab.label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* User Management Tab */}
+          {activeTab === 'users' && (
+            <div>
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <div className="position-relative">
+                  <Search className="position-absolute start-0 top-50 translate-middle-y ms-3 text-muted" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="form-control ps-5"
+                    style={{ paddingLeft: '2.5rem' }}
+                  />
+                </div>
+                <div className="d-flex gap-2">
+                  <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
+                    <Filter size={16} />
+                    <span>Filter</span>
                   </button>
-                  <button
-                    onClick={() => setAnalysisView('matrix')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      analysisView === 'matrix' 
-                        ? 'bg-white text-blue-600 shadow-sm' 
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Permission Matrix
+                  <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
+                    <Download size={16} />
+                    <span>Export</span>
                   </button>
                 </div>
               </div>
 
-              {analysisView === 'single' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Select User</label>
-                      <select
-                        value={analysisUser}
-                        onChange={(e) => {
-                          setAnalysisUser(e.target.value);
-                          if (e.target.value) {
-                            const result = analyzeUserPermissions(e.target.value);
-                            setAnalysisResult(result);
-                          }
-                        }}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Choose a user...</option>
-                        {users.map(user => (
-                          <option key={user.user_id} value={user.user_id}>
-                            {user.name} ({user.role})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {analysisResult && (
-                      <div className="space-y-4">
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <h4 className="font-medium text-gray-900 mb-2">Permission Summary</h4>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span>Access Level:</span>
-                              <span className="font-medium">{analysisResult.summary.access_level}</span>
+              <div className="card">
+                <div className="table-responsive">
+                  <table className="table table-hover mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Master Access</th>
+                        <th>Entity</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map((user) => (
+                        <tr key={user.user_id}>
+                          <td>
+                            <div>
+                              <div className="fw-medium text-dark">{user.name}</div>
+                              <div className="text-muted small">{user.email}</div>
                             </div>
-                            <div className="flex justify-between">
-                              <span>Entity Control:</span>
-                              <span className="font-medium">{analysisResult.summary.entity_control}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Risk Level:</span>
-                              <span className={`font-medium ${
-                                analysisResult.summary.risk_level === 'HIGH' ? 'text-red-600' :
-                                analysisResult.summary.risk_level === 'MEDIUM' ? 'text-yellow-600' :
-                                'text-green-600'
+                          </td>
+                          <td>
+                            <span className="badge bg-primary">
+                              {user.role.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge ${user.master_access === 'GLOBAL' ? 'bg-danger' :
+                              user.master_access === 'VERTICAL' ? 'bg-warning' :
+                                user.master_access === 'PROJECT' ? 'bg-success' :
+                                  'bg-info'
                               }`}>
-                                {analysisResult.summary.risk_level}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
+                              {user.master_access}
+                            </span>
+                          </td>
+                          <td className="text-dark">
+                            {user.entity_name || 'N/A'}
+                          </td>
+                          <td>
+                            <span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-danger'
+                              }`}>
+                              {user.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="d-flex gap-2">
+                              <button
+                                onClick={() => {
+                                  console.log('button hitting');
+                                  handleViewUserDetails(user);
+                                }}
+                                className="btn btn-sm btn-outline-info"
+                                title="View Details"
+                              >
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className={`p-3 rounded-lg ${analysisResult.summary.can_add ? 'bg-green-100' : 'bg-red-100'}`}>
-                            <div className="flex items-center space-x-2">
-                              {analysisResult.summary.can_add ? <CheckCircle className="text-green-600" size={16} /> : <XCircle className="text-red-600" size={16} />}
-                              <span className="text-sm font-medium">Add Content</span>
+                                <Eye size={16} />
+                              </button>
+
+                              <button className="btn btn-sm btn-outline-success">
+                                <Edit size={16} />
+                              </button>
+                              <button className="btn btn-sm btn-outline-danger">
+                                <Trash2 size={16} />
+                              </button>
                             </div>
-                          </div>
-                          <div className={`p-3 rounded-lg ${analysisResult.summary.can_edit ? 'bg-green-100' : 'bg-red-100'}`}>
-                            <div className="flex items-center space-x-2">
-                              {analysisResult.summary.can_edit ? <CheckCircle className="text-green-600" size={16} /> : <XCircle className="text-red-600" size={16} />}
-                              <span className="text-sm font-medium">Edit Content</span>
-                            </div>
-                          </div>
-                          <div className={`p-3 rounded-lg ${analysisResult.summary.can_verify ? 'bg-green-100' : 'bg-red-100'}`}>
-                            <div className="flex items-center space-x-2">
-                              {analysisResult.summary.can_verify ? <CheckCircle className="text-green-600" size={16} /> : <XCircle className="text-red-600" size={16} />}
-                              <span className="text-sm font-medium">Verify Content</span>
-                            </div>
-                          </div>
-                          <div className="p-3 rounded-lg bg-blue-100">
-                            <div className="flex items-center space-x-2">
-                              <Eye className="text-blue-600" size={16} />
-                              <span className="text-sm font-medium">View Access</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Permission Analysis Tab */}
+          {activeTab === 'analysis' && (
+            <div>
+              <div className="card">
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h3 className="card-title">Permission Analysis</h3>
+                    <div className="btn-group" role="group">
+                      <input
+                        type="radio"
+                        className="btn-check"
+                        name="analysisView"
+                        id="single"
+                        checked={analysisView === 'single'}
+                        onChange={() => setAnalysisView('single')}
+                      />
+                      <label className="btn btn-outline-primary" htmlFor="single">
+                        Single User
+                      </label>
+
+                      <input
+                        type="radio"
+                        className="btn-check"
+                        name="analysisView"
+                        id="matrix"
+                        checked={analysisView === 'matrix'}
+                        onChange={() => setAnalysisView('matrix')}
+                      />
+                      <label className="btn btn-outline-primary" htmlFor="matrix">
+                        Permission Matrix
+                      </label>
+                    </div>
                   </div>
 
-                  {analysisResult && (
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-gray-900">Detailed Permissions</h4>
-                      
-                      <div className="space-y-3">
-                        <div className="bg-blue-50 rounded-lg p-4">
-                          <h5 className="font-medium text-blue-900 mb-2">View Access</h5>
-                          <p className="text-sm text-blue-800">{analysisResult.permissions.view_access.description}</p>
+                  {analysisView === 'single' && (
+                    <div className="row">
+                      <div className="col-lg-6">
+                        <div className="mb-4">
+                          <label className="form-label fw-medium">Select User</label>
+                          <select
+                            value={analysisUser}
+                            onChange={(e) => {
+                              setAnalysisUser(e.target.value);
+                              if (e.target.value) {
+                                const result = analyzeUserPermissions(e.target.value);
+                                setAnalysisResult(result);
+                              }
+                            }}
+                            className="form-select"
+                          >
+                            <option value="">Choose a user...</option>
+                            {users.map(user => (
+                              <option key={user.user_id} value={user.user_id}>
+                                {user.name} ({user.role})
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
-                        <div className="bg-green-50 rounded-lg p-4">
-                          <h5 className="font-medium text-green-900 mb-2">Add Permissions</h5>
-                          <p className="text-sm text-green-800">{analysisResult.permissions.add_permissions}</p>
-                        </div>
+                        {analysisResult && (
+                          <div>
+                            <div className="card bg-light mb-4">
+                              <div className="card-body">
+                                <h5 className="card-title">Permission Summary</h5>
+                                <div className="row g-2 small">
+                                  <div className="col-6">
+                                    <span className="text-muted">Access Level:</span>
+                                  </div>
+                                  <div className="col-6">
+                                    <span className="fw-medium">{analysisResult.summary.access_level}</span>
+                                  </div>
+                                  <div className="col-6">
+                                    <span className="text-muted">Entity Control:</span>
+                                  </div>
+                                  <div className="col-6">
+                                    <span className="fw-medium">{analysisResult.summary.entity_control}</span>
+                                  </div>
+                                  <div className="col-6">
+                                    <span className="text-muted">Risk Level:</span>
+                                  </div>
+                                  <div className="col-6">
+                                    <span className={`fw-medium ${analysisResult.summary.risk_level === 'HIGH' ? 'text-danger' :
+                                      analysisResult.summary.risk_level === 'MEDIUM' ? 'text-warning' :
+                                        'text-success'
+                                      }`}>
+                                      {analysisResult.summary.risk_level}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
 
-                        <div className="bg-yellow-50 rounded-lg p-4">
-                          <h5 className="font-medium text-yellow-900 mb-2">Edit Permissions</h5>
-                          <p className="text-sm text-yellow-800">{analysisResult.permissions.edit_permissions}</p>
-                        </div>
+                            <div className="row g-2 mb-4">
+                              <div className="col-6">
+                                <div className={`card text-center ${analysisResult.summary.can_add ? 'bg-success bg-opacity-10' : 'bg-danger bg-opacity-10'}`}>
+                                  <div className="card-body py-3">
+                                    <div className="d-flex align-items-center justify-content-center gap-2">
+                                      {analysisResult.summary.can_add ? <CheckCircle className="text-success" size={16} /> : <XCircle className="text-danger" size={16} />}
+                                      <span className="small fw-medium">Add Content</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="col-6">
+                                <div className={`card text-center ${analysisResult.summary.can_edit ? 'bg-success bg-opacity-10' : 'bg-danger bg-opacity-10'}`}>
+                                  <div className="card-body py-3">
+                                    <div className="d-flex align-items-center justify-content-center gap-2">
+                                      {analysisResult.summary.can_edit ? <CheckCircle className="text-success" size={16} /> : <XCircle className="text-danger" size={16} />}
+                                      <span className="small fw-medium">Edit Content</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="col-6">
+                                <div className={`card text-center ${analysisResult.summary.can_verify ? 'bg-success bg-opacity-10' : 'bg-danger bg-opacity-10'}`}>
+                                  <div className="card-body py-3">
+                                    <div className="d-flex align-items-center justify-content-center gap-2">
+                                      {analysisResult.summary.can_verify ? <CheckCircle className="text-success" size={16} /> : <XCircle className="text-danger" size={16} />}
+                                      <span className="small fw-medium">Verify Content</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="col-6">
+                                <div className="card text-center bg-primary bg-opacity-10">
+                                  <div className="card-body py-3">
+                                    <div className="d-flex align-items-center justify-content-center gap-2">
+                                      <Eye className="text-primary" size={16} />
+                                      <span className="small fw-medium">View Access</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
-                        <div className="bg-purple-50 rounded-lg p-4">
-                          <h5 className="font-medium text-purple-900 mb-2">Verify Permissions</h5>
-                          <p className="text-sm text-purple-800">{analysisResult.permissions.verify_permissions}</p>
+                      {analysisResult && (
+                        <div className="col-lg-6">
+                          <h5 className="fw-medium mb-3">Detailed Permissions</h5>
+
+                          <div className="row g-3">
+                            <div className="col-12">
+                              <div className="card border-primary">
+                                <div className="card-body">
+                                  <h6 className="card-title text-primary mb-2">View Access</h6>
+                                  <p className="card-text small text-primary mb-0">{analysisResult.permissions.view_access.description}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-12">
+                              <div className="card border-success">
+                                <div className="card-body">
+                                  <h6 className="card-title text-success mb-2">Add Permissions</h6>
+                                  <p className="card-text small text-success mb-0">{analysisResult.permissions.add_permissions}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-12">
+                              <div className="card border-warning">
+                                <div className="card-body">
+                                  <h6 className="card-title text-warning mb-2">Edit Permissions</h6>
+                                  <p className="card-text small text-warning mb-0">{analysisResult.permissions.edit_permissions}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-12">
+                              <div className="card border-info">
+                                <div className="card-body">
+                                  <h6 className="card-title text-info mb-2">Verify Permissions</h6>
+                                  <p className="card-text small text-info mb-0">{analysisResult.permissions.verify_permissions}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {analysisView === 'matrix' && (
+                    <div>
+                      <div className="d-flex justify-content-between align-items-center mb-4">
+                        <h5 className="fw-medium">Overall Permission Matrix</h5>
+                        <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
+                          <Download size={16} />
+                          <span>Export Matrix</span>
+                        </button>
+                      </div>
+
+                      <div className="table-responsive">
+                        <table className="table table-bordered table-hover">
+                          <thead className="table-light">
+                            <tr>
+                              <th className="border-end">User</th>
+                              <th className="text-center border-end">Role</th>
+                              <th className="text-center border-end">Master Level</th>
+                              <th className="text-center border-end text-primary">Global View</th>
+                              <th className="text-center border-end text-success">Add Project</th>
+                              <th className="text-center border-end text-success">Add Center</th>
+                              <th className="text-center border-end text-success">Add Course</th>
+                              <th className="text-center border-end text-success">Add Batch</th>
+                              <th className="text-center border-end text-warning">Edit Vertical</th>
+                              <th className="text-center border-end text-warning">Edit Project</th>
+                              <th className="text-center border-end text-warning">Edit Center</th>
+                              <th className="text-center border-end text-info">Verify</th>
+                              <th className="text-center text-danger">Risk</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {generatePermissionMatrix().map((user, index) => (
+                              <tr key={user.user_id} className={index % 2 === 0 ? '' : 'table-light'}>
+                                <td className="border-end">
+                                  <div>
+                                    <div className="fw-medium text-dark">{user.name}</div>
+                                    <div className="small text-muted">{user.entity_name}</div>
+                                  </div>
+                                </td>
+                                <td className="text-center border-end">
+                                  <span className="badge bg-primary">
+                                    {user.role.replace('_', ' ')}
+                                  </span>
+                                </td>
+                                <td className="text-center border-end">
+                                  <span className={`badge ${user.master_access === 'GLOBAL' ? 'bg-danger' :
+                                    user.master_access === 'VERTICAL' ? 'bg-warning' :
+                                      user.master_access === 'PROJECT' ? 'bg-success' :
+                                        'bg-info'
+                                    }`}>
+                                    {user.master_access}
+                                  </span>
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_view_global ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_add_project ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_add_center ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_add_course ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_add_batch ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_edit_vertical ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_edit_project ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_edit_center ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center border-end">
+                                  {user.can_verify_content ? <CheckCircle className="text-success" size={20} /> : <XCircle className="text-danger" size={20} />}
+                                </td>
+                                <td className="text-center">
+                                  <span className={`badge ${user.risk_level === 'HIGH' ? 'bg-danger' :
+                                    user.risk_level === 'MEDIUM' ? 'bg-warning' :
+                                      'bg-success'
+                                    }`}>
+                                    {user.risk_level}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="card bg-light mt-4">
+                        <div className="card-body">
+                          <h6 className="card-title">Legend</h6>
+                          <div className="row g-3 small">
+                            <div className="col-md-3">
+                              <div className="d-flex align-items-center gap-2">
+                                <CheckCircle className="text-success" size={16} />
+                                <span>Permission Granted</span>
+                              </div>
+                            </div>
+                            <div className="col-md-3">
+                              <div className="d-flex align-items-center gap-2">
+                                <XCircle className="text-danger" size={16} />
+                                <span>Permission Denied</span>
+                              </div>
+                            </div>
+                            <div className="col-md-3">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="badge bg-danger rounded-circle" style={{ width: '16px', height: '16px' }}></span>
+                                <span>High Risk</span>
+                              </div>
+                            </div>
+                            <div className="col-md-3">
+                              <div className="d-flex align-items-center gap-2">
+                                <span className="badge bg-success rounded-circle" style={{ width: '16px', height: '16px' }}></span>
+                                <span>Low Risk</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+            </div>
+          )}
+        </div>
 
-              {analysisView === 'matrix' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium text-gray-900">Overall Permission Matrix</h4>
-                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                      <Download size={16} />
-                      <span>Export Matrix</span>
-                    </button>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">User</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r">Role</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r">Master Level</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider border-r">Global View</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider border-r">Add Project</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider border-r">Add Center</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider border-r">Add Course</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider border-r">Add Batch</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-yellow-600 uppercase tracking-wider border-r">Edit Vertical</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-yellow-600 uppercase tracking-wider border-r">Edit Project</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-yellow-600 uppercase tracking-wider border-r">Edit Center</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-purple-600 uppercase tracking-wider border-r">Verify</th>
-                          <th className="px-3 py-3 text-center text-xs font-medium text-red-600 uppercase tracking-wider">Risk</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {generatePermissionMatrix().map((user, index) => (
-                          <tr key={user.user_id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="px-4 py-3 border-r">
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                                <div className="text-xs text-gray-500">{user.entity_name}</div>
+        {/* User Details Modal */}
+        {showUserDetails && viewDetailsUser && (
+          <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+            <div className="modal-dialog modal-xl modal-dialog-scrollable">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    <User className="me-2" size={20} />
+                    User Details: {viewDetailsUser.name}
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowUserDetails(false)}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <div className="row g-4">
+                    {/* User Information */}
+                    <div className="col-md-4">
+                      <div className="card h-100">
+                        <div className="card-body">
+                          <h6 className="card-title text-primary">👤 User Information</h6>
+                          <div className="mb-3">
+                            <div className="d-flex justify-content-center mb-3">
+                              <div className="bg-primary bg-opacity-10 rounded-circle p-3">
+                                <User size={40} className="text-primary" />
                               </div>
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {user.role.replace('_', ' ')}
+                            </div>
+                            <div className="text-center">
+                              <h5 className="mb-1">{viewDetailsUser.name}</h5>
+                              <p className="text-muted mb-2">{viewDetailsUser.email}</p>
+                              <span className={`badge ${viewDetailsUser.status === 'active' ? 'bg-success' : 'bg-danger'
+                                }`}>
+                                {viewDetailsUser.status}
                               </span>
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                user.master_access === 'GLOBAL' ? 'bg-red-100 text-red-800' :
-                                user.master_access === 'VERTICAL' ? 'bg-purple-100 text-purple-800' :
-                                user.master_access === 'PROJECT' ? 'bg-green-100 text-green-800' :
-                                'bg-yellow-100 text-yellow-800'
-                              }`}>
-                                {user.master_access}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_view_global ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_add_project ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_add_center ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_add_course ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_add_batch ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_edit_vertical ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_edit_project ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_edit_center ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center border-r">
-                              {user.can_verify_content ? <CheckCircle className="w-4 h-4 text-green-500 mx-auto" /> : <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
-                            </td>
-                            <td className="px-3 py-3 text-center">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                user.risk_level === 'HIGH' ? 'bg-red-100 text-red-800' :
-                                user.risk_level === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-green-100 text-green-800'
-                              }`}>
-                                {user.risk_level}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4 mt-4">
-                    <h5 className="font-medium text-gray-900 mb-2">Legend</h5>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span>Permission Granted</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <XCircle className="w-4 h-4 text-red-500" />
-                        <span>Permission Denied</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="w-4 h-4 bg-red-100 rounded-full"></span>
-                        <span>High Risk</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="w-4 h-4 bg-green-100 rounded-full"></span>
-                        <span>Low Risk</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Role Management Tab */}
-        {activeTab === 'roles' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Available Roles</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {roles.map((role) => (
-                  <div key={role} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900">{role.replace('_', ' ')}</h4>
-                      <Shield className="text-gray-400" size={16} />
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">{roleDescriptions[role]}</p>
-                    <div className="text-xs text-gray-500 mb-3">
-                      Master Level: <span className="font-medium">{getMasterAccessLevel(role)}</span>
-                    </div>
-                    <div className="flex space-x-2">
-                      <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
-                      <button className="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Unified Add User/Role Modal */}
-      {showAddUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-6xl mx-4 my-8 flex flex-col" style={{maxHeight: '85vh'}}>
-            {/* Modal Header - Fixed */}
-            <div className="flex justify-between items-center p-4 border-b bg-white rounded-t-lg flex-shrink-0">
-              <div className="flex items-center space-x-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  {addMode === 'user' ? 'Add New User' : 'Create New Role'}
-                </h3>
-                <div className="flex bg-gray-100 rounded-lg p-1">
-                  <button
-                    onClick={() => setAddMode('user')}
-                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                      addMode === 'user' 
-                        ? 'bg-white text-blue-600 shadow-sm' 
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Add User
-                  </button>
-                  <button
-                    onClick={() => setAddMode('role')}
-                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                      addMode === 'role' 
-                        ? 'bg-white text-green-600 shadow-sm' 
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Create Role
-                  </button>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAddUser(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl"
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Modal Content - Single Scrollable Area */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {addMode === 'user' ? (
-                /* User Form */
-                <div className="max-w-2xl mx-auto space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                      <input
-                        type="text"
-                        value={userForm.name}
-                        onChange={(e) => setUserForm({...userForm, name: e.target.value})}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={userForm.email}
-                        onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                      <select
-                        value={userForm.role}
-                        onChange={(e) => setUserForm({...userForm, role: e.target.value})}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Select Role</option>
-                        {roles.map(role => (
-                          <option key={role} value={role}>{role.replace('_', ' ')}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {userForm.role && userForm.role !== 'SUPER_ADMIN' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Entity Type</label>
-                        <select
-                          value={userForm.entity_type}
-                          onChange={(e) => setUserForm({...userForm, entity_type: e.target.value, entity_id: ''})}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="">Select Entity Type</option>
-                          {Object.keys(entities).map(type => (
-                            <option key={type} value={type}>{type}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {userForm.entity_type && (
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {userForm.role === 'REGIONAL_MANAGER' ? 'Select Multiple Entities' : 'Select Entity'}
-                        </label>
-                        {userForm.role === 'REGIONAL_MANAGER' ? (
-                          <div className="grid grid-cols-2 gap-2 border border-gray-300 rounded-lg p-3" style={{maxHeight: '200px', overflowY: 'auto'}}>
-                            {entities[userForm.entity_type]?.map(entity => (
-                              <label key={entity.id} className="flex items-center space-x-2">
-                                <input
-                                  type="checkbox"
-                                  checked={userForm.multiple_entities.includes(entity.id)}
-                                  onChange={(e) => {
-                                    const updated = e.target.checked
-                                      ? [...userForm.multiple_entities, entity.id]
-                                      : userForm.multiple_entities.filter(id => id !== entity.id);
-                                    setUserForm({...userForm, multiple_entities: updated});
-                                  }}
-                                  className="text-blue-600"
-                                />
-                                <span className="text-sm">{entity.name}</span>
-                              </label>
-                            ))}
+                            </div>
                           </div>
-                        ) : (
-                          <select
-                            value={userForm.entity_id}
-                            onChange={(e) => setUserForm({...userForm, entity_id: e.target.value})}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          >
-                            <option value="">Select Entity</option>
-                            {entities[userForm.entity_type]?.map(entity => (
-                              <option key={entity.id} value={entity.id}>{entity.name}</option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* Role Form */
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Basic Information */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-gray-900 border-b pb-2">Basic Information</h4>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Role Name</label>
-                        <input
-                          type="text"
-                          value={roleForm.name}
-                          onChange={(e) => setRoleForm({...roleForm, name: e.target.value})}
-                          placeholder="e.g., Regional Supervisor"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                        <textarea
-                          value={roleForm.description}
-                          onChange={(e) => setRoleForm({...roleForm, description: e.target.value})}
-                          placeholder="Describe the role's responsibilities..."
-                          rows={3}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      {/* View Access Configuration */}
-                      <div>
-                        <h5 className="font-medium text-gray-800 mb-2">View Access</h5>
-                        <div className="space-y-2">
-                          <label className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              name="view_access_type"
-                              value="GLOBAL"
-                              checked={roleForm.view_access_type === 'GLOBAL'}
-                              onChange={(e) => setRoleForm({...roleForm, view_access_type: e.target.value, master_level: 'GLOBAL', specific_entities: []})}
-                              className="text-blue-600"
-                            />
-                            <span className="text-sm">Global Access</span>
-                          </label>
-                          <label className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              name="view_access_type"
-                              value="SPECIFIC"
-                              checked={roleForm.view_access_type === 'SPECIFIC'}
-                              onChange={(e) => setRoleForm({...roleForm, view_access_type: e.target.value, specific_entities: []})}
-                              className="text-blue-600"
-                            />
-                            <span className="text-sm">Specific Entity Access</span>
-                          </label>
+                          <hr />
+                          <div className="row g-2 small">
+                            <div className="col-6">Role:</div>
+                            <div className="col-6">
+                              <span className="badge bg-primary">{viewDetailsUser.role.replace('_', ' ')}</span>
+                            </div>
+                            <div className="col-6">Access Level:</div>
+                            <div className="col-6">
+                              <span className={`badge ${viewDetailsUser.master_access === 'GLOBAL' ? 'bg-danger' :
+                                viewDetailsUser.master_access === 'VERTICAL' ? 'bg-warning' :
+                                  'bg-info'
+                                }`}>
+                                {viewDetailsUser.master_access}
+                              </span>
+                            </div>
+                            <div className="col-6">Entity:</div>
+                            <div className="col-6 fw-medium">{viewDetailsUser.entity_name}</div>
+                            <div className="col-6">Created:</div>
+                            <div className="col-6 fw-medium">{viewDetailsUser.created_date}</div>
+                            <div className="col-6">Last Login:</div>
+                            <div className="col-6 fw-medium">{viewDetailsUser.last_login}</div>
+                          </div>
                         </div>
-
-                        {roleForm.view_access_type === 'SPECIFIC' && (
-                          <div className="mt-3 space-y-3">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Master Access Level</label>
-                              <select
-                                value={roleForm.master_level}
-                                onChange={(e) => setRoleForm({...roleForm, master_level: e.target.value, specific_entities: []})}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              >
-                                <option value="">Select Master Level</option>
-                                <option value="VERTICAL">Vertical Level</option>
-                                <option value="PROJECT">Project Level</option>
-                                <option value="CENTER">Center Level</option>
-                                <option value="COURSE">Course Level</option>
-                                <option value="BATCH">Batch Level</option>
-                              </select>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Master level determines action scope. Parent hierarchy will be read-only.
-                              </p>
-                            </div>
-
-                            {roleForm.master_level && (
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Select {roleForm.master_level} Entities (Multiple Selection)
-                                </label>
-                                <div className="border border-gray-300 rounded-lg p-3" style={{maxHeight: '150px', overflowY: 'auto'}}>
-                                  {entities[roleForm.master_level]?.map(entity => (
-                                    <label key={entity.id} className="flex items-center space-x-2 mb-1">
-                                      <input
-                                        type="checkbox"
-                                        checked={roleForm.specific_entities?.includes(entity.id)}
-                                        onChange={(e) => {
-                                          const current = roleForm.specific_entities || [];
-                                          const updated = e.target.checked
-                                            ? [...current, entity.id]
-                                            : current.filter(id => id !== entity.id);
-                                          setRoleForm({...roleForm, specific_entities: updated});
-                                        }}
-                                        className="text-blue-600"
-                                      />
-                                      <span className="text-sm">{entity.name}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                                {roleForm.specific_entities?.length > 0 && (
-                                  <p className="text-xs text-green-600 mt-1">
-                                    Selected: {roleForm.specific_entities.length} {roleForm.master_level.toLowerCase()}(s)
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
 
-                    {/* IMPROVED Add Permissions Section */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-gray-900 border-b pb-2">Add Permissions</h4>
-
-                      <div className="space-y-3">
-                        <label className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={roleForm.add_permissions.global}
-                            onChange={(e) => setRoleForm({
-                              ...roleForm,
-                              add_permissions: {
-                                ...roleForm.add_permissions, 
-                                global: e.target.checked,
-                                specific_permissions: e.target.checked ? [] : roleForm.add_permissions.specific_permissions
-                              }
-                            })}
-                            className="text-blue-600"
-                          />
-                          <span className="text-sm font-medium">🌍 Global Add Permission</span>
-                        </label>
-
-                        {!roleForm.add_permissions.global && (
-                          <div className="bg-gray-50 p-4 rounded-lg">
-                            <div className="flex justify-between items-center mb-3">
-                              <h6 className="text-sm font-medium text-gray-800">Specific Add Permissions</h6>
-                              <button
-                                type="button"
-                                onClick={addNewAddPermission}
-                                disabled={!roleForm.master_level || roleForm.view_access_type !== 'SPECIFIC'}
-                                className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                + Add Permission
-                              </button>
-                            </div>
-
-                            {(!roleForm.master_level || roleForm.view_access_type !== 'SPECIFIC') && (
-                              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
-                                <p className="text-sm text-yellow-800">
-                                  ⚠️ Please select Master Access Level in View Access section first
-                                </p>
-                              </div>
-                            )}
-
-                            {roleForm.add_permissions.specific_permissions.length === 0 && roleForm.master_level && (
-                              <div className="text-center py-4 text-gray-500 text-sm">
-                                No specific add permissions configured. Click "Add Permission" to start.
-                              </div>
-                            )}
-
-                            {/* Individual Add Permission Configurations */}
-                            {roleForm.add_permissions.specific_permissions.map((permission, index) => (
-                              <div key={permission.id} className="border border-gray-200 rounded-lg p-3 mb-3 bg-white">
-                                <div className="flex justify-between items-center mb-3">
-                                  <h6 className="text-sm font-medium text-blue-800">Permission #{index + 1}</h6>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeAddPermission(permission.id)}
-                                    className="text-red-600 hover:text-red-800 text-xs"
-                                  >
-                                    Remove
-                                  </button>
+                    {/* View Permissions */}
+                    <div className="col-md-8">
+                      <div className="card h-100">
+                        <div className="card-body">
+                          <h6 className="card-title text-info">👁️ View Permissions</h6>
+                          {(() => {
+                            const viewDetails = getDetailedViewPermissions(viewDetailsUser);
+                            return (
+                              <div>
+                                {/* Summary Cards */}
+                                <div className="row g-2 mb-4">
+                                  <div className="col-3">
+                                    <div className="card bg-primary bg-opacity-10 text-center">
+                                      <div className="card-body py-2">
+                                        <div className="fw-bold text-primary">{viewDetails.access_summary.total_viewable}</div>
+                                        <div className="small">Total Entities</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="col-3">
+                                    <div className="card bg-success bg-opacity-10 text-center">
+                                      <div className="card-body py-2">
+                                        <div className="fw-bold text-success">{viewDetails.access_summary.full_access}</div>
+                                        <div className="small">Full Access</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="col-3">
+                                    <div className="card bg-warning bg-opacity-10 text-center">
+                                      <div className="card-body py-2">
+                                        <div className="fw-bold text-warning">{viewDetails.access_summary.read_only}</div>
+                                        <div className="small">Read Only</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="col-3">
+                                    <div className="card bg-danger bg-opacity-10 text-center">
+                                      <div className="card-body py-2">
+                                        <div className="fw-bold text-danger">{viewDetails.access_summary.restrictions_count}</div>
+                                        <div className="small">Restrictions</div>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
 
-                                {/* Step 1: Select Permission Level */}
-                                <div className="space-y-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      1️⃣ At which level do you want to grant add permissions?
-                                    </label>
-                                    <select
-                                      value={permission.permission_level || ''}
-                                      onChange={(e) => updateAddPermission(permission.id, 'permission_level', e.target.value)}
-                                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                                    >
-                                      <option value="">Select Level</option>
-                                      {getAllowedAddLevels().map(level => (
-                                        <option key={level} value={level}>
-                                          {level} Level
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      You can only select levels up to your view access level ({roleForm.master_level || 'None'})
-                                    </p>
-                                  </div>
-
-                                  {/* Step 2: Select Specific Entities */}
-                                  {permission.permission_level && (
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        2️⃣ Select specific {permission.permission_level.toLowerCase()}(s) where they can add content:
-                                      </label>
-                                      
-                                      {/* Show context of selected parent entities */}
-                                      {permission.permission_level !== roleForm.master_level && roleForm.specific_entities?.length > 0 && (
-                                        <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
-                                          <div className="text-xs font-medium text-blue-800 mb-1">
-                                            📋 Based on your selected {roleForm.master_level.toLowerCase()}(s):
+                                {/* Viewable Entities */}
+                                <div className="mb-4">
+                                  <h6 className="fw-medium mb-3">Accessible Entities</h6>
+                                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                    <div className="list-group">
+                                      {viewDetails.viewable_entities.map((item, index) => (
+                                        <div key={index} className="list-group-item d-flex justify-content-between align-items-center">
+                                          <div>
+                                            <div className="fw-medium">{item.entity.name}</div>
+                                            <div className="small text-muted">
+                                              {item.level} Level
+                                              {item.access_type === 'READ_ONLY' && ' (Parent Hierarchy)'}
+                                            </div>
                                           </div>
-                                          <div className="text-xs text-blue-700">
-                                            {entities[roleForm.master_level]?.filter(entity => 
-                                              roleForm.specific_entities.includes(entity.id)
-                                            ).map(entity => entity.name).join(', ')}
+                                          <div className="d-flex align-items-center gap-2">
+                                            {item.access_type === 'FULL' ? (
+                                              <Eye className="text-success" size={16} />
+                                            ) : (
+                                              <EyeOff className="text-warning" size={16} />
+                                            )}
+                                            <span className={`badge ${item.access_type === 'FULL' ? 'bg-success' : 'bg-warning'
+                                              }`}>
+                                              {item.access_type}
+                                            </span>
                                           </div>
                                         </div>
-                                      )}
-                                      
-                                      {/* Show available entities based on permission level and view access */}
-                                      <div className="border border-gray-300 rounded p-2 max-h-32 overflow-y-auto">
-                                        {(() => {
-                                          let availableEntities = [];
-                                          
-                                          if (permission.permission_level === roleForm.master_level) {
-                                            // Same level as master - show only selected entities from view access
-                                            availableEntities = entities[roleForm.master_level]?.filter(entity => 
-                                              roleForm.specific_entities?.includes(entity.id)
-                                            ) || [];
-                                          } else {
-                                            // Different level - show child entities based on hierarchy
-                                            availableEntities = getChildEntities(
-                                              permission.permission_level, 
-                                              roleForm.master_level, 
-                                              roleForm.specific_entities || []
-                                            );
-                                          }
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
 
-                                          if (availableEntities.length === 0) {
-                                            return (
-                                              <div className="text-xs text-gray-500 italic p-2">
-                                                {permission.permission_level === roleForm.master_level 
-                                                  ? `No ${permission.permission_level.toLowerCase()} entities selected in view access`
-                                                  : `No ${permission.permission_level.toLowerCase()} entities found under selected ${roleForm.master_level.toLowerCase()}(s)`
-                                                }
-                                              </div>
-                                            );
-                                          }
-
-                                          // Group entities by parent for better organization
-                                          if (permission.permission_level !== roleForm.master_level && availableEntities.length > 3) {
-                                            const hierarchy = ['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'];
-                                            const currentIndex = hierarchy.indexOf(permission.permission_level);
-                                            const parentLevel = hierarchy[currentIndex - 1];
-                                            
-                                            // Group by immediate parent
-                                            const grouped = availableEntities.reduce((acc, entity) => {
-                                              const parentEntity = entities[parentLevel]?.find(p => p.id === entity.parent_id);
-                                              const parentName = parentEntity?.name || 'Unknown Parent';
-                                              
-                                              if (!acc[parentName]) {
-                                                acc[parentName] = [];
-                                              }
-                                              acc[parentName].push(entity);
-                                              return acc;
-                                            }, {});
-
-                                            return Object.entries(grouped).map(([parentName, children]) => (
-                                              <div key={parentName} className="mb-2">
-                                                <div className="text-xs font-medium text-gray-600 mb-1 bg-gray-100 px-2 py-1 rounded">
-                                                  📁 {parentName}
+                                {/* Restrictions */}
+                                {viewDetails.restricted_areas.length > 0 && (
+                                  <div>
+                                    <h6 className="fw-medium mb-3 text-danger">🚫 View Restrictions</h6>
+                                    <div className="row g-2">
+                                      {viewDetails.restricted_areas.map((restriction, index) => {
+                                        const restrictionData = viewRestrictionsOptions.find(opt => opt.id === restriction);
+                                        const Icon = restrictionData?.icon || Lock;
+                                        return (
+                                          <div key={index} className="col-6">
+                                            <div className="card border-danger">
+                                              <div className="card-body py-2">
+                                                <div className="d-flex align-items-center gap-2">
+                                                  <Icon size={16} className="text-danger" />
+                                                  <span className="small fw-medium">
+                                                    {restrictionData?.label || restriction.replace('_', ' ')}
+                                                  </span>
                                                 </div>
-                                                <div className="ml-2 space-y-1">
-                                                  {children.map(entity => (
-                                                    <label key={entity.id} className="flex items-center space-x-2 text-xs">
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Permission Summary */}
+                    <div className="col-12">
+                      <div className="card">
+                        <div className="card-body">
+                          <h6 className="card-title text-success">📊 Complete Permission Summary</h6>
+                          {(() => {
+                            const fullAnalysis = analyzeUserPermissions(viewDetailsUser.user_id);
+                            return (
+                              <div className="row g-3">
+                                <div className="col-md-3">
+                                  <div className="card border-primary">
+                                    <div className="card-body text-center">
+                                      <Eye className="text-primary mb-2" size={24} />
+                                      <h6 className="card-title text-primary">View Access</h6>
+                                      <p className="card-text small">{fullAnalysis.permissions.view_access.description}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-md-3">
+                                  <div className="card border-success">
+                                    <div className="card-body text-center">
+                                      <Plus className="text-success mb-2" size={24} />
+                                      <h6 className="card-title text-success">Add Permissions</h6>
+                                      <p className="card-text small">{fullAnalysis.permissions.add_permissions}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-md-3">
+                                  <div className="card border-warning">
+                                    <div className="card-body text-center">
+                                      <Edit className="text-warning mb-2" size={24} />
+                                      <h6 className="card-title text-warning">Edit Permissions</h6>
+                                      <p className="card-text small">{fullAnalysis.permissions.edit_permissions}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-md-3">
+                                  <div className="card border-info">
+                                    <div className="card-body text-center">
+                                      <CheckCircle className="text-info mb-2" size={24} />
+                                      <h6 className="card-title text-info">Verify Permissions</h6>
+                                      <p className="card-text small">{fullAnalysis.permissions.verify_permissions}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowUserDetails(false)}>
+                    Close
+                  </button>
+                  <button type="button" className="btn btn-primary">
+                    <Edit size={16} className="me-2" />
+                    Edit User
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add User Modal */}
+        {showAddUser && (
+          <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+            <div className="modal-dialog modal-xl modal-dialog-scrollable" style={{ maxHeight: '85vh' }}>
+              <div className="modal-content d-flex flex-column h-100">
+                {/* Modal Header - Fixed */}
+                <div className="modal-header flex-shrink-0">
+                  <div className="d-flex align-items-center gap-4">
+                    <h5 className="modal-title">Add New User</h5>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowAddUser(false)}
+                  ></button>
+                </div>
+
+                {/* Modal Body - Scrollable */}
+                <div className="modal-body flex-grow-1 overflow-auto">
+                  {addMode === 'user' ? (
+                    /* User Form */
+                    <div className="container-fluid">
+                      <div className="row g-4">
+                        <div className="col-md-6">
+                          <label className="form-label">Name</label>
+                          <input
+                            type="text"
+                            value={userForm.name}
+                            onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                            className="form-control"
+                          />
+                        </div>
+
+                        <div className="col-md-6">
+                          <label className="form-label">Email</label>
+                          <input
+                            type="email"
+                            value={userForm.email}
+                            onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                            className="form-control"
+                          />
+                        </div>
+
+                        <div className="col-md-6">
+                          <label className="form-label">Role</label>
+                          <select
+                            value={userForm.role}
+                            onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                            className="form-select"
+                          >
+                            <option value="">Select Role</option>
+                            {roles.map(role => (
+                              <option key={role} value={role}>{role.replace('_', ' ')}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {userForm.role && userForm.role !== 'SUPER_ADMIN' && (
+                          <div className="col-md-6">
+                            <label className="form-label">Entity Type</label>
+                            <select
+                              value={userForm.entity_type}
+                              onChange={(e) => setUserForm({ ...userForm, entity_type: e.target.value, entity_id: '' })}
+                              className="form-select"
+                            >
+                              <option value="">Select Entity Type</option>
+                              {Object.keys(entities).map(type => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {userForm.entity_type && (
+                          <div className="col-12">
+                            <label className="form-label">
+                              {userForm.role === 'REGIONAL_MANAGER' ? 'Select Multiple Entities' : 'Select Entity'}
+                            </label>
+                            {userForm.role === 'REGIONAL_MANAGER' ? (
+                              <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                <div className="row">
+                                  {entities[userForm.entity_type]?.map(entity => (
+                                    <div key={entity.id} className="col-6">
+                                      <div className="form-check">
+                                        <input
+                                          type="checkbox"
+                                          className="form-check-input"
+                                          checked={userForm.multiple_entities.includes(entity.id)}
+                                          onChange={(e) => {
+                                            const updated = e.target.checked
+                                              ? [...userForm.multiple_entities, entity.id]
+                                              : userForm.multiple_entities.filter(id => id !== entity.id);
+                                            setUserForm({ ...userForm, multiple_entities: updated });
+                                          }}
+                                        />
+                                        <label className="form-check-label small">{entity.name}</label>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <select
+                                value={userForm.entity_id}
+                                onChange={(e) => setUserForm({ ...userForm, entity_id: e.target.value })}
+                                className="form-select"
+                              >
+                                <option value="">Select Entity</option>
+                                {entities[userForm.entity_type]?.map(entity => (
+                                  <option key={entity.id} value={entity.id}>{entity.name}</option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Role Form */
+                    <div>
+                      <div className="row g-4">
+                        {/* Basic Information */}
+                        <div className="col-12">
+                          <h5 className="border-bottom pb-2">Basic Information</h5>
+
+                          <div className="row g-3 mt-2">
+                            <div className="col-md-6">
+                              <label className="form-label">Name</label>
+                              <input
+                                type="text"
+                                value={userForm.name}
+                                onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                                className="form-control"
+                              />
+                            </div>
+                            <div className="col-md-6">
+                              <label className="form-label">Email</label>
+                              <input
+                                type="email"
+                                value={userForm.email}
+                                onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                                className="form-control"
+                              />
+                            </div>
+                            <div className="col-md-6">
+                              <label className="form-label">Role Name</label>
+                              <input
+                                type="text"
+                                value={roleForm.name}
+                                onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
+                                placeholder="e.g., Regional Supervisor"
+                                className="form-control"
+                              />
+                            </div>
+                            <div className="col-12">
+                              <label className="form-label">Description</label>
+                              <textarea
+                                value={roleForm.description}
+                                onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
+                                placeholder="Describe the role's responsibilities..."
+                                rows={3}
+                                className="form-control"
+                              />
+                            </div>
+
+                            {/* View Access Configuration */}
+                            <div className="col-12 mt-4">
+                              <h6 className="fw-medium mb-3">View Access</h6>
+                              <div className="row g-2">
+                                <div className="col-12">
+                                  <div className="form-check">
+                                    <input
+                                      type="radio"
+                                      name="view_access_type"
+                                      value="GLOBAL"
+                                      checked={roleForm.view_access_type === 'GLOBAL'}
+                                      onChange={(e) => setRoleForm({ ...roleForm, view_access_type: e.target.value, master_level: 'GLOBAL', specific_entities: [] })}
+                                      className="form-check-input"
+                                    />
+                                    <label className="form-check-label small">Global Access</label>
+                                  </div>
+                                </div>
+                                <div className="col-12">
+                                  <div className="form-check">
+                                    <input
+                                      type="radio"
+                                      name="view_access_type"
+                                      value="SPECIFIC"
+                                      checked={roleForm.view_access_type === 'SPECIFIC'}
+                                      onChange={(e) => setRoleForm({ ...roleForm, view_access_type: e.target.value, specific_entities: [] })}
+                                      className="form-check-input"
+                                    />
+                                    <label className="form-check-label small">Specific Entity Access</label>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {roleForm.view_access_type === 'SPECIFIC' && (
+                                <div className="mt-3">
+                                  <div className="mb-3">
+                                    <label className="form-label small fw-medium">Master Access Level</label>
+                                    <select
+                                      value={roleForm.master_level}
+                                      onChange={(e) => setRoleForm({ ...roleForm, master_level: e.target.value, specific_entities: [] })}
+                                      className="form-select"
+                                    >
+                                      <option value="">Select Master Level</option>
+                                      <option value="VERTICAL">Vertical Level</option>
+                                      <option value="PROJECT">Project Level</option>
+                                      <option value="CENTER">Center Level</option>
+                                      <option value="COURSE">Course Level</option>
+                                      <option value="BATCH">Batch Level</option>
+                                    </select>
+                                    <div className="form-text small">
+                                      Master level determines action scope. Parent hierarchy will be read-only.
+                                    </div>
+                                  </div>
+
+                                  {roleForm.master_level && (
+                                    <div>
+                                      <label className="form-label small fw-medium">
+                                        Select {roleForm.master_level} Entities (Multiple Selection)
+                                      </label>
+                                      <div className="border rounded p-3" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                        {entities[roleForm.master_level]?.map(entity => (
+                                          <div key={entity.id} className="form-check mb-1">
+                                            <input
+                                              type="checkbox"
+                                              className="form-check-input"
+                                              checked={roleForm.specific_entities?.includes(entity.id)}
+                                              onChange={(e) => {
+                                                const current = roleForm.specific_entities || [];
+                                                const updated = e.target.checked
+                                                  ? [...current, entity.id]
+                                                  : current.filter(id => id !== entity.id);
+                                                setRoleForm({ ...roleForm, specific_entities: updated });
+                                              }}
+                                            />
+                                            <label className="form-check-label small">{entity.name}</label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {roleForm.specific_entities?.length > 0 && (
+                                        <div className="form-text text-success mt-1 small">
+                                          Selected: {roleForm.specific_entities.length} {roleForm.master_level.toLowerCase()}(s)
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Add Permissions Section */}
+                        <div className="col-12">
+                          <h5 className="border-bottom pb-2">Add Permissions</h5>
+
+                          <div className="mt-3">
+                            <div className="form-check mb-3">
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={roleForm.add_permissions.global}
+                                onChange={(e) => setRoleForm({
+                                  ...roleForm,
+                                  add_permissions: {
+                                    ...roleForm.add_permissions,
+                                    global: e.target.checked,
+                                    specific_permissions: e.target.checked ? [] : roleForm.add_permissions.specific_permissions
+                                  }
+                                })}
+                              />
+                              <label className="form-check-label fw-medium small">🌍 Global Add Permission</label>
+                            </div>
+
+                            {!roleForm.add_permissions.global && (
+                              <div className="card bg-light">
+                                <div className="card-body">
+                                  <div className="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 className="card-title mb-0 small fw-medium">Specific Add Permissions</h6>
+                                    <button
+                                      type="button"
+                                      onClick={addNewAddPermission}
+                                      disabled={!roleForm.master_level || roleForm.view_access_type !== 'SPECIFIC'}
+                                      className="btn btn-success btn-sm"
+                                    >
+                                      + Add Permission
+                                    </button>
+                                  </div>
+
+                                  {(!roleForm.master_level || roleForm.view_access_type !== 'SPECIFIC') && (
+                                    <div className="alert alert-warning py-2">
+                                      <p className="mb-0 small">⚠️ Please select Master Access Level in View Access section first</p>
+                                    </div>
+                                  )}
+
+                                  {roleForm.add_permissions.specific_permissions.length === 0 && roleForm.master_level && (
+                                    <div className="text-center py-4 text-muted small">
+                                      No specific add permissions configured. Click "Add Permission" to start.
+                                    </div>
+                                  )}
+
+                                  {/* Individual Add Permission Configurations */}
+                                  {roleForm.add_permissions.specific_permissions.map((permission, index) => (
+                                    <div key={permission.id} className="card border mb-3">
+                                      <div className="card-body">
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                          <h6 className="text-primary mb-0 small fw-medium">Permission #{index + 1}</h6>
+                                          <button
+                                            type="button"
+                                            onClick={() => removeAddPermission(permission.id)}
+                                            className="btn btn-outline-danger btn-sm"
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+
+                                        {/* Step 1: Select Permission Level */}
+                                        <div className="row g-3">
+                                          <div className="col-12">
+                                            <label className="form-label small fw-medium">
+                                              1️⃣ At which level do you want to grant add permissions?
+                                            </label>
+                                            <select
+                                              value={permission.permission_level || ''}
+                                              onChange={(e) => updateAddPermission(permission.id, 'permission_level', e.target.value)}
+                                              className="form-select form-select-sm"
+                                            >
+                                              <option value="">Select Level</option>
+                                              {getAllowedAddLevels().map(level => (
+                                                <option key={level} value={level}>
+                                                  {level} Level
+                                                </option>
+                                              ))}
+                                            </select>
+                                            <div className="form-text small">
+                                              You can only select levels up to your view access level ({roleForm.master_level || 'None'})
+                                            </div>
+                                          </div>
+
+                                          {/* Step 2: Select Specific Entities */}
+                                          {permission.permission_level && (
+                                            <div className="col-12">
+                                              <label className="form-label small fw-medium">
+                                                2️⃣ Select specific {permission.permission_level.toLowerCase()}(s) where they can add content:
+                                              </label>
+
+                                              {/* Show context of selected parent entities */}
+                                              {permission.permission_level !== roleForm.master_level && roleForm.specific_entities?.length > 0 && (
+                                                <div className="alert alert-info py-2 mb-2">
+                                                  <div className="small fw-medium text-info mb-1">
+                                                    📋 Based on your selected {roleForm.master_level.toLowerCase()}(s):
+                                                  </div>
+                                                  <div className="small text-info">
+                                                    {entities[roleForm.master_level]?.filter(entity =>
+                                                      roleForm.specific_entities.includes(entity.id)
+                                                    ).map(entity => entity.name).join(', ')}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              {/* Show available entities based on permission level and view access */}
+                                              <div className="border rounded p-2" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                                {(() => {
+                                                  let availableEntities = [];
+
+                                                  if (permission.permission_level === roleForm.master_level) {
+                                                    // Same level as master - show only selected entities from view access
+                                                    availableEntities = entities[roleForm.master_level]?.filter(entity =>
+                                                      roleForm.specific_entities?.includes(entity.id)
+                                                    ) || [];
+                                                  } else {
+                                                    // Different level - show child entities based on hierarchy
+                                                    availableEntities = getChildEntities(
+                                                      permission.permission_level,
+                                                      roleForm.master_level,
+                                                      roleForm.specific_entities || []
+                                                    );
+                                                  }
+
+                                                  if (availableEntities.length === 0) {
+                                                    return (
+                                                      <div className="small text-muted fst-italic p-2">
+                                                        {permission.permission_level === roleForm.master_level
+                                                          ? `No ${permission.permission_level.toLowerCase()} entities selected in view access`
+                                                          : `No ${permission.permission_level.toLowerCase()} entities found under selected ${roleForm.master_level.toLowerCase()}(s)`
+                                                        }
+                                                      </div>
+                                                    );
+                                                  }
+
+                                                  // Simple list for most cases
+                                                  return availableEntities.map(entity => (
+                                                    <div key={entity.id} className="form-check mb-1">
                                                       <input
                                                         type="checkbox"
+                                                        className="form-check-input"
                                                         checked={permission.selected_entities?.includes(entity.id)}
                                                         onChange={(e) => {
                                                           const current = permission.selected_entities || [];
@@ -1384,614 +1766,662 @@ const PermissionAdminDashboard = () => {
                                                             : current.filter(id => id !== entity.id);
                                                           updateAddPermission(permission.id, 'selected_entities', updated);
                                                         }}
-                                                        className="text-blue-600"
                                                       />
-                                                      <span>{entity.name}</span>
-                                                    </label>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            ));
-                                          }
-
-                                          // Simple list for small numbers or same level
-                                          return availableEntities.map(entity => (
-                                            <label key={entity.id} className="flex items-center space-x-2 text-xs mb-1">
-                                              <input
-                                                type="checkbox"
-                                                checked={permission.selected_entities?.includes(entity.id)}
-                                                onChange={(e) => {
-                                                  const current = permission.selected_entities || [];
-                                                  const updated = e.target.checked
-                                                    ? [...current, entity.id]
-                                                    : current.filter(id => id !== entity.id);
-                                                  updateAddPermission(permission.id, 'selected_entities', updated);
-                                                }}
-                                                className="text-blue-600"
-                                              />
-                                              <span>{entity.name}</span>
-                                              {/* Show parent context for nested children */}
-                                              {entity.parent_id && permission.permission_level !== roleForm.master_level && availableEntities.length <= 3 && (() => {
-                                                // Find the parent entity name
-                                                const hierarchy = ['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'];
-                                                const currentIndex = hierarchy.indexOf(permission.permission_level);
-                                                const parentLevel = hierarchy[currentIndex - 1];
-                                                const parentEntity = entities[parentLevel]?.find(p => p.id === entity.parent_id);
-                                                
-                                                return (
-                                                  <span className="text-gray-400 text-xs ml-1">
-                                                    (under {parentEntity?.name || 'parent'})
-                                                  </span>
-                                                );
-                                              })()}
-                                            </label>
-                                          ));
-                                        })()}
-                                      </div>
-                                      
-                                      {permission.selected_entities?.length > 0 && (
-                                        <p className="text-xs text-green-600 mt-1">
-                                          ✅ Selected: {permission.selected_entities.length} {permission.permission_level.toLowerCase()}(s)
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {/* Step 3: What can they add */}
-                                  {permission.permission_level && permission.selected_entities?.length > 0 && (
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        3️⃣ What can they add in the selected {permission.permission_level.toLowerCase()}(s)?
-                                      </label>
-                                      
-                                      <div className="grid grid-cols-2 gap-2">
-                                        {getChildEntityTypes(permission.permission_level).map(childType => (
-                                          <label key={childType} className="flex items-center space-x-2 text-xs">
-                                            <input
-                                              type="checkbox"
-                                              checked={permission.can_add_types?.includes(childType)}
-                                              onChange={(e) => {
-                                                const current = permission.can_add_types || [];
-                                                const updated = e.target.checked
-                                                  ? [...current, childType]
-                                                  : current.filter(type => type !== childType);
-                                                updateAddPermission(permission.id, 'can_add_types', updated);
-                                              }}
-                                              className="text-green-600"
-                                            />
-                                            <span>Add {childType}</span>
-                                          </label>
-                                        ))}
-                                      </div>
-
-                                      {getChildEntityTypes(permission.permission_level).length === 0 && (
-                                        <div className="text-xs text-gray-500 italic p-2 bg-gray-100 rounded">
-                                          ⚠️ No child entities can be added at {permission.permission_level} level
-                                        </div>
-                                      )}
-
-                                      {permission.can_add_types?.length > 0 && (
-                                        <div className="mt-2 p-2 bg-green-50 rounded">
-                                          <p className="text-xs text-green-800">
-                                            ✅ Can add: {permission.can_add_types.join(', ')} in {permission.selected_entities.length} selected {permission.permission_level.toLowerCase()}(s)
-                                          </p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Edit Permissions */}
-                      <div className="border-t pt-4">
-                        <h5 className="font-medium text-gray-800 mb-2">Edit Permissions</h5>
-                        <div className="space-y-3">
-                          <label className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={roleForm.edit_permissions.global}
-                              onChange={(e) => setRoleForm({
-                                ...roleForm,
-                                edit_permissions: {
-                                  ...roleForm.edit_permissions, 
-                                  global: e.target.checked,
-                                  specific_permissions: e.target.checked ? [] : roleForm.edit_permissions.specific_permissions
-                                }
-                              })}
-                              className="text-blue-600"
-                            />
-                            <span className="text-sm font-medium">🌍 Global Edit Permission</span>
-                          </label>
-
-                          {!roleForm.edit_permissions.global && (
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                              <div className="flex justify-between items-center mb-3">
-                                <h6 className="text-sm font-medium text-gray-800">Specific Edit Permissions</h6>
-                                <button
-                                  type="button"
-                                  onClick={addNewEditPermission}
-                                  disabled={!roleForm.master_level || roleForm.view_access_type !== 'SPECIFIC'}
-                                  className="px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  + Add Edit Permission
-                                </button>
-                              </div>
-
-                              {(!roleForm.master_level || roleForm.view_access_type !== 'SPECIFIC') && (
-                                <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
-                                  <p className="text-sm text-yellow-800">
-                                    ⚠️ Please select Master Access Level in View Access section first
-                                  </p>
-                                </div>
-                              )}
-
-                              {roleForm.edit_permissions.specific_permissions.length === 0 && roleForm.master_level && (
-                                <div className="text-center py-4 text-gray-500 text-sm">
-                                  No specific edit permissions configured. Click "Add Edit Permission" to start.
-                                </div>
-                              )}
-
-                              {/* Individual Edit Permission Configurations */}
-                              {roleForm.edit_permissions.specific_permissions.map((permission, index) => (
-                                <div key={permission.id} className="border border-gray-200 rounded-lg p-3 mb-3 bg-white">
-                                  <div className="flex justify-between items-center mb-3">
-                                    <h6 className="text-sm font-medium text-yellow-800">Edit Permission #{index + 1}</h6>
-                                    <button
-                                      type="button"
-                                      onClick={() => removeEditPermission(permission.id)}
-                                      className="text-red-600 hover:text-red-800 text-xs"
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-
-                                  {/* Step 1: Select Edit Type */}
-                                  <div className="space-y-3">
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-2">
-                                        1️⃣ What type of edit permission?
-                                      </label>
-                                      
-                                      {/* Using radio buttons instead of dropdown for better debugging */}
-                                      <div className="space-y-2">
-                                        <label className="flex items-center space-x-2">
-                                          <input
-                                            type="radio"
-                                            name={`edit_type_${permission.id}`}
-                                            value="particular_entity"
-                                            checked={permission.edit_type === 'particular_entity'}
-                                            onChange={(e) => {
-                                              console.log('Radio changed:', e.target.value); // Debug
-                                              updateEditPermission(permission.id, 'edit_type', e.target.value);
-                                              // Reset other fields when edit type changes
-                                              updateEditPermission(permission.id, 'permission_level', '');
-                                              updateEditPermission(permission.id, 'selected_entities', []);
-                                            }}
-                                            className="text-yellow-600"
-                                          />
-                                          <span className="text-sm">📝 Particular Entity Edit</span>
-                                        </label>
-                                        
-                                        <label className="flex items-center space-x-2">
-                                          <input
-                                            type="radio"
-                                            name={`edit_type_${permission.id}`}
-                                            value="parent_child_specific"
-                                            checked={permission.edit_type === 'parent_child_specific'}
-                                            onChange={(e) => {
-                                              console.log('Radio changed:', e.target.value); // Debug
-                                              updateEditPermission(permission.id, 'edit_type', e.target.value);
-                                              updateEditPermission(permission.id, 'permission_level', '');
-                                              updateEditPermission(permission.id, 'selected_entities', []);
-                                            }}
-                                            className="text-yellow-600"
-                                          />
-                                          <span className="text-sm">🔗 Parent-Child Specific Edit</span>
-                                        </label>
-                                        
-                                        <label className="flex items-center space-x-2">
-                                          <input
-                                            type="radio"
-                                            name={`edit_type_${permission.id}`}
-                                            value="full_parent_access"
-                                            checked={permission.edit_type === 'full_parent_access'}
-                                            onChange={(e) => {
-                                              console.log('Radio changed:', e.target.value); // Debug
-                                              updateEditPermission(permission.id, 'edit_type', e.target.value);
-                                              updateEditPermission(permission.id, 'permission_level', '');
-                                              updateEditPermission(permission.id, 'selected_entities', []);
-                                            }}
-                                            className="text-yellow-600"
-                                          />
-                                          <span className="text-sm">🏢 Full Parent Access Edit</span>
-                                        </label>
-                                        
-                                        <label className="flex items-center space-x-2">
-                                          <input
-                                            type="radio"
-                                            name={`edit_type_${permission.id}`}
-                                            value="details_only"
-                                            checked={permission.edit_type === 'details_only'}
-                                            onChange={(e) => {
-                                              console.log('Radio changed:', e.target.value); // Debug
-                                              updateEditPermission(permission.id, 'edit_type', e.target.value);
-                                              updateEditPermission(permission.id, 'permission_level', '');
-                                              updateEditPermission(permission.id, 'selected_entities', []);
-                                            }}
-                                            className="text-yellow-600"
-                                          />
-                                          <span className="text-sm">📋 Details Only Edit</span>
-                                        </label>
-                                      </div>
-                                      
-                                      <div className="text-xs text-gray-500 mt-2">
-                                        {permission.edit_type === 'particular_entity' && '📝 Edit specific entities only'}
-                                        {permission.edit_type === 'parent_child_specific' && '🔗 Edit specific children within parent entities'}
-                                        {permission.edit_type === 'full_parent_access' && '🏢 Edit everything within selected parent entities'}
-                                        {permission.edit_type === 'details_only' && '📋 Edit entity details only, not nested content'}
-                                      </div>
-                                    </div>
-
-                                    {/* Step 2: Select Entity Level */}
-                                    {permission.edit_type && (
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                                          2️⃣ At which entity level?
-                                        </label>
-                                        <select
-                                          value={permission.permission_level || ''}
-                                          onChange={(e) => {
-                                            console.log('Level dropdown changed:', e.target.value); // Debug
-                                            updateEditPermission(permission.id, 'permission_level', e.target.value);
-                                            updateEditPermission(permission.id, 'selected_entities', []);
-                                          }}
-                                          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                                        >
-                                          <option value="">Select Entity Level</option>
-                                          {getAllowedAddLevels().map(level => (
-                                            <option key={level} value={level}>
-                                              {level} Level
-                                            </option>
-                                          ))}
-                                        </select>
-                                        <p className="text-xs text-gray-500 mt-1">
-                                          Available levels based on your view access ({roleForm.master_level || 'None'})
-                                        </p>
-                                        <p className="text-xs text-blue-600 mt-1">
-                                          Debug: Selected edit type = {permission.edit_type}
-                                        </p>
-                                      </div>
-                                    )}
-
-                                    {/* Step 3: Select Specific Entities */}
-                                    {permission.edit_type && permission.permission_level && (
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                                          3️⃣ Select specific {permission.permission_level.toLowerCase()}(s):
-                                        </label>
-                                        
-                                        {/* Show context of selected parent entities */}
-                                        {permission.permission_level !== roleForm.master_level && roleForm.specific_entities?.length > 0 && (
-                                          <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
-                                            <div className="text-xs font-medium text-yellow-800 mb-1">
-                                              📋 Based on your selected {roleForm.master_level.toLowerCase()}(s):
-                                            </div>
-                                            <div className="text-xs text-yellow-700">
-                                              {entities[roleForm.master_level]?.filter(entity => 
-                                                roleForm.specific_entities.includes(entity.id)
-                                              ).map(entity => entity.name).join(', ')}
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        <div className="border border-gray-300 rounded p-2 max-h-32 overflow-y-auto">
-                                          {(() => {
-                                            let availableEntities = [];
-                                            
-                                            if (permission.permission_level === roleForm.master_level) {
-                                              // Same level as master - show only selected entities from view access
-                                              availableEntities = entities[roleForm.master_level]?.filter(entity => 
-                                                roleForm.specific_entities?.includes(entity.id)
-                                              ) || [];
-                                            } else {
-                                              // Different level - show child entities based on hierarchy
-                                              availableEntities = getChildEntities(
-                                                permission.permission_level, 
-                                                roleForm.master_level, 
-                                                roleForm.specific_entities || []
-                                              );
-                                            }
-
-                                            if (availableEntities.length === 0) {
-                                              return (
-                                                <div className="text-xs text-gray-500 italic p-2">
-                                                  {permission.permission_level === roleForm.master_level 
-                                                    ? `No ${permission.permission_level.toLowerCase()} entities selected in view access`
-                                                    : `No ${permission.permission_level.toLowerCase()} entities found under selected ${roleForm.master_level.toLowerCase()}(s)`
-                                                  }
-                                                </div>
-                                              );
-                                            }
-
-                                            // Group entities by parent for better organization
-                                            if (permission.permission_level !== roleForm.master_level && availableEntities.length > 3) {
-                                              const hierarchy = ['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'];
-                                              const currentIndex = hierarchy.indexOf(permission.permission_level);
-                                              const parentLevel = hierarchy[currentIndex - 1];
-                                              
-                                              // Group by immediate parent
-                                              const grouped = availableEntities.reduce((acc, entity) => {
-                                                const parentEntity = entities[parentLevel]?.find(p => p.id === entity.parent_id);
-                                                const parentName = parentEntity?.name || 'Unknown Parent';
-                                                
-                                                if (!acc[parentName]) {
-                                                  acc[parentName] = [];
-                                                }
-                                                acc[parentName].push(entity);
-                                                return acc;
-                                              }, {});
-
-                                              return Object.entries(grouped).map(([parentName, children]) => (
-                                                <div key={parentName} className="mb-2">
-                                                  <div className="text-xs font-medium text-gray-600 mb-1 bg-gray-100 px-2 py-1 rounded">
-                                                    📁 {parentName}
-                                                  </div>
-                                                  <div className="ml-2 space-y-1">
-                                                    {children.map(entity => (
-                                                      <label key={entity.id} className="flex items-center space-x-2 text-xs">
-                                                        <input
-                                                          type="checkbox"
-                                                          checked={permission.selected_entities?.includes(entity.id)}
-                                                          onChange={(e) => {
-                                                            const current = permission.selected_entities || [];
-                                                            const updated = e.target.checked
-                                                              ? [...current, entity.id]
-                                                              : current.filter(id => id !== entity.id);
-                                                            updateEditPermission(permission.id, 'selected_entities', updated);
-                                                          }}
-                                                          className="text-yellow-600"
-                                                        />
-                                                        <span>{entity.name}</span>
-                                                      </label>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              ));
-                                            }
-
-                                            // Simple list for small numbers or same level
-                                            return availableEntities.map(entity => (
-                                              <label key={entity.id} className="flex items-center space-x-2 text-xs mb-1">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={permission.selected_entities?.includes(entity.id)}
-                                                  onChange={(e) => {
-                                                    const current = permission.selected_entities || [];
-                                                    const updated = e.target.checked
-                                                      ? [...current, entity.id]
-                                                      : current.filter(id => id !== entity.id);
-                                                    updateEditPermission(permission.id, 'selected_entities', updated);
-                                                  }}
-                                                  className="text-yellow-600"
-                                                />
-                                                <span>{entity.name}</span>
-                                                {/* Show parent context for nested children */}
-                                                {entity.parent_id && permission.permission_level !== roleForm.master_level && availableEntities.length <= 3 && (() => {
-                                                  // Find the parent entity name
-                                                  const hierarchy = ['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'];
-                                                  const currentIndex = hierarchy.indexOf(permission.permission_level);
-                                                  const parentLevel = hierarchy[currentIndex - 1];
-                                                  const parentEntity = entities[parentLevel]?.find(p => p.id === entity.parent_id);
-                                                  
-                                                  return (
-                                                    <span className="text-gray-400 text-xs ml-1">
-                                                      (under {parentEntity?.name || 'parent'})
-                                                    </span>
-                                                  );
+                                                      <label className="form-check-label small">{entity.name}</label>
+                                                    </div>
+                                                  ));
                                                 })()}
+                                              </div>
+
+                                              {permission.selected_entities?.length > 0 && (
+                                                <div className="form-text text-success mt-1 small">
+                                                  ✅ Selected: {permission.selected_entities.length} {permission.permission_level.toLowerCase()}(s)
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* Step 3: What can they add */}
+                                          {permission.permission_level && permission.selected_entities?.length > 0 && (
+                                            <div className="col-12">
+                                              <label className="form-label small fw-medium">
+                                                3️⃣ What can they add in the selected {permission.permission_level.toLowerCase()}(s)?
                                               </label>
-                                            ));
-                                          })()}
+
+                                              <div className="row g-2">
+                                                {getChildEntityTypes(permission.permission_level).map(childType => (
+                                                  <div key={childType} className="col-6">
+                                                    <div className="form-check">
+                                                      <input
+                                                        type="checkbox"
+                                                        className="form-check-input"
+                                                        checked={permission.can_add_types?.includes(childType)}
+                                                        onChange={(e) => {
+                                                          const current = permission.can_add_types || [];
+                                                          const updated = e.target.checked
+                                                            ? [...current, childType]
+                                                            : current.filter(type => type !== childType);
+                                                          updateAddPermission(permission.id, 'can_add_types', updated);
+                                                        }}
+                                                      />
+                                                      <label className="form-check-label small">Add {childType}</label>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+
+                                              {getChildEntityTypes(permission.permission_level).length === 0 && (
+                                                <div className="alert alert-secondary py-2">
+                                                  <p className="mb-0 small fst-italic">⚠️ No child entities can be added at {permission.permission_level} level</p>
+                                                </div>
+                                              )}
+
+                                              {permission.can_add_types?.length > 0 && (
+                                                <div className="alert alert-success py-2 mt-2">
+                                                  <p className="mb-0 small">
+                                                    ✅ Can add: {permission.can_add_types.join(', ')} in {permission.selected_entities.length} selected {permission.permission_level.toLowerCase()}(s)
+                                                  </p>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
-                                        
-                                        {permission.selected_entities?.length > 0 && (
-                                          <div className="mt-2 p-2 bg-yellow-50 rounded">
-                                            <p className="text-xs text-yellow-800">
-                                              ✅ Selected: {permission.selected_entities.length} {permission.permission_level.toLowerCase()}(s) for {permission.edit_type?.replace('_', ' ')}
-                                            </p>
-                                          </div>
-                                        )}
                                       </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Verify Permissions & Preview */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-gray-900 border-b pb-2">Verify & Preview</h4>
-
-                      {/* Verify Permissions */}
-                      <div>
-                        <h5 className="font-medium text-gray-800 mb-2">Verify Permissions</h5>
-                        <div className="space-y-3">
-                          <label className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={roleForm.verify_permissions.global}
-                              onChange={(e) => setRoleForm({
-                                ...roleForm,
-                                verify_permissions: {...roleForm.verify_permissions, global: e.target.checked}
-                              })}
-                              className="text-blue-600"
-                            />
-                            <span className="text-sm">Global Verify</span>
-                          </label>
-
-                          {!roleForm.verify_permissions.global && (
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                              {/* Vertical Level Verify */}
-                              <div className="mb-3">
-                                <div className="text-xs font-medium text-blue-700 mb-2">Vertical Level:</div>
-                                <div className="grid grid-cols-2 gap-1">
-                                  {['PROJECT', 'CENTER', 'COURSE', 'BATCH'].map(type => (
-                                    <label key={`verify_vertical_${type}`} className="flex items-center space-x-2">
-                                      <input
-                                        type="checkbox"
-                                        checked={roleForm.verify_permissions.vertical_types?.includes(type)}
-                                        onChange={(e) => {
-                                          const current = roleForm.verify_permissions.vertical_types || [];
-                                          const updated = e.target.checked
-                                            ? [...current, type]
-                                            : current.filter(t => t !== type);
-                                          setRoleForm({
-                                            ...roleForm,
-                                            verify_permissions: {...roleForm.verify_permissions, vertical_types: updated}
-                                          });
-                                        }}
-                                        className="text-blue-600"
-                                      />
-                                      <span className="text-xs">{type}</span>
-                                    </label>
+                                    </div>
                                   ))}
                                 </div>
                               </div>
+                            )}
+                          </div>
+                        </div>
 
-                              {/* Specific Entity Verify */}
-                              <div className="border-t pt-3" style={{maxHeight: '200px', overflowY: 'auto'}}>
-                                <div className="text-xs font-medium text-green-700 mb-2">Specific Entity Verify:</div>
-                                {Object.entries(entities).map(([entityType, entityList]) => (
-                                  <div key={entityType} className="mb-2">
-                                    <div className="text-xs text-gray-600 mb-1 font-medium">{entityType}:</div>
-                                    <div className="grid grid-cols-1 gap-1 ml-2">
-                                      {entityList?.map(entity => (
-                                        <label key={`verify_${entity.id}`} className="flex items-center space-x-2">
-                                          <input
-                                            type="checkbox"
-                                            checked={roleForm.verify_permissions.specific_entities?.some(
-                                              e => e.entity_id === entity.id
-                                            )}
-                                            onChange={(e) => {
-                                              const current = roleForm.verify_permissions.specific_entities || [];
-                                              const updated = e.target.checked
-                                                ? [...current, {entity_type: entityType, entity_id: entity.id, entity_name: entity.name}]
-                                                : current.filter(e => e.entity_id !== entity.id);
-                                              setRoleForm({
-                                                ...roleForm,
-                                                verify_permissions: {...roleForm.verify_permissions, specific_entities: updated}
-                                              });
-                                            }}
-                                            className="text-green-600"
-                                          />
-                                          <span className="text-xs">{entity.name}</span>
-                                        </label>
-                                      ))}
+                        {/* NEW IMPROVED Edit Permissions Section */}
+                        <div className="col-12">
+                          <h5 className="border-bottom pb-2">Edit Permissions</h5>
+                          <div className="mt-3">
+                            <div className="form-check mb-3">
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={roleForm.edit_permissions.global}
+                                onChange={(e) => setRoleForm({
+                                  ...roleForm,
+                                  edit_permissions: {
+                                    ...roleForm.edit_permissions,
+                                    global: e.target.checked,
+                                    specific_permissions: e.target.checked ? [] : roleForm.edit_permissions.specific_permissions
+                                  }
+                                })}
+                              />
+                              <label className="form-check-label fw-medium small">🌍 Global Edit Permission</label>
+                            </div>
+
+                            {!roleForm.edit_permissions.global && (
+                              <div className="card bg-light">
+                                <div className="card-body">
+                                  <div className="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 className="card-title mb-0 small fw-medium">Specific Edit Permissions</h6>
+                                    <button
+                                      type="button"
+                                      onClick={addNewEditPermission}
+                                      disabled={!roleForm.master_level || roleForm.view_access_type !== 'SPECIFIC'}
+                                      className="btn btn-warning btn-sm"
+                                    >
+                                      + Add Edit Permission
+                                    </button>
+                                  </div>
+
+                                  {(!roleForm.master_level || roleForm.view_access_type !== 'SPECIFIC') && (
+                                    <div className="alert alert-warning py-2">
+                                      <p className="mb-0 small">⚠️ Please select Master Access Level in View Access section first</p>
+                                    </div>
+                                  )}
+
+                                  {roleForm.edit_permissions.specific_permissions.length === 0 && roleForm.master_level && (
+                                    <div className="text-center py-4 text-muted small">
+                                      No specific edit permissions configured. Click "Add Edit Permission" to start.
+                                    </div>
+                                  )}
+
+                                  {/* Individual Edit Permission Configurations */}
+                                  {roleForm.edit_permissions.specific_permissions.map((permission, index) => (
+                                    <div key={permission.id} className="card border mb-3">
+                                      <div className="card-body">
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                          <h6 className="text-warning mb-0 small fw-medium">Edit Permission #{index + 1}</h6>
+                                          <button
+                                            type="button"
+                                            onClick={() => removeEditPermission(permission.id)}
+                                            className="btn btn-outline-danger btn-sm"
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+
+                                        {/* Step 1: Select Edit Type */}
+                                        <div className="row g-3">
+                                          <div className="col-12">
+                                            <label className="form-label small fw-medium mb-2">
+                                              1️⃣ What type of edit permission?
+                                            </label>
+
+                                            <div className="row g-2">
+                                              <div className="col-12">
+                                                <div className="form-check mb-2">
+                                                  <input
+                                                    type="radio"
+                                                    name={`edit_type_${permission.id}`}
+                                                    value="specific_entity_level"
+                                                    checked={permission.edit_type === 'specific_entity_level'}
+                                                    onChange={(e) => {
+                                                      console.log('Radio button clicked:', e.target.value);
+                                                      updateEditPermission(permission.id, 'edit_type', e.target.value);
+                                                      // Reset other fields
+                                                      setTimeout(() => {
+                                                        updateEditPermission(permission.id, 'permission_levels', []);
+                                                        updateEditPermission(permission.id, 'specific_entities', []);
+                                                        updateEditPermission(permission.id, 'entity_names', []);
+                                                        updateEditPermission(permission.id, 'with_child_levels', false);
+                                                      }, 10);
+                                                    }}
+                                                    className="form-check-input"
+                                                    id={`edit_type_1_${permission.id}`}
+                                                  />
+                                                  <label className="form-check-label small" htmlFor={`edit_type_1_${permission.id}`}>
+                                                    <strong>📋 Specific Entity Level Edit Permission</strong>
+                                                    <div className="text-muted small">Multi-select levels (project, course, center, vertical)</div>
+                                                  </label>
+                                                </div>
+                                              </div>
+
+                                              <div className="col-12">
+                                                <div className="form-check mb-2">
+                                                  <input
+                                                    type="radio"
+                                                    name={`edit_type_${permission.id}`}
+                                                    value="specific_entity_with_children"
+                                                    checked={permission.edit_type === 'specific_entity_with_children'}
+                                                    onChange={(e) => {
+                                                      console.log('Radio button clicked:', e.target.value);
+                                                      updateEditPermission(permission.id, 'edit_type', e.target.value);
+                                                      setTimeout(() => {
+                                                        updateEditPermission(permission.id, 'permission_levels', []);
+                                                        updateEditPermission(permission.id, 'specific_entities', []);
+                                                        updateEditPermission(permission.id, 'entity_names', []);
+                                                        updateEditPermission(permission.id, 'with_child_levels', true);
+                                                      }, 10);
+                                                    }}
+                                                    className="form-check-input"
+                                                    id={`edit_type_2_${permission.id}`}
+                                                  />
+                                                  <label className="form-check-label small" htmlFor={`edit_type_2_${permission.id}`}>
+                                                    <strong>🔗 Specific Entity Level with All Child Level</strong>
+                                                    <div className="text-muted small">Edit entity and all its children</div>
+                                                  </label>
+                                                </div>
+                                              </div>
+
+                                              <div className="col-12">
+                                                <div className="form-check mb-2">
+                                                  <input
+                                                    type="radio"
+                                                    name={`edit_type_${permission.id}`}
+                                                    value="specific_entity_and_children"
+                                                    checked={permission.edit_type === 'specific_entity_and_children'}
+                                                    onChange={(e) => {
+                                                      console.log('Radio button clicked:', e.target.value);
+                                                      updateEditPermission(permission.id, 'edit_type', e.target.value);
+                                                      setTimeout(() => {
+                                                        updateEditPermission(permission.id, 'permission_levels', []);
+                                                        updateEditPermission(permission.id, 'specific_entities', []);
+                                                        updateEditPermission(permission.id, 'entity_names', []);
+                                                        updateEditPermission(permission.id, 'with_child_levels', false);
+                                                      }, 10);
+                                                    }}
+                                                    className="form-check-input"
+                                                    id={`edit_type_3_${permission.id}`}
+                                                  />
+                                                  <label className="form-check-label small" htmlFor={`edit_type_3_${permission.id}`}>
+                                                    <strong>🏢 Specific Entity and All Child Entity Edit Permission</strong>
+                                                    <div className="text-muted small">Need to take entity name</div>
+                                                  </label>
+                                                </div>
+                                              </div>
+
+                                              <div className="col-12">
+                                                <div className="form-check mb-2">
+                                                  <input
+                                                    type="radio"
+                                                    name={`edit_type_${permission.id}`}
+                                                    value="specific_entities_only"
+                                                    checked={permission.edit_type === 'specific_entities_only'}
+                                                    onChange={(e) => {
+                                                      console.log('Radio button clicked:', e.target.value);
+                                                      updateEditPermission(permission.id, 'edit_type', e.target.value);
+                                                      setTimeout(() => {
+                                                        updateEditPermission(permission.id, 'permission_levels', []);
+                                                        updateEditPermission(permission.id, 'specific_entities', []);
+                                                        updateEditPermission(permission.id, 'entity_names', []);
+                                                        updateEditPermission(permission.id, 'with_child_levels', false);
+                                                      }, 10);
+                                                    }}
+                                                    className="form-check-input"
+                                                    id={`edit_type_4_${permission.id}`}
+                                                  />
+                                                  <label className="form-check-label small" htmlFor={`edit_type_4_${permission.id}`}>
+                                                    <strong>📝 Specific Entities Edit Permission</strong>
+                                                    <div className="text-muted small">Edit specific entities like "x project", "digital course" - need to take names</div>
+                                                  </label>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          {/* Option 2: Specific Entity Level (Multi-select levels) */}
+                                          {permission.edit_type === 'specific_entity_level' && (
+                                            <div className="col-12">
+                                              <label className="form-label small fw-medium">
+                                                2️⃣ Select Entity Levels (Multi-select):
+                                              </label>
+                                              <div className="row g-2">
+                                                {['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'].map(level => (
+                                                  <div key={level} className="col-6">
+                                                    <div className="form-check">
+                                                      <input
+                                                        type="checkbox"
+                                                        className="form-check-input"
+                                                        checked={permission.permission_levels?.includes(level) || false}
+                                                        onChange={(e) => {
+                                                          console.log(`Checkbox ${level} clicked:`, e.target.checked);
+                                                          const current = permission.permission_levels || [];
+                                                          const updated = e.target.checked
+                                                            ? [...current, level]
+                                                            : current.filter(l => l !== level);
+                                                          console.log('Updated levels:', updated);
+                                                          updateEditPermission(permission.id, 'permission_levels', updated);
+                                                        }}
+                                                        id={`level_${level}_${permission.id}`}
+                                                      />
+                                                      <label className="form-check-label small" htmlFor={`level_${level}_${permission.id}`}>
+                                                        {level}
+                                                      </label>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                              {permission.permission_levels?.length > 0 && (
+                                                <div className="alert alert-warning py-2 mt-2">
+                                                  <p className="mb-0 small">
+                                                    ✅ Can edit all entities at: {permission.permission_levels.join(', ')} levels
+                                                  </p>
+                                                </div>
+                                              )}
+                                              <div className="small text-muted mt-1">
+                                                Debug: Selected levels = {JSON.stringify(permission.permission_levels)}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Option 3: Specific Entity Level with All Child Level */}
+                                          {permission.edit_type === 'specific_entity_with_children' && (
+                                            <div className="col-12">
+                                              <label className="form-label small fw-medium">
+                                                2️⃣ Select Entity Level:
+                                              </label>
+                                              <select
+                                                value={permission.permission_levels?.[0] || ''}
+                                                onChange={(e) => {
+                                                  updateEditPermission(permission.id, 'permission_levels', e.target.value ? [e.target.value] : []);
+                                                  updateEditPermission(permission.id, 'specific_entities', []);
+                                                }}
+                                                className="form-select form-select-sm"
+                                              >
+                                                <option value="">Select Level</option>
+                                                {['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'].map(level => (
+                                                  <option key={level} value={level}>{level}</option>
+                                                ))}
+                                              </select>
+
+                                              {/* Select specific entities at that level */}
+                                              {permission.permission_levels?.[0] && (
+                                                <div className="mt-3">
+                                                  <label className="form-label small fw-medium">
+                                                    3️⃣ Select specific {permission.permission_levels[0].toLowerCase()}(s):
+                                                  </label>
+                                                  <div className="border rounded p-2" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                                    {entities[permission.permission_levels[0]]?.map(entity => (
+                                                      <div key={entity.id} className="form-check mb-1">
+                                                        <input
+                                                          type="checkbox"
+                                                          className="form-check-input"
+                                                          checked={permission.specific_entities?.includes(entity.id)}
+                                                          onChange={(e) => {
+                                                            const current = permission.specific_entities || [];
+                                                            const updated = e.target.checked
+                                                              ? [...current, entity.id]
+                                                              : current.filter(id => id !== entity.id);
+                                                            updateEditPermission(permission.id, 'specific_entities', updated);
+                                                          }}
+                                                        />
+                                                        <label className="form-check-label small">{entity.name}</label>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                  {permission.specific_entities?.length > 0 && (
+                                                    <div className="alert alert-warning py-2 mt-2">
+                                                      <p className="mb-0 small">
+                                                        ✅ Can edit selected {permission.permission_levels[0].toLowerCase()}(s) and ALL their children
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* Option 4 & 5: Specific Entity Names */}
+                                          {(permission.edit_type === 'specific_entity_and_children' || permission.edit_type === 'specific_entities_only') && (
+                                            <div className="col-12">
+                                              <label className="form-label small fw-medium">
+                                                2️⃣ Select Specific Entities by Name:
+                                              </label>
+                                              <div className="border rounded p-2" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                                {getAllEntitiesForSelection().map(entity => (
+                                                  <div key={`${entity.entity_type}_${entity.id}`} className="form-check mb-1">
+                                                    <input
+                                                      type="checkbox"
+                                                      className="form-check-input"
+                                                      checked={permission.entity_names?.includes(`${entity.entity_type}_${entity.id}`)}
+                                                      onChange={(e) => {
+                                                        const current = permission.entity_names || [];
+                                                        const entityKey = `${entity.entity_type}_${entity.id}`;
+                                                        const updated = e.target.checked
+                                                          ? [...current, entityKey]
+                                                          : current.filter(key => key !== entityKey);
+                                                        updateEditPermission(permission.id, 'entity_names', updated);
+                                                      }}
+                                                    />
+                                                    <label className="form-check-label small">{entity.full_name}</label>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                              {permission.entity_names?.length > 0 && (
+                                                <div className="alert alert-warning py-2 mt-2">
+                                                  <p className="mb-0 small">
+                                                    ✅ Selected {permission.entity_names.length} specific entities {permission.edit_type === 'specific_entity_and_children' ? '(including their children)' : '(entities only)'}
+                                                  </p>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Verify Permissions & Preview */}
+                        {/* Verify Permissions & Preview */}
+                        {/* Verify Permissions & Preview */}
+                        <div className="col-12">
+                          <h5 className="border-bottom pb-2">Verify & Preview</h5>
+
+                          {/* Verify Permissions */}
+                          <div className="mt-3">
+                            <h6 className="fw-medium mb-3">Verify Permissions</h6>
+
+                            <div className="row g-3">
+                              {/* Option 1: Global Access */}
+                              <div className="col-12">
+                                <div className="form-check mb-2">
+                                  <input
+                                    type="radio"
+                                    name="verify_type"
+                                    value="global"
+                                    checked={roleForm.verify_permissions.type === 'global'}
+                                    onChange={(e) => setRoleForm({
+                                      ...roleForm,
+                                      verify_permissions: {
+                                        type: 'global',
+                                        global: true,
+                                        parent_entities: [],
+                                        selected_levels: []
+                                      }
+                                    })}
+                                    className="form-check-input"
+                                    id="verify_global"
+                                  />
+                                  <label className="form-check-label fw-medium" htmlFor="verify_global">
+                                    <span className="text-danger">🌍 1. Global Access</span>
+                                    <div className="text-muted small">Can verify any content anywhere in the system</div>
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Option 2: Specific Entity's Child */}
+                              <div className="col-12">
+                                <div className="form-check mb-2">
+                                  <input
+                                    type="radio"
+                                    name="verify_type"
+                                    value="entity_children"
+                                    checked={roleForm.verify_permissions.type === 'entity_children'}
+                                    onChange={(e) => setRoleForm({
+                                      ...roleForm,
+                                      verify_permissions: {
+                                        type: 'entity_children',
+                                        global: false,
+                                        parent_entities: [],
+                                        selected_levels: []
+                                      }
+                                    })}
+                                    className="form-check-input"
+                                    id="verify_entity_children"
+                                  />
+                                  <label className="form-check-label fw-medium" htmlFor="verify_entity_children">
+                                    <span className="text-warning">🔗 2. Specific Entity's Child</span>
+                                    <div className="text-muted small">Can verify all children of selected parent entities</div>
+                                  </label>
+                                </div>
+
+                                {/* Show entity selection for option 2 */}
+                                {roleForm.verify_permissions.type === 'entity_children' && (
+                                  <div className="ms-4 mt-3">
+                                    <div className="card bg-warning bg-opacity-10 border-warning">
+                                      <div className="card-body">
+                                        <h6 className="card-title text-warning mb-3">Select Parent Entities</h6>
+
+                                        {Object.entries(entities).map(([entityType, entityList]) => (
+                                          <div key={entityType} className="mb-3">
+                                            <div className="fw-medium text-warning mb-2">{entityType} Level:</div>
+                                            <div className="border rounded p-2" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                                              {entityList?.map(entity => (
+                                                <div key={`verify_parent_${entity.id}`} className="form-check mb-1">
+                                                  <input
+                                                    type="checkbox"
+                                                    className="form-check-input"
+                                                    checked={roleForm.verify_permissions.parent_entities?.some(
+                                                      e => e.entity_id === entity.id
+                                                    )}
+                                                    onChange={(e) => {
+                                                      const current = roleForm.verify_permissions.parent_entities || [];
+                                                      const updated = e.target.checked
+                                                        ? [...current, { entity_type: entityType, entity_id: entity.id, entity_name: entity.name }]
+                                                        : current.filter(e => e.entity_id !== entity.id);
+                                                      setRoleForm({
+                                                        ...roleForm,
+                                                        verify_permissions: {
+                                                          ...roleForm.verify_permissions,
+                                                          parent_entities: updated
+                                                        }
+                                                      });
+                                                    }}
+                                                  />
+                                                  <label className="form-check-label small">{entity.name}</label>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ))}
+
+                                        {roleForm.verify_permissions.parent_entities?.length > 0 && (
+                                          <div className="alert alert-warning py-2 mt-2">
+                                            <div className="small fw-medium mb-1">✅ Selected Parent Entities:</div>
+                                            <div className="small">
+                                              {roleForm.verify_permissions.parent_entities.map(entity =>
+                                                `${entity.entity_name} (${entity.entity_type})`
+                                              ).join(', ')}
+                                            </div>
+                                            <div className="small text-warning mt-1">
+                                              <strong>Can verify:</strong> All children content under these entities
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                ))}
+                                )}
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
 
-                      {/* Permission Preview */}
-                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border">
-                        <h5 className="font-medium text-gray-800 mb-2">🔍 Permission Preview</h5>
-                        <div className="text-sm space-y-2">
-                          <div className="bg-white p-2 rounded border-l-4 border-blue-500">
-                            <span className="font-medium text-blue-800">👁️ View:</span>
-                            <div className="text-blue-700 ml-4 text-xs">
-                              {roleForm.view_access_type === 'GLOBAL' 
-                                ? '🌍 Complete system' 
-                                : `📍 ${roleForm.master_level || 'Specific'} level + hierarchy`
-                              }
-                            </div>
-                          </div>
+                              {/* Option 3: Specific Entity Levels' Children */}
+                              <div className="col-12">
+                                <div className="form-check mb-2">
+                                  <input
+                                    type="radio"
+                                    name="verify_type"
+                                    value="specific_levels_children"
+                                    checked={roleForm.verify_permissions.type === 'specific_levels_children'}
+                                    onChange={(e) => setRoleForm({
+                                      ...roleForm,
+                                      verify_permissions: {
+                                        type: 'specific_levels_children',
+                                        global: false,
+                                        parent_entities: [],
+                                        selected_levels: []
+                                      }
+                                    })}
+                                    className="form-check-input"
+                                    id="verify_specific_levels_children"
+                                  />
+                                  <label className="form-check-label fw-medium" htmlFor="verify_specific_levels_children">
+                                    <span className="text-success">📊 3. Specific Entity Levels' Children</span>
+                                    <div className="text-muted small">Can verify children of entities at selected levels (Vertical, Projects, Centers, etc.)</div>
+                                  </label>
+                                </div>
 
-                          <div className="bg-white p-2 rounded border-l-4 border-green-500">
-                            <span className="font-medium text-green-800">➕ Add:</span>
-                            <div className="text-green-700 ml-4 text-xs">
-                              {roleForm.add_permissions.global 
-                                ? '🔓 Can add anywhere'
-                                : `🎯 ${roleForm.add_permissions.specific_permissions?.length || 0} permission configurations`
-                              }
-                            </div>
-                          </div>
+                                {/* Show level selection for option 3 */}
+                                {roleForm.verify_permissions.type === 'specific_levels_children' && (
+                                  <div className="ms-4 mt-3">
+                                    <div className="card bg-success bg-opacity-10 border-success">
+                                      <div className="card-body">
+                                        <h6 className="card-title text-success mb-3">Select Entity Levels</h6>
 
-                          <div className="bg-white p-2 rounded border-l-4 border-yellow-500">
-                            <span className="font-medium text-yellow-800">✏️ Edit:</span>
-                            <div className="text-yellow-700 ml-4 text-xs">
-                              {roleForm.edit_permissions.global 
-                                ? '🔓 Can edit anything'
-                                : `🎯 ${roleForm.edit_permissions.specific_permissions?.length || 0} edit permission configurations`
-                              }
-                            </div>
-                          </div>
+                                        <div className="row g-2">
+                                          {['VERTICAL', 'PROJECT', 'CENTER', 'COURSE', 'BATCH'].map(level => (
+                                            <div key={`verify_level_${level}`} className="col-6">
+                                              <div className="form-check">
+                                                <input
+                                                  type="checkbox"
+                                                  className="form-check-input"
+                                                  checked={roleForm.verify_permissions.selected_levels?.includes(level)}
+                                                  onChange={(e) => {
+                                                    const current = roleForm.verify_permissions.selected_levels || [];
+                                                    const updated = e.target.checked
+                                                      ? [...current, level]
+                                                      : current.filter(l => l !== level);
+                                                    setRoleForm({
+                                                      ...roleForm,
+                                                      verify_permissions: {
+                                                        ...roleForm.verify_permissions,
+                                                        selected_levels: updated
+                                                      }
+                                                    });
+                                                  }}
+                                                  id={`verify_level_checkbox_${level}`}
+                                                />
+                                                <label className="form-check-label small fw-medium" htmlFor={`verify_level_checkbox_${level}`}>
+                                                  {level}
+                                                </label>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
 
-                          <div className="bg-white p-2 rounded border-l-4 border-purple-500">
-                            <span className="font-medium text-purple-800">✅ Verify:</span>
-                            <div className="text-purple-700 ml-4 text-xs">
-                              {roleForm.verify_permissions.global 
-                                ? '🔓 Can verify anything'
-                                : `🎯 ${(roleForm.verify_permissions.vertical_types?.length || 0) + (roleForm.verify_permissions.specific_entities?.length || 0)} permissions`
-                              }
-                            </div>
-                          </div>
+                                        {roleForm.verify_permissions.selected_levels?.length > 0 && (
+                                          <div className="alert alert-success py-2 mt-3">
+                                            <div className="small fw-medium mb-1">✅ Selected Entity Levels:</div>
+                                            <div className="small mb-2">
+                                              <strong>{roleForm.verify_permissions.selected_levels.join(', ')}</strong>
+                                            </div>
+                                            <div className="small text-success">
+                                              <strong>Can verify:</strong> All children of entities at these levels
+                                            </div>
 
-                          <div className="bg-white p-2 rounded border-l-4 border-red-500">
-                            <span className="font-medium text-red-800">⚠️ Risk:</span>
-                            <div className="text-red-700 ml-4 text-xs">
-                              {(roleForm.view_access_type === 'GLOBAL' || roleForm.add_permissions.global || roleForm.edit_permissions.global || roleForm.verify_permissions.global)
-                                ? '🔴 HIGH (Global permissions)'
-                                : roleForm.master_level === 'VERTICAL'
-                                  ? '🟡 MEDIUM (Vertical access)'
-                                  : '🟢 LOW (Limited scope)'
-                              }
+                                            {/* Show examples */}
+                                            <div className="mt-2 p-2 bg-white rounded border">
+                                              <div className="small fw-medium text-dark mb-1">Examples:</div>
+                                              {roleForm.verify_permissions.selected_levels.includes('VERTICAL') && (
+                                                <div className="small text-muted">• VERTICAL → Can verify all Projects, Centers, Courses, Batches under any vertical</div>
+                                              )}
+                                              {roleForm.verify_permissions.selected_levels.includes('PROJECT') && (
+                                                <div className="small text-muted">• PROJECT → Can verify all Centers, Courses, Batches under any project</div>
+                                              )}
+                                              {roleForm.verify_permissions.selected_levels.includes('CENTER') && (
+                                                <div className="small text-muted">• CENTER → Can verify all Courses, Batches under any center</div>
+                                              )}
+                                              {roleForm.verify_permissions.selected_levels.includes('COURSE') && (
+                                                <div className="small text-muted">• COURSE → Can verify all Batches under any course</div>
+                                              )}
+                                              {roleForm.verify_permissions.selected_levels.includes('BATCH') && (
+                                                <div className="small text-muted">• BATCH → Can verify batch-level content</div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Modal Footer - Fixed */}
-            <div className="flex justify-end space-x-3 p-4 border-t bg-gray-50 rounded-b-lg flex-shrink-0">
-              <button
-                onClick={() => setShowAddUser(false)}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={addMode === 'user' ? handleAddUser : handleAddRole}
-                disabled={addMode === 'user' 
-                  ? (!userForm.name || !userForm.email || !userForm.role)
-                  : (!roleForm.name || !roleForm.description)
-                }
-                className={`px-4 py-2 text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  addMode === 'user' ? 'bg-blue-600' : 'bg-green-600'
-                }`}
-              >
-                {addMode === 'user' ? 'Add User' : 'Create Role'}
-              </button>
+                {/* Modal Footer - Fixed */}
+                <div className="modal-footer flex-shrink-0">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowAddUser(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addMode === 'user' ? handleAddUser : handleAddRole}
+                    disabled={addMode === 'user'
+                      ? (!userForm.name || !userForm.email || !userForm.role)
+                      : (!roleForm.name || !roleForm.description)
+                    }
+                    className={`btn ${addMode === 'user' ? 'btn-primary' : 'btn-success'}`}
+                  >
+                    Add User
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 };
 
