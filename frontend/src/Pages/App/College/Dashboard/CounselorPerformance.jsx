@@ -1026,12 +1026,8 @@ const CounselorPerformance = () => {
 
   return (
     <div className="enhanced-counselor-performance">
-      <div className="performance-header">
-        <h3>👥 Advanced Counselor & Student Management System</h3>
-        <p className="text-muted">Comprehensive tracking from counselors to individual students with batch-wise distribution</p>
-      </div>
 
-      <div className="breadcrumb-navigation">
+      {/* <div className="breadcrumb-navigation">
         <div className="breadcrumb">
           <span className={`breadcrumb-item ${viewMode === 'overview' ? 'active' : ''}`} 
                 onClick={() => setViewMode('overview')}>
@@ -1073,7 +1069,7 @@ const CounselorPerformance = () => {
             </>
           )}
         </div>
-      </div>
+      </div> */}
 
       <div className="view-content">
         {viewMode === 'overview' && renderOverviewTab()}
