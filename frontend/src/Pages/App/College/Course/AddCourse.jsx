@@ -32,6 +32,9 @@ const styles = {
 };
 
 const AddCourse = () => {
+
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
   const navigate = useNavigate();
   const trainingCenterRef = useRef(null);
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -47,6 +50,13 @@ const AddCourse = () => {
   const [selectedThumbnail, setSelectedThumbnail] = useState(null);
   const [selectedTestimonialVideos, setSelectedTestimonialVideos] = useState([]);
 
+  //vertical and project handle
+
+  const [selectedVertical, setSelectedVertical] = useState([]);
+  const [verticals, setVerticals] = useState([]);
+  const [projects, setProjects] = useState([]);
+
+
 const choicesInstance = useRef(null);
   // Basic form state
   const [formData, setFormData] = useState({
@@ -54,6 +64,8 @@ const choicesInstance = useRef(null);
     courseLevel: '',
     courseFeeType: '',
     projectName: '',
+    vertical:'',
+    project:'',
     typeOfProject: '',
     courseType: '',
     name: '',
@@ -209,6 +221,53 @@ useEffect(() => {
 //   }
 // }, [formData.trainingCenter]);
 
+//verticalAPI
+
+useEffect(()=>{
+  fetchVerticals() 
+  
+},[])
+
+useEffect(()=>{
+  console.log('projects', projects)
+  
+},[projects])
+
+useEffect(() => {
+  const fetchProjects = async () => {
+    if (formData.vertical) {
+      try {
+        const response = await axios.get(`${backendUrl}/college/list-projects?vertical=${formData.vertical}`, {
+          headers: { 'x-auth': token }
+        });
+        if (response.data.success) {
+          setProjects(response.data.data);
+        } else {
+          setProjects([]);
+          console.error('Failed to fetch projects');
+        }
+      } catch (error) {
+        setProjects([]);
+        console.error('Error fetching projects:', error);
+      }
+    } else {
+      setProjects([]);
+    }
+  };
+
+  fetchProjects();
+}, [formData.vertical]);
+
+
+const fetchVerticals = async () => {
+    const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, { headers: { 'x-auth': token } });
+
+    // Update the whole enhancedEntities but keep other keys unchanged
+    setVerticals(newVertical.data.data);
+
+  };
+
+ 
 
   // Handle input field changes
   const handleChange = (e) => {
@@ -514,7 +573,6 @@ useEffect(() => {
           'x-auth': user.token
         }
       });
-
       if (response.data.status) {
         alert("Course added successfully");
         window.location.reload();
@@ -637,36 +695,40 @@ useEffect(() => {
 
                       {/* Project Name (conditional) */}
                       {/* {showProjectFields && ( */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="projectNameblock">
-                        <label htmlFor="projectName">Project Name</label>
-                        <input
+                     <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                        <label htmlFor="typeOfProject">Vertical</label>
+                        <select
                           className="form-control"
-                          type="text"
-                          name="projectName"
-                          id="projectName"
-                          value={formData.projectName}
+                          name="vertical"
+                          id="vertical"
+                          value={formData.vertical}
                           onChange={handleChange}
-                        />
+                        >
+                          <option value="">Select Vertical</option>
+                          {verticals.map(vertical =>(
+                          <option value={vertical._id}>{vertical.name}</option>))}
+                          
+                        </select>
                       </div>
                       {/* )} */}
 
-                      {/* Type of Project (conditional) */}
-                      {/* {showProjectFields && ( */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="typeOfProject">Type of Project</label>
+                        <label htmlFor="typeOfProject">Project</label>
                         <select
                           className="form-control"
-                          name="typeOfProject"
-                          id="typeOfProject"
-                          value={formData.typeOfProject}
+                          name="project"
+                          id="project"
+                          value={formData.project}
                           onChange={handleChange}
                         >
-                          <option value="">Select Type of Project</option>
-                          <option value="T&P">T&P</option>
-                          <option value="P&T">P&T</option>
-                          <option value="General">General</option>
+                          <option value="">Select Project</option>
+                          {projects.map(a =>(
+                          <option value={a._id}>{a.name}</option>))}
+                          
                         </select>
                       </div>
+
+                    
                       {/* )} */}
 
                       {/* Course Type */}

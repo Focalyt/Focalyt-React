@@ -204,7 +204,6 @@ router
 		}
 	})
 	.post(async (req, res) => {
-		console.log('post api hitting')
 		try {
 			const { files } = req;
 			let body = req.body;

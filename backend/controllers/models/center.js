@@ -15,11 +15,11 @@ const centerSchema = new Schema({
     enum: ['active', 'inactive'],
     default: 'active',
   },
-  project: {
+  projects: [{
     type: Schema.Types.ObjectId,
     ref: 'Project',
     required: true,
-  },
+  }],
   createdBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',

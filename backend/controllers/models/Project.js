@@ -20,6 +20,7 @@ const projectSchema = new Schema({
     ref: 'Vertical',
     required: true,
   },
+
   createdBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',
