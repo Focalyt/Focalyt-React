@@ -1,63 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import {
+import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 
-import OverviewDashboard from './OverviewDashboard';
-import CounselorPerformance from './CounselorPerformance';
-import CenterAnalytics from './CenterAnalytics';
-import CourseAnalysis from './CourseAnalysis';
-import DetailedLeads from './DetailedLeads';
-import Lead from './Lead'
-
-const Dashboard = () => {
+const OverviewDashboard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [timeRange, setTimeRange] = useState('today');
-  const [activeMainTab, setActiveMainTab] = useState('overview');
   const [activeMetric, setActiveMetric] = useState('students');
-
-  // Tab configuration
-  const tabs = [
-    {
-      id: 'overview',
-      label: 'Overview Dashboard',
-      icon: 'fas fa-tachometer-alt',
-      component: OverviewDashboard,
-      color: 'primary'
-    },
-    {
-      id: 'counselors',
-      label: 'Counselor Performance',
-      icon: 'fas fa-users',
-      component: CounselorPerformance,
-      color: 'success'
-    },
-    {
-      id: 'centers',
-      label: 'Center Analytics',
-      icon: 'fas fa-building',
-      component: CenterAnalytics,
-      color: 'info'
-    },
-    {
-      id: 'courses',
-      label: 'Course Analysis',
-      icon: 'fas fa-graduation-cap',
-      component: CourseAnalysis,
-      color: 'warning'
-    },
-    {
-      id: 'leads',
-      label: 'Detailed Leads',
-      icon: 'fas fa-chart-line',
-      component: DetailedLeads,
-      color: 'danger'
-    }
-  ];
-
-  const activeTabData = tabs.find(tab => tab.id === activeMainTab);
-  const ActiveComponent = activeTabData?.component;
 
   // Sample data
   const [dashboardData] = useState({
@@ -79,14 +29,6 @@ const Dashboard = () => {
       { label: 'Active Batches', value: 234, icon: 'bi-people', color: 'danger', change: '+7%' },
       { label: 'Total Students', value: 3456, icon: 'bi-mortarboard', color: 'dark', change: '+18%' }
     ],
-    revenueChart: [
-      { month: 'Jan', revenue: 245000, students: 2800, leads: 456 },
-      { month: 'Feb', revenue: 287000, students: 2950, leads: 512 },
-      { month: 'Mar', revenue: 298000, students: 3100, leads: 478 },
-      { month: 'Apr', revenue: 312000, students: 3200, leads: 534 },
-      { month: 'May', revenue: 328000, students: 3350, leads: 567 },
-      { month: 'Jun', revenue: 345000, students: 3456, leads: 589 }
-    ],
     leadsData: [
       { day: 'Mon', leads: 15, conversions: 8, revenue: 12000 },
       { day: 'Tue', leads: 22, conversions: 12, revenue: 18500 },
@@ -96,6 +38,14 @@ const Dashboard = () => {
       { day: 'Sat', leads: 18, conversions: 10, revenue: 15300 },
       { day: 'Today', leads: 18, conversions: 7, revenue: 13500 }
     ],
+    revenueChart: [
+      { month: 'Jan', students: 2800, leads: 456 },
+      { month: 'Feb', students: 2950, leads: 512 },
+      { month: 'Mar', students: 3100, leads: 478 },
+      { month: 'Apr', students: 3200, leads: 534 },
+      { month: 'May', students: 3350, leads: 567 },
+      { month: 'Jun', students: 3456, leads: 589 }
+    ], 
     verticalData: [
       { name: 'Technology', value: 35, students: 1200, color: '#0d6efd' },
       { name: 'Business', value: 28, students: 980, color: '#198754' },
@@ -122,7 +72,7 @@ const Dashboard = () => {
 
   const getTimeRangeText = () => {
     const today = new Date();
-    switch (timeRange) {
+    switch(timeRange) {
       case 'today': return today.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       case 'week': return `Week of ${today.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}`;
       case 'month': return today.toLocaleDateString('en-IN', { year: 'numeric', month: 'long' });
@@ -132,132 +82,34 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
-      {/* Header Section */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h1 className="h3 mb-1 text-dark fw-bold">📊 Education Management Dashboard</h1>
-              <p className="text-muted mb-0">Real-time insights and analytics for your educational platform</p>
-            </div>
-            <div className="d-flex align-items-center gap-3">
-              {/* Time Range Selector */}
-              <div className="btn-group" role="group">
-                {[
-                  { key: 'today', label: 'Today' },
-                  { key: 'week', label: 'Week' },
-                  { key: 'month', label: 'Month' },
-                  { key: 'year', label: 'Year' }
-                ].map(range => (
-                  <button
-                    key={range.key}
-                    type="button"
-                    className={`btn ${timeRange === range.key ? 'btn-primary' : 'btn-outline-primary'} btn-sm`}
-                    onClick={() => setTimeRange(range.key)}
-                  >
-                    {range.label}
-                  </button>
-                ))}
-              </div>
-              <button className="btn btn-success btn-sm">
-                <i className="bi bi-download me-2"></i>Export Report
-              </button>
-            </div>
-          </div>
-
-          {/* Date Display */}
-          <div className="card border-0 shadow-sm mb-4">
-            <div className="card-body py-3">
-              <div className="row align-items-center">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center">
-                    <i className="bi bi-calendar3 text-primary me-3 fs-5"></i>
-                    <div>
-                      <h6 className="mb-0 fw-semibold">{getTimeRangeText()}</h6>
-                      <small className="text-muted">Last updated: {new Date().toLocaleTimeString()}</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4 text-md-end">
-                  <div className="d-flex justify-content-md-end gap-4">
-                    <div className="text-center">
-                      <div className="text-muted small">Yesterday</div>
-                      <div className="fw-bold text-secondary">{dashboardData.todayStats.yesterdayLeads} leads</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-muted small">Today</div>
-                      <div className="fw-bold text-primary">{dashboardData.todayStats.todayLeads} leads</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div><div className="dashboard-header">
-        <div className="container-fluid">
-          <div className="row align-items-center py-3">
+    <div className="overview-dashboard">
+      {/* Date Display */}
+      <div className="card border-0 shadow-sm mb-4">
+        <div className="card-body py-3">
+          <div className="row align-items-center">
             <div className="col-md-8">
-              <h1 className="dashboard-title">
-                🎯 Lead Management Dashboard
-              </h1>
-              <p className="dashboard-subtitle">
-                Comprehensive lead tracking, counselor performance & conversion analytics
-              </p>
-            </div>
-            <div className="col-md-4 text-end">
-              <div className="btn-group me-2">
-                {['today', 'week', 'month', 'year'].map(range => (
-                  <button
-                    key={range}
-                    className={`btn ${timeRange === range ? 'btn-primary' : 'btn-outline-primary'} btn-sm`}
-                    onClick={() => setTimeRange(range)}
-                  >
-                    {range.charAt(0).toUpperCase() + range.slice(1)}
-                  </button>
-                ))}
+              <div className="d-flex align-items-center">
+                <i className="bi bi-calendar3 text-primary me-3 fs-5"></i>
+                <div>
+                  <h6 className="mb-0 fw-semibold">{getTimeRangeText()}</h6>
+                  <small className="text-muted">Last updated: {new Date().toLocaleTimeString()}</small>
+                </div>
               </div>
-              <button className="btn btn-success btn-sm">
-                <i className="fas fa-download me-1"></i>
-                Export Report
-              </button>
+            </div>
+            <div className="col-md-4 text-md-end">
+              <div className="d-flex justify-content-md-end gap-4">
+                <div className="text-center">
+                  <div className="text-muted small">Yesterday</div>
+                  <div className="fw-bold text-secondary">{dashboardData.todayStats.yesterdayLeads} leads</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-muted small">Today</div>
+                  <div className="fw-bold text-primary">{dashboardData.todayStats.todayLeads} leads</div>
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* Enhanced Tab Navigation */}
-          <div className="dashboard-tabs-container">
-            <ul className="nav nav-tabs dashboard-tabs">
-              {tabs.map((tab) => (
-                <li className="nav-item" key={tab.id}>
-                  <button
-                    className={`nav-link dashboard-tab ${activeMainTab === tab.id ? 'active' : ''}`}
-                    onClick={() => setActiveMainTab(tab.id)}
-                    data-tab-color={tab.color}
-                  >
-                    <div className="tab-content-wrapper">
-                      <i className={`${tab.icon} tab-icon`}></i>
-                      <span className="tab-label">{tab.label}</span>
-                      {activeMainTab === tab.id && (
-                        <div className="tab-indicator"></div>
-                      )}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="dashboard-content">
-        <div className="container-fluid py-4">
-          {ActiveComponent && <ActiveComponent />}
-        </div>
-      </div>
-
-
-
       </div>
 
       {/* Key Metrics Cards */}
@@ -293,19 +145,14 @@ const Dashboard = () => {
               <div className="d-flex justify-content-between align-items-center">
                 <h6 className="card-title mb-0 fw-semibold">📈 Revenue & Growth Trends</h6>
                 <div className="btn-group btn-group-sm">
-                  <button
-                    className={`btn ${activeMetric === 'revenue' ? 'btn-primary' : 'btn-outline-primary'}`}
-                    onClick={() => setActiveMetric('revenue')}
-                  >
-                    Revenue
-                  </button>
-                  <button
+                 
+                  <button 
                     className={`btn ${activeMetric === 'students' ? 'btn-primary' : 'btn-outline-primary'}`}
                     onClick={() => setActiveMetric('students')}
                   >
                     Students
                   </button>
-                  <button
+                  <button 
                     className={`btn ${activeMetric === 'leads' ? 'btn-primary' : 'btn-outline-primary'}`}
                     onClick={() => setActiveMetric('leads')}
                   >
@@ -320,23 +167,23 @@ const Dashboard = () => {
                   <AreaChart data={dashboardData.revenueChart}>
                     <defs>
                       <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0d6efd" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#0d6efd" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#0d6efd" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#0d6efd" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e9ecef" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
+                    <Tooltip 
                       formatter={(value) => activeMetric === 'revenue' ? formatCurrency(value) : value.toLocaleString()}
                       labelStyle={{ color: '#495057' }}
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #dee2e6', borderRadius: '8px' }}
                     />
-                    <Area
-                      type="monotone"
-                      dataKey={activeMetric}
-                      stroke="#0d6efd"
-                      fillOpacity={1}
+                    <Area 
+                      type="monotone" 
+                      dataKey={activeMetric} 
+                      stroke="#0d6efd" 
+                      fillOpacity={1} 
                       fill="url(#colorRevenue)"
                       strokeWidth={3}
                     />
@@ -405,7 +252,7 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e9ecef" />
                     <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
+                    <Tooltip 
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #dee2e6', borderRadius: '8px' }}
                     />
                     <Legend />
@@ -442,7 +289,7 @@ const Dashboard = () => {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip
+                    <Tooltip 
                       formatter={(value, name) => [`${value}%`, 'Share']}
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #dee2e6', borderRadius: '8px' }}
                     />
@@ -494,7 +341,7 @@ const Dashboard = () => {
                         <td>
                           <div className="d-flex align-items-center">
                             <div className="progress me-2" style={{ width: '60px', height: '8px' }}>
-                              <div
+                              <div 
                                 className={`progress-bar ${center.attendance >= 95 ? 'bg-success' : center.attendance >= 90 ? 'bg-warning' : 'bg-danger'}`}
                                 style={{ width: `${center.attendance}%` }}
                               ></div>
@@ -563,4 +410,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default OverviewDashboard;
