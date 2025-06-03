@@ -128,8 +128,6 @@ const CandidateManagementPortal = () => {
       alert('Please fill in all required fields');
       return;
     }
-
-
     if (editingVertical) {
       // Edit existing vertical
       const newVertical = await axios.put(`${backendUrl}/college/editVertical/${editingVertical.id}`, {

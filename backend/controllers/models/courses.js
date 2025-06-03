@@ -24,7 +24,17 @@ const courseSchema = new Schema({
     type: String,
     enum: ['P&T', 'T&P', "General"],
   },
+  vertical: {
+    type: Schema.Types.ObjectId,
+    ref: 'Vertical',
+    required: true,
+  },
   projectName: String,
+  project: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+      required: true,
+    },
   courseType: String,
   youtubeURL: String,
   brochure: String,

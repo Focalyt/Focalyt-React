@@ -8,7 +8,7 @@ const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { AppliedCourses, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status,Center } = require("../../models");
+	Skill, CollegeDocuments, Candidate, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, Center, Courses } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -281,11 +281,13 @@ router.route("/appliedCandidates").get(async (req, res) => {
 
 			// Count calculations
 			let verifiedCount = 0;
+			let RejectedCount = 0;
 			let pendingVerificationCount = 0;
 			let notUploadedCount = 0;
 
 			combinedDocs.forEach(doc => {
 				if (doc.status === "Verified") verifiedCount++;
+				else if (doc.status === "Rejected") RejectedCount++;
 				else if (doc.status === "Pending") pendingVerificationCount++;
 				else if (doc.status === "Not Uploaded") notUploadedCount++;
 			});
@@ -307,6 +309,7 @@ router.route("/appliedCandidates").get(async (req, res) => {
 				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
 				docCounts: {
 					totalRequired,
+					RejectedCount,
 					uploadedCount,
 					verifiedCount,
 					pendingVerificationCount,
@@ -1928,145 +1931,216 @@ router.delete('/deleteVertical/:id', [isCollege], async (req, res) => {
 /// Project
 // POST /api/projects/add
 router.post('/add_project', [isCollege], async (req, res) => {
-  try {
+	try {
 
-    let { name, description, vertical, status } = req.body;
-	const user = req.user
+		let { name, description, vertical, status } = req.body;
+		const user = req.user
 
 
-    // Basic validation
-    if (!name || !vertical) {
-		
-      return res.status(400).json({ success: false, message: 'Name and verticalId are required.' });
-    }
-    // Create new project document
-    const newProject = new Project({
-      name,
-      description,
-      vertical,
-      createdBy:user._id,      
-      status: status !== undefined ? status : 'active',
-    });
+		// Basic validation
+		if (!name || !vertical) {
 
-    const savedProject = await newProject.save();
+			return res.status(400).json({ success: false, message: 'Name and verticalId are required.' });
+		}
+		// Create new project document
+		const newProject = new Project({
+			name,
+			description,
+			vertical,
+			createdBy: user._id,
+			status: status !== undefined ? status : 'active',
+		});
 
-    return res.status(201).json({ success: true, message: 'Project added successfully', data: savedProject });
-  } catch (error) {
-    console.error('Error adding project:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
+		const savedProject = await newProject.save();
+
+		return res.status(201).json({ success: true, message: 'Project added successfully', data: savedProject });
+	} catch (error) {
+		console.error('Error adding project:', error);
+		return res.status(500).json({ success: false, message: 'Server error' });
+	}
 });
 
 router.put('/edit_project/:id', [isCollege], async (req, res) => {
-  try {
-    const projectId = req.params.id;
-    const { name, description, vertical, status } = req.body;
-    const user = req.user;
+	try {
+		const projectId = req.params.id;
+		const { name, description, vertical, status } = req.body;
+		const user = req.user;
 
-    // Validation
-    if (!name || !vertical) {
-      return res.status(400).json({ success: false, message: 'Name and verticalId are required.' });
-    }
+		// Validation
+		if (!name || !vertical) {
+			return res.status(400).json({ success: false, message: 'Name and verticalId are required.' });
+		}
 
-    // Find project by id
-    const project = await Project.findById(projectId);
-    if (!project) {
-      return res.status(404).json({ success: false, message: 'Project not found.' });
-    }
+		// Find project by id
+		const project = await Project.findById(projectId);
+		if (!project) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
 
-    // Update fields
-    project.name = name;
-    project.description = description || project.description;
-    project.vertical = vertical;
-    project.status = status !== undefined ? status : project.status;
-    project.updatedBy = user._id; // Optional: agar aap update karne wale user ko track karna chahte hain
+		// Update fields
+		project.name = name;
+		project.description = description || project.description;
+		project.vertical = vertical;
+		project.status = status !== undefined ? status : project.status;
+		project.updatedBy = user._id; // Optional: agar aap update karne wale user ko track karna chahte hain
 
-    const updatedProject = await project.save();
+		const updatedProject = await project.save();
 
-    return res.status(200).json({ success: true, message: 'Project updated successfully', data: updatedProject });
-  } catch (error) {
-    console.error('Error updating project:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
+		return res.status(200).json({ success: true, message: 'Project updated successfully', data: updatedProject });
+	} catch (error) {
+		console.error('Error updating project:', error);
+		return res.status(500).json({ success: false, message: 'Server error' });
+	}
 });
 
 router.delete('/delete_project/:id', [isCollege], async (req, res) => {
-  try {
-    const projectId = req.params.id;
+	try {
+		const projectId = req.params.id;
 
-    const deletedProject = await Project.findByIdAndDelete(projectId);
-    if (!deletedProject) {
-      return res.status(404).json({ success: false, message: 'Project not found' });
-    }
+		const deletedProject = await Project.findByIdAndDelete(projectId);
+		if (!deletedProject) {
+			return res.status(404).json({ success: false, message: 'Project not found' });
+		}
 
-    return res.status(200).json({ success: true, message: 'Project deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting project:', error);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
+		return res.status(200).json({ success: true, message: 'Project deleted successfully' });
+	} catch (error) {
+		console.error('Error deleting project:', error);
+		return res.status(500).json({ success: false, message: 'Server error' });
+	}
 });
 
 
 
 
 router.get('/list-projects', async (req, res) => {
-  try {
-    let filter = {};
-    const vertical = req.query.vertical;
+	try {
+		let filter = {};
+		const vertical = req.query.vertical;
 
-    if (vertical) {
-      if (mongoose.Types.ObjectId.isValid(vertical)) {
-        filter.vertical = new mongoose.Types.ObjectId(vertical);
-      } else {
-        // Agar vertical string ObjectId nahi hai, toh error ya empty filter kar sakte hain
-        return res.status(400).json({ success: false, message: 'Invalid vertical id' });
-      }
-    }
+		if (vertical) {
+			if (mongoose.Types.ObjectId.isValid(vertical)) {
+				filter.vertical = new mongoose.Types.ObjectId(vertical);
+			} else {
+				// Agar vertical string ObjectId nahi hai, toh error ya empty filter kar sakte hain
+				return res.status(400).json({ success: false, message: 'Invalid vertical id' });
+			}
+		}
 
-    const projects = await Project.find(filter).sort({ createdAt: -1 });
-    res.json({ success: true, data: projects });
-  } catch (error) {
-    console.error('Error fetching projects:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+		const projects = await Project.find(filter).sort({ createdAt: -1 });
+		res.json({ success: true, data: projects });
+	} catch (error) {
+		console.error('Error fetching projects:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+router.get('/list_all_projects', async (req, res) => {
+	try {
+		
+
+		const projects = await Project.find({status:'active'}).sort({ createdAt: -1 });
+		console.log('projects',projects)
+		res.json({ success: true, data: projects });
+	} catch (error) {
+		console.error('Error fetching projects:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
 });
 
 //Center Api
 
 // POST /api/centers/add
-router.post('/add_canter',[isCollege], async (req, res) => {
-  try {
-    const { name, location, status, project } = req.body;
-    const user = req.user; // agar aap authentication middleware laga rahe hain
+router.post('/add_canter', [isCollege], async (req, res) => {
+	try {
+		const { name, location, status, project } = req.body;
+		const user = req.user; // agar aap authentication middleware laga rahe hain
 
-    // Validation
-    if (!name || !project) {
-      return res.status(400).json({ success: false, message: 'Name and project are required.' });
+		// Validation
+		if (!name || !project) {
+			return res.status(400).json({ success: false, message: 'Name and project are required.' });
+		}
+
+		// Ensure project is an array
+    const projectArray = Array.isArray(project) ? project : [project];
+
+		const newCenter = new Center({
+			name,
+			address: location,
+			status: status || 'active',
+			project:projectArray,
+			createdBy: user ? user._id : null,
+		});
+
+		const savedCenter = await newCenter.save();
+
+		res.status(201).json({ success: true, message: 'Center added successfully', data: savedCenter });
+	} catch (error) {
+		console.error('Error adding center:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+
+
+router.put('/edit_center/:id', async (req, res) => {
+	try {
+		const { id } = req.params;
+		const updateData = req.body;
+
+		const updatedCenter = await Center.findByIdAndUpdate(id, updateData, { new: true });
+		if (!updatedCenter) {
+			return res.status(404).json({ success: false, message: 'Center not found' });
+		}
+
+		res.json({ success: true, data: updatedCenter });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+router.put('/asign_center/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { projectId } = req.body; // extract projectId from body
+
+    if (!projectId) {
+      return res.status(400).json({ success: false, message: 'Project ID is required' });
     }
 
-    const newCenter = new Center({
-      name,
-      address:location,
-      status: status || 'active',
-      project,
-      createdBy: user ? user._id : null,
-    });
+    // Use $addToSet instead of $push if you want to avoid duplicates
+    const updatedCenter = await Center.findByIdAndUpdate(
+      id,
+      { $addToSet: { projects: projectId } }, // pushes projectId into project array if not already present
+      { new: true }
+    );
 
-    const savedCenter = await newCenter.save();
+    if (!updatedCenter) {
+      return res.status(404).json({ success: false, message: 'Center not found' });
+    }
 
-    res.status(201).json({ success: true, message: 'Center added successfully', data: savedCenter });
-  } catch (error) {
-    console.error('Error adding center:', error);
+    res.json({ success: true, data: updatedCenter });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
-router.put('/edit_center/:id', async (req, res) => {
+router.put('/remove_project_from_center/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const { projectId } = req.body;
 
-    const updatedCenter = await Center.findByIdAndUpdate(id, updateData, { new: true });
+    if (!projectId) {
+      return res.status(400).json({ success: false, message: 'Project ID is required' });
+    }
+
+    const updatedCenter = await Center.findByIdAndUpdate(
+      id,
+      { $pull: { projects: projectId } }, // removes projectId from the array
+      { new: true }
+    );
+
     if (!updatedCenter) {
       return res.status(404).json({ success: false, message: 'Center not found' });
     }
@@ -2080,43 +2154,61 @@ router.put('/edit_center/:id', async (req, res) => {
 
 
 
+
 router.get('/list-centers', async (req, res) => {
-  try {
-    const projectId = req.query.projectId;
+	try {
+		const projectId = req.query.projectId;
+		if (projectId) {
+			if (!mongoose.Types.ObjectId.isValid(projectId)) {
+			return res.status(400).json({ success: false, message: 'Invalid Project ID' });
+		}
+		const centers = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
+		console.log('centers', centers)
+		return res.json({ success: true, data: centers });
+	}
+		else 
+		{
+		const centers = await Center.find({status:'active'}).sort({ createdAt: -1 });
+		console.log('centers', centers)
+		return res.json({ success: true, data: centers});
+		}
 
-    if (!projectId) {
-      return res.status(400).json({ success: false, message: 'Project ID is required' });
-    }
+		
+	} catch (error) {
+		console.error('Error fetching centers by project:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
 
-    if (!mongoose.Types.ObjectId.isValid(projectId)) {
-      return res.status(400).json({ success: false, message: 'Invalid Project ID' });
-    }
+router.get('/list_all_centers', async (req, res) => {
+	try {
+		
 
-    const centers = await Center.find({ project: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
-	console.log('centers',centers)
+		const centers = await Center.find({ status:'active' }).sort({ createdAt: -1 });
+		console.log('centers', centers)
 
-    res.json({ success: true, data: centers });
-  } catch (error) {
-    console.error('Error fetching centers by project:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+		res.json({ success: true, data: centers });
+	} catch (error) {
+		console.error('Error fetching centers by project:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
 });
 
 
 router.delete('/center_delete/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
+	try {
+		const { id } = req.params;
 
-    const deletedCenter = await Center.findByIdAndDelete(id);
-    if (!deletedCenter) {
-      return res.status(404).json({ success: false, message: 'Center not found' });
-    }
+		const deletedCenter = await Center.findByIdAndDelete(id);
+		if (!deletedCenter) {
+			return res.status(404).json({ success: false, message: 'Center not found' });
+		}
 
-    res.json({ success: true, message: 'Center deleted successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+		res.json({ success: true, message: 'Center deleted successfully' });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
 });
 
 
@@ -2200,6 +2292,24 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		return res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });
+
+
+///courses
+
+router.get('/all_courses', async (req, res) => {
+	try {
+		const courses = await Courses.find({ status:true }).sort({ createdAt: -1 });
+		console.log('centers', courses)
+
+		res.json({ success: true, data: courses });
+	} catch (error) {
+		console.error('Error fetching centers by project:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+
+
 
 
 

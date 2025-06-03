@@ -1,4 +1,4 @@
-import React, { useState, useEffect ,useRef} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -165,13 +165,22 @@ const CRMDashboard = () => {
     }
   };
 
-  const filterDocuments = (documents) => {
-    if (statusFilter === 'all') return documents;
-    return documents.filter(doc => {
-      if (doc.uploads.length === 0) return statusFilter === 'none';
-      return doc.uploads[doc.uploads.length - 1].status.toLowerCase() === statusFilter;
-    });
-  };
+ const filterDocuments = (documents = []) => {
+  if (statusFilter === 'all') return documents;
+
+  return documents.filter(doc => {
+    // agar doc.uploads undefined ya empty array hai
+    if (!doc.uploads || doc.uploads.length === 0) return statusFilter === 'none';
+
+    // agar doc.uploads valid hai
+    const lastUpload = doc.uploads[doc.uploads.length - 1];
+    // agar lastUpload ya status undefined ho
+    if (!lastUpload || !lastUpload.status) return false;
+
+    return lastUpload.status.toLowerCase() === statusFilter;
+  });
+};
+
 
   const getDocumentCounts = (documents) => {
     const totalDocs = documents.length;
@@ -220,13 +229,13 @@ const CRMDashboard = () => {
                       }}
                     />
                     <div className="preview-controls">
-                      <button onClick={() => setDocumentZoom(prev => prev + 0.1)} className="control-btn" style={{whiteSpace: 'nowrap'}}>
+                      <button onClick={() => setDocumentZoom(prev => prev + 0.1)} className="control-btn" style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-search-plus"></i> Zoom In
                       </button>
-                      <button onClick={() => setDocumentZoom(prev => prev - 0.1)}lassName="control-btn" style={{whiteSpace: 'nowrap'}}>
+                      <button onClick={() => setDocumentZoom(prev => prev - 0.1)} lassName="control-btn" style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-search-minus"></i> Zoom Out
                       </button>
-                      <button onClick={() => setDocumentRotation(prev => prev + 90)} className="control-btn" style={{whiteSpace: 'nowrap'}}>
+                      <button onClick={() => setDocumentRotation(prev => prev + 90)} className="control-btn" style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-redo"></i> Rotate
                       </button>
                     </div>
@@ -360,6 +369,10 @@ const CRMDashboard = () => {
     }
     return range;
   };
+
+  useEffect(() => {
+    getPaginationPages()
+  }, [totalPages])
 
 
 
@@ -1005,85 +1018,7 @@ const CRMDashboard = () => {
     currentlyWorking: false
   }]);
 
-  const [educations, setEducations] = useState([
-    {
-      education: '',          // ObjectId of Qualification (e.g., 10th, UG)
-      universityName: '',
-      boardName: '',
-      collegeName: '',
-      schoolName: '',
-      course: '',             // ObjectId of QualificationCourse
-      specialization: '',
-      passingYear: '',
-      marks: '',
 
-      universityLocation: {
-        type: 'Point',
-        coordinates: [0, 0],
-        city: '',
-        state: '',
-        fullAddress: ''
-      },
-      collegeLocation: {
-        type: 'Point',
-        coordinates: [0, 0],
-        city: '',
-        state: '',
-        fullAddress: ''
-      },
-      schoolLocation: {
-        type: 'Point',
-        coordinates: [0, 0],
-        city: '',
-        state: '',
-        fullAddress: ''
-      }
-    }
-  ]);
-
-  const [educationList, setEducationList] = useState([
-    { _id: '1', name: 'Bachelor of Science' }
-  ]);
-
-  const [coursesList, setCoursesList] = useState([
-    [{ _id: '1', name: 'Computer Science' }]
-  ]);
-
-  const [skills, setSkills] = useState([{
-    skillName: '',
-    skillPercent: 0
-  }]);
-
-  const [languages, setLanguages] = useState([{
-    name: '',
-    level: 0
-  }]);
-
-  const [certificates, setCertificates] = useState([{
-    certificateName: '',
-    orgName: '',
-    month: '',
-    year: '',
-    orgLocation: {
-      type: 'Point',
-      coordinates: [],
-      city: '',
-      state: '',
-      fullAddress: ''
-    }
-  }]);
-
-  const [projects, setProjects] = useState([{
-    projectName: '',
-    proyear: '',
-    proDescription: ''
-  }]);
-
-  const [interests, setInterests] = useState(['']);
-
-  const [declaration, setDeclaration] = useState({
-    text: 'I hereby declare that the above information is true to the best of my knowledge.'
-  });
 
   useEffect(() => {
     // Initialize circular progress
@@ -1107,11 +1042,26 @@ const CRMDashboard = () => {
     });
   }, []);
 
+  // यह logs add करें अपने code में
+  useEffect(() => {
+    console.log('Current State:', {
+      totalProfiles: allProfiles.length,
+      totalPages: totalPages,
+      currentPage: currentPage,
+      pageSize: pageSize
+    });
+  }, [allProfiles, totalPages, currentPage, pageSize]);
+
   const handleCrmFilterClick = (_id, index) => {
+
+    setCurrentPage(1);
     if (_id === 'all') {
       // Agar "all" filter select hua hai to pura data set kar do
       setAllProfiles(allProfilesData);
+
       setActiveCrmFilter(index)
+      fetchProfileData();
+
     } else {
       // Filter karo jisme leadStatus._id match ho
       const filteredProfiles = allProfilesData.filter(profile => {
@@ -1121,6 +1071,10 @@ const CRMDashboard = () => {
 
       setActiveCrmFilter(index)
       setAllProfiles(filteredProfiles);
+      // Calculate total pages
+      const totalPages = Math.ceil(filteredProfiles.length / pageSize);
+      setTotalPages(totalPages > 0 ? totalPages : 1);
+
     }
   };
 
@@ -3321,59 +3275,9 @@ const CRMDashboard = () => {
                                   {(activeTab[profileIndex] || 0) === 4 && (
                                     <div className="tab-pane active" id='studentsDocuments'>
                                       <div className="enhanced-documents-panel">
-                                      
 
-                                        {/* Candidate Info Header */}
-                                        <div className="candidate-header-section">
-                                          <div className="candidate-info-card">
-                                            <div className="candidate-avatar-large">
-                                              {profile._candidate?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
-                                            </div>
-                                            <div className="candidate-details">
-                                              <h3>{profile._candidate?.name}</h3>
-                                              <div className="contact-details">
-                                                <span><i className="fas fa-envelope text-primary"></i> {profile._candidate?.email}</span>
-                                                <span><i className="fas fa-phone text-success"></i> {profile._candidate?.mobile}</span>
-                                              </div>
-                                            </div>
-                                            <div className="completion-ring">
-                                              {(() => {
-                                                const counts = getDocumentCounts(profile._candidate?.documents || staticDocuments);
-                                                const percentage = Math.round((counts.verifiedDocs / counts.totalDocs) * 100);
-                                                return (
-                                                  <div className="circular-progress" data-percentage={percentage}>
-                                                    <svg className="progress-ring" width="80" height="80">
-                                                      <circle
-                                                        cx="40"
-                                                        cy="40"
-                                                        r="35"
-                                                        fill="none"
-                                                        stroke="#e6e6e6"
-                                                        strokeWidth="6"
-                                                      />
-                                                      <circle
-                                                        cx="40"
-                                                        cy="40"
-                                                        r="35"
-                                                        fill="none"
-                                                        stroke="#4facfe"
-                                                        strokeWidth="6"
-                                                        strokeLinecap="round"
-                                                        strokeDasharray={`${(percentage / 100) * 220} 220`}
-                                                        transform="rotate(-90 40 40)"
-                                                        className="progress-bar"
-                                                      />
-                                                    </svg>
-                                                    <div className="percentage-text">
-                                                      <span className="percentage">{percentage}%</span>
-                                                      <span className="label">Complete</span>
-                                                    </div>
-                                                  </div>
-                                                );
-                                              })()}
-                                            </div>
-                                          </div>
-                                        </div>
+
+                                     
 
                                         {/* Enhanced Stats Grid */}
                                         <div className="stats-grid">
@@ -3386,7 +3290,7 @@ const CRMDashboard = () => {
                                                     <i className="fas fa-file-alt"></i>
                                                   </div>
                                                   <div className="stat-info">
-                                                    <h4>{counts.totalDocs}</h4>
+                                                    <h4>{profile?.docCounts?.totalRequired}</h4>
                                                     <p>Total Required</p>
                                                   </div>
                                                   <div className="stat-trend">
@@ -3399,7 +3303,7 @@ const CRMDashboard = () => {
                                                     <i className="fas fa-cloud-upload-alt"></i>
                                                   </div>
                                                   <div className="stat-info">
-                                                    <h4>{counts.uploadedDocs}</h4>
+                                                    <h4>{profile?.docCounts?.uploadedCount}</h4>
                                                     <p>Uploaded</p>
                                                   </div>
                                                   <div className="stat-trend">
@@ -3412,7 +3316,8 @@ const CRMDashboard = () => {
                                                     <i className="fas fa-clock"></i>
                                                   </div>
                                                   <div className="stat-info">
-                                                    <h4>{counts.pendingDocs}</h4>
+                                                    <h4>{profile?.docCounts?.pendingVerificationCount}</h4>
+
                                                     <p>Pending Review</p>
                                                   </div>
                                                   <div className="stat-trend">
@@ -3425,7 +3330,7 @@ const CRMDashboard = () => {
                                                     <i className="fas fa-check-circle"></i>
                                                   </div>
                                                   <div className="stat-info">
-                                                    <h4>{counts.verifiedDocs}</h4>
+                                                    <h4>{profile?.docCounts?.verifiedCount}</h4>
                                                     <p>Approved</p>
                                                   </div>
                                                   <div className="stat-trend">
@@ -3438,14 +3343,14 @@ const CRMDashboard = () => {
                                                     <i className="fas fa-times-circle"></i>
                                                   </div>
                                                   <div className="stat-info">
-                                                    <h4>{counts.rejectedDocs}</h4>
+                                                    <h4>{profile?.docCounts?.RejectedCount}</h4>
                                                     <p>Rejected</p>
                                                   </div>
                                                   <div className="stat-trend">
                                                     <i className="fas fa-arrow-down"></i>
                                                   </div>
                                                 </div>
-                                                
+
                                               </>
                                             );
                                           })()}
@@ -3497,7 +3402,7 @@ const CRMDashboard = () => {
 
                                         {/* Enhanced Documents Grid */}
                                         <div className="documents-grid-enhanced">
-                                          {filterDocuments(profile._candidate?.documents || staticDocuments).map((doc, index) => {
+                                         {filterDocuments(profile.uploadedDocs || []).map((doc, index) => {
                                             const latestUpload = doc.uploads.length > 0 ? doc.uploads[doc.uploads.length - 1] : null;
 
                                             return (
@@ -3643,60 +3548,60 @@ const CRMDashboard = () => {
                 </div>
               </div>
               <nav aria-label="Page navigation" className="mt-4">
-  <div className="d-flex justify-content-between align-items-center mb-3">
-    <small className="text-muted">
-      Page {currentPage} of {totalPages} ({allProfiles.length} results)
-    </small>
-  </div>
-  
-  <ul className="pagination justify-content-center">
-    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-      <button
-        className="page-link"
-        onClick={() => setCurrentPage(currentPage - 1)}
-        disabled={currentPage === 1}
-      >
-        &laquo;
-      </button>
-    </li>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <small className="text-muted">
+                    Page {currentPage} of {totalPages} ({allProfiles.length} results)
+                  </small>
+                </div>
 
-    {currentPage > 3 && (
-      <>
-        <li className="page-item">
-          <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
-        </li>
-        {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-      </>
-    )}
+                <ul className="pagination justify-content-center">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      &laquo;
+                    </button>
+                  </li>
 
-    {getPaginationPages().map((pageNumber) => (
-      <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-        <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
-          {pageNumber}
-        </button>
-      </li>
-    ))}
+                  {currentPage > 3 && (
+                    <>
+                      <li className="page-item">
+                        <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
+                      </li>
+                      {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+                    </>
+                  )}
 
-    {currentPage < totalPages - 2 && (
-      <>
-        {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-        <li className="page-item">
-          <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
-        </li>
-      </>
-    )}
+                  {getPaginationPages().map((pageNumber) => (
+                    <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
+                      <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
+                        {pageNumber}
+                      </button>
+                    </li>
+                  ))}
 
-    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-      <button
-        className="page-link"
-        onClick={() => setCurrentPage(currentPage + 1)}
-        disabled={currentPage === totalPages}
-      >
-        &raquo;
-      </button>
-    </li>
-  </ul>
-</nav>
+                  {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
+                    <>
+                      {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+                      <li className="page-item">
+                        <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
+                      </li>
+                    </>
+                  )}
+
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      &raquo;
+                    </button>
+                  </li>
+                </ul>
+              </nav>
             </section>
           </div>
         </div>
@@ -3717,9 +3622,9 @@ const CRMDashboard = () => {
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
       </div>
-     <style>
-      {
-        `
+      <style>
+        {
+          `
         html body .content .content-wrapper {
     padding: calc(0.9rem - 0.1rem) 1.2rem
 }
@@ -3770,8 +3675,8 @@ const CRMDashboard = () => {
     }
 }
         `
-      }
-     </style>
+        }
+      </style>
     </div>
   );
 };
