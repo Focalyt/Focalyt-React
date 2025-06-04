@@ -57,7 +57,7 @@ const AddCourse = () => {
 
   // Basic form state
   const [formData, setFormData] = useState({
-    sector: '',
+    sectors: [],
     courseLevel: '',
     courseFeeType: '',
     projectName: '',
@@ -646,12 +646,12 @@ const AddCourse = () => {
                     <div className="row">
                       {/* Sector */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="sectorblock">
-                        <label htmlFor="sector">Sector</label>
+                        <label htmlFor="sectors">Sector</label>
                         <select
                           className={`form-control ${formErrors.sector ? 'is-invalid' : ''}`}
-                          name="sector"
-                          id="sector"
-                          value={formData.sector}
+                          name="sectors"
+                          id="sectors"
+                          value={formData.sectors[0]}
                           onChange={handleChange}
                         >
                           <option value="">Select Sector</option>
