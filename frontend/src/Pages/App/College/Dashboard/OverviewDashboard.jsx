@@ -214,12 +214,7 @@ const OverviewDashboard = () => {
                     <div className="small text-muted">Active Classes</div>
                   </div>
                 </div>
-                <div className="col-12">
-                  <div className="text-center p-3 bg-warning bg-opacity-10 rounded-3">
-                    <div className="h4 mb-1 text-warning fw-bold">{formatCurrency(dashboardData.todayStats.todayRevenue)}</div>
-                    <div className="small text-muted">Today's Revenue</div>
-                  </div>
-                </div>
+               
                 <div className="col-6">
                   <div className="text-center p-3 bg-info bg-opacity-10 rounded-3">
                     <div className="h4 mb-1 text-info fw-bold">{dashboardData.todayStats.conversionRate}%</div>
