@@ -18,15 +18,15 @@ const editTypes = [
 const verifyTypes = ['global', 'entity_children', 'specific_levels_children',''];
 
 const hierarchicalSelectionSchema = new Schema({
-  selected_verticals: [{ type: String, required: true }],
-  selected_projects: [{ type: String, required: true }],
-  selected_centers: [{ type: String, required: true }],
-  selected_courses: [{ type: String, required: true }],
-  selected_batches: [{ type: String, required: true }]
+  selected_verticals: [{ type: String }],
+  selected_projects: [{ type: String }],
+  selected_centers: [{ type: String}],
+  selected_courses: [{ type: String}],
+  selected_batches: [{ type: String}]
 }, { _id: false });
 
 const viewPermissionsSchema = new Schema({
-  global: { type: Boolean, required: true, default: false },
+  global: { type: Boolean, default: false },
   hierarchical_selection: {
 	type: hierarchicalSelectionSchema,
 	required: true,
@@ -41,42 +41,42 @@ const viewPermissionsSchema = new Schema({
 }, { _id: false });
 
 const addSpecificPermissionSchema = new Schema({
-  id: { type: Schema.Types.Mixed, required: true },
-  permission_level: { type: String, enum: entityTypes, required: true },
-  selected_entities: [{ type: String, required: true }],
-  can_add_types: [{ type: String, enum: entityTypes, required: true }]
+  id: { type: Schema.Types.Mixed },
+  permission_level: { type: String, enum: entityTypes },
+  selected_entities: [{ type: String }],
+  can_add_types: [{ type: String, enum: entityTypes }]
 }, { _id: false });
 
 const addPermissionsSchema = new Schema({
-  global: { type: Boolean, required: true, default: false },
-  specific_permissions: [{ type: addSpecificPermissionSchema, required: true }]
+  global: { type: Boolean, default: false },
+  specific_permissions: [{ type: addSpecificPermissionSchema}]
 }, { _id: false });
 
 const editSpecificPermissionSchema = new Schema({
-  id: { type: Schema.Types.Mixed, required: true },
-  edit_type: { type: String, enum: editTypes, required: true },
-  permission_levels: [{ type: String, enum: entityTypes, required: true }],
+  id: { type: Schema.Types.Mixed },
+  edit_type: { type: String, enum: editTypes },
+  permission_levels: [{ type: String, enum: entityTypes }],
   with_child_levels: { type: Boolean, default: false },
-  specific_entities: [{ type: String, required: true }],
-  entity_names: [{ type: String, required: true }]
+  specific_entities: [{ type: String}],
+  entity_names: [{ type: String }]
 }, { _id: false });
 
 const editPermissionsSchema = new Schema({
-  global: { type: Boolean, required: true, default: false },
-  specific_permissions: [{ type: editSpecificPermissionSchema, required: true }]
+  global: { type: Boolean, default: false },
+  specific_permissions: [{ type: editSpecificPermissionSchema }]
 }, { _id: false });
 
 const parentEntitySchema = new Schema({
-  entity_type: { type: String, enum: entityTypes, required: true },
-  entity_id: { type: String, required: true },
-  entity_name: { type: String, required: true }
+  entity_type: { type: String, enum: entityTypes },
+  entity_id: { type: String },
+  entity_name: { type: String }
 }, { _id: false });
 
 const verifyPermissionsSchema = new Schema({
   global: { type: Boolean, default: false },
   type: { type: String, enum: verifyTypes, default: '' },
-  parent_entities: [{ type: parentEntitySchema, required: true }],
-  selected_levels: [{ type: String, enum: entityTypes, required: true }]
+  parent_entities: [{ type: parentEntitySchema }],
+  selected_levels: [{ type: String, enum: entityTypes }]
 }, { _id: false });
 
 const leadPermissionsSchema = new Schema({
@@ -93,11 +93,11 @@ const leadPermissionsSchema = new Schema({
 const permissionsSchema = new Schema({
   is_counseling_team: { type: Boolean, default: false },
   permission_type: { type: String, enum: permissionTypes },
-  view_permissions: { type: viewPermissionsSchema, required: true },
-  add_permissions: { type: addPermissionsSchema, required: true },
-  edit_permissions: { type: editPermissionsSchema, required: true },
-  verify_permissions: { type: verifyPermissionsSchema, required: true },
-  lead_permissions: { type: leadPermissionsSchema, required: true },
+  view_permissions: { type: viewPermissionsSchema},
+  add_permissions: { type: addPermissionsSchema },
+  edit_permissions: { type: editPermissionsSchema},
+  verify_permissions: { type: verifyPermissionsSchema},
+  lead_permissions: { type: leadPermissionsSchema},
   
   // ✅ Updated to ObjectId references
   reporting_managers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
