@@ -22,7 +22,7 @@ const courseSchema = new Schema({
   },
   typeOfProject: {
     type: String,
-    enum: ['P&T', 'T&P', "General"],
+    // enum: ['P&T', 'T&P', "General"],
   },
   vertical: {
     type: Schema.Types.ObjectId,

@@ -7,11 +7,20 @@ import Choices from 'choices.js';
 import 'choices.js/public/assets/styles/choices.min.css';
 
 const EditCourse = () => {
+
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
+
   const { id } = useParams(); // Get course ID from URL
   const navigate = useNavigate();
-  const trainingCenterRef = useRef(null);
+  const centerRef = useRef(null);
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+   //vertical and project handle
+    const [selectedVertical, setSelectedVertical] = useState([]);
+    const [verticals, setVerticals] = useState([]);
+    const [projects, setProjects] = useState([]);
 
   // State for data from API
   const [sectors, setSectors] = useState([]);
@@ -24,9 +33,35 @@ const EditCourse = () => {
 
   const choicesInstance = useRef(null);
 
+  // Document requirements
+  const [docsRequired, setDocsRequired] = useState([{ name: '' }]);
+
+  // FAQ questions and answers
+  const [questionAnswers, setQuestionAnswers] = useState([
+    { question: '', answer: '' }
+  ]);
+
+  // UI control states
+  const [showProjectFields, setShowProjectFields] = useState(false);
+  const [showTrainingFields, setShowTrainingFields] = useState({
+    online: false,
+    offline: false,
+    center: false
+  });
+  const [showAddressFields, setShowAddressFields] = useState({
+    appLink: false,
+    addressInput: false
+  });
+  const [showContactInfo, setShowContactInfo] = useState(false);
+
+  // Form validation
+  const [formErrors, setFormErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
   // Basic form state
   const [formData, setFormData] = useState({
-    sector: '',
+    sectors: [],
     courseLevel: '',
     courseFeeType: '',
     projectName: '',
@@ -42,7 +77,7 @@ const EditCourse = () => {
     trainingMode: '',
     onlineTrainingTiming: '',
     offlineTrainingTiming: '',
-    trainingCenter: [],
+    center: [],
     address: '',
     city: '',
     state: '',
@@ -73,64 +108,171 @@ const EditCourse = () => {
     testimonialvideos: [],
   });
 
-  // Document requirements
-  const [docsRequired, setDocsRequired] = useState([{ name: '' }]);
+   useEffect(() => {
+      if (!formData.project) {
+        setCenters([]); // Clear centers if project is empty     
+        return; // Exit early if no project is selected
+      }
+  
+      const fetchCenters = async () => {
+        try {
+          const response = await axios.get(`${backendUrl}/college/list-centers?projectId=${formData.project}`, {
+            headers: { 'x-auth': token },
+          });
+  
+          if (response.data.success) {
+            setCenters(response.data.data); // Set the centers
+          } else {
+            setCenters([]); // Handle case where no data is returned
+          }
+        } catch (error) {
+          console.error("Error fetching centers:", error);
+          setCenters([]); // Fallback in case of error
+        }
+      };
+  
+      fetchCenters(); // Trigger the fetch function when project changes
+    }, [formData.project, backendUrl, token]); // Re-run the effect whenever the project changes
+  
 
-  // FAQ questions and answers
-  const [questionAnswers, setQuestionAnswers] = useState([
-    { question: '', answer: '' }
-  ]);
+      useEffect(() => {
+        // Cleanup previous instance
+        const cleanupChoices = () => {
+          if (choicesInstance.current) {
+            try {
+              // Check if the instance has a valid element before destroying
+              if (choicesInstance.current.passedElement && 
+                  choicesInstance.current.passedElement.element) {
+                choicesInstance.current.destroy();
+              }
+            } catch (error) {
+              console.warn('Error destroying Choices instance:', error);
+            }
+            choicesInstance.current = null;
+          }
+        };
+    
+        // Initialize Choices.js when training center field is visible and centers are available
+        if (showTrainingFields.center && 
+            centerRef.current && 
+            centers.length > 0) {
+          
+          // Clean up any existing instance first
+          cleanupChoices();
+    
+          try {
+            // Initialize new Choices instance
+            choicesInstance.current = new Choices(centerRef.current, {
+              removeItemButton: true,
+              searchEnabled: true,
+              itemSelectText: '',
+              placeholder: false,
+              allowHTML: false,
+              maxItemCount: -1,
+              duplicateItemsAllowed: false,
+              delimiter: ',',
+              paste: true,
+              maxItems: null,
+              silent: false
+            });
+    
+            // Set selected values if any
+            if (formData.center && formData.center.length > 0) {
+              choicesInstance.current.setChoiceByValue(formData.center);
+            }
+          } catch (error) {
+            console.error('Error initializing Choices:', error);
+          }
+        } else {
+          // Clean up if field is not visible or no centers available
+          cleanupChoices();
+        }
+    
+        // Cleanup function
+        return cleanupChoices;
+      }, [showTrainingFields.center, centers, formData.center]);
+    
+      // Fetch verticals on mount
+      useEffect(() => {
+        fetchVerticals();
+      }, []);
+    
+      useEffect(() => {
+        console.log('projects', projects);
+      }, [projects]);
+    
+      // Fetch projects when vertical changes
+      useEffect(() => {
+        const fetchProjects = async () => {
+          if (formData.vertical) {
+            try {
+              const response = await axios.get(`${backendUrl}/college/list-projects?vertical=${formData.vertical}`, {
+                headers: { 'x-auth': token }
+              });
+              if (response.data.success) {
+                setProjects(response.data.data);
+              } else {
+                setProjects([]);
+                console.error('Failed to fetch projects');
+              }
+            } catch (error) {
+              setProjects([]);
+              console.error('Error fetching projects:', error);
+            }
+          } else {
+            setProjects([]);
+          }
+        };
+    
+        fetchProjects();
+      }, [formData.vertical, backendUrl, token]);
+    
+      const fetchVerticals = async () => {
+        try {
+          const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, { 
+            headers: { 'x-auth': token } 
+          });
+          // Update the whole enhancedEntities but keep other keys unchanged
+          setVerticals(newVertical.data.data);
+        } catch (error) {
+          console.error('Error fetching verticals:', error);
+          setVerticals([]);
+        }
+      };
 
-  // UI control states
-  const [showProjectFields, setShowProjectFields] = useState(false);
-  const [showTrainingFields, setShowTrainingFields] = useState({
-    online: false,
-    offline: false,
-    trainingCenter: false
-  });
-  const [showAddressFields, setShowAddressFields] = useState({
-    appLink: false,
-    addressInput: false
-  });
-  const [showContactInfo, setShowContactInfo] = useState(false);
-
-  // Form validation
-  const [formErrors, setFormErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  
 
   // Fetch course, sectors and centers data on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-         const user = JSON.parse(sessionStorage.getItem('user'));
-      const headers = {
-        'x-auth': user.token,
-      };
+        const user = JSON.parse(sessionStorage.getItem('user'));
+        const headers = {
+          'x-auth': user.token,
+        };
         // Fetch course data
-        const courseRes = await axios.get(`${backendUrl}/college/courses/edit/${id}` , { headers });
-        console.log('courseRes' , courseRes)
+        const courseRes = await axios.get(`${backendUrl}/college/courses/edit/${id}`, { headers });
+        console.log('courseRes', courseRes)
         // Fetch sectors and centers data
         const sectorsRes = await axios.get(`${backendUrl}/api/sectorList`);
-        const centersRes = await axios.get(`${backendUrl}/api/centerList`);
-        
+
         console.log('Course data:', courseRes.data);
         console.log('Sectors data:', sectorsRes.data);
-        console.log('Centers data:', centersRes.data);
-        
+
         // Set sectors and centers
         setSectors(Array.isArray(sectorsRes.data) ? sectorsRes.data : []);
-        setCenters(Array.isArray(centersRes.data) ? centersRes.data : []);
-        
-        
+
+
         // Format the course data
         const course = courseRes.data.course;
-        console.log('course...', courseRes.data.course );
+        console.log('course...', courseRes.data.course);
         // Initialize form data with course data
         setFormData({
-          sector: course.sectors?.[0]?._id || '',
+          sectors: course.sectors ? course.sectors.map(c => c._id) : [],
           courseLevel: course.courseLevel || '',
           courseFeeType: course.courseFeeType || '',
+          vertical: course.vertical || '',
+          project: course.project || '',
           projectName: course.projectName || '',
           typeOfProject: course.typeOfProject || '',
           courseType: course.courseType || '',
@@ -144,7 +286,7 @@ const EditCourse = () => {
           trainingMode: course.trainingMode || '',
           onlineTrainingTiming: course.onlineTrainingTiming || '',
           offlineTrainingTiming: course.offlineTrainingTiming || '',
-          trainingCenter: course.center ? course.center.map(c => c._id) : [],
+          center: course.center ? course.center.map(c => c._id) : [],
           address: course.address || '',
           city: course.city || '',
           state: course.state || '',
@@ -174,46 +316,46 @@ const EditCourse = () => {
           counslerwhatsappnumber: course.counslerwhatsappnumber || '',
           counsleremail: course.counsleremail || '',
         });
-        
+
         // Set docs required
         if (course.docsRequired && course.docsRequired.length > 0) {
-          setDocsRequired(course.docsRequired.map(doc => ({ 
-            _id: doc._id, 
-            name: doc.Name 
+          setDocsRequired(course.docsRequired.map(doc => ({
+            _id: doc._id,
+            name: doc.Name
           })));
         }
-        
+
         // Set question answers
         if (course.questionAnswers && course.questionAnswers.length > 0) {
-          setQuestionAnswers(course.questionAnswers.map(qa => ({ 
-            question: qa.Question || '', 
-            answer: qa.Answer || '' 
+          setQuestionAnswers(course.questionAnswers.map(qa => ({
+            question: qa.Question || '',
+            answer: qa.Answer || ''
           })));
         }
-        
+
         // Set UI state based on course data
         setShowProjectFields(course.courseFeeType === 'Free');
         setShowContactInfo(!!course.counslername || !!course.counslerphonenumber);
         handleTrainingModeChange(course.trainingMode);
         handleAddressChange(course.address);
-        
+
       } catch (error) {
         console.error('Error fetching data:', error);
         alert('Error loading course data. Please try again.');
       }
     };
-    
+
     fetchData();
   }, []);
 
   // Initialize Choices.js for multi-select fields when training center is visible
   useEffect(() => {
-    if (showTrainingFields.trainingCenter && trainingCenterRef.current) {
+    if (showTrainingFields.center && centerRef.current) {
       if (choicesInstance.current) {
         choicesInstance.current.destroy(); // destroy previous instance
       }
 
-      choicesInstance.current = new Choices(trainingCenterRef.current, {
+      choicesInstance.current = new Choices(centerRef.current, {
         removeItemButton: true,
         searchEnabled: true,
         itemSelectText: '',
@@ -228,12 +370,12 @@ const EditCourse = () => {
       });
 
       // Set selected options
-      if (formData.trainingCenter?.length) {
-        choicesInstance.current.setChoiceByValue(formData.trainingCenter);
+      if (formData.center?.length) {
+        choicesInstance.current.setChoiceByValue(formData.center);
       }
 
       // Remove empty option if it exists
-      const emptyOption = trainingCenterRef.current.querySelector('option[value=""]');
+      const emptyOption = centerRef.current.querySelector('option[value=""]');
       if (emptyOption) {
         emptyOption.remove();
       }
@@ -244,7 +386,7 @@ const EditCourse = () => {
         }
       };
     }
-  }, [showTrainingFields.trainingCenter, centers, formData.trainingCenter]);
+  }, [showTrainingFields.center, centers, formData.center]);
 
   // Handle input field changes
   const handleChange = (e) => {
@@ -278,7 +420,7 @@ const EditCourse = () => {
     setShowTrainingFields({
       online: value === 'Online' || value === 'Blended',
       offline: value === 'Offline' || value === 'Blended',
-      trainingCenter: value === 'Offline' || value === 'Blended'
+      center: value === 'Offline' || value === 'Blended'
     });
   };
 
@@ -300,13 +442,27 @@ const EditCourse = () => {
   };
 
   // Handle multi-select training center field
-  const handleTrainingCenterChange = (selectedOptions) => {
+  const handlecenterChange = (selectedOptions) => {
     const selectedValues = Array.from(selectedOptions).map(option => option.value);
     setFormData({
       ...formData,
-      trainingCenter: selectedValues
+      center: selectedValues ? [selectedValues] : []
     });
   };
+
+
+  useEffect(()=>{
+    console.log('selected sectos',formData )
+  },[formData.sectors])
+
+  const handleSectorChange = (e) => {
+  const selectedValues = Array.from(e.target.selectedOptions).map(option => option.value);
+  console.log('selectedValues', selectedValues);
+  setFormData({
+    ...formData,
+    sectors: selectedValues ? [selectedValues] : []
+  });
+};
 
   // Validate file based on type
   const validateFile = (file, fileType) => {
@@ -390,7 +546,7 @@ const EditCourse = () => {
   const removeFile = async (fileType, key) => {
     try {
       await axios.post(`${backendUrl}/api/deletefile`, { key });
-      
+
       let endpoint = '';
       switch (fileType) {
         case 'video':
@@ -416,7 +572,7 @@ const EditCourse = () => {
         default:
           break;
       }
-      
+
       if (endpoint) {
         await axios.post(`${backendUrl}${endpoint}`, { courseId: id, key });
         alert(`${fileType} removed successfully`);
@@ -477,7 +633,7 @@ const EditCourse = () => {
   const validateForm = () => {
     const errors = {};
     const requiredFields = [
-      'sector', 'courseLevel', 'name', 'duration', 'qualification',
+      'courseLevel', 'name', 'duration', 'qualification',
       'trainingMode', 'address', 'ojt', 'emiOptionAvailable'
     ];
 
@@ -500,91 +656,105 @@ const EditCourse = () => {
   };
 
   // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
-    
-    setIsSubmitting(true);
-    
-    try {
-      const user = JSON.parse(sessionStorage.getItem('user'));
-      const form = new FormData();
-      
-      // Append form fields
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key !== 'photos' && key !== 'videos' && key !== 'testimonialvideos' && 
-            key !== 'brochure' && key !== 'thumbnail') {
-          if (Array.isArray(value)) {
-            value.forEach(v => form.append(`${key}[]`, v));
-          } else {
-            form.append(key, value);
-          }
+  // Fixed handleSubmit function - Replace your existing one
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (!validateForm()) return;
+
+  setIsSubmitting(true);
+
+  try {
+    const user = JSON.parse(sessionStorage.getItem('user'));
+    const form = new FormData();
+
+    // Append form fields - FIXED VERSION
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key !== 'photos' && key !== 'videos' && key !== 'testimonialvideos' &&
+        key !== 'brochure' && key !== 'thumbnail') {
+        
+        // Special handling for sectors
+        if (key === 'sectors' && Array.isArray(value)) {
+          // Send multiple values with same field name
+          value.forEach(v => form.append('sectors', v));
+        } 
+        // Keep center as array format
+        else if (key === 'center' && Array.isArray(value)) {
+          value.forEach(v => form.append(`center`, v));
         }
-      });
-      
-      // Append existing photos, videos, testimonials
-      form.append('existingPhotos', JSON.stringify(formData.photos));
-      form.append('existingVideos', JSON.stringify(formData.videos));
-      form.append('existingTestimonialVideos', JSON.stringify(formData.testimonialvideos));
-      form.append('existingBrochure', formData.brochure);
-      form.append('existingThumbnail', formData.thumbnail);
-      
-      // Append new files
-      if (selectedVideos.length > 0) {
-        selectedVideos.forEach(file => form.append('videos', file));
-      }
-      
-      if (selectedPhotos.length > 0) {
-        selectedPhotos.forEach(file => form.append('photos', file));
-      }
-      
-      if (selectedBrochure) {
-        form.append('brochure', selectedBrochure);
-      }
-      
-      if (selectedThumbnail) {
-        form.append('thumbnail', selectedThumbnail);
-      }
-      
-      if (selectedTestimonialVideos.length > 0) {
-        selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
-      }
-      
-      // Append docs required
-      form.append('docsRequired', JSON.stringify(docsRequired.map(doc => ({ 
-        _id: doc._id, 
-        Name: doc.name 
-      }))));
-      
-      // Append question answers
-      form.append('questionAnswers', JSON.stringify(questionAnswers.map(qa => ({ 
-        Question: qa.question, 
-        Answer: qa.answer 
-      }))));
-      
-      
-      const response = await axios.put(`${backendUrl}/college/courses/edit/${id}`, form, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'x-auth': user?.token || sessionStorage.getItem('token')
+        // Handle other arrays (if any)
+        else if (Array.isArray(value)) {
+          value.forEach(v => form.append(`${key}[]`, v));
+        } 
+        // Handle single values
+        else {
+          form.append(key, value);
         }
-      });
-      
-      if (response.data.status) {
-        setSubmitSuccess(true);
-        alert('Course updated successfully');
-        navigate('/institute/viewcourse');
-      } else {
-        alert(response.data.message || 'Failed to update course');
       }
-    } catch (error) {
-      console.error('Error updating course:', error);
-      alert('Error updating course. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+    });
+
+    // Rest of your code remains same...
+    form.append('existingPhotos', JSON.stringify(formData.photos));
+    form.append('existingVideos', JSON.stringify(formData.videos));
+    form.append('existingTestimonialVideos', JSON.stringify(formData.testimonialvideos));
+    form.append('existingBrochure', formData.brochure);
+    form.append('existingThumbnail', formData.thumbnail);
+
+    // Append new files
+    if (selectedVideos.length > 0) {
+      selectedVideos.forEach(file => form.append('videos', file));
     }
-  };
+
+    if (selectedPhotos.length > 0) {
+      selectedPhotos.forEach(file => form.append('photos', file));
+    }
+
+    if (selectedBrochure) {
+      form.append('brochure', selectedBrochure);
+    }
+
+    if (selectedThumbnail) {
+      form.append('thumbnail', selectedThumbnail);
+    }
+
+    if (selectedTestimonialVideos.length > 0) {
+      selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
+    }
+
+    // Append docs required
+    form.append('docsRequired', JSON.stringify(docsRequired.map(doc => ({
+      _id: doc._id,
+      Name: doc.name
+    }))));
+
+    // Append question answers
+    form.append('questionAnswers', JSON.stringify(questionAnswers.map(qa => ({
+      Question: qa.question,
+      Answer: qa.answer
+    }))));
+
+    const response = await axios.put(`${backendUrl}/college/courses/edit/${id}`, form, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'x-auth': user?.token || sessionStorage.getItem('token')
+      }
+    });
+
+    if (response.data.status) {
+      setSubmitSuccess(true);
+      alert('Course updated successfully');
+      navigate('/institute/viewcourse');
+    } else {
+      alert(response.data.message || 'Failed to update course');
+    }
+  } catch (error) {
+    console.error('Error updating course:', error);
+    alert('Error updating course. Please try again.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // CKEditor configuration
   const editorConfig = {
@@ -638,13 +808,13 @@ const EditCourse = () => {
                     <div className="row">
                       {/* Sector */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="sectorblock">
-                        <label htmlFor="sector">Sector</label>
+                        <label htmlFor="sectors">Sector</label>
                         <select
-                          className={`form-control ${formErrors.sector ? 'is-invalid' : ''}`}
-                          name="sector"
-                          id="sector"
-                          value={formData.sector}
-                          onChange={handleChange}
+                          className={`form-control ${formErrors.sectors ? 'is-invalid' : ''}`}
+                          name="sectors"
+                          id="sectors"
+                          value={formData.sectors[0]}
+                           onChange={handleSectorChange}
                         >
                           <option value="">Select Sector</option>
                           {Array.isArray(sectors) && sectors.length > 0 ? (
@@ -655,7 +825,7 @@ const EditCourse = () => {
                             <option disabled>No sectors available</option>
                           )}
                         </select>
-                        {formErrors.sector && <div className="invalid-feedback">{formErrors.sector}</div>}
+                        {formErrors.sectors && <div className="invalid-feedback">{formErrors.sectors}</div>}
                       </div>
 
                       {/* Course Level */}
@@ -693,39 +863,39 @@ const EditCourse = () => {
                         </select>
                       </div>
 
-                      {/* Project Name (conditional) */}
-                      {showProjectFields && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="projectNameblock">
-                          <label htmlFor="projectName">Project Name</label>
-                          <input
-                            className="form-control"
-                            type="text"
-                            name="projectName"
-                            id="projectName"
-                            value={formData.projectName}
-                            onChange={handleChange}
-                          />
-                        </div>
-                      )}
+                      {/* Vertical */}
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                        <label htmlFor="vertical">Vertical</label>
+                        <select
+                          className="form-control"
+                          name="vertical"
+                          id="vertical"
+                          value={formData.vertical}
+                          onChange={handleChange}
+                        >
+                          <option value="">Select Vertical</option>
+                          {verticals.map((vertical, index) => (
+                            <option key={vertical._id || index} value={vertical._id}>{vertical.name}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                      {/* Type of Project (conditional) */}
-                      {showProjectFields && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                          <label htmlFor="typeOfProject">Type of Project</label>
-                          <select
-                            className="form-control"
-                            name="typeOfProject"
-                            id="typeOfProject"
-                            value={formData.typeOfProject}
-                            onChange={handleChange}
-                          >
-                            <option value="">Select Type of Project</option>
-                            <option value="T&P">T&P</option>
-                            <option value="P&T">P&T</option>
-                            <option value="General">General</option>
-                          </select>
-                        </div>
-                      )}
+                      {/* Project */}
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                        <label htmlFor="project">Project</label>
+                        <select
+                          className="form-control"
+                          name="project"
+                          id="project"
+                          value={formData.project}
+                          onChange={handleChange}
+                        >
+                          <option value="">Select Project</option>
+                          {projects.map((project, index) => (
+                            <option key={project._id || index} value={project._id}>{project.name}</option>
+                          ))}
+                        </select>
+                      </div>
 
                       {/* Course Type */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseTypeblock">
@@ -891,16 +1061,17 @@ const EditCourse = () => {
                       )}
 
                       {/* Training Center (conditional) */}
-                      {showTrainingFields.trainingCenter && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="trainingCenterblock">
-                          <label htmlFor="trainingCenter">Training Center</label>
+                      {showTrainingFields.center && (
+                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="centerblock">
+                          <label htmlFor="center">Training Center</label>
                           <select
                             className="form-control"
-                            name="trainingCenter"
-                            id="trainingCenter"
+                            name="center"
+                            id="center"
                             multiple
-                            ref={trainingCenterRef}
-                            onChange={(e) => handleTrainingCenterChange(e.target.selectedOptions)}
+                            value={formData.center}
+                            ref={centerRef}
+                            onChange={(e) => handlecenterChange(e.target.selectedOptions)}
                           >
                             {Array.isArray(centers) && centers.length > 0 ? (
                               centers.map((center, i) => (
@@ -1222,7 +1393,7 @@ const EditCourse = () => {
                                     <a href={`${bucketUrl}/${video}`} target="_blank" rel="noopener noreferrer" className="text-primary">
                                       Video {i + 1}
                                     </a>
-                                    <button 
+                                    <button
                                       type="button"
                                       className="btn btn-sm btn-danger ml-2"
                                       onClick={() => removeFile('video', video)}
@@ -1259,13 +1430,13 @@ const EditCourse = () => {
                               <div key={`photo-${i}`} className="col-xl-2 col-lg-2 col-md-3 col-sm-4 col-6 mb-2">
                                 <div className="card">
                                   <div className="card-body p-1 text-center">
-                                    <img 
-                                      src={`${bucketUrl}/${photo}`} 
-                                      alt={`Photo ${i + 1}`} 
+                                    <img
+                                      src={`${bucketUrl}/${photo}`}
+                                      alt={`Photo ${i + 1}`}
                                       className="img-fluid mb-1"
                                       style={{ maxHeight: '100px' }}
                                     />
-                                    <button 
+                                    <button
                                       type="button"
                                       className="btn btn-sm btn-danger"
                                       onClick={() => removeFile('photo', photo)}
@@ -1304,7 +1475,7 @@ const EditCourse = () => {
                                   <a href={`${bucketUrl}/${formData.brochure}`} target="_blank" rel="noopener noreferrer" className="text-primary">
                                     View Brochure
                                   </a>
-                                  <button 
+                                  <button
                                     type="button"
                                     className="btn btn-sm btn-danger ml-2"
                                     onClick={() => removeFile('brochure', formData.brochure)}
@@ -1341,7 +1512,7 @@ const EditCourse = () => {
                                   <a href={`${bucketUrl}/${formData.thumbnail}`} target="_blank" rel="noopener noreferrer" className="text-primary">
                                     View Thumbnail
                                   </a>
-                                  <button 
+                                  <button
                                     type="button"
                                     className="btn btn-sm btn-danger ml-2"
                                     onClick={() => removeFile('thumbnail', formData.thumbnail)}
@@ -1397,7 +1568,7 @@ const EditCourse = () => {
                                     <a href={`${bucketUrl}/${video}`} target="_blank" rel="noopener noreferrer" className="text-primary">
                                       Testimonial {i + 1}
                                     </a>
-                                    <button 
+                                    <button
                                       type="button"
                                       className="btn btn-sm btn-danger ml-2"
                                       onClick={() => removeFile('testimonial', video)}
@@ -1412,7 +1583,7 @@ const EditCourse = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="row">
                       <div className="col-xl-4 col-xl-lg-4 col-md-4 col-sm-12 col-12 mb-1">
                         <label htmlFor="testimonialvideos">Add New Testimonial Videos</label>
