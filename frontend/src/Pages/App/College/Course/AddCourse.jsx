@@ -37,9 +37,9 @@ const AddCourse = () => {
   const token = userData.token;
   const navigate = useNavigate();
   const trainingCenterRef = useRef(null);
+  const choicesInstance = useRef(null);
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
- 
 
   // State for data from API
   const [sectors, setSectors] = useState([]);
@@ -51,21 +51,18 @@ const AddCourse = () => {
   const [selectedTestimonialVideos, setSelectedTestimonialVideos] = useState([]);
 
   //vertical and project handle
-
   const [selectedVertical, setSelectedVertical] = useState([]);
   const [verticals, setVerticals] = useState([]);
   const [projects, setProjects] = useState([]);
 
-
-const choicesInstance = useRef(null);
   // Basic form state
   const [formData, setFormData] = useState({
     sector: '',
     courseLevel: '',
     courseFeeType: '',
     projectName: '',
-    vertical:'',
-    project:'',
+    vertical: '',
+    project: '',
     typeOfProject: '',
     courseType: '',
     name: '',
@@ -104,9 +101,6 @@ const choicesInstance = useRef(null);
     counsleremail: '',
   });
 
-  // File upload state
-
-
   // Document requirements
   const [docsRequired, setDocsRequired] = useState([{ name: '' }]);
 
@@ -133,150 +127,173 @@ const choicesInstance = useRef(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
+  // Fetch centers when project changes
+  useEffect(() => {
+    if (!formData.project) {
+      setCenters([]); // Clear centers if project is empty     
+      return; // Exit early if no project is selected
+    }
+
+    const fetchCenters = async () => {
+      try {
+        const response = await axios.get(`${backendUrl}/college/list-centers?projectId=${formData.project}`, {
+          headers: { 'x-auth': token },
+        });
+
+        if (response.data.success) {
+          setCenters(response.data.data); // Set the centers
+        } else {
+          setCenters([]); // Handle case where no data is returned
+        }
+      } catch (error) {
+        console.error("Error fetching centers:", error);
+        setCenters([]); // Fallback in case of error
+      }
+    };
+
+    fetchCenters(); // Trigger the fetch function when project changes
+  }, [formData.project, backendUrl, token]); // Re-run the effect whenever the project changes
+
   // Fetch sectors and centers data on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         // Replace these URLs with your actual API endpoints
         const sectorsResponse = await axios.get(`${backendUrl}/api/sectorList`);
-        const centersResponse = await axios.get(`${backendUrl}/api/centerList`);
-
         console.log('Sectors response:', sectorsResponse.data);
-        console.log('Centers response:', centersResponse.data);
-
         setSectors(Array.isArray(sectorsResponse.data) ? sectorsResponse.data : []);
-        setCenters(Array.isArray(centersResponse.data) ? centersResponse.data : []);
       } catch (error) {
         console.error('Error fetching initial data:', error);
         // Set empty arrays as fallback
         setSectors([]);
-        setCenters([]);
       }
     };
 
     fetchData();
-  }, []);
+  }, [backendUrl]);
 
-  // Initialize Choices.js for multi-select fields
+  // Consolidated Choices.js management - FIXED VERSION
   useEffect(() => {
-    console.log("Ref current:", trainingCenterRef.current);
-    if (trainingCenterRef.current) {
-      const choices = new Choices(trainingCenterRef.current, {
-        removeItemButton: true,
-        searchEnabled: true,
-        itemSelectText: '',
-        placeholder: false,
-        allowHTML: false,
-        maxItemCount: -1,
-        duplicateItemsAllowed: false,
-        delimiter: ',',
-        paste: true,
-        maxItems: null,
-        silent: false
-      });
-
-      // Remove empty option if it exists
-      const emptyOption = trainingCenterRef.current.querySelector('option[value=""]');
-      if (emptyOption) {
-        emptyOption.remove();
+    // Cleanup previous instance
+    const cleanupChoices = () => {
+      if (choicesInstance.current) {
+        try {
+          // Check if the instance has a valid element before destroying
+          if (choicesInstance.current.passedElement && 
+              choicesInstance.current.passedElement.element) {
+            choicesInstance.current.destroy();
+          }
+        } catch (error) {
+          console.warn('Error destroying Choices instance:', error);
+        }
+        choicesInstance.current = null;
       }
-
-      // Clean up on component unmount
-      return () => {
-        choices.destroy();
-      };
-    }
-  }, [centers]);
-
-useEffect(() => {
-  if (showTrainingFields.trainingCenter && trainingCenterRef.current) {
-    if (choicesInstance.current) {
-      choicesInstance.current.destroy(); // destroy previous instance
-    }
-
-    choicesInstance.current = new Choices(trainingCenterRef.current, {
-      removeItemButton: true,
-      searchEnabled: true,
-      itemSelectText: '',
-      placeholder: false
-    });
-
-    // Optional: sync selected options manually if needed
-    if (formData.trainingCenter?.length) {
-      choicesInstance.current.setChoiceByValue(formData.trainingCenter);
-    }
-
-    return () => {
-      choicesInstance.current?.destroy();
     };
-  }
-}, [showTrainingFields.trainingCenter, centers]); // <== trigger only when field becomes visible
 
+    // Initialize Choices.js when training center field is visible and centers are available
+    if (showTrainingFields.trainingCenter && 
+        trainingCenterRef.current && 
+        centers.length > 0) {
+      
+      // Clean up any existing instance first
+      cleanupChoices();
 
-//  edit mode 
-
-// useEffect(() => {
-//   if (choicesInstance.current && formData.trainingCenter?.length > 0) {
-//     choicesInstance.current.setChoiceByValue(formData.trainingCenter);
-//   }
-// }, [formData.trainingCenter]);
-
-//verticalAPI
-
-useEffect(()=>{
-  fetchVerticals() 
-  
-},[])
-
-useEffect(()=>{
-  console.log('projects', projects)
-  
-},[projects])
-
-useEffect(() => {
-  const fetchProjects = async () => {
-    if (formData.vertical) {
       try {
-        const response = await axios.get(`${backendUrl}/college/list-projects?vertical=${formData.vertical}`, {
-          headers: { 'x-auth': token }
+        // Initialize new Choices instance
+        choicesInstance.current = new Choices(trainingCenterRef.current, {
+          removeItemButton: true,
+          searchEnabled: true,
+          itemSelectText: '',
+          placeholder: false,
+          allowHTML: false,
+          maxItemCount: -1,
+          duplicateItemsAllowed: false,
+          delimiter: ',',
+          paste: true,
+          maxItems: null,
+          silent: false
         });
-        if (response.data.success) {
-          setProjects(response.data.data);
-        } else {
-          setProjects([]);
-          console.error('Failed to fetch projects');
+
+        // Set selected values if any
+        if (formData.trainingCenter && formData.trainingCenter.length > 0) {
+          choicesInstance.current.setChoiceByValue(formData.trainingCenter);
         }
       } catch (error) {
-        setProjects([]);
-        console.error('Error fetching projects:', error);
+        console.error('Error initializing Choices:', error);
       }
     } else {
-      setProjects([]);
+      // Clean up if field is not visible or no centers available
+      cleanupChoices();
+    }
+
+    // Cleanup function
+    return cleanupChoices;
+  }, [showTrainingFields.trainingCenter, centers, formData.trainingCenter]);
+
+  // Fetch verticals on mount
+  useEffect(() => {
+    fetchVerticals();
+  }, []);
+
+  useEffect(() => {
+    console.log('projects', projects);
+  }, [projects]);
+
+  // Fetch projects when vertical changes
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (formData.vertical) {
+        try {
+          const response = await axios.get(`${backendUrl}/college/list-projects?vertical=${formData.vertical}`, {
+            headers: { 'x-auth': token }
+          });
+          if (response.data.success) {
+            setProjects(response.data.data);
+          } else {
+            setProjects([]);
+            console.error('Failed to fetch projects');
+          }
+        } catch (error) {
+          setProjects([]);
+          console.error('Error fetching projects:', error);
+        }
+      } else {
+        setProjects([]);
+      }
+    };
+
+    fetchProjects();
+  }, [formData.vertical, backendUrl, token]);
+
+  const fetchVerticals = async () => {
+    try {
+      const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, { 
+        headers: { 'x-auth': token } 
+      });
+      // Update the whole enhancedEntities but keep other keys unchanged
+      setVerticals(newVertical.data.data);
+    } catch (error) {
+      console.error('Error fetching verticals:', error);
+      setVerticals([]);
     }
   };
-
-  fetchProjects();
-}, [formData.vertical]);
-
-
-const fetchVerticals = async () => {
-    const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, { headers: { 'x-auth': token } });
-
-    // Update the whole enhancedEntities but keep other keys unchanged
-    setVerticals(newVertical.data.data);
-
-  };
-
- 
 
   // Handle input field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    // If project is selected to the default value, reset it to empty string
+    if (name === 'project' && value === '') {
+      setFormData({
+        ...formData,
+        [name]: ''  // Reset to empty string when the default option is selected
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
 
     // Clear error for this field if it exists
     if (formErrors[name]) {
@@ -331,15 +348,6 @@ const fetchVerticals = async () => {
     });
   };
 
-  const handlefileChange = (selectedOptions) => {
-    const selectedValues = Array.from(selectedOptions).map(option => option.value);
-    setFormData({
-      ...formData,
-      trainingCenter: selectedValues
-    });
-  };
-
-
   // Validate file based on type
   const validateFile = (file, fileType) => {
     if (!file) return false;
@@ -387,10 +395,6 @@ const fetchVerticals = async () => {
     // For videos (less strict validation)
     return true;
   };
-
-
-
-
 
   // Add a new document field
   const addDocumentField = () => {
@@ -443,6 +447,8 @@ const fetchVerticals = async () => {
       courseLevel: '',
       courseFeeType: '',
       projectName: '',
+      vertical: '',
+      project: '',
       typeOfProject: '',
       courseType: '',
       name: '',
@@ -481,8 +487,12 @@ const fetchVerticals = async () => {
       counsleremail: '',
     });
 
-    // Reset file URLs
-
+    // Reset file states
+    setSelectedVideos([]);
+    setSelectedPhotos([]);
+    setSelectedBrochure(null);
+    setSelectedThumbnail(null);
+    setSelectedTestimonialVideos([]);
 
     // Reset docs required
     setDocsRequired([{ name: '' }]);
@@ -493,7 +503,7 @@ const fetchVerticals = async () => {
     ]);
 
     // Reset UI state
-
+    setShowProjectFields(false);
     setShowTrainingFields({
       online: false,
       offline: false,
@@ -530,32 +540,28 @@ const fetchVerticals = async () => {
       }
     });
 
-    // Append files (assume you have these in state: selectedVideos, selectedPhotos, selectedBrochure, selectedThumbnail)
-    // Append videos
-    if(selectedVideos.length>0){
-    selectedVideos.forEach(file => form.append('videos', file));}
+    // Append files
+    if (selectedVideos.length > 0) {
+      selectedVideos.forEach(file => form.append('videos', file));
+    }
 
-    // Append photos
-    if(selectedPhotos.length>0){
-    selectedPhotos.forEach(file => form.append('photos', file));}
+    if (selectedPhotos.length > 0) {
+      selectedPhotos.forEach(file => form.append('photos', file));
+    }
 
-
-    // Append brochure
     if (selectedBrochure) {
       form.append('brochure', selectedBrochure);
     }
 
-    // Append thumbnail
     if (selectedThumbnail) {
       form.append('thumbnail', selectedThumbnail);
     }
 
-    // Append testimonial videos
-    if(selectedTestimonialVideos.length>0){
-    selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
+    if (selectedTestimonialVideos.length > 0) {
+      selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
     }
 
-    // Append JSON fields (docsRequired and questionAnswers)
+    // Append JSON fields
     form.append('docsRequired', JSON.stringify(docsRequired));
     form.append('questionAnswers', JSON.stringify(questionAnswers));
 
@@ -567,6 +573,7 @@ const fetchVerticals = async () => {
     form.append('college', user.collegeId);
 
     try {
+      setIsSubmitting(true);
       const response = await axios.post(`${backendUrl}/college/courses/add`, form, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -582,9 +589,10 @@ const fetchVerticals = async () => {
     } catch (error) {
       console.error(error);
       alert("Error while submitting course");
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
 
   // CKEditor configuration
   const editorConfig = {
@@ -616,7 +624,7 @@ const fetchVerticals = async () => {
         </div>
       </div>
 
-      {/* Success Message (if form successfully submitted) */}
+      {/* Success Message */}
       {submitSuccess && (
         <div className="alert alert-success mb-2" role="alert">
           Course added successfully!
@@ -693,10 +701,9 @@ const fetchVerticals = async () => {
                         </select>
                       </div>
 
-                      {/* Project Name (conditional) */}
-                      {/* {showProjectFields && ( */}
-                     <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="typeOfProject">Vertical</label>
+                      {/* Vertical */}
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                        <label htmlFor="vertical">Vertical</label>
                         <select
                           className="form-control"
                           name="vertical"
@@ -705,15 +712,15 @@ const fetchVerticals = async () => {
                           onChange={handleChange}
                         >
                           <option value="">Select Vertical</option>
-                          {verticals.map(vertical =>(
-                          <option value={vertical._id}>{vertical.name}</option>))}
-                          
+                          {verticals.map((vertical, index) => (
+                            <option key={vertical._id || index} value={vertical._id}>{vertical.name}</option>
+                          ))}
                         </select>
                       </div>
-                      {/* )} */}
 
+                      {/* Project */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="typeOfProject">Project</label>
+                        <label htmlFor="project">Project</label>
                         <select
                           className="form-control"
                           name="project"
@@ -722,14 +729,11 @@ const fetchVerticals = async () => {
                           onChange={handleChange}
                         >
                           <option value="">Select Project</option>
-                          {projects.map(a =>(
-                          <option value={a._id}>{a.name}</option>))}
-                          
+                          {projects.map((project, index) => (
+                            <option key={project._id || index} value={project._id}>{project.name}</option>
+                          ))}
                         </select>
                       </div>
-
-                    
-                      {/* )} */}
 
                       {/* Course Type */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseTypeblock">
@@ -1211,11 +1215,9 @@ const fetchVerticals = async () => {
                           id="videos"
                           type="file"
                           accept="video/*"
-
                           multiple
                           onChange={(e) => setSelectedVideos(Array.from(e.target.files))}
                         />
-
                       </div>
 
                       {/* Brochure */}
@@ -1228,7 +1230,6 @@ const fetchVerticals = async () => {
                           accept=".pdf,.doc,.docx"
                           onChange={(e) => setSelectedBrochure(e.target.files[0])}
                         />
-
                       </div>
 
                       {/* Thumbnail */}
@@ -1241,7 +1242,6 @@ const fetchVerticals = async () => {
                           accept="image/*"
                           onChange={(e) => setSelectedThumbnail(e.target.files[0])}
                         />
-
                       </div>
 
                       {/* Photos */}
@@ -1255,7 +1255,6 @@ const fetchVerticals = async () => {
                           multiple
                           onChange={(e) => setSelectedPhotos(Array.from(e.target.files))}
                         />
-
                       </div>
                     </div>
                   </div>
@@ -1286,7 +1285,6 @@ const fetchVerticals = async () => {
                           multiple
                           onChange={(e) => setSelectedTestimonialVideos(Array.from(e.target.files))}
                         />
-
                       </div>
                     </div>
                   </div>
@@ -1545,14 +1543,11 @@ const fetchVerticals = async () => {
         </div>
       </form>
       <style>
-        {
-          `
+        {`
           .ck-editor__editable_inline{
-          height:40px;
+            height:40px;
           }
-          
-          `
-        }
+        `}
       </style>
     </div>
   );
