@@ -1954,7 +1954,7 @@ router
       }
       // If it's a valid ObjectId string, convert it to ObjectId
       else if (typeof highestQualification === 'string' && mongoose.Types.ObjectId.isValid(highestQualification)) {
-          highestQualification = mongoose.Types.ObjectId(highestQualification);
+          highestQualification =new mongoose.Types.ObjectId(highestQualification);
       } else {
           highestQualification = null; // Invalid value, set to null
       }

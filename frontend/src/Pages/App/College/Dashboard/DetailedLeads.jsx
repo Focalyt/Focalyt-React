@@ -1,5 +1,5 @@
 import React from 'react';
-// import Lead from './Lead'; // Uncomment this line and import your existing Lead component
+import Lead from './Lead'; 
 
 const DetailedLeads = () => {
   return (
@@ -12,10 +12,10 @@ const DetailedLeads = () => {
       {/* Placeholder for your existing Lead component */}
       <div className="lead-component-container">
         {/* Uncomment the line below when you have the actual Lead component */}
-        {/* <Lead /> */}
+        <Lead />
         
         {/* Placeholder for now */}
-        <div className="placeholder-message">
+        {/* <div className="placeholder-message">
           <div className="card border-0 shadow-sm">
             <div className="card-body text-center p-5">
               <div className="mb-4">
@@ -69,7 +69,7 @@ const DetailedLeads = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       <style jsx>{`

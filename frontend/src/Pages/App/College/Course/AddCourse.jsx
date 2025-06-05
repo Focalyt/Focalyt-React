@@ -424,7 +424,7 @@ const AddCourse = () => {
   const validateForm = () => {
     const errors = {};
     const requiredFields = [
-      'sector', 'courseLevel', 'name', 'duration', 'qualification',
+      'sectors', 'courseLevel', 'name', 'duration', 'qualification',
       'trainingMode', 'address', 'ojt', 'emiOptionAvailable'
     ];
 
@@ -443,7 +443,7 @@ const AddCourse = () => {
   const resetForm = () => {
     // Reset all form fields
     setFormData({
-      sector: '',
+      sector: [],
       courseLevel: '',
       courseFeeType: '',
       projectName: '',
@@ -651,7 +651,7 @@ const AddCourse = () => {
                           className={`form-control ${formErrors.sector ? 'is-invalid' : ''}`}
                           name="sectors"
                           id="sectors"
-                          value={formData.sectors[0]}
+                          value={formData.sectors}
                           onChange={handleChange}
                         >
                           <option value="">Select Sector</option>
