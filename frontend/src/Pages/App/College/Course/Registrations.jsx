@@ -41,80 +41,8 @@ const CRMDashboard = () => {
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Static document data for demonstration
-  const staticDocuments = [
-    {
-      _id: 'doc1',
-      Name: 'Aadhaar Card',
-      uploads: [{
-        _id: 'upload1',
-        fileUrl: 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=400',
-        uploadedAt: new Date('2024-01-15'),
-        status: 'Pending'
-      }]
-    },
-    {
-      _id: 'doc2',
-      Name: 'PAN Card',
-      uploads: [{
-        _id: 'upload2',
-        fileUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400',
-        uploadedAt: new Date('2024-01-16'),
-        status: 'Verified'
-      }]
-    },
-    {
-      _id: 'doc3',
-      Name: '10th Marksheet',
-      uploads: [{
-        _id: 'upload3',
-        fileUrl: 'https://images.unsplash.com/photo-1586953208448-b95a79798f07?w=400',
-        uploadedAt: new Date('2024-01-17'),
-        status: 'Rejected'
-      }]
-    },
-    {
-      _id: 'doc4',
-      Name: '12th Marksheet',
-      uploads: []
-    },
-    {
-      _id: 'doc5',
-      Name: 'Passport Photo',
-      uploads: [{
-        _id: 'upload5',
-        fileUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-        uploadedAt: new Date('2024-01-18'),
-        status: 'Verified'
-      }]
-    }
-  ];
+ 
 
-  // Static profile data
-  const staticProfileData = [
-    {
-      _id: 'profile1',
-      _candidate: {
-        name: 'Rahul Sharma',
-        mobile: '+91 9876543210',
-        email: 'rahul.sharma@email.com',
-        documents: staticDocuments
-      },
-      _leadStatus: { _id: 'status1', title: 'Hot Lead' },
-      createdAt: new Date('2024-01-10'),
-      updatedAt: new Date('2024-01-20'),
-      _course: {
-        name: 'Full Stack Development',
-        sectors: 'Information Technology'
-      }
-    }
-  ];
-
-  // Initialize data
-  useEffect(() => {
-    setAllProfiles(staticProfileData);
-    setAllProfilesData(staticProfileData);
-  }, []);
 
   // Document functions
   const openDocumentModal = (document) => {
@@ -166,15 +94,14 @@ const CRMDashboard = () => {
   };
 
  const filterDocuments = (documents = []) => {
+  // Ensure documents is always an array
+  if (!Array.isArray(documents)) return [];
   if (statusFilter === 'all') return documents;
 
   return documents.filter(doc => {
-    // agar doc.uploads undefined ya empty array hai
     if (!doc.uploads || doc.uploads.length === 0) return statusFilter === 'none';
 
-    // agar doc.uploads valid hai
     const lastUpload = doc.uploads[doc.uploads.length - 1];
-    // agar lastUpload ya status undefined ho
     if (!lastUpload || !lastUpload.status) return false;
 
     return lastUpload.status.toLowerCase() === statusFilter;
@@ -182,21 +109,30 @@ const CRMDashboard = () => {
 };
 
 
-  const getDocumentCounts = (documents) => {
-    const totalDocs = documents.length;
-    const uploadedDocs = documents.filter(doc => doc.uploads.length > 0).length;
-    const pendingDocs = documents.filter(doc =>
-      doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Pending'
-    ).length;
-    const verifiedDocs = documents.filter(doc =>
-      doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Verified'
-    ).length;
-    const rejectedDocs = documents.filter(doc =>
-      doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Rejected'
-    ).length;
-
-    return { totalDocs, uploadedDocs, pendingDocs, verifiedDocs, rejectedDocs };
+  const getDocumentCounts = (documents = []) => {
+  // Ensure documents is always an array
+  if (!Array.isArray(documents)) return {
+    totalDocs: 0,
+    uploadedDocs: 0,
+    pendingDocs: 0,
+    verifiedDocs: 0,
+    rejectedDocs: 0
   };
+  
+  const totalDocs = documents.length;
+  const uploadedDocs = documents.filter(doc => doc.uploads && doc.uploads.length > 0).length;
+  const pendingDocs = documents.filter(doc =>
+    doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Pending'
+  ).length;
+  const verifiedDocs = documents.filter(doc =>
+    doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Verified'
+  ).length;
+  const rejectedDocs = documents.filter(doc =>
+    doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Rejected'
+  ).length;
+
+  return { totalDocs, uploadedDocs, pendingDocs, verifiedDocs, rejectedDocs };
+};
 
 
   // Document Modal Component
@@ -810,6 +746,8 @@ const CRMDashboard = () => {
     setSelectedStatus(e.target.value);
   };
 
+  
+
   const handleTimeChange = (e) => {
     if (!followupDate) {
       alert('Select date first');
@@ -865,15 +803,14 @@ const CRMDashboard = () => {
       if (response.data.success) {
         const status = response.data.data;
         const allFilter = { _id: 'all', name: 'All', count: status.reduce((acc, cur) => acc + (cur.count || 0), 0) || 15 };
-        const admissionListFilter = { _id: 'admission_list', name: 'Admission List', count: 0, milestone: '' };
+       
 
         setCrmFilters([allFilter, ...status.map(r => ({
           _id: r._id,
           name: r.title,
           milestone: r.milestone,
           count: r.count || 0,  // agar backend me count nahi hai to 0
-        })),
-          admissionListFilter]);
+        }))]);
 
         setStatuses(status.map(r => ({
           _id: r._id,
@@ -888,6 +825,44 @@ const CRMDashboard = () => {
       alert('Failed to fetch Status');
     }
   };
+
+  const handleMoveToKyc = async (profile) => {
+    console.log('Function called');
+    try {
+
+      console.log('Function in try');
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+
+      // Prepare the request body
+      const updatedData = {
+        kycStage:true
+      };
+
+      // Send PUT request to backend API
+      const response = await axios.put(`${backendUrl}/college/update/${profile._id}`, updatedData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('API response:', response.data);
+
+      if (response.data.success) {
+        alert('Lead moved to KYC Section successfully!');
+        // Optionally refresh data here
+        fetchProfileData()
+      } else {
+        alert('Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      // alert('An error occurred while updating status');
+    }
+  };
+
   const fetchSubStatus = async () => {
     try {
       const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -999,7 +974,10 @@ const CRMDashboard = () => {
         const data = response.data.data; // create array 
         setAllProfiles(response.data.data);
         setAllProfilesData(response.data.data)
-        setTotalPages(response.data.totalPages)
+        setTotalPages(response.data.totalPages);
+
+
+
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -1021,26 +999,32 @@ const CRMDashboard = () => {
 
 
   useEffect(() => {
-    // Initialize circular progress
-    const containers = document.querySelectorAll('.circular-progress-container');
-    containers.forEach(container => {
-      const percent = container.getAttribute('data-percent');
-      const circle = container.querySelector('circle.circle-progress');
-      if (circle && percent) {
+  // Initialize circular progress
+  const containers = document.querySelectorAll('.circular-progress-container');
+  containers.forEach(container => {
+    const percent = container.getAttribute('data-percent');
+    const circle = container.querySelector('circle.circle-progress');
+    const progressText = container.querySelector('.progress-text');
+    
+    if (circle && progressText) {
+      if (percent === 'NA' || percent === null || percent === undefined) {
+        // Handle NA case
+        circle.style.strokeDasharray = 0;
+        circle.style.strokeDashoffset = 0;
+        progressText.innerText = 'NA';
+      } else {
+        // Handle numeric percentage
         const radius = 16;
         const circumference = 2 * Math.PI * radius;
         const offset = circumference - (percent / 100) * circumference;
 
         circle.style.strokeDasharray = circumference;
         circle.style.strokeDashoffset = offset;
-
-        const progressText = container.querySelector('.progress-text');
-        if (progressText) {
-          progressText.innerText = percent + '%';
-        }
+        progressText.innerText = percent + '%';
       }
-    });
-  }, []);
+    }
+  });
+}, [allProfiles]);
 
   // यह logs add करें अपने code में
   useEffect(() => {
@@ -2267,7 +2251,7 @@ const CRMDashboard = () => {
                                         <input className="form-check-input" type="checkbox" />
                                       </div>
                                       <div className="me-3">
-                                        <div className="circular-progress-container" data-percent="40">
+                                        <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired >0 ? profile.docCounts.uploadPercentage: 'NA'}>
                                           <svg width="40" height="40">
                                             <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
                                             <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
@@ -2397,8 +2381,9 @@ const CRMDashboard = () => {
                                               fontSize: "12px",
                                               fontWeight: "600"
                                             }}
+                                             onClick={()=>(handleMoveToKyc(profile))}
                                           >
-                                            Move To Admission List
+                                            Move To KYC List
                                           </button>
                                           <button
                                             className="dropdown-item"
@@ -2531,8 +2516,9 @@ const CRMDashboard = () => {
                                               fontSize: "12px",
                                               fontWeight: "600"
                                             }}
+                                            onClick={()=>(handleMoveToKyc(profile))}
                                           >
-                                            Move To Admission List
+                                            Move To KYC List
                                           </button>
                                           <button
                                             className="dropdown-item"
@@ -3273,265 +3259,303 @@ const CRMDashboard = () => {
                                   {/* {activeTab === 4 && ( */}
 
                                   {(activeTab[profileIndex] || 0) === 4 && (
-                                    <div className="tab-pane active" id='studentsDocuments'>
-                                      <div className="enhanced-documents-panel">
+                                      <div className="tab-pane active" id='studentsDocuments'>
+                                        {(() => {
+                                          const documentsToDisplay = profile.uploadedDocs || profile._candidate?.documents || [];
+                                          const totalRequired = profile?.docCounts?.totalRequired || 0;
 
-
-                                     
-
-                                        {/* Enhanced Stats Grid */}
-                                        <div className="stats-grid">
-                                          {(() => {
-                                            const counts = getDocumentCounts(profile._candidate?.documents || staticDocuments);
+                                          // If no documents are required, show a message
+                                          if (totalRequired === 0) {
                                             return (
-                                              <>
-                                                <div className="stat-card total-docs">
-                                                  <div className="stat-icon">
-                                                    <i className="fas fa-file-alt"></i>
-                                                  </div>
-                                                  <div className="stat-info">
-                                                    <h4>{profile?.docCounts?.totalRequired}</h4>
-                                                    <p>Total Required</p>
-                                                  </div>
-                                                  <div className="stat-trend">
-                                                    <i className="fas fa-list"></i>
+                                                <div className="col-12 text-center py-5">
+                                                  <div className="text-muted">
+                                                    <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                    <h5 className="text-success">No Documents Required</h5>
+                                                    <p>This course does not require any document verification.</p>
                                                   </div>
                                                 </div>
-
-                                                <div className="stat-card uploaded-docs">
-                                                  <div className="stat-icon">
-                                                    <i className="fas fa-cloud-upload-alt"></i>
-                                                  </div>
-                                                  <div className="stat-info">
-                                                    <h4>{profile?.docCounts?.uploadedCount}</h4>
-                                                    <p>Uploaded</p>
-                                                  </div>
-                                                  <div className="stat-trend">
-                                                    <i className="fas fa-arrow-up"></i>
-                                                  </div>
-                                                </div>
-
-                                                <div className="stat-card pending-docs">
-                                                  <div className="stat-icon">
-                                                    <i className="fas fa-clock"></i>
-                                                  </div>
-                                                  <div className="stat-info">
-                                                    <h4>{profile?.docCounts?.pendingVerificationCount}</h4>
-
-                                                    <p>Pending Review</p>
-                                                  </div>
-                                                  <div className="stat-trend">
-                                                    <i className="fas fa-exclamation-triangle"></i>
-                                                  </div>
-                                                </div>
-
-                                                <div className="stat-card verified-docs">
-                                                  <div className="stat-icon">
-                                                    <i className="fas fa-check-circle"></i>
-                                                  </div>
-                                                  <div className="stat-info">
-                                                    <h4>{profile?.docCounts?.verifiedCount}</h4>
-                                                    <p>Approved</p>
-                                                  </div>
-                                                  <div className="stat-trend">
-                                                    <i className="fas fa-thumbs-up"></i>
-                                                  </div>
-                                                </div>
-
-                                                <div className="stat-card rejected-docs">
-                                                  <div className="stat-icon">
-                                                    <i className="fas fa-times-circle"></i>
-                                                  </div>
-                                                  <div className="stat-info">
-                                                    <h4>{profile?.docCounts?.RejectedCount}</h4>
-                                                    <p>Rejected</p>
-                                                  </div>
-                                                  <div className="stat-trend">
-                                                    <i className="fas fa-arrow-down"></i>
-                                                  </div>
-                                                </div>
-
-                                              </>
+                                             
                                             );
-                                          })()}
-                                        </div>
+                                          }
 
-                                        {/* Enhanced Filter Section */}
-                                        <div className="filter-section-enhanced">
-                                          <div className="filter-tabs-container">
-                                            <h5 className="filter-title">
-                                              <i className="fas fa-filter me-2"></i>
-                                              Filter Documents
-                                            </h5>
-                                            <div className="filter-tabs">
-                                              <button
-                                                className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                onClick={() => setStatusFilter('all')}
-                                              >
-                                                <i className="fas fa-list-ul"></i>
-                                                All Documents
-                                                <span className="badge">{getDocumentCounts(profile._candidate?.documents || staticDocuments).totalDocs}</span>
-                                              </button>
-                                              <button
-                                                className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                onClick={() => setStatusFilter('pending')}
-                                              >
-                                                <i className="fas fa-clock"></i>
-                                                Pending
-                                                <span className="badge">{getDocumentCounts(profile._candidate?.documents || staticDocuments).pendingDocs}</span>
-                                              </button>
-                                              <button
-                                                className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                onClick={() => setStatusFilter('verified')}
-                                              >
-                                                <i className="fas fa-check-circle"></i>
-                                                Verified
-                                                <span className="badge">{getDocumentCounts(profile._candidate?.documents || staticDocuments).verifiedDocs}</span>
-                                              </button>
-                                              <button
-                                                className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                onClick={() => setStatusFilter('rejected')}
-                                              >
-                                                <i className="fas fa-times-circle"></i>
-                                                Rejected
-                                                <span className="badge">{getDocumentCounts(profile._candidate?.documents || staticDocuments).rejectedDocs}</span>
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* Enhanced Documents Grid */}
-                                        <div className="documents-grid-enhanced">
-                                         {filterDocuments(profile.uploadedDocs || []).map((doc, index) => {
-                                            const latestUpload = doc.uploads.length > 0 ? doc.uploads[doc.uploads.length - 1] : null;
-
-                                            return (
-                                              <div key={doc._id} className="document-card-enhanced">
-                                                <div className="document-image-container">
-                                                  {latestUpload ? (
+                                          // If documents are required, show the full interface
+                                          return (
+                                            <div className="enhanced-documents-panel">
+                                              {/* Enhanced Stats Grid */}
+                                              <div className="stats-grid">
+                                                {(() => {
+                                                  // Use backend counts only, remove static document fallback
+                                                  const backendCounts = profile?.docCounts || {};
+                                                  return (
                                                     <>
-                                                      <img
-                                                        src={latestUpload.fileUrl}
-                                                        alt="Document Preview"
-                                                        className="document-image"
-                                                      />
-                                                      <div className="image-overlay">
-                                                        <button
-                                                          className="preview-btn"
-                                                          onClick={() => openDocumentModal(doc)}
-                                                        >
-                                                          <i className="fas fa-search-plus"></i>
-                                                          Preview
-                                                        </button>
+                                                      <div className="stat-card total-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-file-alt"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.totalRequired || 0}</h4>
+                                                          <p>Total Required</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-list"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card uploaded-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-cloud-upload-alt"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                          <p>Uploaded</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-arrow-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card pending-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-clock"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                          <p>Pending Review</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-exclamation-triangle"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card verified-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-check-circle"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                          <p>Approved</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-thumbs-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card rejected-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-times-circle"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                          <p>Rejected</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-arrow-down"></i>
+                                                        </div>
                                                       </div>
                                                     </>
-                                                  ) : (
-                                                    <div className="no-document-placeholder">
-                                                      <i className="fas fa-file-upload"></i>
-                                                      <p>No Document</p>
-                                                    </div>
-                                                  )}
+                                                  );
+                                                })()}
+                                              </div>
 
-                                                  {/* Status Badge Overlay */}
-                                                  <div className="status-badge-overlay">
-                                                    {latestUpload?.status === 'Pending' && (
-                                                      <span className="status-badge-new pending">
-                                                        <i className="fas fa-clock"></i>
-                                                        Pending
-                                                      </span>
-                                                    )}
-                                                    {latestUpload?.status === 'Verified' && (
-                                                      <span className="status-badge-new verified">
-                                                        <i className="fas fa-check-circle"></i>
-                                                        Verified
-                                                      </span>
-                                                    )}
-                                                    {latestUpload?.status === 'Rejected' && (
-                                                      <span className="status-badge-new rejected">
-                                                        <i className="fas fa-times-circle"></i>
-                                                        Rejected
-                                                      </span>
-                                                    )}
-                                                    {!latestUpload && (
-                                                      <span className="status-badge-new not-uploaded">
-                                                        <i className="fas fa-upload"></i>
-                                                        Required
-                                                      </span>
-                                                    )}
-                                                  </div>
-                                                </div>
-
-                                                <div className="document-info-section">
-                                                  <div className="document-header">
-                                                    <h4 className="document-title">{doc.Name}</h4>
-                                                    <div className="document-actions">
-                                                      {!latestUpload ? (
-                                                        <button className="action-btn upload-btn" title="Upload Document">
-                                                          <i className="fas fa-cloud-upload-alt"></i>
-                                                          Upload
-                                                        </button>
-                                                      ) : latestUpload.status === 'Pending' ? (
-                                                        <button
-                                                          className="action-btn verify-btn"
-                                                          onClick={() => openDocumentModal(doc)}
-                                                          title="Verify Document"
-                                                        >
-                                                          <i className="fas fa-search"></i>
-                                                          Verify
-                                                        </button>
-                                                      ) : (
-                                                        <button
-                                                          className="action-btn view-btn"
-                                                          onClick={() => openDocumentModal(doc)}
-                                                          title="View Document"
-                                                        >
-                                                          <i className="fas fa-eye"></i>
-                                                          View
-                                                        </button>
-                                                      )}
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="document-meta">
-                                                    <div className="meta-item">
-                                                      <i className="fas fa-calendar-alt text-muted"></i>
-                                                      <span className="meta-text">
-                                                        {latestUpload ?
-                                                          new Date(latestUpload.uploadedAt).toLocaleDateString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric'
-                                                          }) :
-                                                          'Not uploaded'
-                                                        }
-                                                      </span>
-                                                    </div>
-
-                                                    {latestUpload && (
-                                                      <div className="meta-item">
-                                                        <i className="fas fa-clock text-muted"></i>
-                                                        <span className="meta-text">
-                                                          {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit'
-                                                          })}
-                                                        </span>
-                                                      </div>
-                                                    )}
+                                              {/* Enhanced Filter Section */}
+                                              <div className="filter-section-enhanced">
+                                                <div className="filter-tabs-container">
+                                                  <h5 className="filter-title">
+                                                    <i className="fas fa-filter me-2"></i>
+                                                    Filter Documents
+                                                  </h5>
+                                                  <div className="filter-tabs">
+                                                    {(() => {
+                                                      const backendCounts = profile?.docCounts || {};
+                                                      return (
+                                                        <>
+                                                          <button
+                                                            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('all')}
+                                                          >
+                                                            <i className="fas fa-list-ul"></i>
+                                                            All Documents
+                                                            <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('pending')}
+                                                          >
+                                                            <i className="fas fa-clock"></i>
+                                                            Pending
+                                                            <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('verified')}
+                                                          >
+                                                            <i className="fas fa-check-circle"></i>
+                                                            Verified
+                                                            <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('rejected')}
+                                                          >
+                                                            <i className="fas fa-times-circle"></i>
+                                                            Rejected
+                                                            <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                          </button>
+                                                        </>
+                                                      );
+                                                    })()}
                                                   </div>
                                                 </div>
                                               </div>
-                                            );
-                                          })}
-                                        </div>
 
+                                              {/* Enhanced Documents Grid */}
+                                              <div className="documents-grid-enhanced">
+                                                {(() => {
+                                                  // Filter documents based on status filter
+                                                  const filteredDocs = filterDocuments(documentsToDisplay);
 
-                                        <DocumentModal />
+                                                  if (filteredDocs.length === 0) {
+                                                    return (
+                                                      <div className="col-12 text-center py-5">
+                                                        <div className="text-muted">
+                                                          <i className="fas fa-filter fa-3x mb-3"></i>
+                                                          <h5>No Documents Found</h5>
+                                                          <p>No documents match the current filter criteria.</p>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  }
+
+                                                  return filteredDocs.map((doc, index) => {
+                                                    const latestUpload = doc.uploads && doc.uploads.length > 0 ? doc.uploads[doc.uploads.length - 1] : null;
+
+                                                    return (
+                                                      <div key={doc._id || index} className="document-card-enhanced">
+                                                        <div className="document-image-container">
+                                                          {latestUpload ? (
+                                                            <>
+                                                              <img
+                                                                src={latestUpload.fileUrl}
+                                                                alt="Document Preview"
+                                                                className="document-image"
+                                                              />
+                                                              <div className="image-overlay">
+                                                                <button
+                                                                  className="preview-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                >
+                                                                  <i className="fas fa-search-plus"></i>
+                                                                  Preview
+                                                                </button>
+                                                              </div>
+                                                            </>
+                                                          ) : (
+                                                            <div className="no-document-placeholder">
+                                                              <i className="fas fa-file-upload"></i>
+                                                              <p>No Document</p>
+                                                            </div>
+                                                          )}
+
+                                                          {/* Status Badge Overlay */}
+                                                          <div className="status-badge-overlay">
+                                                            {latestUpload?.status === 'Pending' && (
+                                                              <span className="status-badge-new pending">
+                                                                <i className="fas fa-clock"></i>
+                                                                Pending
+                                                              </span>
+                                                            )}
+                                                            {latestUpload?.status === 'Verified' && (
+                                                              <span className="status-badge-new verified">
+                                                                <i className="fas fa-check-circle"></i>
+                                                                Verified
+                                                              </span>
+                                                            )}
+                                                            {latestUpload?.status === 'Rejected' && (
+                                                              <span className="status-badge-new rejected">
+                                                                <i className="fas fa-times-circle"></i>
+                                                                Rejected
+                                                              </span>
+                                                            )}
+                                                            {!latestUpload && (
+                                                              <span className="status-badge-new not-uploaded">
+                                                                <i className="fas fa-upload"></i>
+                                                                Required
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="document-info-section">
+                                                          <div className="document-header">
+                                                            <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
+                                                            <div className="document-actions">
+                                                              {!latestUpload ? (
+                                                                <button className="action-btn upload-btn" title="Upload Document">
+                                                                  <i className="fas fa-cloud-upload-alt"></i>
+                                                                  Upload
+                                                                </button>
+                                                              ) : latestUpload.status === 'Pending' ? (
+                                                                <button
+                                                                  className="action-btn verify-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                  title="Verify Document"
+                                                                >
+                                                                  <i className="fas fa-search"></i>
+                                                                  Verify
+                                                                </button>
+                                                              ) : (
+                                                                <button
+                                                                  className="action-btn view-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                  title="View Document"
+                                                                >
+                                                                  <i className="fas fa-eye"></i>
+                                                                  View
+                                                                </button>
+                                                              )}
+                                                            </div>
+                                                          </div>
+
+                                                          <div className="document-meta">
+                                                            <div className="meta-item">
+                                                              <i className="fas fa-calendar-alt text-muted"></i>
+                                                              <span className="meta-text">
+                                                                {latestUpload ?
+                                                                  new Date(latestUpload.uploadedAt).toLocaleDateString('en-GB', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric'
+                                                                  }) :
+                                                                  'Not uploaded'
+                                                                }
+                                                              </span>
+                                                            </div>
+
+                                                            {latestUpload && (
+                                                              <div className="meta-item">
+                                                                <i className="fas fa-clock text-muted"></i>
+                                                                <span className="meta-text">
+                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                  })}
+                                                                </span>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  });
+                                                })()}
+                                              </div>
+
+                                              <DocumentModal />
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
-
-
-                                    </div>
-                                  )}
+                                    )}
 
                                 </div>
                               )}

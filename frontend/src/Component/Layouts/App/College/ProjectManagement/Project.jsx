@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Center from '../../../../Layouts/App/College/ProjectManagement/Center';
 
 const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
-const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
@@ -18,7 +18,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [newRole, setNewRole] = useState('Viewer');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
-  
+
   // New states for center view
   const [showCenters, setShowCenters] = useState(false);
   const [selectedProjectForCenters, setSelectedProjectForCenters] = useState(null);
@@ -38,7 +38,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   ];
 
   const [projects, setProjects] = useState([
-    
+
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -54,29 +54,29 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   }, [selectedVertical]);
 
   const filteredProjects = projects.filter(project => {
-  // Vertical filter (agar selectedVertical hai)
-  
+    // Vertical filter (agar selectedVertical hai)
 
-  // Status filter based on activeProjectTab
-  if (activeProjectTab === 'Active Projects' && project.status.toLowerCase() !== 'active') {
-    return false;
-  }
-  if (activeProjectTab === 'Inactive Projects' && project.status.toLowerCase() !== 'inactive') {
-    return false;
-  }
 
-  // Search filter on name, code, or vertical (case-insensitive)
-  const search = searchQuery.toLowerCase();
-  const nameMatch = project.name?.toLowerCase().includes(search);
-  const codeMatch = project.code?.toLowerCase().includes(search);
-  const verticalMatch = project.vertical?.toLowerCase().includes(search);
+    // Status filter based on activeProjectTab
+    if (activeProjectTab === 'Active Projects' && project.status.toLowerCase() !== 'active') {
+      return false;
+    }
+    if (activeProjectTab === 'Inactive Projects' && project.status.toLowerCase() !== 'inactive') {
+      return false;
+    }
 
-  return nameMatch || codeMatch || verticalMatch;
-});
+    // Search filter on name, code, or vertical (case-insensitive)
+    const search = searchQuery.toLowerCase();
+    const nameMatch = project.name?.toLowerCase().includes(search);
+    const codeMatch = project.code?.toLowerCase().includes(search);
+    const verticalMatch = project.vertical?.toLowerCase().includes(search);
+
+    return nameMatch || codeMatch || verticalMatch;
+  });
 
 
   useEffect(() => {
-    
+
   }, [selectedVertical]);
 
   const resetForm = () => {
@@ -115,41 +115,41 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   };
 
   const confirmDelete = async () => {
-  if (!projectToDelete) return;
+    if (!projectToDelete) return;
 
-  try {
-       const response = await fetch(`${backendUrl}/college/delete_project/${projectToDelete._id}`, {
-      method: 'DELETE',
-      headers: {
-        'x-auth': token,
-      },
-    });
+    try {
+      const response = await fetch(`${backendUrl}/college/delete_project/${projectToDelete._id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-auth': token,
+        },
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to delete project');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete project');
+      }
+
+      // Backend delete successful, local state update karo
+      fetchProjects()
+
+      // Modal close karo
+      setShowDeleteModal(false);
+      setProjectToDelete(null);
+
+    } catch (error) {
+      alert(error.message || 'Something went wrong while deleting');
     }
+  };
 
-    // Backend delete successful, local state update karo
-    fetchProjects()
-
-    // Modal close karo
-    setShowDeleteModal(false);
-    setProjectToDelete(null);
-
-  } catch (error) {
-    alert(error.message || 'Something went wrong while deleting');
-  }
-};
-
- useEffect(() => {
+  useEffect(() => {
 
     fetchProjects();
 
   }, []);
   const fetchProjects = async () => {
-    
-    console.log('selectedVertical',selectedVertical)
+
+    console.log('selectedVertical', selectedVertical)
     setLoading(true);
 
     fetch(`${backendUrl}/college/list-projects?vertical=${selectedVertical.id}`)
@@ -175,52 +175,54 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   if (error) return <p style={{ color: 'red' }}>{error}</p>;
 
 
- const handleSubmit = async () => {
-  console.log('selecetedVertical', selectedVertical)
-  if (!formData.name.trim() || !formData.vertical.trim()) {
-    alert('Please fill in all required fields');
-    return;
-  }
-
-  try {
-    console.log('formData', JSON.stringify(formData))
-
-    if (editingProject) {
-      // Edit existing project - PUT request
-      const response = await fetch(`${backendUrl}/college/edit_project/${editingProject._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json',
-          'x-auth': token
-         },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) throw new Error('Failed to update project');
-
-     fetchProjects()
-      setShowEditForm(false);
-    } else {
-      // Add new project - POST request
-      const response = await fetch(`${backendUrl}/college/add_project`, {
-        method: 'POST',
-        headers: { 'x-auth': token,
-          'Content-Type': 'application/json'
-         } ,
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) throw new Error('Failed to add project');
-
-     fetchProjects()
-      setShowAddForm(false);
+  const handleSubmit = async () => {
+    console.log('selecetedVertical', selectedVertical)
+    if (!formData.name.trim() || !formData.vertical.trim()) {
+      alert('Please fill in all required fields');
+      return;
     }
 
-    resetForm();
-    setEditingProject(null);
-  } catch (error) {
-    alert(error.message || 'Something went wrong');
-  }
-};
+    try {
+      console.log('formData', JSON.stringify(formData))
+
+      if (editingProject) {
+        // Edit existing project - PUT request
+        const response = await fetch(`${backendUrl}/college/edit_project/${editingProject._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth': token
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) throw new Error('Failed to update project');
+
+        fetchProjects()
+        setShowEditForm(false);
+      } else {
+        // Add new project - POST request
+        const response = await fetch(`${backendUrl}/college/add_project`, {
+          method: 'POST',
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) throw new Error('Failed to add project');
+
+        fetchProjects()
+        setShowAddForm(false);
+      }
+
+      resetForm();
+      setEditingProject(null);
+    } catch (error) {
+      alert(error.message || 'Something went wrong');
+    }
+  };
 
 
   const handleShare = (project) => {
@@ -248,7 +250,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   };
 
   const getPriorityColor = (priority) => {
-    switch(priority) {
+    switch (priority) {
       case 'high': return 'bg-danger';
       default: return 'bg-secondary';
     }
@@ -292,8 +294,8 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   if (showCenters && selectedProjectForCenters) {
     return (
       <div>
-       
-        <Center selectedProject={selectedProjectForCenters} onBackToProjects={handleBackToProjects}  onBackToVerticals={onBackToVerticals} selectedVertical={selectedVertical} />
+
+        <Center selectedProject={selectedProjectForCenters} onBackToProjects={handleBackToProjects} onBackToVerticals={onBackToVerticals} selectedVertical={selectedVertical} />
       </div>
     );
   }
@@ -304,35 +306,35 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
           <div className="d-flex align-items-center gap-3">
-          
+
             <div className='d-flex align-items-center'>
-            <h4 onClick={onBackToVerticals} style={{cursor:'pointer'}}  className=" me-2">{selectedVertical.name} Vertical</h4>
-            <span className="mx-2"> &gt; </span>
-            <h5 className="breadcrumb-item mb-0" style={{whiteSpace: 'nowrap'}} aria-current="page">
-               Project
-            </h5>
-          </div>
+              <h4 onClick={onBackToVerticals} style={{ cursor: 'pointer' }} className=" me-2">{selectedVertical.name} Vertical</h4>
+              <span className="mx-2"> &gt; </span>
+              <h5 className="breadcrumb-item mb-0" style={{ whiteSpace: 'nowrap' }} aria-current="page">
+                Project
+              </h5>
+            </div>
           </div>
         </div>
         <div className='d-flex'>
-          
+
           {onBackToVerticals && (
-            <button 
-              onClick={onBackToVerticals} 
+            <button
+              onClick={onBackToVerticals}
               className="btn btn-light"
               title="Back to Verticals"
             >
-              <i className="bi bi-arrow-left"></i>  
+              <i className="bi bi-arrow-left"></i>
               <span>Back</span>
             </button>
           )}
-          
-          
+
+
 
           <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
-          <button className="btn btn-primary" style={{whiteSpace: 'nowrap'}} onClick={handleAdd}>Add Project</button>
+          <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleAdd}>Add Project</button>
         </div>
       </div>
 
@@ -366,7 +368,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
               <div className="card h-100 border rounded shadow-sm position-relative">
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-start mb-2">
-                    <div 
+                    <div
                       className="flex-grow-1 cursor-pointer"
                       onClick={() => handleProjectClick(project)}
                       style={{ cursor: 'pointer' }}
@@ -386,18 +388,18 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                       </div>
                     </div>
                     <div className="text-end">
-                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => {e.stopPropagation(); handleShare(project);}}>
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(project); }}>
                         <i className="bi bi-share-fill"></i>
                       </button>
-                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => {e.stopPropagation(); handleEdit(project);}}>
+                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(project); }}>
                         <i className="bi bi-pencil-square"></i>
                       </button>
-                      <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => {e.stopPropagation(); handleDelete(project);}}>
+                      <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(project); }}>
                         <i className="bi bi-trash"></i>
                       </button>
                     </div>
                   </div>
-                  
+
                   {/* Progress Bar */}
                   {/* <div className="mb-3">
                     <div className="d-flex justify-content-between small text-muted mb-1">
@@ -422,8 +424,8 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                         <i className="bi bi-calendar-check me-1"></i>Due: <strong>{project.dueDate}</strong>
                       </div>
                       <div className="col-4">
-                        <span 
-                          className="text-primary" 
+                        <span
+                          className="text-primary"
                           style={{ cursor: 'pointer', textDecoration: 'underline' }}
                           onClick={() => handleProjectClick(project)}
                         >
@@ -461,27 +463,27 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                 <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
               </div>
               <div className="modal-body">
-              <div className="row">
-                <div className="col-md-6 mb-3">
-                  <label className="form-label">Project Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter project name"
-                  />
-                </div>
-                <div className="col-md-6 mb-3">
-                  <label className="form-label">Description</label>
-                  <textarea
-                    className="form-control"
-                    rows="3"
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Enter project description"
-                  ></textarea>
-                </div>
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Project Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter project name"
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Description</label>
+                    <textarea
+                      className="form-control"
+                      rows="3"
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Enter project description"
+                    ></textarea>
+                  </div>
                 </div>
                 <div className="row">
                   <div className="col-md-6 mb-3">
@@ -495,7 +497,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                       <option value="inactive">Inactive</option>
                     </select>
                   </div>
-                  
+
                 </div>
               </div>
               <div className="modal-footer">
