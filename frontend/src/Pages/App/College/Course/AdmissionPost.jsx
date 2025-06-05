@@ -139,6 +139,125 @@ const CRMDashboard = () => {
     { _id: 'alladmission', name: 'All Lists', count: 1480, milestone: '' },
   ]);
 
+  // open model for upload documents 
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedDocumentForUpload, setSelectedDocumentForUpload] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadPreview, setUploadPreview] = useState(null);
+
+  const openUploadModal = (document) => {
+    setSelectedDocumentForUpload(document);
+    setShowUploadModal(true);
+    setSelectedFile(null);
+    setUploadPreview(null);
+    setUploadProgress(0);
+  };
+
+  const closeUploadModal = () => {
+    setShowUploadModal(false);
+    setSelectedDocumentForUpload(null);
+    setSelectedFile(null);
+    setUploadPreview(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+  };
+
+const handleFileSelect = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Validate file type (images and PDFs)
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+  if (!allowedTypes.includes(file.type)) {
+    alert('Please select a valid file (JPG, PNG, GIF, or PDF)');
+    return;
+  }
+
+  // Validate file size (max 10MB)
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    alert('File size should be less than 10MB');
+    return;
+  }
+
+  setSelectedFile(file);
+
+  // Create preview for images
+  if (file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setUploadPreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  } else {
+    setUploadPreview(null);
+  }
+};
+
+
+// Simulate file upload with progress
+const handleFileUpload = async () => {
+  if (!selectedFile || !selectedDocumentForUpload) return;
+
+  setIsUploading(true);
+  setUploadProgress(0);
+
+  try {
+    // Simulate upload progress
+    for (let i = 0; i <= 100; i += 10) {
+      setUploadProgress(i);
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+
+    // Create new upload entry
+    const newUpload = {
+      _id: `upload_${Date.now()}`,
+      fileUrl: uploadPreview || 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=400',
+      uploadedAt: new Date(),
+      status: 'Pending',
+      fileName: selectedFile.name,
+      fileSize: selectedFile.size
+    };
+
+    // Update the document with new upload
+    setAllProfiles(prevProfiles => 
+      prevProfiles.map(profile => {
+        if (profile._id === selectedProfile._id) {
+          const updatedDocuments = (profile._candidate?.documents || staticDocuments).map(doc => {
+            if (doc._id === selectedDocumentForUpload._id) {
+              return {
+                ...doc,
+                uploads: [...(doc.uploads || []), newUpload]
+              };
+            }
+            return doc;
+          });
+          
+          return {
+            ...profile,
+            _candidate: {
+              ...profile._candidate,
+              documents: updatedDocuments
+            }
+          };
+        }
+        return profile;
+      })
+    );
+
+    alert('Document uploaded successfully! Status: Pending Review');
+    closeUploadModal();
+
+  } catch (error) {
+    console.error('Upload error:', error);
+    alert('Upload failed. Please try again.');
+  } finally {
+    setIsUploading(false);
+  }
+};
+
   // ========================================
   // 🎯 NEW: Get Current Filters Function (ADD THIS)
   // Returns appropriate filters based on main tab
@@ -188,7 +307,7 @@ const CRMDashboard = () => {
       alert('Please provide a rejection reason');
       return;
     }
-      if (status === 'Verified') {
+    if (status === 'Verified') {
       // Update profile eKYC status to 'done'
       setAllProfiles(prevProfiles => prevProfiles.map(profile =>
         profile._id === selectedProfile._id
@@ -1053,6 +1172,127 @@ const CRMDashboard = () => {
     );
   };
 
+  const UploadModal = () => {
+  if (!showUploadModal || !selectedDocumentForUpload) return null;
+
+  return (
+    <div className="upload-modal-overlay" onClick={closeUploadModal}>
+      <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="upload-modal-header">
+          <h3>
+            <i className="fas fa-cloud-upload-alt me-2"></i>
+            Upload {selectedDocumentForUpload.Name}
+          </h3>
+          <button className="close-btn" onClick={closeUploadModal}>&times;</button>
+        </div>
+
+        <div className="upload-modal-body">
+          <div className="upload-section">
+            {!selectedFile ? (
+              <div className="file-drop-zone">
+                <div className="drop-zone-content">
+                  <i className="fas fa-cloud-upload-alt upload-icon"></i>
+                  <h4>Choose a file to upload</h4>
+                  <p>Drag and drop a file here, or click to select</p>
+                  <div className="file-types">
+                    <span>Supported: JPG, PNG, GIF, PDF</span>
+                    <span>Max size: 10MB</span>
+                  </div>
+                  <input
+                    type="file"
+                    id="file-input"
+                    accept=".jpg,.jpeg,.png,.gif,.pdf"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => document.getElementById('file-input').click()}
+                  >
+                    <i className="fas fa-folder-open me-2"></i>
+                    Choose File
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="file-preview-section">
+                <div className="selected-file-info">
+                  <h4>Selected File:</h4>
+                  <div className="file-details">
+                    <div className="file-icon">
+                      <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                    </div>
+                    <div className="file-info">
+                      <p className="file-name">{selectedFile.name}</p>
+                      <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                    <button 
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setUploadPreview(null);
+                      }}
+                    >
+                      <i className="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+
+                {uploadPreview && (
+                  <div className="upload-preview">
+                    <h5>Preview:</h5>
+                    <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
+                  </div>
+                )}
+
+                {isUploading && (
+                  <div className="upload-progress-section">
+                    <h5>Uploading...</h5>
+                    <div className="progress-bar-container">
+                      <div 
+                        className="progress-bar" 
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                    <p>{uploadProgress}% Complete</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="upload-modal-footer">
+          <button 
+            className="btn btn-secondary"
+            onClick={closeUploadModal}
+            disabled={isUploading}
+          >
+            Cancel
+          </button>
+          <button 
+            className="btn btn-primary"
+            onClick={handleFileUpload}
+            disabled={!selectedFile || isUploading}
+          >
+            {isUploading ? (
+              <>
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Uploading...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-upload me-2"></i>
+                Upload Document
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
   const scrollLeft = () => {
     const container = document.querySelector('.scrollable-content');
     if (container) {
@@ -1540,36 +1780,36 @@ const CRMDashboard = () => {
             <div className="container-fluid py-2">
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
-                   <div className="main-tabs-container">
-                <ul className="nav nav-tabs nav-tabs-main border-0">
-                  {/* 🔹 eKYC Management Tab */}
-                  <li className="nav-item">
-                    <button
-                      className={`nav-link main-tab ${mainTab === 'Ekyc' ? 'active' : ''}`}
-                      onClick={() => handleMainTabChange('Ekyc')}
-                    >
-                      <i className="fas fa-id-card me-2"></i>
-                      eKYC Management
-                      <span className="tab-badge">
-                        {ekycFilters.reduce((sum, filter) => sum + filter.count, 0)}
-                      </span>
-                    </button>
-                  </li>
-                  {/* 🔹 All Admission Tab */}
-                  <li className="nav-item">
-                    <button
-                      className={`nav-link main-tab ${mainTab === 'AllAdmission' ? 'active' : ''}`}
-                      onClick={() => handleMainTabChange('AllAdmission')}
-                    >
-                      <i className="fas fa-graduation-cap me-2"></i>
-                      All Admission
-                      <span className="tab-badge">
-                        {admissionFilters.reduce((sum, filter) => sum + filter.count, 0)}
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-              </div>
+                  <div className="main-tabs-container">
+                    <ul className="nav nav-tabs nav-tabs-main border-0">
+                      {/* 🔹 eKYC Management Tab */}
+                      <li className="nav-item">
+                        <button
+                          className={`nav-link main-tab ${mainTab === 'Ekyc' ? 'active' : ''}`}
+                          onClick={() => handleMainTabChange('Ekyc')}
+                        >
+                          <i className="fas fa-id-card me-2"></i>
+                          eKYC Management
+                          <span className="tab-badge">
+                            {ekycFilters.reduce((sum, filter) => sum + filter.count, 0)}
+                          </span>
+                        </button>
+                      </li>
+                      {/* 🔹 All Admission Tab */}
+                      <li className="nav-item">
+                        <button
+                          className={`nav-link main-tab ${mainTab === 'AllAdmission' ? 'active' : ''}`}
+                          onClick={() => handleMainTabChange('AllAdmission')}
+                        >
+                          <i className="fas fa-graduation-cap me-2"></i>
+                          All Admission
+                          <span className="tab-badge">
+                            {admissionFilters.reduce((sum, filter) => sum + filter.count, 0)}
+                          </span>
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
 
                 <div className="col-md-6">
@@ -1638,7 +1878,7 @@ const CRMDashboard = () => {
                 Two main tabs: eKYC Management and All Admission
                 ======================================== */}
             <div className="container-fluid pb-2">
-             
+
 
               {/* ========================================
                   🎯 NEW: Dynamic Sub-filters Section (ADD THIS)
@@ -2778,56 +3018,7 @@ const CRMDashboard = () => {
 
 
                                         {/* Candidate Info Header */}
-                                        <div className="candidate-header-section">
-                                          <div className="candidate-info-card">
-                                            <div className="candidate-avatar-large">
-                                              {profile._candidate?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
-                                            </div>
-                                            <div className="candidate-details">
-                                              <h3>{profile._candidate?.name}</h3>
-                                              <div className="contact-details">
-                                                <span><i className="fas fa-envelope text-primary"></i> {profile._candidate?.email}</span>
-                                                <span><i className="fas fa-phone text-success"></i> {profile._candidate?.mobile}</span>
-                                              </div>
-                                            </div>
-                                            <div className="completion-ring">
-                                              {(() => {
-                                                const counts = getDocumentCounts(profile._candidate?.documents || staticDocuments);
-                                                const percentage = Math.round((counts.verifiedDocs / counts.totalDocs) * 100);
-                                                return (
-                                                  <div className="circular-progress" data-percentage={percentage}>
-                                                    <svg className="progress-ring" width="80" height="80">
-                                                      <circle
-                                                        cx="40"
-                                                        cy="40"
-                                                        r="35"
-                                                        fill="none"
-                                                        stroke="#e6e6e6"
-                                                        strokeWidth="6"
-                                                      />
-                                                      <circle
-                                                        cx="40"
-                                                        cy="40"
-                                                        r="35"
-                                                        fill="none"
-                                                        stroke="#4facfe"
-                                                        strokeWidth="6"
-                                                        strokeLinecap="round"
-                                                        strokeDasharray={`${(percentage / 100) * 220} 220`}
-                                                        transform="rotate(-90 40 40)"
-                                                        className="progress-bar"
-                                                      />
-                                                    </svg>
-                                                    <div className="percentage-text">
-                                                      <span className="percentage">{percentage}%</span>
-                                                      <span className="label">Complete</span>
-                                                    </div>
-                                                  </div>
-                                                );
-                                              })()}
-                                            </div>
-                                          </div>
-                                        </div>
+                                    
 
                                         {/* Enhanced Stats Grid */}
                                         <div className="stats-grid">
@@ -3015,7 +3206,7 @@ const CRMDashboard = () => {
                                                     <h4 className="document-title">{doc.Name}</h4>
                                                     <div className="document-actions">
                                                       {!latestUpload ? (
-                                                        <button className="action-btn upload-btn" title="Upload Document">
+                                                        <button className="action-btn upload-btn" title="Upload Document" onClick={() => openUploadModal(doc)}>
                                                           <i className="fas fa-cloud-upload-alt"></i>
                                                           Upload
                                                         </button>
@@ -3076,6 +3267,7 @@ const CRMDashboard = () => {
 
 
                                         <DocumentModal />
+                                        <UploadModal />
                                       </div>
 
 
@@ -3153,6 +3345,8 @@ const CRMDashboard = () => {
               </nav>
             </section>
           </div>
+
+          
         </div>
 
         {/* Right Sidebar for Desktop - Panels */}
@@ -3171,6 +3365,9 @@ const CRMDashboard = () => {
         {isMobile && renderEditPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
+
+
+        
       </div>
 
       <style>
@@ -3294,6 +3491,241 @@ const CRMDashboard = () => {
           border-color: #dee2e6;
           color: #495057;
         }
+
+
+.upload-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.upload-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.upload-modal-header {
+  display: flex;
+  justify-content: between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.upload-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.3s;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.upload-modal-body {
+  padding: 25px;
+}
+
+.file-drop-zone {
+  border: 3px dashed #ddd;
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  background: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.file-drop-zone:hover {
+  border-color: #007bff;
+  background: #f0f8ff;
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #007bff;
+  margin-bottom: 10px;
+}
+
+.drop-zone-content h4 {
+  margin: 0;
+  color: #333;
+  font-weight: 600;
+}
+
+.drop-zone-content p {
+  margin: 0;
+  color: #666;
+}
+
+.file-types {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.file-types span {
+  font-size: 12px;
+  color: #999;
+}
+
+.file-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.selected-file-info h4 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.file-details {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.file-icon {
+  width: 50px;
+  height: 50px;
+  background: #007bff;
+  color: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.file-info {
+  flex: 1;
+}
+
+.file-name {
+  margin: 0;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.file-size {
+  margin: 5px 0 0 0;
+  color: #666;
+  font-size: 12px;
+}
+
+.upload-preview {
+  text-align: center;
+}
+
+.upload-preview h5 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  border: 2px solid #eee;
+}
+
+.upload-progress-section {
+  text-align: center;
+}
+
+.upload-progress-section h5 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  transition: width 0.3s ease;
+}
+
+.upload-modal-footer {
+  padding: 20px 25px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #fafafa;
+  border-radius: 0 0 12px 12px;
+}
+
+@media (max-width: 768px) {
+  .upload-modal-content {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .upload-modal-header {
+    padding: 15px 20px;
+  }
+  
+  .upload-modal-body {
+    padding: 20px;
+  }
+  
+  .file-drop-zone {
+    padding: 30px 15px;
+  }
+}
+
 
         /* ========================================
            🎯 NEW: Responsive Design (ADD THESE STYLES)
