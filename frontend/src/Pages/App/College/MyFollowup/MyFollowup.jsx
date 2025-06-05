@@ -2017,7 +2017,7 @@ const MyFollowup = () => {
         .main-tabs-wrapper {
           position: sticky;
           top: 0;
-          z-index: 1021;
+          z-index: 11;
         }
         
         .main-tab {
@@ -2042,7 +2042,7 @@ const MyFollowup = () => {
         .sub-tabs-wrapper {
           position: sticky;
           top: 64px;
-          z-index: 1020;
+          z-index: 11;
         }
         
         .sub-tab {
@@ -2080,6 +2080,7 @@ const MyFollowup = () => {
         
         .sidebar-content {
           top: 20px;
+          z-index: 11
         }
         
         .calendar-header h6 {
@@ -2144,7 +2145,7 @@ const MyFollowup = () => {
         .container-fluid.py-2 {
           position: sticky !important;
           top: 128px; /* Adjusted for new tabs */
-          z-index: 1019;
+          z-index: 11;
           background-color: white;
           box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
