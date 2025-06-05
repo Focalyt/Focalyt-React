@@ -150,6 +150,11 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
     top:0;
     visibility: hidden;
     }
+
+    .navbar-floating .header-navbar-shadow {
+    display: block;
+    background: linear-gradient(rgba(248, 248, 248, 0.95) 44%, rgba(248, 248, 248, 0.46) 73%, rgba(255, 255, 255, 0)) repeat;
+}
           `
         }
       </style>
