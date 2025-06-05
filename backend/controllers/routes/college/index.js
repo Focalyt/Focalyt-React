@@ -2577,7 +2577,7 @@ router.route("/kycCandidates").get(async (req, res) => {
 			};
 		});
 
-		console.log('data', result)
+		console.log('result', result)
 
 		res.status(200).json({
 			success: true,
