@@ -1,3 +1,4 @@
+const { defaultFormatUtc } = require('moment');
 const mongoose = require('mongoose');
 const { Schema, model } = require("mongoose");
 const { ObjectId } = Schema.Types;
@@ -40,6 +41,9 @@ const appliedCoursesSchema = new Schema(
       default: 0,
     },
 
+    kycStage:{type:Boolean, default:false},
+    kyc:{type:Boolean, default:false},
+    admissionDone:{type:Boolean,default:false},
     // Followup info (optional, alag se track karenge)
     followupDate: {
       type: Date,

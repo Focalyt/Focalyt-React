@@ -60,16 +60,23 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
       const headers = {
         'x-auth': token,
       };
-      const queryString = qs.stringify(params);
 
-      const response = await axios.get(`${backendUrl}/college/courses?${queryString}`, { headers });
 
-      console.log("Fetched courses:", response.data.course);
+      const response = await axios.get(`${backendUrl}/college/all_courses_centerwise`, {
+        params: {
+          centerId: selectedCenter._id,
+          projectId: selectedProject._id
+        },
+        headers: headers // make sure headers are passed correctly
+      });
+
+
+      console.log("Fetched courses:", response.data.data);
       console.log(" Response :", response);
 
 
       if (response.data) {
-        const updatedCourses = (response.data.courses || []).map(course => ({
+        const updatedCourses = (response.data.data || []).map(course => ({
           ...course,
           status: course.status === true ? 'active' : 'inactive'
         }));
@@ -241,7 +248,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
         </div> */}
 
         {/* Batch Component with filtered data */}
-        <Batch selectedCourse={selectedCourseForBatches} />
+        <Batch selectedCourse={selectedCourseForBatches} onBackToCourses = {handleBackToCourses} selectedCenter={selectedCenter} onBackToCenters={onBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
       </div>
     );
   }
@@ -251,38 +258,38 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
       {/* ======== ADD THIS: Back Button and Header ======== */}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
-                    <div className="d-flex align-items-center gap-3">
+          <div className="d-flex align-items-center gap-3">
 
-                        <div className='d-flex align-items-center'>
-                            <h5 style={{cursor:'pointer'}} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
-                            <span className="mx-2"> &gt; </span>
-                            <h5 style={{cursor:'pointer'}} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
-                                {selectedProject.name} Project
-                            </h5>
-                            <span className="mx-2"> &gt; </span>
-                            <h5 style={{cursor:'pointer'}} onClick={onBackToCenters}  className="breadcrumb-item mb-0" aria-current="page">
-                                {selectedCenter.name} Centers
-                            </h5>
-                            <span className="mx-2"> &gt; </span>
-                            <h5  className="breadcrumb-item mb-0" aria-current="page">
-                                All Courses
-                            </h5>
-                        </div>
-                    </div>
-                </div>
+            <div className='d-flex align-items-center'>
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
+              <span className="mx-2"> &gt; </span>
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+                {selectedProject.name} Project
+              </h5>
+              <span className="mx-2"> &gt; </span>
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
+                {selectedCenter.name} Centers
+              </h5>
+              <span className="mx-2"> &gt; </span>
+              <h5 className="breadcrumb-item mb-0" aria-current="page">
+                All Courses
+              </h5>
+            </div>
+          </div>
+        </div>
 
         <div>
 
           {onBackToCenters && (
-                        <button
-                            onClick={onBackToCenters}
-                            className="btn btn-light"
-                            title="Back to Verticals"
-                        >
-                            <i className="bi bi-arrow-left"></i>
-                            <span>Back</span>
-                        </button>
-                    )}
+            <button
+              onClick={onBackToCenters}
+              className="btn btn-light"
+              title="Back to Verticals"
+            >
+              <i className="bi bi-arrow-left"></i>
+              <span>Back</span>
+            </button>
+          )}
 
           <button className="btn btn-outline-secondary me-2 border-0 bg-transparent" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>

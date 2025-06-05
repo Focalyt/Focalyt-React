@@ -58,13 +58,12 @@ const ViewCourses = () => {
       const headers = {
         'x-auth': user.token,
       };
-const queryString = qs.stringify(params);
+      const queryString = qs.stringify(params);
 
       const response = await axios.get(`${backendUrl}/college/courses?${queryString}`, { headers });
 
       console.log("Fetched courses:", response.data.course);
       console.log(" Response :", response);
-
 
       if (response.data) {
         setCourses(response.data.courses || []);
@@ -82,32 +81,34 @@ const queryString = qs.stringify(params);
     navigate(`/institute/viewcourse?status=${!newArchived}`);
   };
 
-  // Handle toggle status
-  const handleToggleStatus = async (id, currentStatus) => {
+  // Handle toggle status - FIXED VERSION
+  const handleToggleStatus = async (courseId, currentStatus) => {
+    console.log("Course ID:", courseId, "Current Status:", currentStatus);
     
     try {
-      
-      console.log('status',currentStatus)
       const user = JSON.parse(sessionStorage.getItem('user'));
-
-      // Toggle status
-    const newStatus = !(currentStatus === 'true' || currentStatus === true);
-      console.log('newStatus',newStatus)
-
-
-    const form = { status: newStatus };
- 
-
-      await axios.put(`${backendUrl}/college/courses/edit/${id}`, form, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'x-auth': user?.token || sessionStorage.getItem('token')
+      
+      // Toggle the status
+      const newStatus = !currentStatus;
+      
+      await axios.put(`${backendUrl}/college/courses/update_course_status/${courseId}`, 
+        { status: newStatus },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth': user?.token || sessionStorage.getItem('token')
+          }
         }
-      });
-      // Reload data after status change
-      fetchCourses();
+      );
+      
+      window.location.reload()
+     
+      
+      console.log(`Course ${courseId} status updated to ${newStatus}`);
+      
     } catch (error) {
       console.error('Error changing course status:', error);
+      // Optionally show error message to user
     }
   };
 
@@ -286,39 +287,50 @@ const queryString = qs.stringify(params);
                           <th>Course Level</th>
                           <th>Course Name</th>
                           <th>Duration</th>
-                          {(status === 'true' ||status ===true) &&(
-                          <th>Add Leads</th>)}
+                          {(status === 'true' || status === true) && (
+                            <th>Add Leads</th>
+                          )}
                           <th>Status</th>
                           <th>Action</th>
-
                         </tr>
                       </thead>
                       <tbody>
                         {courses.map((course, i) => (
                           <tr key={course._id}>
                             <td style={{ padding: '14px' }}>
-                              {course.sectors?.map((sector, i) => (
+                              {course.sectors?.map((sector, j) => (
                                 <div key={sector._id}>{sector.name}</div>
                               ))}
                             </td>
                             <td>{course.courseLevel}</td>
                             <td>{course.name}</td>
-                            <td>{course.duration}</td>
-                            {(course.status ==='true' || course.status === true)&& (
-                            <td className="text-capitalize text-nowrap">
-                              <Link
-                                to={`/institute/viewcourse/${course._id}/candidate/addleads`}
-                                className="btn btn-danger waves-effect waves-light text-white d-inline btn-sm"
-                                style={{ padding: '7px' }}
-                              >
-                                Add leads
-                              </Link>
-                            </td>)}
-                            <td >
-
+                            {/* FIXED: Show actual duration instead of _id */}
+                            <td>{course.duration || 'N/A'}</td>
+                            {(course.status === 'true' || course.status === true) && (
+                              <td className="text-capitalize text-nowrap">
+                                <Link
+                                  to={`/institute/viewcourse/${course._id}/candidate/addleads`}
+                                  className="btn btn-danger waves-effect waves-light text-white d-inline btn-sm"
+                                  style={{ padding: '7px' }}
+                                >
+                                  Add leads
+                                </Link>
+                              </td>
+                            )}
+                            <td>
                               <div className="custom-control custom-switch custom-control-inline p-0">
-                                <input type="checkbox" id="customSwitch1" className="custom-control-input" onChange={() => handleToggleStatus(course._id, course.status)} checked={course.status} />
-                                <label for="customSwitch1" class="toggleSwitch"></label>
+                                {/* FIXED: Unique ID and proper event handling */}
+                                <input 
+                                  type="checkbox" 
+                                  id={`customSwitch${course._id}`} 
+                                  className="custom-control-input" 
+                                  onChange={() => handleToggleStatus(course._id, course.status)} 
+                                  checked={course.status === true || course.status === 'true'} 
+                                />
+                                <label 
+                                  htmlFor={`customSwitch${course._id}`} 
+                                  className="toggleSwitch"
+                                ></label>
                               </div>
                             </td>
                             <td valign="middle" className="qualification-action-custom-class d-flex justify-content-center border-0" style={{ padding: "14px" }}>
@@ -326,7 +338,6 @@ const queryString = qs.stringify(params);
                                 <Edit size={20} className="primary" />
                               </Link>
                             </td>
-
                           </tr>
                         ))}
                       </tbody>
@@ -340,71 +351,67 @@ const queryString = qs.stringify(params);
       </div>
 
       <style>
-        {
-          `
+        {`
           tbody tr{
-          border-bottom: 1px solid ;
+            border-bottom: 1px solid ;
           }
           .primary {
-    color: #FC2B5A!important;
-}
-  /* To hide the checkbox */
- .custom-table td{
-  padding: 14px!important;
-  font-size: 12.5px!important;
-  }
-#customSwitch1 {
-  display: none;
-}
+            color: #FC2B5A!important;
+          }
+          .custom-table td{
+            padding: 14px!important;
+            font-size: 12.5px!important;
+          }
+          
+          /* Hide the checkbox inputs */
+          .custom-control-input {
+            display: none;
+          }
 
-.toggleSwitch {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 50px;
-  height: 30px;
-  background-color: rgb(82, 82, 82);
-  border-radius: 20px;
-  cursor: pointer;
-  transition-duration: .2s;
-}
+          .toggleSwitch {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 50px;
+            height: 30px;
+            background-color: rgb(82, 82, 82);
+            border-radius: 20px;
+            cursor: pointer;
+            transition-duration: .2s;
+          }
 
-.toggleSwitch::after {
-  content: "";
-  position: absolute;
-  height: 18px;
-  width: 18px;
-  left: 5px;
-  background-color: transparent;
-  border-radius: 50%;
-  transition-duration: .2s;
-  box-shadow: 5px 2px 7px rgba(8, 8, 8, 0.26);
-  border: 5px solid white;
-}
+          .toggleSwitch::after {
+            content: "";
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 5px;
+            background-color: transparent;
+            border-radius: 50%;
+            transition-duration: .2s;
+            box-shadow: 5px 2px 7px rgba(8, 8, 8, 0.26);
+            border: 5px solid white;
+          }
 
-/* Fixed translation to move toggle all the way to the right */
-#customSwitch1:checked+.toggleSwitch::after {
-  transform: translateX(25px); /* Fixed value instead of percentage */
-  transition-duration: .2s;
-  background-color: white;
-}
+          .custom-control-input:checked + .toggleSwitch::after {
+            transform: translateX(25px);
+            transition-duration: .2s;
+            background-color: white;
+          }
 
-/* Changed background color to pink */
-#customSwitch1:checked+.toggleSwitch {
-  background-color: #FC2B5A; /* Pink color to match your code */
-  transition-duration: .2s;
-  height: 1.671rem;
-}
+          .custom-control-input:checked + .toggleSwitch {
+            background-color: #FC2B5A;
+            transition-duration: .2s;
+            height: 1.671rem;
+          }
 
-/* Bootstrap custom switch styles if needed */
-.custom-control-input:checked~.custom-control-label::before {
-  color: #fff;
-  border-color: #FC2B5A;
-  background-color: #FC2B5A;
-}
-          `
-        }
+          .custom-control-input:checked ~ .custom-control-label::before {
+            color: #fff;
+            border-color: #FC2B5A;
+            background-color: #FC2B5A;
+          }
+        `}
       </style>
     </div>
   );
