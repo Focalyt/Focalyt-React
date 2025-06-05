@@ -115,7 +115,6 @@ router.route("/login")
 	});
 
 router.route("/register")
-
 	.post(async (req, res) => {
 		try {
 			console.log('recieved data', req.body)
@@ -190,31 +189,26 @@ router.route("/appliedCandidates").get(async (req, res) => {
 
 		const totalCount = await AppliedCourses.countDocuments();
 
-		const appliedCourses = await AppliedCourses.find()
+		const appliedCourses = await AppliedCourses.find({
+			kycStage: { $nin: [true] },
+			kyc: { $nin: [true] },
+			admissionDone: { $nin: [true] }
+		})
 			.populate({
 				path: '_course',
+				select: 'name description docsRequired', // Select the necessary fields
 				populate: {
 					path: 'sectors',
 					select: 'name'
 				}
 			})
-			.populate({
-				path: '_course',
-				select: 'name description docsRequired'   // docsRequired bhi laao
-			})
 			.populate('_leadStatus')
 			.populate('registeredBy')
 			.populate({
 				path: '_candidate',
-				populate: {
-					path: '_appliedCourses',
-					populate: [
-						{ path: '_course', select: 'name description' },
-						{ path: 'registeredBy', select: 'name email' },
-						{ path: '_center', select: 'name location' },
-						{ path: '_leadStatus', select: 'title' }
-					]
-				}
+				populate: [
+					{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+				]
 			})
 			.populate({
 				path: 'logs',
@@ -226,6 +220,7 @@ router.route("/appliedCandidates").get(async (req, res) => {
 			.sort({ createdAt: -1 })
 			.skip(skip)
 			.limit(limit);
+
 
 		const result = appliedCourses.map(doc => {
 			let selectedSubstatus = null;
@@ -2036,10 +2031,10 @@ router.get('/list-projects', async (req, res) => {
 
 router.get('/list_all_projects', async (req, res) => {
 	try {
-		
 
-		const projects = await Project.find({status:'active'}).sort({ createdAt: -1 });
-		console.log('projects',projects)
+
+		const projects = await Project.find({ status: 'active' }).sort({ createdAt: -1 });
+		console.log('projects', projects)
 		res.json({ success: true, data: projects });
 	} catch (error) {
 		console.error('Error fetching projects:', error);
@@ -2061,13 +2056,13 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 		}
 
 		// Ensure project is an array
-    const projectArray = Array.isArray(project) ? project : [project];
+		const projectArray = Array.isArray(project) ? project : [project];
 
 		const newCenter = new Center({
 			name,
 			address: location,
 			status: status || 'active',
-			project:projectArray,
+			project: projectArray,
 			createdBy: user ? user._id : null,
 		});
 
@@ -2100,56 +2095,56 @@ router.put('/edit_center/:id', async (req, res) => {
 });
 
 router.put('/asign_center/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { projectId } = req.body; // extract projectId from body
+	try {
+		const { id } = req.params;
+		const { projectId } = req.body; // extract projectId from body
 
-    if (!projectId) {
-      return res.status(400).json({ success: false, message: 'Project ID is required' });
-    }
+		if (!projectId) {
+			return res.status(400).json({ success: false, message: 'Project ID is required' });
+		}
 
-    // Use $addToSet instead of $push if you want to avoid duplicates
-    const updatedCenter = await Center.findByIdAndUpdate(
-      id,
-      { $addToSet: { projects: projectId } }, // pushes projectId into project array if not already present
-      { new: true }
-    );
+		// Use $addToSet instead of $push if you want to avoid duplicates
+		const updatedCenter = await Center.findByIdAndUpdate(
+			id,
+			{ $addToSet: { projects: projectId } }, // pushes projectId into project array if not already present
+			{ new: true }
+		);
 
-    if (!updatedCenter) {
-      return res.status(404).json({ success: false, message: 'Center not found' });
-    }
+		if (!updatedCenter) {
+			return res.status(404).json({ success: false, message: 'Center not found' });
+		}
 
-    res.json({ success: true, data: updatedCenter });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+		res.json({ success: true, data: updatedCenter });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
 });
 
 router.put('/remove_project_from_center/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { projectId } = req.body;
+	try {
+		const { id } = req.params;
+		const { projectId } = req.body;
 
-    if (!projectId) {
-      return res.status(400).json({ success: false, message: 'Project ID is required' });
-    }
+		if (!projectId) {
+			return res.status(400).json({ success: false, message: 'Project ID is required' });
+		}
 
-    const updatedCenter = await Center.findByIdAndUpdate(
-      id,
-      { $pull: { projects: projectId } }, // removes projectId from the array
-      { new: true }
-    );
+		const updatedCenter = await Center.findByIdAndUpdate(
+			id,
+			{ $pull: { projects: projectId } }, // removes projectId from the array
+			{ new: true }
+		);
 
-    if (!updatedCenter) {
-      return res.status(404).json({ success: false, message: 'Center not found' });
-    }
+		if (!updatedCenter) {
+			return res.status(404).json({ success: false, message: 'Center not found' });
+		}
 
-    res.json({ success: true, data: updatedCenter });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+		res.json({ success: true, data: updatedCenter });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
 });
 
 
@@ -2160,20 +2155,19 @@ router.get('/list-centers', async (req, res) => {
 		const projectId = req.query.projectId;
 		if (projectId) {
 			if (!mongoose.Types.ObjectId.isValid(projectId)) {
-			return res.status(400).json({ success: false, message: 'Invalid Project ID' });
+				return res.status(400).json({ success: false, message: 'Invalid Project ID' });
+			}
+			const centers = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
+			console.log('centers', centers)
+			return res.json({ success: true, data: centers });
 		}
-		const centers = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
-		console.log('centers', centers)
-		return res.json({ success: true, data: centers });
-	}
-		else 
-		{
-		const centers = await Center.find({status:'active'}).sort({ createdAt: -1 });
-		console.log('centers', centers)
-		return res.json({ success: true, data: centers});
+		else {
+			const centers = await Center.find({ status: 'active' }).sort({ createdAt: -1 });
+			console.log('centers', centers)
+			return res.json({ success: true, data: centers });
 		}
 
-		
+
 	} catch (error) {
 		console.error('Error fetching centers by project:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
@@ -2182,9 +2176,9 @@ router.get('/list-centers', async (req, res) => {
 
 router.get('/list_all_centers', async (req, res) => {
 	try {
-		
 
-		const centers = await Center.find({ status:'active' }).sort({ createdAt: -1 });
+
+		const centers = await Center.find({ status: 'active' }).sort({ createdAt: -1 });
 		console.log('centers', centers)
 
 		res.json({ success: true, data: centers });
@@ -2298,7 +2292,7 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 router.get('/all_courses', async (req, res) => {
 	try {
-		const courses = await Courses.find({ status:true }).sort({ createdAt: -1 });
+		const courses = await Courses.find({ status: true }).sort({ createdAt: -1 });
 		console.log('centers', courses)
 
 		res.json({ success: true, data: courses });
@@ -2307,6 +2301,305 @@ router.get('/all_courses', async (req, res) => {
 		res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
+
+router.get('/all_courses_centerwise', async (req, res) => {
+	try {
+		const { centerId, projectId } = req.query
+		let filter = {
+			center: centerId,
+			project: projectId
+
+		}
+		console.log('req.params', req.params)
+		if (!centerId || !projectId) {
+			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
+
+		}
+		const courses = await Courses.find(filter).sort({ createdAt: -1 });
+		// Update the 'status' field based on the boolean value
+
+		console.log('centers', courses)
+
+		res.json({ success: true, data: courses });
+	} catch (error) {
+		console.error('Error fetching centers by project:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+//Batch APi
+
+router.post('/add_batch', async (req, res) => {
+	try {
+		// Destructure the data sent in the request body
+		const {
+			name,
+			startDate,
+			description,
+			endDate,
+			zeroPeriodStartDate,
+			zeroPeriodEndDate,
+			maxStudents,
+			status,
+			instructor,
+			courseId,
+			centerId,
+			createdBy
+		} = req.body;
+
+		// Validation: Ensure all required fields are provided
+		if (!name || !startDate || !endDate || !zeroPeriodStartDate || !zeroPeriodEndDate || !courseId || !centerId) {
+			return res.status(400).json({ success: false, message: 'All required fields must be provided' });
+		}
+
+		// Create a new batch
+		const newBatch = new Batch({
+			name,
+			startDate,
+			description,
+			instructor,
+			endDate,
+			zeroPeriodStartDate,
+			zeroPeriodEndDate,
+			maxStudents: maxStudents || 0,  // Default to 0 if not provided
+			status,  // Default to active if not provided
+			courseId,
+			centerId,
+			createdBy
+		});
+
+		// Save the batch to the database
+		const savedBatch = await newBatch.save();
+
+		// Send success response
+		res.status(201).json({
+			success: true,
+			message: 'Batch created successfully',
+			data: savedBatch
+		});
+	} catch (error) {
+		console.error('Error creating batch:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+// GET API to fetch batches
+router.get('/get_batches', async (req, res) => {
+	try {
+		const { centerId, courseId } = req.query;  // Get query params for filtering
+
+		let filter = {};
+
+		if (centerId) {
+			filter.centerId = centerId;
+		}
+
+		if (courseId) {
+			filter.courseId = courseId;
+		}
+
+		const batches = await Batch.find(filter).sort({ createdAt: -1 });  // Sorting by createdAt
+
+		res.json({
+			success: true,
+			data: batches
+		});
+
+	} catch (error) {
+		console.error('Error fetching batches:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+
+//Applied data update api
+
+router.put('/update/:id', async (req, res) => {
+	try {
+		const { id } = req.params; // Extract the ID from URL parameters
+		const updatedData = req.body; // Get the data to update from the request body
+
+		console.log('updatedData', updatedData)
+
+		// Find the document by ID and update it with the provided data
+		const updatedDocument = await AppliedCourses.findByIdAndUpdate(
+			id,
+			updatedData, // Dynamically pass the updated fields
+			{ new: true, runValidators: true } // Return the updated document and validate the update
+		);
+
+		console.log('updatedDocument', updatedDocument)
+
+		if (!updatedDocument) {
+			return res.status(404).json({ success: false, message: 'Document not found' });
+		}
+
+		// Return the updated document as a response
+		res.json({ success: true, data: updatedDocument });
+	} catch (error) {
+		console.error('Error updating document:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+//KYC Leads
+
+router.route("/kycCandidates").get(async (req, res) => {
+	try {
+		const page = parseInt(req.query.page) || 1;      // Default page 1
+		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+		const skip = (page - 1) * limit;
+
+
+
+		const appliedCourses = await AppliedCourses.find({
+			kycStage: { $in: [true] },
+			admissionDone: { $nin: [true] }
+		})
+			.populate({
+				path: '_course',
+				select: 'name description docsRequired', // Select the necessary fields
+				populate: {
+					path: 'sectors',
+					select: 'name'
+				}
+			})
+			.populate('_leadStatus')
+			.populate('registeredBy')
+			.populate({
+				path: '_candidate',
+				populate: [
+					{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+				]
+			})
+			.populate({
+				path: 'logs',
+				populate: {
+					path: 'user',
+					select: 'name'
+				}
+			})
+			.sort({ createdAt: -1 })
+			.skip(skip)
+			.limit(limit);
+
+		const totalCount = appliedCourses.length
+		const pendingKycCount = await AppliedCourses.countDocuments({
+			kycStage: { $in: [true] },
+			kyc: { $in: [false] },
+
+		});
+
+
+		const result = appliedCourses.map(doc => {
+			let selectedSubstatus = null;
+
+
+
+			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+				selectedSubstatus = doc._leadStatus.substatuses.find(
+					sub => sub._id.toString() === doc._leadSubStatus.toString()
+				);
+			}
+
+			const docObj = doc.toObject();
+
+			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+			if (docObj._course) {
+				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+			}
+
+			const requiredDocs = docObj._course?.docsRequired || [];
+			const uploadedDocs = docObj.uploadedDocs || [];
+
+			// Map uploaded docs by docsId for quick lookup
+			const uploadedDocsMap = {};
+			uploadedDocs.forEach(d => {
+				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+			});
+
+			// Prepare combined docs array
+			const combinedDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					// Agar uploaded hai to uploadedDoc details bhejo
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						_id: reqDoc._id
+					};
+				} else {
+					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
+
+			// Count calculations
+			let verifiedCount = 0;
+			let RejectedCount = 0;
+			let pendingVerificationCount = 0;
+			let notUploadedCount = 0;
+
+			combinedDocs.forEach(doc => {
+				if (doc.status === "Verified") verifiedCount++;
+				else if (doc.status === "Rejected") RejectedCount++;
+				else if (doc.status === "Pending") pendingVerificationCount++;
+				else if (doc.status === "Not Uploaded") notUploadedCount++;
+			});
+
+			const totalRequired = combinedDocs.length;
+			const uploadedCount = combinedDocs.filter(doc => doc.status !== "Not Uploaded").length;
+			const uploadPercentage = totalRequired > 0
+				? Math.round((uploadedCount / totalRequired) * 100)
+				: 0;
+			return {
+				...docObj,
+				selectedSubstatus,
+				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				docCounts: {
+					totalRequired,
+					RejectedCount,
+					uploadedCount,
+					verifiedCount,
+					pendingVerificationCount,
+					notUploadedCount,
+					uploadPercentage
+				}
+			};
+		});
+
+		console.log('data', result)
+
+		res.status(200).json({
+			success: true,
+			count: result.length,
+			page,
+			pendingKycCount,
+			limit,
+			totalCount,
+			totalPages: Math.ceil(totalCount / limit),
+			data: result,
+		});
+
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
+
+
 
 
 

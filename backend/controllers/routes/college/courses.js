@@ -93,12 +93,11 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 
 
 router.route("/").get(async (req, res) => {
-	console.log('college api hitting')
+
 	try {
 		let view = false
 		let canEdit = false
 		const user = req.user
-		console.log("user", user)
 
 
 		const data = req.query;
@@ -162,15 +161,12 @@ router.route("/").get(async (req, res) => {
 
 
 			courses = filteredCourses;
-			console.log("filteredCourses:", filteredCourses);
 		} else {
-			console.log('fields', fields)
 			courses = await Courses.find(fields).populate("sectors");
 		}
 
 
 
-		console.log(status, "this is status")
 		return res.json({
 
 			view,
@@ -474,6 +470,39 @@ router
 		}
 	});
 
+router.put('/update_course_status/:courseId', async (req, res) => {
+	try {
+		const { courseId } = req.params;
+
+		// Find the course by ID
+		const course = await Courses.findOne({ _id: courseId });
+		if (!course) {
+			return res.status(404).json({ success: false, message: 'Course not found' });
+		}
+		// Toggle the course status
+		let newStatus = course.status === true ? false : true;
+
+		// Find the course and update its status
+		const updatedCourse = await Courses.findByIdAndUpdate(
+			courseId,
+			{ status: newStatus }, // Set the new status
+			{ new: true } // Return the updated document
+		);
+
+		if (!updatedCourse) {
+			return res.status(404).json({ success: false, message: 'Course update failed' });
+		}
+
+		// Return the updated course data
+		res.json({ success: true, data: updatedCourse });
+	} catch (error) {
+		console.error('Error updating course status:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+
+
 
 
 router
@@ -577,24 +606,8 @@ router.route("/registrations")
 			let courseIds = [];
 			let centerIds = [];
 
-			// Convert courseAccess to ObjectIds
-			if (user.access && typeof user.access.courseAccess === 'string') {
-				courseIds = user.access.courseAccess
-					.split(',')
-					.map(id => id.trim())
-					.filter(id => id)
-					.map(id => new ObjectId(id));
-			}
-
-			// Convert centerAccess to ObjectIds
-			if (user.access && typeof user.access.centerAccess === 'string') {
-				centerIds = user.access.centerAccess
-					.split(',')
-					.map(id => id.trim())
-					.filter(id => id)
-					.map(id => new ObjectId(id));
-			}
-			if (user.role === 0 || user.role === 10) {
+			
+			
 				if (req.session.user.role === 10) {
 					view = true
 				}
@@ -623,87 +636,6 @@ router.route("/registrations")
 				let agg = candidateServices.candidateCourseList(sorting, perPage, page, filter);
 				candidates = await AppliedCourses.aggregate(agg);
 				totalPages = Math.ceil(count / perPage);
-
-			}
-			else if (user.role === 11 && user.access.roleName === "FSE Sales") {
-				console.log(user)
-
-				numberCheck = isNaN(data?.name);
-				if (data['name'] != '' && data.hasOwnProperty('name')) {
-					const regex = new RegExp(data['name'], 'i');
-					filter["name"] = regex;
-				}
-				if (data['name'] && !numberCheck) {
-					filter["$or"] = [
-						{ "name": { "$regex": data['name'], "$options": "i" } },
-						{ "mobile": Number(data['mobile']) },
-						{ "whatsapp": Number(data['whatsapp']) }
-					];
-				}
-
-				count = await AppliedCourses.countDocuments(filter)
-
-				if (value && order) {
-					sorting[value] = Number(order)
-				} else {
-					sorting = { createdAt: -1 }
-				};
-				let agg = candidateServices.candidateCourseList(sorting, perPage, page, filter);
-				let allCandidates = await AppliedCourses.aggregate(agg);
-
-				// ✅ Filter only those registered by current user
-				candidates = allCandidates.filter(c =>
-					c.registeredBy?.toString() === user._id.toString()
-				);
-				totalPages = Math.ceil(count / perPage);
-			}
-			else if (user.role === 11) {
-				console.log(user)
-
-				numberCheck = isNaN(data?.name);
-				if (data['name'] != '' && data.hasOwnProperty('name')) {
-					const regex = new RegExp(data['name'], 'i');
-					filter["name"] = regex;
-				}
-				if (data['name'] && !numberCheck) {
-					filter["$or"] = [
-						{ "name": { "$regex": data['name'], "$options": "i" } },
-						{ "mobile": Number(data['mobile']) },
-						{ "whatsapp": Number(data['whatsapp']) }
-					];
-				}
-
-				count = await AppliedCourses.countDocuments(filter)
-
-				if (value && order) {
-					sorting[value] = Number(order)
-				} else {
-					sorting = { createdAt: -1 }
-				};
-				let agg = candidateServices.candidateCourseList(sorting, perPage, page, filter);
-				let allCandidates = await AppliedCourses.aggregate(agg);
-				let centerIds = user.access?.centerAccess?.map(id => id.toString()) || [];
-				let courseIds = user.access?.courseAccess?.map(id => id.toString()) || [];
-
-				let filtered = allCandidates;
-
-				if (centerIds.length > 0) {
-					filtered = filtered.filter(c => c.centerId && centerIds.includes(c.centerId.toString()));
-				}
-
-				if (courseIds.length > 0) {
-					filtered = filtered.filter(c => c.courseId && courseIds.includes(c.courseId.toString()));
-				}
-
-				candidates = filtered
-
-
-				// ✅ Log to confirm filtering
-				console.log("filtered candidates:", candidates);
-				console.log('centerIds', centerIds);
-				console.log('allCandidates', allCandidates);
-			}
-
 
 			if (Array.isArray(candidates)) {
 
@@ -759,10 +691,6 @@ router.route("/registrations")
 			} else {
 				console.error("❌ candidates is not an array:", candidates);
 			}
-
-
-
-
 			console.log("candidates", candidates)
 			return res.render(`${req.vPath}/admin/course/registration`, {
 				candidates,
