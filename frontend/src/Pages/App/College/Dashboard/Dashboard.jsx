@@ -83,12 +83,12 @@ const Dashboard = () => {
       { label: 'Total Students', value: 3456, icon: 'fas fa-graduation-cap', color: 'dark', change: '+18%', changeType: 'positive' }
     ],
     revenueChart: [
-      { month: 'Jan', students: 2800, leads: 456, revenue: 2800000 },
-      { month: 'Feb', students: 2950, leads: 512, revenue: 2950000 },
-      { month: 'Mar', students: 3100, leads: 478, revenue: 3100000 },
-      { month: 'Apr', students: 3200, leads: 534, revenue: 3200000 },
-      { month: 'May', students: 3350, leads: 567, revenue: 3350000 },
-      { month: 'Jun', students: 3456, leads: 589, revenue: 3456000 }
+       { month: 'Jan', students: 2800, leads: 456 },
+      { month: 'Feb', students: 2950, leads: 512 },
+      { month: 'Mar', students: 3100, leads: 478 },
+      { month: 'Apr', students: 3200, leads: 534 },
+      { month: 'May', students: 3350, leads: 567 },
+      { month: 'Jun', students: 3456, leads: 589 }
     ],
     leadsData: [
       { day: 'Mon', leads: 15, conversions: 8 },
@@ -192,7 +192,7 @@ const Dashboard = () => {
                 </div>
                 <div className="chart-controls">
                   <div className="metric-selector">
-                    {['students', 'leads', 'revenue'].map(metric => (
+                    {['students', 'leads'].map(metric => (
                       <button
                         key={metric}
                         className={`metric-btn ${activeMetric === metric ? 'active' : ''}`}
@@ -364,7 +364,7 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className="chart-body">
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={400}>
                   <PieChart>
                     <Pie
                       data={dashboardData.verticalData}
@@ -1101,7 +1101,7 @@ const Dashboard = () => {
         .performance-grid {
           padding: 1.5rem 2rem 2rem 2rem;
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(1, 1fr);
           gap: 1.5rem;
         }
 
