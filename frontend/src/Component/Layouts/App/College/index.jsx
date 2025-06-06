@@ -209,12 +209,12 @@ function CollegeLayout({ children }) {
           <div className="main-menu-content border border-left-0 border-right-0 border-bottom-0">
             <ul className="navigation navigation-main" id="main-menu-navigation">
               {/* Dashboard */}
-              {/* <li className={`nav-item ${location.pathname === '/institute/dashboard' ? 'active' : ''}`}>
+              <li className={`nav-item ${location.pathname === '/institute/dashboard' ? 'active' : ''}`}>
                 <Link to="/institute/dashboard" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faChartLine} />
                   <span className="menu-title">Dashboard</span>
                 </Link>
-              </li> */}
+              </li>
 
               {/* Your Profile */}
               <li className={`nav-item ${location.pathname === '/institute/myProfile' ? 'active' : ''}`}>
@@ -223,12 +223,7 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">Your Profile</span>
                 </Link>
               </li>
-              <li className={`nav-item ${location.pathname === '/institute/projectmanagment' ? 'active' : ''}`}>
-                <Link to="/institute/projectmanagment" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faTasks} />
-                  <span className="menu-title">Project Management </span>
-                </Link>
-              </li>
+
 
               {/* Courses */}
               <li className={`nav-item has-sub ${openSubmenu.courses ? 'open' : ''}`}>
@@ -290,6 +285,20 @@ function CollegeLayout({ children }) {
                     color: location.pathname === '/institute/admissionpost' ? 'white' : 'black'
                   }}></i>
                   <span className="menu-title">Admission Cycle Post</span>
+                </Link>
+              </li>
+
+              <li className={`nav-item ${location.pathname === '/institute/projectmanagment' ? 'active' : ''}`}>
+                <Link to="/institute/projectmanagment" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faTasks} />
+                  <span className="menu-title">Training management</span>
+                </Link>
+              </li>
+
+              <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>
+                <Link to="/institute/myfollowup" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faChartLine} />
+                  <span className="menu-title">Follow up</span>
                 </Link>
               </li>
 
