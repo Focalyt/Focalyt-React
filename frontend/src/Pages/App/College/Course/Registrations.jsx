@@ -43,7 +43,124 @@ const CRMDashboard = () => {
   const fileInputRef = useRef(null);
 
 
+  // open model for upload documents 
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedDocumentForUpload, setSelectedDocumentForUpload] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadPreview, setUploadPreview] = useState(null);
 
+  const openUploadModal = (document) => {
+    setSelectedDocumentForUpload(document);
+    setShowUploadModal(true);
+    setSelectedFile(null);
+    setUploadPreview(null);
+    setUploadProgress(0);
+    setIsUploading(false)
+  };
+
+  const closeUploadModal = () => {
+    setShowUploadModal(false);
+    setSelectedDocumentForUpload(null);
+    setSelectedFile(null);
+    setUploadPreview(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type (images and PDFs)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a valid file (JPG, PNG, GIF, or PDF)');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('File size should be less than 10MB');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUploadPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setUploadPreview(null);
+    }
+  };
+
+  //  Simulate file upload with progress
+  const handleFileUpload = async () => {
+    if (!selectedFile || !selectedDocumentForUpload) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Simulate upload progress
+      for (let i = 0; i <= 100; i += 10) {
+        setUploadProgress(i);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      // Create new upload entry
+      const newUpload = {
+        _id: `upload_${Date.now()}`,
+        fileUrl: uploadPreview || 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=400',
+        uploadedAt: new Date(),
+        status: 'Pending',
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size
+      };
+
+      // Update the document with new upload
+      setAllProfiles(prevProfiles =>
+        prevProfiles.map(profile => {
+          if (profile._id === selectedProfile._id) {
+            const updatedDocuments = (profile._candidate?.documents).map(doc => {
+              if (doc._id === selectedDocumentForUpload._id) {
+                return {
+                  ...doc,
+                  uploads: [...(doc.uploads || []), newUpload]
+                };
+              }
+              return doc;
+            });
+
+            return {
+              ...profile,
+              _candidate: {
+                ...profile._candidate,
+                documents: updatedDocuments
+              }
+            };
+          }
+          return profile;
+        })
+      );
+
+      alert('Document uploaded successfully! Status: Pending Review');
+      closeUploadModal();
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Document functions
   // Fixed openDocumentModal function
@@ -481,6 +598,127 @@ const CRMDashboard = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+    const UploadModal = () => {
+    if (!showUploadModal || !selectedDocumentForUpload) return null;
+
+    return (
+      <div className="upload-modal-overlay" onClick={closeUploadModal}>
+        <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="upload-modal-header">
+            <h3>
+              <i className="fas fa-cloud-upload-alt me-2"></i>
+              Upload {selectedDocumentForUpload.Name}
+            </h3>
+            <button className="close-btn" onClick={closeUploadModal}>&times;</button>
+          </div>
+
+          <div className="upload-modal-body">
+            <div className="upload-section">
+              {!selectedFile ? (
+                <div className="file-drop-zone">
+                  <div className="drop-zone-content">
+                    <i className="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h4>Choose a file to upload</h4>
+                    <p>Drag and drop a file here, or click to select</p>
+                    <div className="file-types">
+                      <span>Supported: JPG, PNG, GIF, PDF</span>
+                      <span>Max size: 10MB</span>
+                    </div>
+                    <input
+                      type="file"
+                      id="file-input"
+                      accept=".jpg,.jpeg,.png,.gif,.pdf"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => document.getElementById('file-input').click()}
+                    >
+                      <i className="fas fa-folder-open me-2"></i>
+                      Choose File
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="file-preview-section">
+                  <div className="selected-file-info">
+                    <h4>Selected File:</h4>
+                    <div className="file-details">
+                      <div className="file-icon">
+                        <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                      </div>
+                      <div className="file-info">
+                        <p className="file-name">{selectedFile.name}</p>
+                        <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                      </div>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setUploadPreview(null);
+                        }}
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  {uploadPreview && (
+                    <div className="upload-preview">
+                      <h5>Preview:</h5>
+                      <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
+                    </div>
+                  )}
+
+                  {isUploading && (
+                    <div className="upload-progress-section">
+                      <h5>Uploading...</h5>
+                      <div className="progress-bar-container">
+                        <div
+                          className="progress-bar"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                      <p>{uploadProgress}% Complete</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="upload-modal-footer">
+            <button
+              className="btn btn-secondary"
+              onClick={closeUploadModal}
+              disabled={isUploading}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleFileUpload}
+              disabled={!selectedFile || isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <i className="fas fa-spinner fa-spin me-2"></i>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-upload me-2"></i>
+                  Upload Document
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -3731,7 +3969,10 @@ const CRMDashboard = () => {
                                                           <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
                                                           <div className="document-actions">
                                                             {(!latestUpload && doc.status === "Not Uploaded") ? (
-                                                              <button className="action-btn upload-btn" title="Upload Document">
+                                                              <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                                  setSelectedProfile(profile); // Set the current profile
+                                                                  openUploadModal(doc);        // Open the upload modal
+                                                                }}>
                                                                 <i className="fas fa-cloud-upload-alt"></i>
                                                                 Upload
                                                               </button>
@@ -3792,6 +4033,7 @@ const CRMDashboard = () => {
                                             </div>
 
                                             <DocumentModal />
+                                            <UploadModal />
                                           </div>
                                         );
                                       })()}
@@ -3926,6 +4168,137 @@ const CRMDashboard = () => {
 
 .react-date-picker__clear-button {
     display: none;
+}
+
+/* Upload Modal Styles */
+.upload-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+  backdrop-filter: blur(2px);
+}
+
+.upload-modal-content {
+  background-color: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  position: relative;
+}
+
+.upload-modal-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.upload-modal-body {
+  padding: 24px;
+}
+
+.upload-modal-footer {
+  padding: 16px 24px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.file-drop-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  background-color: #f9fafb;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.file-drop-zone:hover {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.drop-zone-content .upload-icon {
+  font-size: 48px;
+  color: #3b82f6;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.file-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.file-icon {
+  width: 48px;
+  height: 48px;
+  background-color: #3b82f6;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+}
+
+.file-info {
+  flex: 1;
+}
+
+.file-name {
+  margin: 0 0 4px;
+  font-weight: 500;
+  color: #1f2937;
+  font-size: 0.875rem;
+}
+
+.file-size {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background-color: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #3b82f6;
+  transition: width 0.3s ease;
+  border-radius: 4px;
 }
 
 @media(max-width:1920px) {
