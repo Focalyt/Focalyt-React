@@ -183,7 +183,7 @@ const handleFileUpload = async () => {
     setAllProfiles(prevProfiles => 
       prevProfiles.map(profile => {
         if (profile._id === selectedProfile._id) {
-          const updatedDocuments = (profile._candidate?.documents || staticDocuments).map(doc => {
+          const updatedDocuments = (profile._candidate?.documents).map(doc => {
             if (doc._id === selectedDocumentForUpload._id) {
               return {
                 ...doc,

@@ -518,15 +518,6 @@ const fetchCourses = async () => {
                 <span>Add User</span>
               </button>
 
-              {(permissionMode === 'hierarchical' || permissionMode === 'unified') && (
-                <button
-                  onClick={handleCreateRole}
-                  className="btn btn-info d-flex align-items-center gap-2"
-                >
-                  <Shield size={16} />
-                  <span>Add Role</span>
-                </button>
-              )}
             </div>
           </div>
         </div>

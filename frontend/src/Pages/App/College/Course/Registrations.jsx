@@ -9,6 +9,11 @@ import './CourseCrm.css';
 import './crm.css';
 
 const CRMDashboard = () => {
+
+   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -63,7 +68,7 @@ const CRMDashboard = () => {
       setIsNewModalOpen(false);
     }
 
-    document.body?.classList.add('no-scroll');
+    document.body?.classNameList.add('no-scroll');
   };
 
   const closeDocumentModal = () => {
@@ -75,7 +80,7 @@ const CRMDashboard = () => {
     // Only reset when actually closing modal
     setDocumentZoom(1);
     setDocumentRotation(0);
-    document.body?.classList.remove('no-scroll');
+    document.body?.classNameList.remove('no-scroll');
   };
 
   const zoomIn = () => {
@@ -569,7 +574,7 @@ const CRMDashboard = () => {
   ]);
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  
 
   const tabs = [
     'Lead Details',
@@ -992,10 +997,6 @@ const CRMDashboard = () => {
 
   const fetchStatus = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
-
       const response = await axios.get(`${backendUrl}/college/status`, {
         headers: { 'x-auth': token }
       });
@@ -1033,11 +1034,7 @@ const CRMDashboard = () => {
     try {
 
       console.log('Function in try');
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
-
-
-      // Prepare the request body
+       // Prepare the request body
       const updatedData = {
         kycStage: true
       };
@@ -1067,10 +1064,6 @@ const CRMDashboard = () => {
 
   const fetchSubStatus = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
-
       const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
         headers: { 'x-auth': token }
       });
@@ -1092,51 +1085,119 @@ const CRMDashboard = () => {
   };
 
   const handleUpdateStatus = async () => {
-    console.log('Function called');
-    try {
+  console.log('Function called');
+  
+  try {
+    console.log('Function in try');
+    console.log('Selected Status:', seletectedStatus);
+    console.log('Selected Sub Status:', seletectedSubStatus);
+    console.log('Followup Date:', followupDate);
+    console.log('Followup Time:', followupTime);
+    console.log('Remarks:', remarks);
+    console.log('Selected Profile:', selectedProfile);
 
-      console.log('Function in try');
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+    // Validation checks
+    if (!selectedProfile || !selectedProfile._id) {
+      alert('No profile selected');
+      return;
+    }
 
-      // Combine date and time into a single Date object (if both are set)
-      let followupDateTime = '';
-      if (followupDate && followupTime) {
-        followupDateTime = new Date(`${followupDate}T${followupTime}`);
+    if (!seletectedStatus) {
+      alert('Please select a status');
+      return;
+    }
+
+    // Combine date and time into a single Date object (if both are set)
+    let followupDateTime = '';
+    if (followupDate && followupTime) {
+      // Create proper datetime string
+      const dateStr = followupDate instanceof Date 
+        ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+        : followupDate;
+      
+      followupDateTime = new Date(`${dateStr}T${followupTime}`);
+      
+      // Validate the datetime
+      if (isNaN(followupDateTime.getTime())) {
+        alert('Invalid date/time combination');
+        return;
       }
+    }
 
-      // Prepare the request body
-      const data = {
-        _leadStatus: seletectedStatus?._id || seletectedStatus, // if it's an object or string
-        _leadSubStatus: seletectedSubStatus?._id || '',
-        followup: followupDateTime ? followupDateTime.toISOString() : '', // ISO string for backend
-        remarks
-      };
+    // Prepare the request body
+    const data = {
+      _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
+      _leadSubStatus: seletectedSubStatus?._id || null,
+      followup: followupDateTime ? followupDateTime.toISOString() : null,
+      remarks: remarks || ''
+    };
 
-      console.log('Sending data:', data);
+    console.log('Sending data:', data);
+    console.log('API URL:', `${backendUrl}/college/lead/status_change/${selectedProfile._id}`);
+    console.log('Token:', token ? 'Token exists' : 'No token');
 
-      // Send PUT request to backend API
-      const response = await axios.put(`${backendUrl}/college/lead/status_change/${selectedProfile._id}`, data, {
+    // Check if backend URL and token exist
+    if (!backendUrl) {
+      alert('Backend URL not configured');
+      return;
+    }
+
+    if (!token) {
+      alert('Authentication token missing');
+      return;
+    }
+
+    // Send PUT request to backend API
+    const response = await axios.put(
+      `${backendUrl}/college/lead/status_change/${selectedProfile._id}`, 
+      data, 
+      {
         headers: {
           'x-auth': token,
           'Content-Type': 'application/json'
         }
-      });
-
-      console.log('API response:', response.data);
-
-      if (response.data.success) {
-        alert('Status updated successfully!');
-        // Optionally refresh data here
-        closeEditPanel();
-      } else {
-        alert('Failed to update status');
       }
-    } catch (error) {
-      console.error('Error updating status:', error);
-      // alert('An error occurred while updating status');
+    );
+
+    console.log('API response:', response.data);
+
+    if (response.data.success) {
+      alert('Status updated successfully!');
+      
+      // Reset form
+      setSelectedStatus('');
+      setSelectedSubStatus(null);
+      setFollowupDate('');
+      setFollowupTime('');
+      setRemarks('');
+      
+      // Refresh data and close panel
+      await fetchProfileData();
+      closeEditPanel();
+    } else {
+      console.error('API returned error:', response.data);
+      alert(response.data.message || 'Failed to update status');
     }
-  };
+  } catch (error) {
+    console.error('Error updating status:', error);
+    
+    // More detailed error handling
+    if (error.response) {
+      // Server responded with error status
+      console.error('Error Response:', error.response.data);
+      console.error('Error Status:', error.response.status);
+      alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
+    } else if (error.request) {
+      // Request was made but no response received
+      console.error('No response received:', error.request);
+      alert('Network error: Unable to reach server');
+    } else {
+      // Something else happened
+      console.error('Error:', error.message);
+      alert(`Error: ${error.message}`);
+    }
+  }
+};
 
 
 
@@ -1158,8 +1219,7 @@ const CRMDashboard = () => {
 
   const fetchProfileData = async () => {
     try {
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+      
       if (!token) {
         console.warn('No token found in session storage.');
         return;
@@ -2041,88 +2101,7 @@ const CRMDashboard = () => {
                 </div>
 
                 <div className="row g-4">
-                  {/* Search Section */}
-                  {/* <div className="col-12">
-                    <div className="card border-0 bg-light">
-                      <div className="card-body p-3">
-                        <label className="form-label small fw-bold text-dark mb-2">
-                          <i className="fas fa-search me-1"></i>
-                          Quick Search
-                        </label>
-                        <div className="input-group">
-                          <span className="input-group-text bg-white border-end-0">
-                            <i className="fas fa-search text-muted"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="name"
-                            className="form-control border-start-0"
-                            placeholder="Type to search by name, mobile, or email..."
-                            value={filterData.name}
-                            onChange={handleFilterChange}
-                          />
-                          {filterData.name && (
-                            <button
-                              className="btn btn-outline-secondary"
-                              type="button"
-                              onClick={() => {
-                                setFilterData(prev => ({ ...prev, name: '' }));
-                                setAllProfiles(allProfilesData);
-                              }}
-                            >
-                              <i className="fas fa-times"></i>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div> */}
-
-                  {/* Category Filters */}
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-tags me-1 text-info"></i>
-                      Lead Category
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="leadStatus"
-                        value={filterData.leadStatus}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Categories</option>
-                        <option value="Application">📋 Application</option>
-                        <option value="Lead">🎯 Lead</option>
-                        <option value="Prospect">👤 Prospect</option>
-                      </select>
-                      <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
-                    </div>
-                  </div>
-
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-signal me-1 text-warning"></i>
-                      Status Priority
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="status"
-                        value={filterData.status}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Status</option>
-                        {statuses.map((status, index) => (
-                          <option key={status._id} value={status._id}>
-                            {getStatusIcon(status.name)} {status.name} ({status.count})
-                          </option>
-                        ))}
-                      </select>
-                      <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
-                    </div>
-                  </div>
-
+                    
                   <div className="col-md-4">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-graduation-cap me-1 text-success"></i>

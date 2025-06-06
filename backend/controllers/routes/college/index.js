@@ -221,6 +221,8 @@ router.route("/appliedCandidates").get(async (req, res) => {
 			.skip(skip)
 			.limit(limit);
 
+			
+
 
 		const result = appliedCourses.map(doc => {
 			let selectedSubstatus = null;
