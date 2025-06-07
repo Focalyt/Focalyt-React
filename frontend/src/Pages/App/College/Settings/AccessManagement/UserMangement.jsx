@@ -134,7 +134,7 @@ const UserManagement = ({
             </li>
           </ul>
         </div>
-        
+
         <div className="card-body p-0">
           <div className="table-responsive">
             <table className="table table-hover mb-0">
@@ -195,8 +195,8 @@ const UserManagement = ({
                             checked={user.status === 'active'}
                             onChange={() => handleStatusChange(user.user_id, user.status)}
                           />
-                          <label 
-                            className="form-check-label" 
+                          <label
+                            className="form-check-label"
                             htmlFor={`userStatus${user.user_id}`}
                           >
                             <span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
@@ -214,16 +214,16 @@ const UserManagement = ({
                           >
                             <Eye size={16} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => onEditUser && onEditUser(user)}
-                            className="btn btn-sm btn-outline-success" 
+                            className="btn btn-sm btn-outline-success"
                             title="Edit User"
                           >
                             <Edit size={16} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => onDeleteUser && onDeleteUser(user)}
-                            className="btn btn-sm btn-outline-danger" 
+                            className="btn btn-sm btn-outline-danger"
                             title="Delete User"
                           >
                             <Trash2 size={16} />
@@ -238,7 +238,7 @@ const UserManagement = ({
           </div>
         </div>
       </div>
-      
+
       {getFilteredUsers().length === 0 && (
         <div className="text-center py-4">
           <Users size={48} className="text-muted mb-3" />
@@ -252,115 +252,25 @@ const UserManagement = ({
         {
 
           `
-          /* Toggle Button CSS */
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 24px;
+          .form-check-input{
+          height: 25px;
+          width:45px!important;
+          }
+          .form-check-input:checked {
+  background-color: #FC2B5A !important;
+  border-color: #FC2B5A !important;
 }
 
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+.form-check-input:focus {
+  border-color: #FC2B5A !important;
+  outline: 0 !important;
+  box-shadow: 0 0 0 0.25rem rgba(252, 43, 90, 0.25) !important;
 }
 
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: 0.3s ease;
-  border-radius: 24px;
+.form-check-input:checked:focus {
+  box-shadow: 0 0 0 0.25rem rgba(252, 43, 90, 0.25) !important;
 }
-
-.toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.3s ease;
-  border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* Active state */
-input:checked + .toggle-slider {
-  background-color: #FC2B5A;
-}
-
-input:checked + .toggle-slider:before {
-  transform: translateX(26px);
-}
-
-/* Focus state for accessibility */
-input:focus + .toggle-slider {
-  box-shadow: 0 0 0 2px rgba(252, 43, 90, 0.3);
-}
-
-/* Hover effects */
-.toggle-slider:hover {
-  opacity: 0.9;
-}
-
-/* Disabled state */
-input:disabled + .toggle-slider {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-input:disabled + .toggle-slider:hover {
-  opacity: 0.5;
-}
-
-/* Alternative larger size */
-.toggle-switch.large {
-  width: 60px;
-  height: 30px;
-}
-
-.toggle-switch.large .toggle-slider {
-  border-radius: 30px;
-}
-
-.toggle-switch.large .toggle-slider:before {
-  height: 22px;
-  width: 22px;
-  left: 4px;
-  bottom: 4px;
-}
-
-.toggle-switch.large input:checked + .toggle-slider:before {
-  transform: translateX(30px);
-}
-
-/* Alternative smaller size */
-.toggle-switch.small {
-  width: 40px;
-  height: 20px;
-}
-
-.toggle-switch.small .toggle-slider {
-  border-radius: 20px;
-}
-
-.toggle-switch.small .toggle-slider:before {
-  height: 14px;
-  width: 14px;
-  left: 3px;
-  bottom: 3px;
-}
-
-.toggle-switch.small input:checked + .toggle-slider:before {
-  transform: translateX(20px);
-} 
+         
           
           `
         }

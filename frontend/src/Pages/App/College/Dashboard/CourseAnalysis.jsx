@@ -8,12 +8,12 @@ const CourseAnalysis = () => {
   // Course analytics data
   const [courseData] = useState({
     courseWiseLeads: [
-      { course: 'Full Stack Development', totalLeads: 1245, interested: 892, converted: 234, revenue: 3456000, avgDuration: '6 months' },
-      { course: 'Data Science', totalLeads: 987, interested: 734, converted: 189, revenue: 2789000, avgDuration: '8 months' },
-      { course: 'Digital Marketing', totalLeads: 756, interested: 567, converted: 145, revenue: 2134000, avgDuration: '4 months' },
-      { course: 'UI/UX Design', totalLeads: 654, interested: 456, converted: 123, revenue: 1890000, avgDuration: '5 months' },
-      { course: 'Cybersecurity', totalLeads: 534, interested: 389, converted: 98, revenue: 1567000, avgDuration: '7 months' },
-      { course: 'Cloud Computing', totalLeads: 423, interested: 312, converted: 87, revenue: 1234000, avgDuration: '6 months' }
+      { course: 'Full Stack Development', totalLeads: 1245, interested: 892, converted: 234, avgDuration: '6 months' },
+      { course: 'Data Science', totalLeads: 987, interested: 734, converted: 189, avgDuration: '8 months' },
+      { course: 'Digital Marketing', totalLeads: 756, interested: 567, converted: 145, avgDuration: '4 months' },
+      { course: 'UI/UX Design', totalLeads: 654, interested: 456, converted: 123, avgDuration: '5 months' },
+      { course: 'Cybersecurity', totalLeads: 534, interested: 389, converted: 98, avgDuration: '7 months' },
+      { course: 'Cloud Computing', totalLeads: 423, interested: 312, converted: 87, avgDuration: '6 months' }
     ]
   });
 
@@ -79,9 +79,9 @@ const CourseAnalysis = () => {
                 <i className="fas fa-rupee-sign"></i>
               </div>
               <h4 className="mb-1">
-                {formatCurrency(courseData.courseWiseLeads.reduce((sum, c) => sum + c.revenue, 0))}
+                {formatCurrency(courseData.courseWiseLeads.reduce((sum, c) => sum +  0))}
               </h4>
-              <p className="text-muted mb-0">Total Revenue</p>
+           
             </div>
           </div>
         </div>
@@ -103,7 +103,6 @@ const CourseAnalysis = () => {
                   <th>Interested</th>
                   <th>Converted</th>
                   <th>Conversion Rate</th>
-                  <th>Revenue</th>
                   <th>Performance</th>
                 </tr>
               </thead>
@@ -142,7 +141,7 @@ const CourseAnalysis = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="text-success fw-bold">{formatCurrency(course.revenue)}</td>
+                  
                     <td>
                       <div className="performance-indicator">
                         {(course.converted / course.totalLeads) >= 0.2 ? '🏆' : 
@@ -186,7 +185,7 @@ const CourseAnalysis = () => {
         <div className="col-md-6 mb-4">
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white border-0 pb-0">
-              <h5 className="card-title mb-0 fw-semibold">💰 Revenue by Course</h5>
+              <h5 className="card-title mb-0 fw-semibold">Course</h5>
             </div>
             <div className="card-body">
               <div style={{ height: '350px' }}>
@@ -198,7 +197,7 @@ const CourseAnalysis = () => {
                       cy="50%"
                       outerRadius={120}
                       dataKey="revenue"
-                      label={({ course, revenue }) => `${course}: ${formatCurrency(revenue)}`}
+                      label={({ course }) => `${course}: ${formatCurrency()}`}
                     >
                       {courseData.courseWiseLeads.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={`hsl(${index * 55}, 70%, 60%)`} />
@@ -269,8 +268,7 @@ const CourseAnalysis = () => {
                   </span>
                 </div>
                 <div className="insight-stat">
-                  <span className="insight-label">Revenue</span>
-                  <span className="insight-value">{formatCurrency(course.revenue)}</span>
+              
                 </div>
               </div>
               <div className="course-insight-progress">
