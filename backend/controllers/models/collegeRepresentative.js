@@ -5,7 +5,7 @@ const { ObjectId } = Schema.Types;
 const collegeRepresentativeSchema = new Schema(
 	{
 		_college: { type: ObjectId, ref: "College" },
-		name: { type: String, lowercase: true, trim: true },
+		name: { type: String, trim: true },
 		email: {
 			type: String,
 			lowercase: true,

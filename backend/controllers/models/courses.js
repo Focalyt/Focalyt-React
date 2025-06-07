@@ -8,7 +8,7 @@ const courseSchema = new Schema({
   centerId: { type: ObjectId, ref: 'Center' }, // ✅ Added for simplified reference
 
   courseLevel: String,
-  name: { type: String, lowercase: true, trim: true },
+  name: { type: String, trim: true },
   description: { type: String }, // ✅ Added to support short course summary
   duration: String,
   students: { type: Number, default: 0 }, // ✅ Added to track enrollment count

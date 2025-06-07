@@ -17,18 +17,18 @@ const appliedCoursesSchema = new Schema(
       type: ObjectId,
       ref: "Center",
     },
-   _leadStatus: {
-        type: ObjectId,
-        ref: "Status",
-        default:new mongoose.Types.ObjectId('64ab1234abcd5678ef901234')
-      },
-   _leadSubStatus: {
-        type: ObjectId,
-        default:new mongoose.Types.ObjectId('64ab1234abcd5678ef901235')
-      },
+    _leadStatus: {
+      type: ObjectId,
+      ref: "Status",
+      default: new mongoose.Types.ObjectId('64ab1234abcd5678ef901234')
+    },
+    _leadSubStatus: {
+      type: ObjectId,
+      default: new mongoose.Types.ObjectId('64ab1234abcd5678ef901235')
+    },
     _initialStatus: {
       type: String,
-      enum:['Hot', 'Warm', 'Cold'],
+      enum: ['Hot', 'Warm', 'Cold'],
     },
     registeredBy: {
       type: ObjectId,
@@ -41,13 +41,26 @@ const appliedCoursesSchema = new Schema(
       default: 0,
     },
 
-    kycStage:{type:Boolean, default:false},
-    kyc:{type:Boolean, default:false},
-    admissionDone:{type:Boolean,default:false},
+    kycStage: { type: Boolean, default: false },
+    kyc: { type: Boolean, default: false },
+    admissionDone: { type: Boolean, default: false },
     // Followup info (optional, alag se track karenge)
     followupDate: {
       type: Date,
     },
+    followups: [{
+      date: {
+        type: Date,
+      },
+      status: {
+        type: String,
+        default:'Planned',
+        enum: ['Done', 'Missed', 'Planned']
+      },
+      
+    }
+
+    ],
     counsellorName: [{
       type: ObjectId,
       ref: "User",

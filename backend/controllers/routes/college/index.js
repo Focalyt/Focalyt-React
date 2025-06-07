@@ -2323,12 +2323,22 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
 			doc._leadSubStatus = _leadSubStatus;
 		}
-
-		// If followup date and time is set or updated, log the change and update the followup
-		if (followup && doc.followup?.toISOString() !== new Date(followup).toISOString()) {
-			actionParts.push(`Followup updated to ${new Date(followup).toLocaleString()}`);
-			doc.followupDate = new Date(followup); // Update followup date and time
+		if (doc.followups?.length > 0) {
+			const lastFollowup = doc.followups[doc.followups.length - 1];
+			if (lastFollowup?.status === 'Planned') {
+				lastFollowup.status = 'Done'
+			}
 		}
+		// If followup date and time is set or updated, log the change and update the followup
+		if (followup && doc.followups?.[doc.followups.length - 1]?.date?.toISOString() !== new Date(followup).toISOString()) {
+			actionParts.push(`Followup updated to ${new Date(followup).toLocaleString()}`);
+			// Push a new followup object
+			doc.followups.push({
+				date: new Date(followup),
+				status: 'Planned'
+			});
+		}
+
 
 		// If remarks are set or updated, log the change and update remarks
 		if (remarks && doc.remarks !== remarks) {
@@ -2589,7 +2599,7 @@ router.route("/kycCandidates").get(async (req, res) => {
 			uploadedDocs.forEach(d => {
 				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
 			});
-// Prepare combined docs array
+			// Prepare combined docs array
 			const allDocs = requiredDocs.map(reqDoc => {
 				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
 				if (uploadedDoc) {
@@ -2698,152 +2708,368 @@ router.route("/kycCandidates").get(async (req, res) => {
 	}
 });
 
-router.route("/update_kyc/:id")
-	.put(async (req, res) => {
-		try {
-			const user = req.user
-			let { id } = req.params;
-			let { doc, kycStatus } = req.body;
-			let docsId = doc;
-			console.log('doc', doc)
-			if (!docsId) {
-				return res.status(400).json({ error: "docs id not found." });
-			}
-			if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
-				docsId = new mongoose.Types.ObjectId(docsId);
-			}
-
-			if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
-				id = new mongoose.Types.ObjectId(id);
-			}
-
-			const appliedCourse = await AppliedCourses.findOne({ _id: id });
-
-			if (!appliedCourse) {
-				return res.status(400).json({ error: "You have not applied for this course." });
-			}
-
-
-
-
-			appliedCourse.uploadedDocs.update({
-				docsId: new mongoose.Types.ObjectId(docsId),
-				fileUrl: fileUrl,
-				status,
-				verifiedDate: new Date(),
-				verifiedBy: user._id
-			});
-
-			await appliedCourse.save();
-			console.log('appliedCourse', appliedCourse)
-
-			return res.status(200).json({
-				status: true,
-				message: "Document uploaded successfully",
-				data: appliedCourse
-			});
-
-		} catch (err) {
-			console.log(err)
-			return res.status(500).send({ status: false, message: err.message });
+router.put("/update_kyc/:id", async (req, res) => {
+	try {
+		const user = req.user
+		let { id } = req.params;
+		let { doc, kycStatus } = req.body;
+		let docsId = doc;
+		console.log('doc', doc)
+		if (!docsId) {
+			return res.status(400).json({ error: "docs id not found." });
 		}
-	})
+		if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
+			docsId = new mongoose.Types.ObjectId(docsId);
+		}
+
+		if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+			id = new mongoose.Types.ObjectId(id);
+		}
+
+		const appliedCourse = await AppliedCourses.findOne({ _id: id });
+
+		if (!appliedCourse) {
+			return res.status(400).json({ error: "You have not applied for this course." });
+		}
+
+
+
+
+		appliedCourse.uploadedDocs.update({
+			docsId: new mongoose.Types.ObjectId(docsId),
+			fileUrl: fileUrl,
+			status,
+			verifiedDate: new Date(),
+			verifiedBy: user._id
+		});
+
+		await appliedCourse.save();
+		console.log('appliedCourse', appliedCourse)
+
+		return res.status(200).json({
+			status: true,
+			message: "Document uploaded successfully",
+			data: appliedCourse
+		});
+
+	} catch (err) {
+		console.log(err)
+		return res.status(500).send({ status: false, message: err.message });
+	}
+})
 
 
 //doccumnet upload
-router.route("/upload_docs/:id")
-	.put(async (req, res) => {
-		try {
-			let { id } = req.params;
-			let { doc } = req.body;
-			let docsId = doc;
-			console.log('doc', doc)
-			if (!docsId) {
-				return res.status(400).json({ error: "docs id not found." });
-			}
-			if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
-				docsId = new mongoose.Types.ObjectId(docsId);
-			}
-
-			if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
-				id = new mongoose.Types.ObjectId(id);
-			}
-
-			const appliedCourse = await AppliedCourses.findOne({ _id: id });
-
-			if (!appliedCourse) {
-				return res.status(400).json({ error: "You have not applied for this course." });
-			}
-
-
-
-			const files = req.files?.file;
-			if (!files) {
-				return res.status(400).send({ status: false, message: "No files uploaded" });
-			}
-
-
-			const filesArray = Array.isArray(files) ? files : [files];
-			const uploadedFiles = [];
-			const uploadPromises = [];
-
-			filesArray.forEach((item) => {
-				const { name, mimetype } = item;
-				const ext = name?.split('.').pop().toLowerCase();
-
-				if (!allowedExtensions.includes(ext)) {
-					throw new Error(`File type not supported: ${ext}`);
-				}
-
-				let fileType = "document";
-				if (allowedImageExtensions.includes(ext)) {
-					fileType = "image";
-				} else if (allowedVideoExtensions.includes(ext)) {
-					fileType = "video";
-				}
-
-				const key = `Documents for course/${appliedCourse._course}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
-				const params = {
-					Bucket: bucketName,
-					Key: key,
-					Body: item.data,
-					ContentType: mimetype,
-				};
-
-				uploadPromises.push(
-					s3.upload(params).promise().then((uploadResult) => {
-						uploadedFiles.push({
-							fileURL: uploadResult.Location,
-							fileType,
-						});
-					})
-				);
-			});
-
-			await Promise.all(uploadPromises);
-			const fileUrl = uploadedFiles[0].fileURL;
-
-			appliedCourse.uploadedDocs.push({
-				docsId: new mongoose.Types.ObjectId(docsId),
-				fileUrl: fileUrl,
-				status: "Pending",
-				uploadedAt: new Date()
-			});
-
-			await appliedCourse.save();
-			console.log('appliedCourse', appliedCourse)
-
-			return res.status(200).json({
-				status: true,
-				message: "Document uploaded successfully",
-				data: appliedCourse
-			});
-
-		} catch (err) {
-			console.log(err)
-			return res.status(500).send({ status: false, message: err.message });
+router.put("/upload_docs/:id", async (req, res) => {
+	try {
+		let { id } = req.params;
+		let { doc } = req.body;
+		let docsId = doc;
+		console.log('doc', doc)
+		if (!docsId) {
+			return res.status(400).json({ error: "docs id not found." });
 		}
-	})
+		if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
+			docsId = new mongoose.Types.ObjectId(docsId);
+		}
+
+		if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+			id = new mongoose.Types.ObjectId(id);
+		}
+
+		const appliedCourse = await AppliedCourses.findOne({ _id: id });
+
+		if (!appliedCourse) {
+			return res.status(400).json({ error: "You have not applied for this course." });
+		}
+
+
+
+		const files = req.files?.file;
+		if (!files) {
+			return res.status(400).send({ status: false, message: "No files uploaded" });
+		}
+
+
+		const filesArray = Array.isArray(files) ? files : [files];
+		const uploadedFiles = [];
+		const uploadPromises = [];
+
+		filesArray.forEach((item) => {
+			const { name, mimetype } = item;
+			const ext = name?.split('.').pop().toLowerCase();
+
+			if (!allowedExtensions.includes(ext)) {
+				throw new Error(`File type not supported: ${ext}`);
+			}
+
+			let fileType = "document";
+			if (allowedImageExtensions.includes(ext)) {
+				fileType = "image";
+			} else if (allowedVideoExtensions.includes(ext)) {
+				fileType = "video";
+			}
+
+			const key = `Documents for course/${appliedCourse._course}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
+			const params = {
+				Bucket: bucketName,
+				Key: key,
+				Body: item.data,
+				ContentType: mimetype,
+			};
+
+			uploadPromises.push(
+				s3.upload(params).promise().then((uploadResult) => {
+					uploadedFiles.push({
+						fileURL: uploadResult.Location,
+						fileType,
+					});
+				})
+			);
+		});
+
+		await Promise.all(uploadPromises);
+		const fileUrl = uploadedFiles[0].fileURL;
+
+		appliedCourse.uploadedDocs.push({
+			docsId: new mongoose.Types.ObjectId(docsId),
+			fileUrl: fileUrl,
+			status: "Pending",
+			uploadedAt: new Date()
+		});
+
+		await appliedCourse.save();
+		console.log('appliedCourse', appliedCourse)
+
+		return res.status(200).json({
+			status: true,
+			message: "Document uploaded successfully",
+			data: appliedCourse
+		});
+
+	} catch (err) {
+		console.log(err)
+		return res.status(500).send({ status: false, message: err.message });
+	}
+})
+
+
+//my followups
+router.get("/leads/my-followups", async (req, res) => {
+	try {
+		const { fromDate, toDate, page = 1, limit = 10 } = req.query;
+
+		// Add date validation
+		let from, to;
+
+		if (fromDate) {
+			from = new Date(fromDate);
+			if (isNaN(from.getTime())) {
+				return res.status(400).json({ error: "Invalid fromDate format" });
+			}
+		} else {
+			from = new Date(new Date().setHours(0, 0, 0, 0));
+		}
+
+		if (toDate) {
+			to = new Date(toDate);
+			if (isNaN(to.getTime())) {
+				return res.status(400).json({ error: "Invalid toDate format" });
+			}
+		} else {
+			to = new Date(new Date().setHours(23, 59, 59, 999));
+		}
+
+		const skip = (parseInt(page) - 1) * parseInt(limit);
+
+		// First, get the documents that match our criteria
+		const matchingDocs = await AppliedCourses.find({
+			followups: { $exists: true, $ne: [] },
+			"followups.date": { $gte: from, $lte: to }
+		})
+			.populate([
+				{
+					path: '_course',
+					select: 'name description docsRequired',
+					populate: { path: 'sectors', select: 'name' }
+				},
+				{ path: '_leadStatus' },
+				{ path: 'registeredBy' },
+				{
+					path: '_candidate',
+					populate: [
+						{
+							path: '_appliedCourses',
+							populate: [
+								{ path: '_course', select: 'name description' },
+								{ path: 'registeredBy', select: 'name email' },
+								{ path: '_center', select: 'name location' },
+								{ path: '_leadStatus', select: 'title' }
+							]
+						}
+					]
+				},
+				{
+					path: 'logs',
+					populate: {
+						path: 'user',
+						select: 'name'
+					}
+				}
+			]);
+
+		// Now flatten and filter the followups
+		let allFollowups = [];
+
+		matchingDocs.forEach(doc => {
+			doc.followups.forEach(followup => {
+				if (followup.date >= from && followup.date <= to) {
+					allFollowups.push({
+						...doc.toObject(), // Convert to plain object here
+						followupDate: followup.date,
+						followupStatus: followup.status
+					});
+				}
+			});
+		});
+
+		// Sort by followup date
+		allFollowups.sort((a, b) => new Date(b.followupDate) - new Date(a.followupDate));
+
+		// Apply pagination
+		const total = allFollowups.length;
+		const totalPages = Math.ceil(total / parseInt(limit));
+		const paginatedData = allFollowups.slice(skip, skip + parseInt(limit));
+
+		const result = paginatedData.map(doc => {
+			let selectedSubstatus = null;
+
+			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+				selectedSubstatus = doc._leadStatus.substatuses.find(
+					sub => sub._id.toString() === doc._leadSubStatus.toString()
+				);
+			}
+
+			// doc is already a plain object from toObject() above, so no need to call toObject() again
+			const docObj = doc;
+
+			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+			if (docObj._course) {
+				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+			}
+
+			const requiredDocs = docObj._course?.docsRequired || [];
+			const uploadedDocs = docObj.uploadedDocs || [];
+
+			// Map uploaded docs by docsId for quick lookup
+			const uploadedDocsMap = {};
+			uploadedDocs.forEach(d => {
+				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+			});
+
+			// Prepare combined docs array
+			const allDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					// Agar uploaded hai to uploadedDoc details bhejo
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						_id: reqDoc._id
+					};
+				} else {
+					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
+
+			let combinedDocs = []; // Initialize combinedDocs
+
+			if (requiredDocs && requiredDocs.length > 0) {
+				// Create a merged array with both required docs and uploaded docs info
+				combinedDocs = requiredDocs.map(reqDoc => {
+					// Handle both Mongoose documents and plain objects
+					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+					// Find matching uploaded docs for this required doc
+					const matchingUploads = uploadedDocs.filter(
+						uploadDoc => uploadDoc.docsId && uploadDoc.docsId.toString() === docObj._id.toString()
+					);
+
+					return {
+						_id: docObj._id,
+						Name: docObj.Name || 'Document',
+						description: docObj.description || '',
+						uploads: matchingUploads || []
+					};
+				});
+			} else {
+				console.log("Course not found or no docs required");
+			}
+
+			// Count calculations
+			let verifiedCount = 0;
+			let RejectedCount = 0;
+			let pendingVerificationCount = 0;
+			let notUploadedCount = 0;
+
+			allDocs.forEach(doc => {
+				if (doc.status === "Verified") verifiedCount++;
+				else if (doc.status === "Rejected") RejectedCount++;
+				else if (doc.status === "Pending") pendingVerificationCount++;
+				else if (doc.status === "Not Uploaded") notUploadedCount++;
+			});
+
+			const totalRequired = allDocs.length;
+			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
+			const uploadPercentage = totalRequired > 0
+				? Math.round((uploadedCount / totalRequired) * 100)
+				: 0;
+
+			return {
+				...docObj,
+				selectedSubstatus,
+				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				docCounts: {
+					totalRequired,
+					RejectedCount,
+					uploadedCount,
+					verifiedCount,
+					pendingVerificationCount,
+					notUploadedCount,
+					uploadPercentage
+				}
+			};
+		});
+
+		console.log('result', result);
+
+		res.status(200).json({
+			success: true,
+			page: parseInt(page),
+			limit: parseInt(limit),
+			total,
+			totalPages,
+			data: result
+		});
+
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: "Server Error" });
+	}
+});
+
+
+
 
 
 

@@ -848,40 +848,185 @@ const CRMDashboard = () => {
   };
 
   const handleUpdateStatus = async () => {
-    console.log('Function called');
-    try {
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
-
-      let followupDateTime = '';
-      if (followupDate && followupTime) {
-        followupDateTime = new Date(`${followupDate}T${followupTime}`);
-      }
-
-      const data = {
-        _leadStatus: seletectedStatus?._id || seletectedStatus,
-        _leadSubStatus: seletectedSubStatus?._id || '',
-        followup: followupDateTime ? followupDateTime.toISOString() : '',
-        remarks
-      };
-
-      const response = await axios.put(`${backendUrl}/college/lead/status_change/${selectedProfile._id}`, data, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json'
+      console.log('Function called');
+  
+      try {
+      if(showEditPanel){
+             // Validation checks
+        if (!selectedProfile || !selectedProfile._id) {
+          alert('No profile selected');
+          return;
         }
-      });
-
-      if (response.data.success) {
-        alert('Status updated successfully!');
-        closeEditPanel();
-      } else {
-        alert('Failed to update status');
+  
+        if (!seletectedStatus) {
+          alert('Please select a status');
+          return;
+        }
+  
+        // Combine date and time into a single Date object (if both are set)
+        let followupDateTime = '';
+        if (followupDate && followupTime) {
+          // Create proper datetime string
+          const dateStr = followupDate instanceof Date
+            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+            : followupDate;
+  
+          followupDateTime = new Date(`${dateStr}T${followupTime}`);
+  
+          // Validate the datetime
+          if (isNaN(followupDateTime.getTime())) {
+            alert('Invalid date/time combination');
+            return;
+          }
+        }
+  
+        // Prepare the request body
+        const data = {
+          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
+          _leadSubStatus: seletectedSubStatus?._id || null,
+          followup: followupDateTime ? followupDateTime.toISOString() : null,
+          remarks: remarks || ''
+        };
+  
+        
+  
+        // Check if backend URL and token exist
+        if (!backendUrl) {
+          alert('Backend URL not configured');
+          return;
+        }
+  
+        if (!token) {
+          alert('Authentication token missing');
+          return;
+        }
+  
+        // Send PUT request to backend API
+        const response = await axios.put(
+          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+          data,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+  
+        console.log('API response:', response.data);
+  
+        if (response.data.success) {
+          alert('Status updated successfully!');
+  
+          // Reset form
+          setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupDate('');
+          setFollowupTime('');
+          setRemarks('');
+  
+          // Refresh data and close panel
+          await fetchProfileData();
+          closeEditPanel();
+        } else {
+          console.error('API returned error:', response.data);
+          alert(response.data.message || 'Failed to update status');
+        }
+  
       }
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  };
+      if(showFollowupPanel){
+        
+  
+        // Combine date and time into a single Date object (if both are set)
+        let followupDateTime = '';
+        if (followupDate && followupTime) {
+          // Create proper datetime string
+          const dateStr = followupDate instanceof Date
+            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+            : followupDate;
+  
+          followupDateTime = new Date(`${dateStr}T${followupTime}`);
+  
+          // Validate the datetime
+          if (isNaN(followupDateTime.getTime())) {
+            alert('Invalid date/time combination');
+            return;
+          }
+        }
+  
+        // Prepare the request body
+        const data = {
+          followup: followupDateTime ? followupDateTime.toISOString() : null,
+          remarks: remarks || ''
+        };
+  
+        
+  
+        // Check if backend URL and token exist
+        if (!backendUrl) {
+          alert('Backend URL not configured');
+          return;
+        }
+  
+        if (!token) {
+          alert('Authentication token missing');
+          return;
+        }
+  
+        // Send PUT request to backend API
+        const response = await axios.put(
+          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+          data,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+  
+        console.log('API response:', response.data);
+  
+        if (response.data.success) {
+          alert('Status updated successfully!');
+  
+          // Reset form
+          setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupDate('');
+          setFollowupTime('');
+          setRemarks('');
+  
+          // Refresh data and close panel
+          await fetchProfileData();
+          closeEditPanel();
+        } else {
+          console.error('API returned error:', response.data);
+          alert(response.data.message || 'Failed to update status');
+        }
+  
+      }
+      } 
+      catch (error) {
+        console.error('Error updating status:', error);
+  
+        // More detailed error handling
+        if (error.response) {
+          // Server responded with error status
+          console.error('Error Response:', error.response.data);
+          console.error('Error Status:', error.response.status);
+          alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
+        } else if (error.request) {
+          // Request was made but no response received
+          console.error('No response received:', error.request);
+          alert('Network error: Unable to reach server');
+        } else {
+          // Something else happened
+          console.error('Error:', error.message);
+          alert(`Error: ${error.message}`);
+        }
+      }
+    };
 
   const [user, setUser] = useState({
     image: '',
@@ -1951,7 +2096,7 @@ const CRMDashboard = () => {
                 onClick={handleUpdateStatus}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
-                UPDATE STATUS
+                SET FOLLOWUP
               </button>
             </div>
           </form>
@@ -2969,7 +3114,25 @@ const CRMDashboard = () => {
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
                                                       <div className="info-label">NEXT ACTION DATE</div>
-                                                      <div className="info-value">{profile.followupDate ? new Date(profile.followupDate).toLocaleString() : 'N/A'}</div>
+                                                      <div className="info-value">
+                                                        {profile.followups.length>0
+                                                          ? (() => {
+                                                            const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
+                                                            const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                              day: '2-digit',
+                                                              month: 'short',
+                                                              year: 'numeric',
+                                                            }).replace(/ /g, '/');
+                                                            const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                              hour: '2-digit',
+                                                              minute: '2-digit',
+                                                              hour12: true,
+                                                            });
+                                                            return `${datePart}, ${timePart}`;
+                                                          })()
+                                                          : 'N/A'}
+                                                      </div>
+
                                                     </div>
                                                   </div>
 
