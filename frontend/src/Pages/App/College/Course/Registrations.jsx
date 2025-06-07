@@ -10,9 +10,9 @@ import './crm.css';
 
 const CRMDashboard = () => {
 
-   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
 
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
@@ -55,6 +55,7 @@ const CRMDashboard = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadPreview, setUploadPreview] = useState(null);
+  const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
@@ -110,6 +111,8 @@ const CRMDashboard = () => {
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
 
+    console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
+
     setIsUploading(true);
     setUploadProgress(0);
 
@@ -120,44 +123,31 @@ const CRMDashboard = () => {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      // Create new upload entry
-      const newUpload = {
-        _id: `upload_${Date.now()}`,
-        fileUrl: uploadPreview || 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=400',
-        uploadedAt: new Date(),
-        status: 'Pending',
-        fileName: selectedFile.name,
-        fileSize: selectedFile.size
-      };
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('doc', selectedDocumentForUpload.docsId);
 
-      // Update the document with new upload
-      setAllProfiles(prevProfiles =>
-        prevProfiles.map(profile => {
-          if (profile._id === selectedProfile._id) {
-            const updatedDocuments = (profile._candidate?.documents).map(doc => {
-              if (doc._id === selectedDocumentForUpload._id) {
-                return {
-                  ...doc,
-                  uploads: [...(doc.uploads || []), newUpload]
-                };
-              }
-              return doc;
-            });
+      const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data',
+        }
+      });
 
-            return {
-              ...profile,
-              _candidate: {
-                ...profile._candidate,
-                documents: updatedDocuments
-              }
-            };
-          }
-          return profile;
-        })
-      );
+      console.log('response', response)
 
-      alert('Document uploaded successfully! Status: Pending Review');
-      closeUploadModal();
+      if (response.data.status) {
+        alert('Document uploaded successfully! Status: Pending Review');
+
+        // Optionally refresh data here
+        closeUploadModal();
+        fetchProfileData()
+      } else {
+        alert('Failed to upload file');
+      }
+
+
+
 
     } catch (error) {
       console.error('Upload error:', error);
@@ -191,13 +181,11 @@ const CRMDashboard = () => {
   const closeDocumentModal = () => {
     setShowDocumentModal(false);
     setSelectedDocument(null);
-    setShowRejectionForm(false);
-    setRejectionReason('');
+
     setIsNewModalOpen(false);
-    // Only reset when actually closing modal
+    // // Only reset when actually closing modal
     setDocumentZoom(1);
     setDocumentRotation(0);
-    document.body?.classNameList.remove('no-scroll');
   };
 
   const zoomIn = () => {
@@ -304,6 +292,261 @@ const CRMDashboard = () => {
       ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
       : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
 
+    // Helper function to render document preview thumbnail using iframe/img
+    const renderDocumentThumbnail = (upload, isSmall = true) => {
+      const fileUrl = upload?.fileUrl;
+      if (!fileUrl) {
+        return (
+          <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #dee2e6',
+            borderRadius: '4px',
+            width: isSmall ? '60px' : '150px',
+            height: isSmall ? '40px' : '100px',
+            fontSize: isSmall ? '16px' : '24px',
+            color: '#6c757d'
+          }}>
+            📄
+          </div>
+        );
+      }
+
+      const fileType = getFileType(fileUrl);
+
+      if (fileType === 'image') {
+        return (
+          <img
+            src={fileUrl}
+            alt="Document Preview"
+            className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+            style={{
+              width: isSmall ? '60px' : '150px',
+              height: isSmall ? '40px' : '100px',
+              objectFit: 'cover',
+              borderRadius: '4px',
+              border: '1px solid #dee2e6',
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              if (isSmall) {
+                // Set this upload as the current preview
+                setCurrentPreviewUpload(upload);
+              }
+            }}
+          />
+        );
+      } else if (fileType === 'pdf') {
+        return (
+          <div style={{ position: 'relative', overflow: 'hidden' }}>
+            <iframe
+              src={fileUrl}
+              className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+              style={{
+                width: isSmall ? '60px' : '150px',
+                height: isSmall ? '40px' : '100px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                pointerEvents: 'none', // Prevent interaction in thumbnail
+                transform: 'scale(0.3)',
+                transformOrigin: 'top left',
+                overflow: 'hidden'
+              }}
+              title="PDF Thumbnail"
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}
+            />
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(220, 53, 69, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#dc3545',
+              fontSize: isSmall ? '10px' : '12px',
+              fontWeight: 'bold',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}>
+              PDF
+            </div>
+          </div>
+        );
+      } else {
+        // For other document types, try to use iframe as well
+        return (
+          <div style={{ position: 'relative' }}>
+            <iframe
+              src={fileUrl}
+              className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+              style={{
+                width: isSmall ? '60px' : '150px',
+                height: isSmall ? '40px' : '100px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                pointerEvents: 'none',
+                backgroundColor: '#f8f9fa'
+              }}
+              title="Document Thumbnail"
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}
+            />
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 123, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#007bff',
+              fontSize: isSmall ? '16px' : '24px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}>
+              {fileType === 'document' ? '📄' :
+                fileType === 'spreadsheet' ? '📊' : '📁'}
+            </div>
+          </div>
+        );
+      }
+    };
+
+    // Main preview rendering using iframe/img
+    const renderMainPreview = () => {
+      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+      const hasDocument = fileUrl ||
+        (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
+
+      if (hasDocument) {
+        if (fileUrl) {
+          const fileType = getFileType(fileUrl);
+
+          if (fileType === 'image') {
+            return (
+              <img
+                src={fileUrl}
+                alt="Document Preview"
+                style={{
+                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                  transition: 'transform 0.3s ease',
+                  maxWidth: '100%',
+                  maxHeight: '500px',
+                  objectFit: 'contain'
+                }}
+              />
+            );
+          } else if (fileType === 'pdf') {
+            return (
+              <iframe
+                src={fileUrl}
+                width="100%"
+                height="500px"
+                style={{
+                  border: 'none',
+                  transform: `scale(${documentZoom})`,
+                  transformOrigin: 'top left',
+                  transition: 'transform 0.3s ease',
+                  borderRadius: '4px'
+                }}
+                title="PDF Document"
+              />
+            );
+          } else {
+            // Try iframe for other document types
+            return (
+              <div style={{ position: 'relative' }}>
+                <iframe
+                  src={fileUrl}
+                  width="100%"
+                  height="500px"
+                  style={{
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    transform: `scale(${documentZoom})`,
+                    transformOrigin: 'top left',
+                    transition: 'transform 0.3s ease'
+                  }}
+                  title="Document Preview"
+                />
+                {/* Fallback overlay if iframe doesn't work */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  textAlign: 'center',
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  padding: '20px',
+                  borderRadius: '8px',
+                  display: 'none' // Show this only if iframe fails
+                }}>
+                  <div style={{ fontSize: '60px', marginBottom: '20px' }}>
+                    {fileType === 'document' ? '📄' :
+                      fileType === 'spreadsheet' ? '📊' : '📁'}
+                  </div>
+                  <h4>Document Preview</h4>
+                  <p>Click download to view this file</p>
+                  <a
+                    href={fileUrl}
+                    download
+                    className="btn btn-primary"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <i className="fas fa-download me-2"></i>
+                    Download & View
+                  </a>
+                </div>
+              </div>
+            );
+          }
+        } else {
+          return (
+            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+              <h4>Document Uploaded</h4>
+              <p>Document is available for verification</p>
+              <p><strong>Status:</strong> {selectedDocument?.status}</p>
+            </div>
+          );
+        }
+      } else {
+        return (
+          <div className="no-document">
+            <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+            <p>No document uploaded</p>
+          </div>
+        );
+      }
+    };
+
     return (
       <div className="document-modal-overlay" onClick={closeDocumentModal}>
         <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -318,105 +561,7 @@ const CRMDashboard = () => {
                 {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
                   (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                   <>
-                    {(() => {
-                      console.log('selectedDocument:', selectedDocument);
-                      console.log('latestUpload:', latestUpload);
-
-                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-                      const hasDocument = fileUrl ||
-                        (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
-
-                      console.log('fileUrl:', fileUrl);
-                      console.log('hasDocument:', hasDocument);
-
-                      if (hasDocument) {
-                        // If we have a file URL, show the appropriate viewer
-                        if (fileUrl) {
-                          const fileType = getFileType(fileUrl);
-
-                          if (fileType === 'image') {
-                            return (
-                              <img
-                                src={fileUrl}
-                                alt="Document Preview"
-                                style={{
-                                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                                  transition: 'transform 0.3s ease',
-                                  maxWidth: '100%',
-                                  objectFit: 'contain'
-                                }}
-                              />
-                            );
-                          } else if (fileType === 'pdf') {
-                            return (
-                              <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
-                                <iframe
-                                  src={fileUrl}
-                                  width="100%"
-                                  height="100%"
-                                  style={{
-                                    border: 'none',
-                                    transform: `scale(${documentZoom})`,
-                                    transformOrigin: 'top left',
-                                    transition: 'transform 0.3s ease'
-                                  }}
-                                  title="PDF Document"
-                                />
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                                <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                                  {fileType === 'document' ? '📄' :
-                                    fileType === 'spreadsheet' ? '📊' : '📁'}
-                                </div>
-                                <h4>Document Preview</h4>
-                                <p>Click download to view this file</p>
-                                {fileUrl ? (
-                                  <a
-                                    href={fileUrl}
-                                    download
-                                    className="btn btn-primary"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <i className="fas fa-download me-2"></i>
-                                    Download & View
-                                  </a>
-                                ) : (
-                                  <button
-                                    className="btn btn-secondary"
-                                    disabled
-                                    title="File URL not available"
-                                  >
-                                    <i className="fas fa-download me-2"></i>
-                                    File Not Available
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          }
-                        } else {
-                          // Document exists but no file URL - show document uploaded message
-                          return (
-                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
-                              <h4>Document Uploaded</h4>
-                              <p>Document is available for verification</p>
-                              <p><strong>Status:</strong> {selectedDocument?.status}</p>
-                            </div>
-                          );
-                        }
-                      } else {
-                        return (
-                          <div className="no-document">
-                            <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                            <p>No document uploaded</p>
-                          </div>
-                        );
-                      }
-                    })()}
+                    {renderMainPreview()}
                     <div className="preview-controls">
                       <button
                         onClick={zoomIn}
@@ -538,64 +683,80 @@ const CRMDashboard = () => {
                       <li>Ensure there are no signs of tampering</li>
                     </ol>
                   </div>
-
-                  {/* {!showRejectionForm ? (
-                    <div className="action-buttons">
-                      <button
-                        className="btn btn-success me-2"
-                        onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
-                      >
-                        <i className="fas fa-check"></i> Approve Document
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => setShowRejectionForm(true)}
-                      >
-                        <i className="fas fa-times"></i> Reject Document
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="rejection-form">
-                      <h4>Provide Rejection Reason</h4>
-                      <textarea
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Please provide a detailed reason for rejection..."
-                        rows="4"
-                        className="form-control mb-3"
-                      />
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-danger"
-                          onClick={() => updateDocumentStatus(latestUpload._id, 'Rejected')}
-                        >
-                          Confirm Rejection
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => setShowRejectionForm(false)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )} */}
                 </div>
               )}
 
+              {/* Enhanced Document History with iframe/img Preview */}
               {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
                 <div className="info-card">
                   <h4>Document History</h4>
                   <div className="document-history">
                     {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
-                      <div key={index} className="history-item">
-                        <div className="history-date">
-                          {formatDate(upload.uploadedAt)}
+                      <div key={index} className="history-item" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '12px',
+                        marginBottom: '8px',
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '8px',
+                        border: '1px solid #e9ecef'
+                      }}>
+                        {/* Document Preview Thumbnail using iframe/img */}
+                        <div className="history-preview" style={{ marginRight: '0px' }}>
+                          {renderDocumentThumbnail(upload, true)}
                         </div>
-                        <div className="history-status">
-                          <span className={`${getStatusBadgeClass(upload.status)}`}>
-                            {upload.status}
-                          </span>
+
+                        {/* Document Info */}
+                        <div className="history-info" style={{ flex: 1 }}>
+                          <div className="history-date" style={{
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#495057',
+                            marginBottom: '4px'
+                          }}>
+                            {formatDate(upload.uploadedAt)}
+                          </div>
+                          <div className="history-status">
+                            <span className={`${getStatusBadgeClass(upload.status)}`} style={{
+                              fontSize: '12px',
+                              padding: '4px 8px'
+                            }}>
+                              {upload.status}
+                            </span>
+                          </div>
+                          {upload.fileUrl && (
+                            <div className="history-actions" style={{ marginTop: '8px' }}>
+                              <a
+                                href={upload.fileUrl}
+                                download
+                                className="btn btn-sm btn-outline-primary"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                <i className="fas fa-download me-1"></i>
+                                Download
+                              </a>
+                              <button
+                                className="btn btn-sm btn-outline-secondary ms-2"
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px'
+                                }}
+                                onClick={() => {
+                                  // Switch main preview to this upload
+                                  setCurrentPreviewUpload(upload);
+                                }}
+                              >
+                                <i className="fas fa-eye me-1"></i>
+                                Preview
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -608,8 +769,7 @@ const CRMDashboard = () => {
       </div>
     );
   };
-
-    const UploadModal = () => {
+  const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
 
     return (
@@ -812,7 +972,7 @@ const CRMDashboard = () => {
   ]);
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-  
+
 
   const tabs = [
     'Lead Details',
@@ -892,9 +1052,18 @@ const CRMDashboard = () => {
     setTimeout(() => applyFilters(newFilterData), 100);
   };
   const formatDate = (date) => {
-    if (!date) return '';
+    // If the date is not a valid Date object, try to convert it
+    if (date && !(date instanceof Date)) {
+      date = new Date(date);
+    }
+
+    // Check if the date is valid
+    if (!date || isNaN(date)) return ''; // Return an empty string if invalid
+
+    // Now call toLocaleDateString
     return date.toLocaleDateString('en-GB');
   };
+
 
 
   // 5. Clear functions
@@ -1272,7 +1441,7 @@ const CRMDashboard = () => {
     try {
 
       console.log('Function in try');
-       // Prepare the request body
+      // Prepare the request body
       const updatedData = {
         kycStage: true
       };
@@ -1323,119 +1492,119 @@ const CRMDashboard = () => {
   };
 
   const handleUpdateStatus = async () => {
-  console.log('Function called');
-  
-  try {
-    console.log('Function in try');
-    console.log('Selected Status:', seletectedStatus);
-    console.log('Selected Sub Status:', seletectedSubStatus);
-    console.log('Followup Date:', followupDate);
-    console.log('Followup Time:', followupTime);
-    console.log('Remarks:', remarks);
-    console.log('Selected Profile:', selectedProfile);
+    console.log('Function called');
 
-    // Validation checks
-    if (!selectedProfile || !selectedProfile._id) {
-      alert('No profile selected');
-      return;
-    }
+    try {
+      console.log('Function in try');
+      console.log('Selected Status:', seletectedStatus);
+      console.log('Selected Sub Status:', seletectedSubStatus);
+      console.log('Followup Date:', followupDate);
+      console.log('Followup Time:', followupTime);
+      console.log('Remarks:', remarks);
+      console.log('Selected Profile:', selectedProfile);
 
-    if (!seletectedStatus) {
-      alert('Please select a status');
-      return;
-    }
-
-    // Combine date and time into a single Date object (if both are set)
-    let followupDateTime = '';
-    if (followupDate && followupTime) {
-      // Create proper datetime string
-      const dateStr = followupDate instanceof Date 
-        ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-        : followupDate;
-      
-      followupDateTime = new Date(`${dateStr}T${followupTime}`);
-      
-      // Validate the datetime
-      if (isNaN(followupDateTime.getTime())) {
-        alert('Invalid date/time combination');
+      // Validation checks
+      if (!selectedProfile || !selectedProfile._id) {
+        alert('No profile selected');
         return;
       }
-    }
 
-    // Prepare the request body
-    const data = {
-      _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-      _leadSubStatus: seletectedSubStatus?._id || null,
-      followup: followupDateTime ? followupDateTime.toISOString() : null,
-      remarks: remarks || ''
-    };
+      if (!seletectedStatus) {
+        alert('Please select a status');
+        return;
+      }
 
-    console.log('Sending data:', data);
-    console.log('API URL:', `${backendUrl}/college/lead/status_change/${selectedProfile._id}`);
-    console.log('Token:', token ? 'Token exists' : 'No token');
+      // Combine date and time into a single Date object (if both are set)
+      let followupDateTime = '';
+      if (followupDate && followupTime) {
+        // Create proper datetime string
+        const dateStr = followupDate instanceof Date
+          ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+          : followupDate;
 
-    // Check if backend URL and token exist
-    if (!backendUrl) {
-      alert('Backend URL not configured');
-      return;
-    }
+        followupDateTime = new Date(`${dateStr}T${followupTime}`);
 
-    if (!token) {
-      alert('Authentication token missing');
-      return;
-    }
-
-    // Send PUT request to backend API
-    const response = await axios.put(
-      `${backendUrl}/college/lead/status_change/${selectedProfile._id}`, 
-      data, 
-      {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json'
+        // Validate the datetime
+        if (isNaN(followupDateTime.getTime())) {
+          alert('Invalid date/time combination');
+          return;
         }
       }
-    );
 
-    console.log('API response:', response.data);
+      // Prepare the request body
+      const data = {
+        _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
+        _leadSubStatus: seletectedSubStatus?._id || null,
+        followup: followupDateTime ? followupDateTime.toISOString() : null,
+        remarks: remarks || ''
+      };
 
-    if (response.data.success) {
-      alert('Status updated successfully!');
-      
-      // Reset form
-      setSelectedStatus('');
-      setSelectedSubStatus(null);
-      setFollowupDate('');
-      setFollowupTime('');
-      setRemarks('');
-      
-      // Refresh data and close panel
-      await fetchProfileData();
-      closeEditPanel();
-    } else {
-      console.error('API returned error:', response.data);
-      alert(response.data.message || 'Failed to update status');
+      console.log('Sending data:', data);
+      console.log('API URL:', `${backendUrl}/college/lead/status_change/${selectedProfile._id}`);
+      console.log('Token:', token ? 'Token exists' : 'No token');
+
+      // Check if backend URL and token exist
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      // Send PUT request to backend API
+      const response = await axios.put(
+        `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+        data,
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('API response:', response.data);
+
+      if (response.data.success) {
+        alert('Status updated successfully!');
+
+        // Reset form
+        setSelectedStatus('');
+        setSelectedSubStatus(null);
+        setFollowupDate('');
+        setFollowupTime('');
+        setRemarks('');
+
+        // Refresh data and close panel
+        await fetchProfileData();
+        closeEditPanel();
+      } else {
+        console.error('API returned error:', response.data);
+        alert(response.data.message || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+
+      // More detailed error handling
+      if (error.response) {
+        // Server responded with error status
+        console.error('Error Response:', error.response.data);
+        console.error('Error Status:', error.response.status);
+        alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
+      } else if (error.request) {
+        // Request was made but no response received
+        console.error('No response received:', error.request);
+        alert('Network error: Unable to reach server');
+      } else {
+        // Something else happened
+        console.error('Error:', error.message);
+        alert(`Error: ${error.message}`);
+      }
     }
-  } catch (error) {
-    console.error('Error updating status:', error);
-    
-    // More detailed error handling
-    if (error.response) {
-      // Server responded with error status
-      console.error('Error Response:', error.response.data);
-      console.error('Error Status:', error.response.status);
-      alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
-    } else if (error.request) {
-      // Request was made but no response received
-      console.error('No response received:', error.request);
-      alert('Network error: Unable to reach server');
-    } else {
-      // Something else happened
-      console.error('Error:', error.message);
-      alert(`Error: ${error.message}`);
-    }
-  }
-};
+  };
 
 
 
@@ -1457,7 +1626,7 @@ const CRMDashboard = () => {
 
   const fetchProfileData = async () => {
     try {
-      
+
       if (!token) {
         console.warn('No token found in session storage.');
         return;
@@ -1745,8 +1914,6 @@ const CRMDashboard = () => {
                         <option value="">Select Status</option>
                         {statuses.map((filter, index) => (
                           <option value={filter._id}>{filter.name}</option>))}
-
-
                       </select>
                     </div>
                   </div>
@@ -2339,7 +2506,7 @@ const CRMDashboard = () => {
                 </div>
 
                 <div className="row g-4">
-                    
+
                   <div className="col-md-4">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-graduation-cap me-1 text-success"></i>
@@ -3680,7 +3847,7 @@ const CRMDashboard = () => {
                                   {(activeTab[profileIndex] || 0) === 4 && (
                                     <div className="tab-pane active" id='studentsDocuments'>
                                       {(() => {
-                                        const documentsToDisplay = profile.uploadedDocs || profile._candidate?.documents || [];
+                                        const documentsToDisplay = profile.uploadedDocs || [];
                                         const totalRequired = profile?.docCounts?.totalRequired || 0;
 
                                         // If no documents are required, show a message
@@ -3870,15 +4037,7 @@ const CRMDashboard = () => {
                                                                 );
                                                               } else if (fileType === 'pdf') {
                                                                 return (
-                                                                  <div className="document-preview-icon" style={{
-                                                                    display: 'flex',
-                                                                    flexDirection: 'column',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    height: '200px',
-                                                                    backgroundColor: '#f8f9fa',
-                                                                    borderRadius: '8px 8px 0 0'
-                                                                  }}>
+                                                                  <div className="document-preview-icon">
                                                                     <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
                                                                     <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
                                                                   </div>
@@ -3945,33 +4104,24 @@ const CRMDashboard = () => {
 
                                                       <div className="document-info-section">
                                                         <div className="document-header">
-                                                          <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
+                                                          <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
                                                           <div className="document-actions">
-                                                            {(!latestUpload && doc.status === "Not Uploaded") ? (
+                                                            {(!latestUpload) ? (
                                                               <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
-                                                                  setSelectedProfile(profile); // Set the current profile
-                                                                  openUploadModal(doc);        // Open the upload modal
-                                                                }}>
+                                                                setSelectedProfile(profile); // Set the current profile
+                                                                openUploadModal(doc);        // Open the upload modal
+                                                              }}>
                                                                 <i className="fas fa-cloud-upload-alt"></i>
                                                                 Upload
                                                               </button>
-                                                            ) : ((latestUpload?.status || doc.status) === 'Pending') ? (
+                                                            ) : (
                                                               <button
                                                                 className="action-btn verify-btn"
                                                                 onClick={() => openDocumentModal(doc)}
                                                                 title="Verify Document"
                                                               >
                                                                 <i className="fas fa-search"></i>
-                                                                Verify
-                                                              </button>
-                                                            ) : (
-                                                              <button
-                                                                className="action-btn view-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                                title="View Document"
-                                                              >
-                                                                <i className="fas fa-eye"></i>
-                                                                View
+                                                                PREVIEW
                                                               </button>
                                                             )}
                                                           </div>
