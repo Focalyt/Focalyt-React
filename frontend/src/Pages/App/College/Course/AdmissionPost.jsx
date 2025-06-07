@@ -9,6 +9,10 @@ import './CourseCrm.css';
 import './crm.css';
 
 const CRMDashboard = () => {
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
   // ========================================
   // 🎯 Main Tab State
   // ========================================
@@ -45,6 +49,8 @@ const CRMDashboard = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
+    const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
+  
 
   // Static document data for demonstration
   useEffect(() => {
@@ -162,6 +168,8 @@ const CRMDashboard = () => {
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
 
+    console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
+
     setIsUploading(true);
     setUploadProgress(0);
 
@@ -172,44 +180,31 @@ const CRMDashboard = () => {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      // Create new upload entry
-      const newUpload = {
-        _id: `upload_${Date.now()}`,
-        fileUrl: uploadPreview || 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=400',
-        uploadedAt: new Date(),
-        status: 'Pending',
-        fileName: selectedFile.name,
-        fileSize: selectedFile.size
-      };
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('doc', selectedDocumentForUpload.docsId);
 
-      // Update the document with new upload
-      setAllProfiles(prevProfiles =>
-        prevProfiles.map(profile => {
-          if (profile._id === selectedProfile._id) {
-            const updatedDocuments = (profile._candidate?.documents).map(doc => {
-              if (doc._id === selectedDocumentForUpload._id) {
-                return {
-                  ...doc,
-                  uploads: [...(doc.uploads || []), newUpload]
-                };
-              }
-              return doc;
-            });
+      const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data',
+        }
+      });
 
-            return {
-              ...profile,
-              _candidate: {
-                ...profile._candidate,
-                documents: updatedDocuments
-              }
-            };
-          }
-          return profile;
-        })
-      );
+      console.log('response',response)
 
-      alert('Document uploaded successfully! Status: Pending Review');
-      closeUploadModal();
+      if (response.data.status) {
+        alert('Document uploaded successfully! Status: Pending Review');
+
+        // Optionally refresh data here
+        closeUploadModal();
+        fetchProfileData()
+      } else {
+        alert('Failed to upload file');
+      }
+
+
+
 
     } catch (error) {
       console.error('Upload error:', error);
@@ -289,12 +284,7 @@ const CRMDashboard = () => {
       return;
     }
     if (status === 'Verified') {
-      // Update profile eKYC status to 'done'
-      setAllProfiles(prevProfiles => prevProfiles.map(profile =>
-        profile._id === selectedProfile._id
-          ? { ...profile, ekycStatus: 'done' }
-          : profile
-      ));
+      
     }
     alert(`Document ${status} successfully!`);
     closeDocumentModal();
@@ -501,8 +491,6 @@ const CRMDashboard = () => {
 
   const [subStatuses, setSubStatuses] = useState([]);
 
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
   const tabs = [
     'Lead Details',
@@ -564,8 +552,17 @@ const CRMDashboard = () => {
     setTimeout(() => applyFilters(newFilterData), 100);
   };
 
+   
   const formatDate = (date) => {
-    if (!date) return '';
+    // If the date is not a valid Date object, try to convert it
+    if (date && !(date instanceof Date)) {
+      date = new Date(date);
+    }
+
+    // Check if the date is valid
+    if (!date || isNaN(date)) return ''; // Return an empty string if invalid
+
+    // Now call toLocaleDateString
     return date.toLocaleDateString('en-GB');
   };
 
@@ -765,9 +762,7 @@ const CRMDashboard = () => {
 
   const fetchStatus = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+      
 
       const response = await axios.get(`${backendUrl}/college/status`, {
         headers: { 'x-auth': token }
@@ -789,9 +784,7 @@ const CRMDashboard = () => {
 
   const fetchSubStatus = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+      
 
       const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
         headers: { 'x-auth': token }
@@ -857,8 +850,7 @@ const CRMDashboard = () => {
 
   const fetchProfileData = async () => {
     try {
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+      
       if (!token) {
         console.warn('No token found in session storage.');
         return;
@@ -871,6 +863,7 @@ const CRMDashboard = () => {
       });
 
       if (response.data.success && response.data.data) {
+        console.log('backend response',response.data.data)
         setAllProfiles(response.data.data);
         setAllProfilesData(response.data.data)
         setTotalPages(response.data.totalPages)
@@ -1075,7 +1068,153 @@ const CRMDashboard = () => {
     const latestUpload = selectedDocument.uploads && selectedDocument.uploads.length > 0
       ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
       : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+      // Helper function to render document preview thumbnail using iframe/img
+  const renderDocumentThumbnail = (upload, isSmall = true) => {
+    const fileUrl = upload?.fileUrl;
+    if (!fileUrl) {
+      return (
+        <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f8f9fa',
+          border: '1px solid #dee2e6',
+          borderRadius: '4px',
+          width: isSmall ? '60px' : '150px',
+          height: isSmall ? '40px' : '100px',
+          fontSize: isSmall ? '16px' : '24px',
+          color: '#6c757d'
+        }}>
+          📄
+        </div>
+      );
+    }
 
+    const fileType = getFileType(fileUrl);
+    
+    if (fileType === 'image') {
+      return (
+        <img
+          src={fileUrl}
+          alt="Document Preview"
+          className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+          style={{
+            width: isSmall ? '60px' : '150px',
+            height: isSmall ? '40px' : '100px',
+            objectFit: 'cover',
+            borderRadius: '4px',
+            border: '1px solid #dee2e6',
+            cursor: 'pointer'
+          }}
+          onClick={() => {
+            if (isSmall) {
+              // Set this upload as the current preview
+              setCurrentPreviewUpload(upload);
+            }
+          }}
+        />
+      );
+    } else if (fileType === 'pdf') {
+      return (
+        <div style={{ position: 'relative', overflow: 'hidden' }}>
+          <iframe
+            src={fileUrl}
+            className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+            style={{
+              width: isSmall ? '60px' : '150px',
+              height: isSmall ? '40px' : '100px',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              pointerEvents: 'none', // Prevent interaction in thumbnail
+              transform: 'scale(0.3)',
+              transformOrigin: 'top left',
+              overflow: 'hidden'
+            }}
+            title="PDF Thumbnail"
+            onClick={() => {
+              if (isSmall) {
+                setCurrentPreviewUpload(upload);
+              }
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#dc3545',
+            fontSize: isSmall ? '10px' : '12px',
+            fontWeight: 'bold',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+          onClick={() => {
+            if (isSmall) {
+              setCurrentPreviewUpload(upload);
+            }
+          }}>
+            PDF
+          </div>
+        </div>
+      );
+    } else {
+      // For other document types, try to use iframe as well
+      return (
+        <div style={{ position: 'relative' }}>
+          <iframe
+            src={fileUrl}
+            className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+            style={{
+              width: isSmall ? '60px' : '150px',
+              height: isSmall ? '40px' : '100px',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              pointerEvents: 'none',
+              backgroundColor: '#f8f9fa'
+            }}
+            title="Document Thumbnail"
+            onClick={() => {
+              if (isSmall) {
+                setCurrentPreviewUpload(upload);
+              }
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#007bff',
+            fontSize: isSmall ? '16px' : '24px',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+          onClick={() => {
+            if (isSmall) {
+              setCurrentPreviewUpload(upload);
+            }
+          }}>
+            {fileType === 'document' ? '📄' :
+              fileType === 'spreadsheet' ? '📊' : '📁'}
+          </div>
+        </div>
+      );
+    }
+  };
+
+  
     return (
       <div className="document-modal-overlay" onClick={closeDocumentModal}>
         <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1356,24 +1495,81 @@ const CRMDashboard = () => {
               )}
 
               {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-                <div className="info-card">
-                  <h4>Document History</h4>
-                  <div className="document-history">
-                    {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
-                      <div key={index} className="history-item">
-                        <div className="history-date">
+              <div className="info-card">
+                <h4>Document History</h4>
+                <div className="document-history">
+                  {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
+                    <div key={index} className="history-item" style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px',
+                      marginBottom: '8px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      border: '1px solid #e9ecef'
+                    }}>
+                      {/* Document Preview Thumbnail using iframe/img */}
+                      <div className="history-preview" style={{ marginRight: '0px' }}>
+                        {renderDocumentThumbnail(upload, true)}
+                      </div>
+                      
+                      {/* Document Info */}
+                      <div className="history-info" style={{ flex: 1 }}>
+                        <div className="history-date" style={{
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          color: '#495057',
+                          marginBottom: '4px'
+                        }}>
                           {formatDate(upload.uploadedAt)}
                         </div>
                         <div className="history-status">
-                          <span className={`${getStatusBadgeClass(upload.status)}`}>
+                          <span className={`${getStatusBadgeClass(upload.status)}`} style={{
+                            fontSize: '12px',
+                            padding: '4px 8px'
+                          }}>
                             {upload.status}
                           </span>
                         </div>
+                        {upload.fileUrl && (
+                          <div className="history-actions" style={{ marginTop: '8px' }}>
+                            <a
+                              href={upload.fileUrl}
+                              download
+                              className="btn btn-sm btn-outline-primary"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                textDecoration: 'none'
+                              }}
+                            >
+                              <i className="fas fa-download me-1"></i>
+                              Download
+                            </a>
+                            <button
+                              className="btn btn-sm btn-outline-secondary ms-2"
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 8px'
+                              }}
+                              onClick={() => {
+                                // Switch main preview to this upload
+                                setCurrentPreviewUpload(upload);
+                              }}
+                            >
+                              <i className="fas fa-eye me-1"></i>
+                              Preview
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
             </div>
           </div>
         </div>
@@ -3343,7 +3539,7 @@ const CRMDashboard = () => {
                                                           <div className="document-header">
                                                             <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
                                                             <div className="document-actions">
-                                                              {(!latestUpload && doc.status === "Not Uploaded") ? (
+                                                              {(!latestUpload) ? (
                                                                 <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
                                                                   setSelectedProfile(profile); // Set the current profile
                                                                   openUploadModal(doc);        // Open the upload modal

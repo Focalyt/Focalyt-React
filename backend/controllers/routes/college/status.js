@@ -19,7 +19,9 @@ router.get('/', async (req, res) => {
     // For each status, get count of AppliedCourses with _leadStatus = status._id
     const statusesWithCount = await Promise.all(
       statuses.map(async (status) => {
-        const count = await AppliedCourses.countDocuments({ _leadStatus: status._id });
+        const count = await AppliedCourses.countDocuments({ _leadStatus: status._id, kycStage: { $nin: [true] },
+			kyc: { $nin: [true] },
+			admissionDone: { $nin: [true] } });
         return {
           _id: status._id,
           title: status.title,
