@@ -1495,15 +1495,8 @@ const CRMDashboard = () => {
     console.log('Function called');
 
     try {
-      console.log('Function in try');
-      console.log('Selected Status:', seletectedStatus);
-      console.log('Selected Sub Status:', seletectedSubStatus);
-      console.log('Followup Date:', followupDate);
-      console.log('Followup Time:', followupTime);
-      console.log('Remarks:', remarks);
-      console.log('Selected Profile:', selectedProfile);
-
-      // Validation checks
+    if(showEditPanel){
+           // Validation checks
       if (!selectedProfile || !selectedProfile._id) {
         alert('No profile selected');
         return;
@@ -1539,9 +1532,7 @@ const CRMDashboard = () => {
         remarks: remarks || ''
       };
 
-      console.log('Sending data:', data);
-      console.log('API URL:', `${backendUrl}/college/lead/status_change/${selectedProfile._id}`);
-      console.log('Token:', token ? 'Token exists' : 'No token');
+      
 
       // Check if backend URL and token exist
       if (!backendUrl) {
@@ -1585,7 +1576,82 @@ const CRMDashboard = () => {
         console.error('API returned error:', response.data);
         alert(response.data.message || 'Failed to update status');
       }
-    } catch (error) {
+
+    }
+    if(showFollowupPanel){
+      
+
+      // Combine date and time into a single Date object (if both are set)
+      let followupDateTime = '';
+      if (followupDate && followupTime) {
+        // Create proper datetime string
+        const dateStr = followupDate instanceof Date
+          ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+          : followupDate;
+
+        followupDateTime = new Date(`${dateStr}T${followupTime}`);
+
+        // Validate the datetime
+        if (isNaN(followupDateTime.getTime())) {
+          alert('Invalid date/time combination');
+          return;
+        }
+      }
+
+      // Prepare the request body
+      const data = {
+        followup: followupDateTime ? followupDateTime.toISOString() : null,
+        remarks: remarks || ''
+      };
+
+      
+
+      // Check if backend URL and token exist
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      // Send PUT request to backend API
+      const response = await axios.put(
+        `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+        data,
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('API response:', response.data);
+
+      if (response.data.success) {
+        alert('Status updated successfully!');
+
+        // Reset form
+        setSelectedStatus('');
+        setSelectedSubStatus(null);
+        setFollowupDate('');
+        setFollowupTime('');
+        setRemarks('');
+
+        // Refresh data and close panel
+        await fetchProfileData();
+        closeEditPanel();
+      } else {
+        console.error('API returned error:', response.data);
+        alert(response.data.message || 'Failed to update status');
+      }
+
+    }
+    } 
+    catch (error) {
       console.error('Error updating status:', error);
 
       // More detailed error handling
@@ -2026,7 +2092,9 @@ const CRMDashboard = () => {
                 onClick={handleUpdateStatus}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
-                UPDATE STATUS
+
+                {showEditPanel && 'UPDATE STATUS'}
+                {showFollowupPanel && 'SET FOLLOWUP '}
               </button>
             </div>
           </form>
@@ -3418,22 +3486,65 @@ const CRMDashboard = () => {
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">NEXT ACTION DATE</div>
-                                                    <div className="info-value">{profile.followupDate ? new Date(profile.followupDate).toLocaleString() : 'N/A'}</div>
+                                                    <div className="info-value">
+                                                      {profile.followups?.length>0
+                                                        ? 
+                                                        (() => {
+                                                          const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
+                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric',
+                                                          }).replace(/ /g, '-');
+                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            hour12: true,
+                                                          });
+                                                          return `${datePart}, ${timePart}`;
+                                                        })()
+                                                        : 'N/A'}
+                                                    </div>
+
                                                   </div>
                                                 </div>
 
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                    <div className="info-value">{profile.createdAt ? (() => {
+                                                          const dateObj = new Date(profile.createdAt);
+                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric',
+                                                          }).replace(/ /g, '-');
+                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            hour12: true,
+                                                          });
+                                                          return `${datePart}, ${timePart}`;
+                                                        })() : 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ?
-                                                      new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                    <div className="info-value">{profile.updatedAt ? (() => {
+                                                          const dateObj = new Date(profile.updatedAt);
+                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric',
+                                                          }).replace(/ /g, '-');
+                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            hour12: true,
+                                                          });
+                                                          return `${datePart}, ${timePart}`;
+                                                        })() : 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">

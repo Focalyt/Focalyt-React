@@ -12,7 +12,7 @@ const candidateRegisterSchema = new Schema(
 			,Comments:String,Experience:String}],
 		techSkills:[{id:ObjectId,URL:String}],	
 		nonTechSkills:[{id:ObjectId,URL:String}],
-		name: { type: String, lowercase: true, trim: true },
+		name: { type: String, trim: true },
 		mobile: {
 			type: String,
 			lowercase: true,

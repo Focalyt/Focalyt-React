@@ -26,7 +26,7 @@ const companySchema = new Schema(
 		_industry: { type: ObjectId, ref: "Industry" },
 		_subIndustry: { type: ObjectId, ref: "SubIndustry" },
 		unmasked: [{type: ObjectId, ref: "User"}],
-		name: { type: String, lowercase: false, trim: true },
+		name: { type: String, trim: true },
 		email: {
 			type: String,
 			lowercase: true,

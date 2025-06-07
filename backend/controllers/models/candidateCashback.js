@@ -12,8 +12,7 @@ const candidateCashBackSchema = new Schema(
     eventType: { type: String, lowercase: true, enum: Object.values(cashbackEventType) },
     eventName: {
       type: String,
-      lowercase: true,
-      enum: Object.values(candidateCashbackEventName),
+       enum: Object.values(candidateCashbackEventName),
     },
     amount: {
       type: Number,

@@ -12,7 +12,7 @@ const collegeSchema = new Schema({
   _branches: [{ type: ObjectId, ref: 'Center' }],
   _qualification: [{ type: ObjectId, ref: 'Qualification' }],
   _university: { type: ObjectId, ref: 'University' },
-  name: { type: String, lowercase: false, trim: true },
+  name: { type: String, trim: true },
   type: { type: String, enum: ['School', 'College', 'Computer Center', 'University'] },
   website: {
     type: String, lowercase: true, trim: true,
