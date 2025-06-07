@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -7,6 +7,49 @@ import moment from 'moment';
 import axios from 'axios'
 import './CourseCrm.css';
 import './crm.css';
+
+// Add this at the top of the file, after imports
+const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
+  const [reason, setReason] = useState('');
+  const reasonRef = useRef('');
+
+  const handleReasonChange = (e) => {
+    reasonRef.current = e.target.value;
+    setReason(e.target.value);
+  };
+
+  const handleConfirm = () => {
+    onConfirm(reasonRef.current);
+  };
+
+  return (
+    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+      <h4>Provide Rejection Reason</h4>
+      <textarea
+        value={reason}
+        onChange={handleReasonChange}
+        placeholder="Please provide a detailed reason for rejection..."
+        rows="8"
+        className="form-control mb-3"
+      />
+      <div className="d-flex gap-2">
+        <button
+          className="btn btn-danger"
+          onClick={handleConfirm}
+          disabled={!reason.trim()}
+        >
+          Confirm Rejection
+        </button>
+        <button
+          className="btn btn-secondary"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+});
 
 const CRMDashboard = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -47,6 +90,7 @@ const CRMDashboard = () => {
   const [documentRotation, setDocumentRotation] = useState(0);
   const [showRejectionForm, setShowRejectionForm] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const rejectionReasonRef = useRef('');
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
@@ -277,14 +321,18 @@ const CRMDashboard = () => {
     setDocumentRotation(0);
   };
 
-  const updateDocumentStatus = (uploadId, status) => {
+  const updateDocumentStatus = (uploadId, status, rejectionReason) => {
     console.log(`Updating document ${uploadId} to ${status}`);
     if (status === 'Rejected' && !rejectionReason.trim()) {
       alert('Please provide a rejection reason');
       return;
     }
     if (status === 'Verified') {
-
+      setAllProfiles(prevProfiles => prevProfiles.map(profile =>
+        profile._id === selectedProfile._id
+          ? { ...profile, ekycStatus: 'done' }
+          : profile
+      ));
     }
     alert(`Document ${status} successfully!`);
     closeDocumentModal();
@@ -1206,13 +1254,136 @@ const CRMDashboard = () => {
 
   const today = new Date();
 
-  // Document Modal Component
+  const DocumentControls = React.memo(({ 
+    onZoomIn, 
+    onZoomOut, 
+    onRotate, 
+    onReset, 
+    onDownload, 
+    zoomLevel, 
+    fileType 
+  }) => {
+    return (
+      <div className="preview-controls">
+        <button
+          onClick={onZoomIn}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Zoom In"
+        >
+          <i className="fas fa-search-plus"></i> Zoom In
+        </button>
+
+        <button
+          onClick={onZoomOut}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Zoom Out"
+        >
+          <i className="fas fa-search-minus"></i> Zoom Out
+        </button>
+
+        {/* Show rotation button only for images */}
+        {fileType === 'image' && (
+          <button
+            onClick={onRotate}
+            className="control-btn"
+            style={{ whiteSpace: 'nowrap' }}
+            title="Rotate 90°"
+          >
+            <i className="fas fa-redo"></i> Rotate
+          </button>
+        )}
+
+        {/* Reset View Button */}
+        <button
+          onClick={onReset}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Reset View"
+        >
+          <i className="fas fa-sync-alt"></i> Reset
+        </button>
+
+        {/* Download Button */}
+        <a
+          href={onDownload}
+          download
+          className="control-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
+          title="Download Document"
+        >
+          <i className="fas fa-download"></i> Download
+        </a>
+
+        {/* Zoom Level Indicator */}
+        <div className="zoom-indicator" style={{
+          fontSize: '12px',
+          color: '#666',
+          marginLeft: '10px',
+          padding: '5px 10px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '4px'
+        }}>
+          {Math.round(zoomLevel * 100)}%
+        </div>
+      </div>
+    );
+  });
+
   const DocumentModal = () => {
+    const [showRejectionForm, setShowRejectionForm] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [documentZoom, setDocumentZoom] = useState(1);
+    const [documentRotation, setDocumentRotation] = useState(0);
+
+    const latestUpload = useMemo(() => {
+      if (!selectedDocument) return null;
+      return selectedDocument.uploads && selectedDocument.uploads.length > 0
+        ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+        : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+    }, [selectedDocument]);
+
+    const handleZoomIn = useCallback(() => {
+      setDocumentZoom(prev => Math.min(prev + 0.1, 2));
+    }, []);
+
+    const handleZoomOut = useCallback(() => {
+      setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
+    }, []);
+
+    const handleRotate = useCallback(() => {
+      setDocumentRotation(prev => (prev + 90) % 360);
+    }, []);
+
+    const handleReset = useCallback(() => {
+      setDocumentZoom(1);
+      setDocumentRotation(0);
+    }, []);
+
+    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+    const fileType = fileUrl ? getFileType(fileUrl) : null;
+
+    const handleRejectClick = useCallback(() => {
+      setShowRejectionForm(true);
+    }, []);
+
+    const handleCancelRejection = useCallback(() => {
+      setShowRejectionForm(false);
+      setRejectionReason('');
+    }, []);
+
+    const handleConfirmRejection = useCallback(() => {
+      if (rejectionReason.trim()) {
+        updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
+        handleCancelRejection();
+      }
+    }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
+
     if (!showDocumentModal || !selectedDocument) return null;
 
-    const latestUpload = selectedDocument.uploads && selectedDocument.uploads.length > 0
-      ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-      : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
     // Helper function to render document preview thumbnail using iframe/img
     const renderDocumentThumbnail = (upload, isSmall = true) => {
       const fileUrl = upload?.fileUrl;
@@ -1225,8 +1396,8 @@ const CRMDashboard = () => {
             backgroundColor: '#f8f9fa',
             border: '1px solid #dee2e6',
             borderRadius: '4px',
-            width: isSmall ? '60px' : '150px',
-            height: isSmall ? '40px' : '100px',
+            width: isSmall ? '100%' : '150px',
+            height: isSmall ? '100%' : '100px',
             fontSize: isSmall ? '16px' : '24px',
             color: '#6c757d'
           }}>
@@ -1244,8 +1415,8 @@ const CRMDashboard = () => {
             alt="Document Preview"
             className={`document-thumbnail ${isSmall ? 'small' : ''}`}
             style={{
-              width: isSmall ? '60px' : '150px',
-              height: isSmall ? '40px' : '100px',
+              width: isSmall ? '100%' : '150px',
+              height: isSmall ? '100%' : '100px',
               objectFit: 'cover',
               borderRadius: '4px',
               border: '1px solid #dee2e6',
@@ -1266,8 +1437,8 @@ const CRMDashboard = () => {
               src={fileUrl}
               className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
-                width: isSmall ? '60px' : '150px',
-                height: isSmall ? '40px' : '100px',
+                width: isSmall ? '100%' : '150px',
+                height: isSmall ? '100%' : '100px',
                 border: '1px solid #dee2e6',
                 borderRadius: '4px',
                 cursor: 'pointer',
@@ -1316,8 +1487,8 @@ const CRMDashboard = () => {
               src={fileUrl}
               className={`document-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
-                width: isSmall ? '60px' : '150px',
-                height: isSmall ? '40px' : '100px',
+                width: isSmall ? '100%' : '150px',
+                height: isSmall ? '100%' : '100px',
                 border: '1px solid #dee2e6',
                 borderRadius: '4px',
                 cursor: 'pointer',
@@ -1473,83 +1644,15 @@ const CRMDashboard = () => {
                         );
                       }
                     })()}
-                    <div className="preview-controls">
-                      <button
-                        onClick={zoomIn}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Zoom In"
-                      >
-                        <i className="fas fa-search-plus"></i> Zoom In
-                      </button>
-
-                      <button
-                        onClick={zoomOut}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Zoom Out"
-                      >
-                        <i className="fas fa-search-minus"></i> Zoom Out
-                      </button>
-
-                      {/* Show rotation button only for images */}
-                      {getFileType(latestUpload?.fileUrl || selectedDocument?.fileUrl) === 'image' && (
-                        <button
-                          onClick={rotateDocument}
-                          className="control-btn"
-                          style={{ whiteSpace: 'nowrap' }}
-                          title="Rotate 90°"
-                        >
-                          <i className="fas fa-redo"></i> Rotate
-                        </button>
-                      )}
-
-                      {/* Reset View Button */}
-                      <button
-                        onClick={resetView}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Reset View"
-                      >
-                        <i className="fas fa-sync-alt"></i> Reset
-                      </button>
-
-                      {/* Download Button */}
-                      {(latestUpload?.fileUrl || selectedDocument?.fileUrl) ? (
-                        <a
-                          href={latestUpload?.fileUrl || selectedDocument?.fileUrl}
-                          download
-                          className="control-btn"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
-                          title="Download Document"
-                        >
-                          <i className="fas fa-download"></i> Download
-                        </a>
-                      ) : (
-                        <button
-                          className="control-btn"
-                          style={{ whiteSpace: 'nowrap', opacity: 0.5 }}
-                          disabled
-                          title="File URL not available"
-                        >
-                          <i className="fas fa-download"></i> Download
-                        </button>
-                      )}
-
-                      {/* Zoom Level Indicator */}
-                      <div className="zoom-indicator" style={{
-                        fontSize: '12px',
-                        color: '#666',
-                        marginLeft: '10px',
-                        padding: '5px 10px',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '4px'
-                      }}>
-                        {Math.round(documentZoom * 100)}%
-                      </div>
-                    </div>
+                    <DocumentControls
+                      onZoomIn={handleZoomIn}
+                      onZoomOut={handleZoomOut}
+                      onRotate={handleRotate}
+                      onReset={handleReset}
+                      onDownload={fileUrl}
+                      zoomLevel={documentZoom}
+                      fileType={fileType}
+                    />
                   </>
                 ) : (
                   <div className="no-document">
@@ -1558,95 +1661,16 @@ const CRMDashboard = () => {
                   </div>
                 )}
               </div>
-            </div>
 
-            <div className="document-info-section">
-              <div className="info-card">
-                <h4>Document Information</h4>
-                <div className="info-row">
-                  <strong>Document Name:</strong> {selectedDocument.Name}
-                </div>
-                <div className="info-row">
-                  <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
-                    new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric'
-                    }) : 'N/A'}
-                </div>
-                <div className="info-row">
-                  <strong>Status:</strong>
-                  <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
-                    {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
-                  </span>
-                </div>
-              </div>
+              {/* document preview container  */}
 
-              {(latestUpload?.status === 'Pending' || selectedDocument?.status === 'Pending') && (
-                <div className="verification-section">
-                  <div className="info-card">
-                    <h4>Verification Steps</h4>
-                    <ol className="verification-steps">
-                      <li>Check if the document is clearly visible</li>
-                      <li>Verify the document belongs to the candidate</li>
-                      <li>Confirm all required details are present</li>
-                      <li>Check the document validity dates</li>
-                      <li>Ensure there are no signs of tampering</li>
-                    </ol>
-                  </div>
-
-                  {!showRejectionForm ? (
-                    <div className="action-buttons">
-                      <button
-                        className="btn btn-success me-2"
-                        onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
-                      >
-                        <i className="fas fa-check"></i> Approve Document
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => setShowRejectionForm(true)}
-                      >
-                        <i className="fas fa-times"></i> Reject Document
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="rejection-form">
-                      <h4>Provide Rejection Reason</h4>
-                      <textarea
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Please provide a detailed reason for rejection..."
-                        rows="4"
-                        className="form-control mb-3"
-                      />
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-danger"
-                          onClick={() => updateDocumentStatus(latestUpload._id, 'Rejected')}
-                        >
-                          Confirm Rejection
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => setShowRejectionForm(false)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-                <div className="info-card">
+               {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+                <div className="info-card mt-4">
                   <h4>Document History</h4>
                   <div className="document-history">
                     {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
                       <div key={index} className="history-item" style={{
-                        display: 'flex',
-                        alignItems: 'center',
+                        display: 'block',
                         padding: '12px',
                         marginBottom: '8px',
                         backgroundColor: '#f8f9fa',
@@ -1715,6 +1739,75 @@ const CRMDashboard = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="document-info-section">
+              <div className="info-card">
+                <h4>Document Information</h4>
+                <div className="info-row">
+                  <strong>Document Name:</strong> {selectedDocument.Name}
+                </div>
+                <div className="info-row">
+                  <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
+                    new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    }) : 'N/A'}
+                </div>
+                <div className="info-row">
+                  <strong>Status:</strong>
+                  <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
+                    {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Document Actions */}
+              <div className="document-actions mt-4">
+                {!showRejectionForm ? (
+                  <div className="action-buttons">
+                    <button
+                      className="btn btn-success me-2"
+                      onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
+                    >
+                      <i className="fas fa-check"></i> Approve Document
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleRejectClick}
+                    >
+                      <i className="fas fa-times"></i> Reject Document
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Please provide a detailed reason for rejection..."
+                      rows="8"
+                      className="form-control mb-3"
+                    />
+                    <div className="d-flex gap-2">
+                      <button
+                        className="btn btn-danger"
+                        onClick={handleConfirmRejection}
+                      >
+                        Confirm Rejection
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={handleCancelRejection}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+             
             </div>
           </div>
         </div>
@@ -2317,6 +2410,11 @@ const CRMDashboard = () => {
         {panelContent}
       </div>
     ) : null;
+  };
+
+  const handleRejectionReasonChange = (e) => {
+    rejectionReasonRef.current = e.target.value;
+    setRejectionReason(e.target.value);
   };
 
   return (

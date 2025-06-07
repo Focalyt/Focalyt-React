@@ -643,7 +643,7 @@
 
 .preview-controls {
     position: absolute;
-    bottom: 15px;
+    bottom: 0px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -758,7 +758,7 @@
 
 .rejection-form textarea {
     width: 100%;
-    min-height: 100px;
+    min-height: 100px!important;
     padding: 10px;
     border: 1px solid #ffeaa7;
     border-radius: 4px;
