@@ -1298,7 +1298,6 @@ const CRMDashboard = () => {
                 borderRadius: '4px',
                 cursor: 'pointer',
                 pointerEvents: 'none', // Prevent interaction in thumbnail
-                transform: 'scale(0.3)',
                 transformOrigin: 'top left',
                 overflow: 'hidden'
               }}
@@ -1433,7 +1432,7 @@ const CRMDashboard = () => {
                             return (
                               <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
                                 <iframe
-                                  src={fileUrl}
+                                  src={fileUrl + '#navpanes=0&toolbar=0'}
                                   width="100%"
                                   height="100%"
                                   style={{

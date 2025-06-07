@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -282,15 +282,137 @@ const CRMDashboard = () => {
 
     return { totalDocs, uploadedDocs, pendingDocs, verifiedDocs, rejectedDocs };
   };
+  const DocumentControls = React.memo(({ 
+    onZoomIn, 
+    onZoomOut, 
+    onRotate, 
+    onReset, 
+    onDownload, 
+    zoomLevel, 
+    fileType 
+  }) => {
+    return (
+      <div className="preview-controls">
+        <button
+          onClick={onZoomIn}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Zoom In"
+        >
+          <i className="fas fa-search-plus"></i> Zoom In
+        </button>
+
+        <button
+          onClick={onZoomOut}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Zoom Out"
+        >
+          <i className="fas fa-search-minus"></i> Zoom Out
+        </button>
+
+        {/* Show rotation button only for images */}
+        {fileType === 'image' && (
+          <button
+            onClick={onRotate}
+            className="control-btn"
+            style={{ whiteSpace: 'nowrap' }}
+            title="Rotate 90°"
+          >
+            <i className="fas fa-redo"></i> Rotate
+          </button>
+        )}
+
+        {/* Reset View Button */}
+        <button
+          onClick={onReset}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Reset View"
+        >
+          <i className="fas fa-sync-alt"></i> Reset
+        </button>
+
+        {/* Download Button */}
+        <a
+          href={onDownload}
+          download
+          className="control-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
+          title="Download Document"
+        >
+          <i className="fas fa-download"></i> Download
+        </a>
+
+        {/* Zoom Level Indicator */}
+        <div className="zoom-indicator" style={{
+          fontSize: '12px',
+          color: '#666',
+          marginLeft: '10px',
+          padding: '5px 10px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '4px'
+        }}>
+          {Math.round(zoomLevel * 100)}%
+        </div>
+      </div>
+    );
+  });
 
 
   // Document Modal Component
   const DocumentModal = () => {
-    if (!showDocumentModal || !selectedDocument) return null;
+    const [showRejectionForm, setShowRejectionForm] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [documentZoom, setDocumentZoom] = useState(1);
+    const [documentRotation, setDocumentRotation] = useState(0);
 
-    const latestUpload = selectedDocument.uploads && selectedDocument.uploads.length > 0
-      ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-      : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+    const latestUpload = useMemo(() => {
+      if (!selectedDocument) return null;
+      return selectedDocument.uploads && selectedDocument.uploads.length > 0
+        ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+        : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+    }, [selectedDocument]);
+
+    const handleZoomIn = useCallback(() => {
+      setDocumentZoom(prev => Math.min(prev + 0.1, 2));
+    }, []);
+
+    const handleZoomOut = useCallback(() => {
+      setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
+    }, []);
+
+    const handleRotate = useCallback(() => {
+      setDocumentRotation(prev => (prev + 90) % 360);
+    }, []);
+
+    const handleReset = useCallback(() => {
+      setDocumentZoom(1);
+      setDocumentRotation(0);
+    }, []);
+
+    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+    const fileType = fileUrl ? getFileType(fileUrl) : null;
+
+    const handleRejectClick = useCallback(() => {
+      setShowRejectionForm(true);
+    }, []);
+
+    const handleCancelRejection = useCallback(() => {
+      setShowRejectionForm(false);
+      setRejectionReason('');
+    }, []);
+
+    const handleConfirmRejection = useCallback(() => {
+      if (rejectionReason.trim()) {
+        updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
+        handleCancelRejection();
+      }
+    }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
+
+    if (!showDocumentModal || !selectedDocument) return null;
 
     // Helper function to render document preview thumbnail using iframe/img
     const renderDocumentThumbnail = (upload, isSmall = true) => {
@@ -304,8 +426,8 @@ const CRMDashboard = () => {
             backgroundColor: '#f8f9fa',
             border: '1px solid #dee2e6',
             borderRadius: '4px',
-            width: isSmall ? '60px' : '150px',
-            height: isSmall ? '40px' : '100px',
+            width: isSmall ? '100%' : '150px',
+            height: isSmall ? '100%' : '100px',
             fontSize: isSmall ? '16px' : '24px',
             color: '#6c757d'
           }}>
@@ -323,8 +445,8 @@ const CRMDashboard = () => {
             alt="Document Preview"
             className={`document-thumbnail ${isSmall ? 'small' : ''}`}
             style={{
-              width: isSmall ? '60px' : '150px',
-              height: isSmall ? '40px' : '100px',
+              width: isSmall ? '100%' : '150px',
+              height: isSmall ? '100%' : '100px',
               objectFit: 'cover',
               borderRadius: '4px',
               border: '1px solid #dee2e6',
@@ -345,13 +467,12 @@ const CRMDashboard = () => {
               src={fileUrl}
               className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
-                width: isSmall ? '60px' : '150px',
-                height: isSmall ? '40px' : '100px',
+                width: isSmall ? '100%' : '150px',
+                height: isSmall ? '100%' : '100px',
                 border: '1px solid #dee2e6',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                pointerEvents: 'none', // Prevent interaction in thumbnail
-                transform: 'scale(0.3)',
+                pointerEvents: 'none',
                 transformOrigin: 'top left',
                 overflow: 'hidden'
               }}
@@ -395,8 +516,8 @@ const CRMDashboard = () => {
               src={fileUrl}
               className={`document-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
-                width: isSmall ? '60px' : '150px',
-                height: isSmall ? '40px' : '100px',
+                width: isSmall ? '100%' : '150px',
+                height: isSmall ? '100%' : '100px',
                 border: '1px solid #dee2e6',
                 borderRadius: '4px',
                 cursor: 'pointer',
@@ -438,114 +559,6 @@ const CRMDashboard = () => {
       }
     };
 
-    // Main preview rendering using iframe/img
-    const renderMainPreview = () => {
-      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-      const hasDocument = fileUrl ||
-        (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
-
-      if (hasDocument) {
-        if (fileUrl) {
-          const fileType = getFileType(fileUrl);
-
-          if (fileType === 'image') {
-            return (
-              <img
-                src={fileUrl}
-                alt="Document Preview"
-                style={{
-                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                  transition: 'transform 0.3s ease',
-                  maxWidth: '100%',
-                  maxHeight: '500px',
-                  objectFit: 'contain'
-                }}
-              />
-            );
-          } else if (fileType === 'pdf') {
-            return (
-              <iframe
-                src={fileUrl}
-                width="100%"
-                height="500px"
-                style={{
-                  border: 'none',
-                  transform: `scale(${documentZoom})`,
-                  transformOrigin: 'top left',
-                  transition: 'transform 0.3s ease',
-                  borderRadius: '4px'
-                }}
-                title="PDF Document"
-              />
-            );
-          } else {
-            // Try iframe for other document types
-            return (
-              <div style={{ position: 'relative' }}>
-                <iframe
-                  src={fileUrl}
-                  width="100%"
-                  height="500px"
-                  style={{
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    transform: `scale(${documentZoom})`,
-                    transformOrigin: 'top left',
-                    transition: 'transform 0.3s ease'
-                  }}
-                  title="Document Preview"
-                />
-                {/* Fallback overlay if iframe doesn't work */}
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  textAlign: 'center',
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  padding: '20px',
-                  borderRadius: '8px',
-                  display: 'none' // Show this only if iframe fails
-                }}>
-                  <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                    {fileType === 'document' ? '📄' :
-                      fileType === 'spreadsheet' ? '📊' : '📁'}
-                  </div>
-                  <h4>Document Preview</h4>
-                  <p>Click download to view this file</p>
-                  <a
-                    href={fileUrl}
-                    download
-                    className="btn btn-primary"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <i className="fas fa-download me-2"></i>
-                    Download & View
-                  </a>
-                </div>
-              </div>
-            );
-          }
-        } else {
-          return (
-            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-              <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
-              <h4>Document Uploaded</h4>
-              <p>Document is available for verification</p>
-              <p><strong>Status:</strong> {selectedDocument?.status}</p>
-            </div>
-          );
-        }
-      } else {
-        return (
-          <div className="no-document">
-            <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-            <p>No document uploaded</p>
-          </div>
-        );
-      }
-    };
 
     return (
       <div className="document-modal-overlay" onClick={closeDocumentModal}>
@@ -561,84 +574,118 @@ const CRMDashboard = () => {
                 {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
                   (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                   <>
-                    {renderMainPreview()}
-                    <div className="preview-controls">
-                      <button
-                        onClick={zoomIn}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Zoom In"
-                      >
-                        <i className="fas fa-search-plus"></i> Zoom In
-                      </button>
+                    {(() => {
+                      console.log('selectedDocument:', selectedDocument);
+                      console.log('latestUpload:', latestUpload);
 
-                      <button
-                        onClick={zoomOut}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Zoom Out"
-                      >
-                        <i className="fas fa-search-minus"></i> Zoom Out
-                      </button>
+                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+                      const hasDocument = fileUrl ||
+                        (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
-                      {/* Show rotation button only for images */}
-                      {getFileType(latestUpload?.fileUrl || selectedDocument?.fileUrl) === 'image' && (
-                        <button
-                          onClick={rotateDocument}
-                          className="control-btn"
-                          style={{ whiteSpace: 'nowrap' }}
-                          title="Rotate 90°"
-                        >
-                          <i className="fas fa-redo"></i> Rotate
-                        </button>
-                      )}
+                      console.log('fileUrl:', fileUrl);
+                      console.log('hasDocument:', hasDocument);
 
-                      {/* Reset View Button */}
-                      <button
-                        onClick={resetView}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Reset View"
-                      >
-                        <i className="fas fa-sync-alt"></i> Reset
-                      </button>
+                      if (hasDocument) {
+                        // If we have a file URL, show the appropriate viewer
+                        if (fileUrl) {
+                          const fileType = getFileType(fileUrl);
 
-                      {/* Download Button */}
-                      {(latestUpload?.fileUrl || selectedDocument?.fileUrl) ? (
-                        <a
-                          href={latestUpload?.fileUrl || selectedDocument?.fileUrl}
-                          download
-                          className="control-btn"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
-                          title="Download Document"
-                        >
-                          <i className="fas fa-download"></i> Download
-                        </a>
-                      ) : (
-                        <button
-                          className="control-btn"
-                          style={{ whiteSpace: 'nowrap', opacity: 0.5 }}
-                          disabled
-                          title="File URL not available"
-                        >
-                          <i className="fas fa-download"></i> Download
-                        </button>
-                      )}
-
-                      {/* Zoom Level Indicator */}
-                      <div className="zoom-indicator" style={{
-                        fontSize: '12px',
-                        color: '#666',
-                        marginLeft: '10px',
-                        padding: '5px 10px',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '4px'
-                      }}>
-                        {Math.round(documentZoom * 100)}%
-                      </div>
-                    </div>
+                          if (fileType === 'image') {
+                            return (
+                              <img
+                                src={fileUrl}
+                                alt="Document Preview"
+                                style={{
+                                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                                  transition: 'transform 0.3s ease',
+                                  maxWidth: '100%',
+                                  objectFit: 'contain'
+                                }}
+                              />
+                            );
+                          } else if (fileType === 'pdf') {
+                            return (
+                              <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
+                                <iframe
+                                  src={fileUrl+ '#navpanes=0&toolbar=0'}
+                                  width="100%"
+                                  height="100%"
+                                  style={{
+                                    border: 'none',
+                                    position: 'absolute',
+                                    top: '50%',
+                                    left: '50%',
+                                    transform: `translate(-50%, -50%) scale(${documentZoom})`,
+                                    transformOrigin: 'center center',
+                                    transition: 'transform 0.3s ease',
+                                    willChange: 'transform'
+                                  }}
+                                  title="PDF Document"
+                                />
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+                                <div style={{ fontSize: '60px', marginBottom: '20px' }}>
+                                  {fileType === 'document' ? '📄' :
+                                    fileType === 'spreadsheet' ? '📊' : '📁'}
+                                </div>
+                                <h4>Document Preview</h4>
+                                <p>Click download to view this file</p>
+                                {fileUrl ? (
+                                  <a
+                                    href={fileUrl}
+                                    download
+                                    className="btn btn-primary"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <i className="fas fa-download me-2"></i>
+                                    Download & View
+                                  </a>
+                                ) : (
+                                  <button
+                                    className="btn btn-secondary"
+                                    disabled
+                                    title="File URL not available"
+                                  >
+                                    <i className="fas fa-download me-2"></i>
+                                    File Not Available
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          }
+                        } else {
+                          // Document exists but no file URL - show document uploaded message
+                          return (
+                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+                              <h4>Document Uploaded</h4>
+                              <p>Document is available for verification</p>
+                              <p><strong>Status:</strong> {selectedDocument?.status}</p>
+                            </div>
+                          );
+                        }
+                      } else {
+                        return (
+                          <div className="no-document">
+                            <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+                            <p>No document uploaded</p>
+                          </div>
+                        );
+                      }
+                    })()}
+                    <DocumentControls
+                      onZoomIn={handleZoomIn}
+                      onZoomOut={handleZoomOut}
+                      onRotate={handleRotate}
+                      onReset={handleReset}
+                      onDownload={fileUrl}
+                      zoomLevel={documentZoom}
+                      fileType={fileType}
+                    />
                   </>
                 ) : (
                   <div className="no-document">
@@ -647,54 +694,16 @@ const CRMDashboard = () => {
                   </div>
                 )}
               </div>
-            </div>
 
-            <div className="document-info-section">
-              <div className="info-card">
-                <h4>Document Information</h4>
-                <div className="info-row">
-                  <strong>Document Name:</strong> {selectedDocument.Name}
-                </div>
-                <div className="info-row">
-                  <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
-                    new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric'
-                    }) : 'N/A'}
-                </div>
-                <div className="info-row">
-                  <strong>Status:</strong>
-                  <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
-                    {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
-                  </span>
-                </div>
-              </div>
+              {/* document preview container  */}
 
-              {(latestUpload?.status === 'Pending' || selectedDocument?.status === 'Pending') && (
-                <div className="verification-section">
-                  <div className="info-card">
-                    <h4>Verification Steps</h4>
-                    <ol className="verification-steps">
-                      <li>Check if the document is clearly visible</li>
-                      <li>Verify the document belongs to the candidate</li>
-                      <li>Confirm all required details are present</li>
-                      <li>Check the document validity dates</li>
-                      <li>Ensure there are no signs of tampering</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
-
-              {/* Enhanced Document History with iframe/img Preview */}
-              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-                <div className="info-card">
+               {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+                <div className="info-card mt-4">
                   <h4>Document History</h4>
                   <div className="document-history">
                     {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
                       <div key={index} className="history-item" style={{
-                        display: 'flex',
-                        alignItems: 'center',
+                        display: 'block',
                         padding: '12px',
                         marginBottom: '8px',
                         backgroundColor: '#f8f9fa',
@@ -764,11 +773,520 @@ const CRMDashboard = () => {
                 </div>
               )}
             </div>
+
+            <div className="document-info-section">
+              <div className="info-card">
+                <h4>Document Information</h4>
+                <div className="info-row">
+                  <strong>Document Name:</strong> {selectedDocument.Name}
+                </div>
+                <div className="info-row">
+                  <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
+                    new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    }) : 'N/A'}
+                </div>
+                <div className="info-row">
+                  <strong>Status:</strong>
+                  <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
+                    {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+                  </span>
+                </div>
+              </div>
+             
+            </div>
           </div>
         </div>
       </div>
     );
   };
+
+  // const DocumentModal = () => {
+  //   if (!showDocumentModal || !selectedDocument) return null;
+
+  //   const latestUpload = selectedDocument.uploads && selectedDocument.uploads.length > 0
+  //     ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+  //     : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+     
+  //   // Helper function to render document preview thumbnail using iframe/img
+  //   const renderDocumentThumbnail = (upload, isSmall = true) => {
+  //     const fileUrl = upload?.fileUrl;
+  //     if (!fileUrl) {
+  //       return (
+  //         <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+  //           display: 'flex',
+  //           alignItems: 'center',
+  //           justifyContent: 'center',
+  //           backgroundColor: '#f8f9fa',
+  //           border: '1px solid #dee2e6',
+  //           borderRadius: '4px',
+  //           width: isSmall ? '60px' : '150px',
+  //           height: isSmall ? '40px' : '100px',
+  //           fontSize: isSmall ? '16px' : '24px',
+  //           color: '#6c757d'
+  //         }}>
+  //           📄
+  //         </div>
+  //       );
+  //     }
+
+  //     const fileType = getFileType(fileUrl);
+
+  //     if (fileType === 'image') {
+  //       return (
+  //         <img
+  //           src={fileUrl}
+  //           alt="Document Preview"
+  //           className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+  //           style={{
+  //             width: isSmall ? '60px' : '150px',
+  //             height: isSmall ? '40px' : '100px',
+  //             objectFit: 'cover',
+  //             borderRadius: '4px',
+  //             border: '1px solid #dee2e6',
+  //             cursor: 'pointer'
+  //           }}
+  //           onClick={() => {
+  //             if (isSmall) {
+  //               // Set this upload as the current preview
+  //               setCurrentPreviewUpload(upload);
+  //             }
+  //           }}
+  //         />
+  //       );
+  //     } else if (fileType === 'pdf') {
+  //       return (
+  //         <div style={{ position: 'relative', overflow: 'hidden' }}>
+  //           <iframe
+  //             src={fileUrl}
+  //             className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+  //             style={{
+  //               width: isSmall ? '60px' : '150px',
+  //               height: isSmall ? '40px' : '100px',
+  //               border: '1px solid #dee2e6',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer',
+  //               pointerEvents: 'none', // Prevent interaction in thumbnail
+  //               transform: 'scale(0.3)',
+  //               transformOrigin: 'top left',
+  //               overflow: 'hidden'
+  //             }}
+  //             title="PDF Thumbnail"
+  //             onClick={() => {
+  //               if (isSmall) {
+  //                 setCurrentPreviewUpload(upload);
+  //               }
+  //             }}
+  //           />
+  //           <div style={{
+  //             position: 'absolute',
+  //             top: 0,
+  //             left: 0,
+  //             right: 0,
+  //             bottom: 0,
+  //             backgroundColor: 'rgba(220, 53, 69, 0.1)',
+  //             display: 'flex',
+  //             alignItems: 'center',
+  //             justifyContent: 'center',
+  //             color: '#dc3545',
+  //             fontSize: isSmall ? '10px' : '12px',
+  //             fontWeight: 'bold',
+  //             borderRadius: '4px',
+  //             cursor: 'pointer'
+  //           }}
+  //             onClick={() => {
+  //               if (isSmall) {
+  //                 setCurrentPreviewUpload(upload);
+  //               }
+  //             }}>
+  //             PDF
+  //           </div>
+  //         </div>
+  //       );
+  //     } else {
+  //       // For other document types, try to use iframe as well
+  //       return (
+  //         <div style={{ position: 'relative' }}>
+  //           <iframe
+  //             src={fileUrl}
+  //             className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+  //             style={{
+  //               width: isSmall ? '60px' : '150px',
+  //               height: isSmall ? '40px' : '100px',
+  //               border: '1px solid #dee2e6',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer',
+  //               pointerEvents: 'none',
+  //               backgroundColor: '#f8f9fa'
+  //             }}
+  //             title="Document Thumbnail"
+  //             onClick={() => {
+  //               if (isSmall) {
+  //                 setCurrentPreviewUpload(upload);
+  //               }
+  //             }}
+  //           />
+  //           <div style={{
+  //             position: 'absolute',
+  //             top: 0,
+  //             left: 0,
+  //             right: 0,
+  //             bottom: 0,
+  //             backgroundColor: 'rgba(0, 123, 255, 0.1)',
+  //             display: 'flex',
+  //             alignItems: 'center',
+  //             justifyContent: 'center',
+  //             color: '#007bff',
+  //             fontSize: isSmall ? '16px' : '24px',
+  //             borderRadius: '4px',
+  //             cursor: 'pointer'
+  //           }}
+  //             onClick={() => {
+  //               if (isSmall) {
+  //                 setCurrentPreviewUpload(upload);
+  //               }
+  //             }}>
+  //             {fileType === 'document' ? '📄' :
+  //               fileType === 'spreadsheet' ? '📊' : '📁'}
+  //           </div>
+  //         </div>
+  //       );
+  //     }
+  //   };
+
+  //   // Main preview rendering using iframe/img
+  //   const renderMainPreview = () => {
+  //     const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  //     const hasDocument = fileUrl ||
+  //       (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
+
+  //     if (hasDocument) {
+  //       if (fileUrl) {
+  //         const fileType = getFileType(fileUrl);
+
+  //         if (fileType === 'image') {
+  //           return (
+  //             <img
+  //               src={fileUrl}
+  //               alt="Document Preview"
+  //               style={{
+  //                 transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+  //                 transition: 'transform 0.3s ease',
+  //                 maxWidth: '100%',
+  //                 maxHeight: '500px',
+  //                 objectFit: 'contain'
+  //               }}
+  //             />
+  //           );
+  //         } else if (fileType === 'pdf') {
+  //           return (
+  //             <iframe
+  //               src={fileUrl}
+  //               width="100%"
+  //               height="500px"
+  //               style={{
+  //                 border: 'none',
+  //                 transform: `scale(${documentZoom})`,
+  //                 transformOrigin: 'top left',
+  //                 transition: 'transform 0.3s ease',
+  //                 borderRadius: '4px'
+  //               }}
+  //               title="PDF Document"
+  //             />
+  //           );
+  //         } else {
+  //           // Try iframe for other document types
+  //           return (
+  //             <div style={{ position: 'relative' }}>
+  //               <iframe
+  //                 src={fileUrl}
+  //                 width="100%"
+  //                 height="500px"
+  //                 style={{
+  //                   border: '1px solid #dee2e6',
+  //                   borderRadius: '4px',
+  //                   transform: `scale(${documentZoom})`,
+  //                   transformOrigin: 'top left',
+  //                   transition: 'transform 0.3s ease'
+  //                 }}
+  //                 title="Document Preview"
+  //               />
+  //               {/* Fallback overlay if iframe doesn't work */}
+  //               <div style={{
+  //                 position: 'absolute',
+  //                 top: '50%',
+  //                 left: '50%',
+  //                 transform: 'translate(-50%, -50%)',
+  //                 textAlign: 'center',
+  //                 backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  //                 padding: '20px',
+  //                 borderRadius: '8px',
+  //                 display: 'none' // Show this only if iframe fails
+  //               }}>
+  //                 <div style={{ fontSize: '60px', marginBottom: '20px' }}>
+  //                   {fileType === 'document' ? '📄' :
+  //                     fileType === 'spreadsheet' ? '📊' : '📁'}
+  //                 </div>
+  //                 <h4>Document Preview</h4>
+  //                 <p>Click download to view this file</p>
+  //                 <a
+  //                   href={fileUrl}
+  //                   download
+  //                   className="btn btn-primary"
+  //                   target="_blank"
+  //                   rel="noopener noreferrer"
+  //                 >
+  //                   <i className="fas fa-download me-2"></i>
+  //                   Download & View
+  //                 </a>
+  //               </div>
+  //             </div>
+  //           );
+  //         }
+  //       } else {
+  //         return (
+  //           <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+  //             <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+  //             <h4>Document Uploaded</h4>
+  //             <p>Document is available for verification</p>
+  //             <p><strong>Status:</strong> {selectedDocument?.status}</p>
+  //           </div>
+  //         );
+  //       }
+  //     } else {
+  //       return (
+  //         <div className="no-document">
+  //           <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+  //           <p>No document uploaded</p>
+  //         </div>
+  //       );
+  //     }
+  //   };
+
+  //   return (
+  //     <div className="document-modal-overlay" onClick={closeDocumentModal}>
+  //       <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
+  //         <div className="modal-header">
+  //           <h3>{selectedDocument.Name} Verification</h3>
+  //           <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
+  //         </div>
+
+  //         <div className="modal-body">
+  //           <div className="document-preview-section">
+  //             <div className="document-preview-container">
+  //               {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
+  //                 (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
+  //                 <>
+  //                   {renderMainPreview()}
+  //                   <div className="preview-controls">
+  //                     <button
+  //                       onClick={zoomIn}
+  //                       className="control-btn"
+  //                       style={{ whiteSpace: 'nowrap' }}
+  //                       title="Zoom In"
+  //                     >
+  //                       <i className="fas fa-search-plus"></i> Zoom In
+  //                     </button>
+
+  //                     <button
+  //                       onClick={zoomOut}
+  //                       className="control-btn"
+  //                       style={{ whiteSpace: 'nowrap' }}
+  //                       title="Zoom Out"
+  //                     >
+  //                       <i className="fas fa-search-minus"></i> Zoom Out
+  //                     </button>
+
+  //                     {/* Show rotation button only for images */}
+  //                     {getFileType(latestUpload?.fileUrl || selectedDocument?.fileUrl) === 'image' && (
+  //                       <button
+  //                         onClick={rotateDocument}
+  //                         className="control-btn"
+  //                         style={{ whiteSpace: 'nowrap' }}
+  //                         title="Rotate 90°"
+  //                       >
+  //                         <i className="fas fa-redo"></i> Rotate
+  //                       </button>
+  //                     )}
+
+  //                     {/* Reset View Button */}
+  //                     <button
+  //                       onClick={resetView}
+  //                       className="control-btn"
+  //                       style={{ whiteSpace: 'nowrap' }}
+  //                       title="Reset View"
+  //                     >
+  //                       <i className="fas fa-sync-alt"></i> Reset
+  //                     </button>
+
+  //                     {/* Download Button */}
+  //                     {(latestUpload?.fileUrl || selectedDocument?.fileUrl) ? (
+  //                       <a
+  //                         href={latestUpload?.fileUrl || selectedDocument?.fileUrl}
+  //                         download
+  //                         className="control-btn"
+  //                         target="_blank"
+  //                         rel="noopener noreferrer"
+  //                         style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
+  //                         title="Download Document"
+  //                       >
+  //                         <i className="fas fa-download"></i> Download
+  //                       </a>
+  //                     ) : (
+  //                       <button
+  //                         className="control-btn"
+  //                         style={{ whiteSpace: 'nowrap', opacity: 0.5 }}
+  //                         disabled
+  //                         title="File URL not available"
+  //                       >
+  //                         <i className="fas fa-download"></i> Download
+  //                       </button>
+  //                     )}
+
+  //                     {/* Zoom Level Indicator */}
+  //                     <div className="zoom-indicator" style={{
+  //                       fontSize: '12px',
+  //                       color: '#666',
+  //                       marginLeft: '10px',
+  //                       padding: '5px 10px',
+  //                       backgroundColor: '#f8f9fa',
+  //                       borderRadius: '4px'
+  //                     }}>
+  //                       {Math.round(documentZoom * 100)}%
+  //                     </div>
+  //                   </div>
+  //                 </>
+  //               ) : (
+  //                 <div className="no-document">
+  //                   <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+  //                   <p>No document uploaded</p>
+  //                 </div>
+  //               )}
+  //             </div>
+  //           </div>
+
+  //           <div className="document-info-section">
+  //             <div className="info-card">
+  //               <h4>Document Information</h4>
+  //               <div className="info-row">
+  //                 <strong>Document Name:</strong> {selectedDocument.Name}
+  //               </div>
+  //               <div className="info-row">
+  //                 <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
+  //                   new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
+  //                     day: '2-digit',
+  //                     month: 'short',
+  //                     year: 'numeric'
+  //                   }) : 'N/A'}
+  //               </div>
+  //               <div className="info-row">
+  //                 <strong>Status:</strong>
+  //                 <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
+  //                   {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+  //                 </span>
+  //               </div>
+  //             </div>
+
+  //             {(latestUpload?.status === 'Pending' || selectedDocument?.status === 'Pending') && (
+  //               <div className="verification-section">
+  //                 <div className="info-card">
+  //                   <h4>Verification Steps</h4>
+  //                   <ol className="verification-steps">
+  //                     <li>Check if the document is clearly visible</li>
+  //                     <li>Verify the document belongs to the candidate</li>
+  //                     <li>Confirm all required details are present</li>
+  //                     <li>Check the document validity dates</li>
+  //                     <li>Ensure there are no signs of tampering</li>
+  //                   </ol>
+  //                 </div>
+  //               </div>
+  //             )}
+
+  //             {/* Enhanced Document History with iframe/img Preview */}
+  //             {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+  //               <div className="info-card">
+  //                 <h4>Document History</h4>
+  //                 <div className="document-history">
+  //                   {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
+  //                     <div key={index} className="history-item" style={{
+  //                       display: 'flex',
+  //                       alignItems: 'center',
+  //                       padding: '12px',
+  //                       marginBottom: '8px',
+  //                       backgroundColor: '#f8f9fa',
+  //                       borderRadius: '8px',
+  //                       border: '1px solid #e9ecef'
+  //                     }}>
+  //                       {/* Document Preview Thumbnail using iframe/img */}
+  //                       <div className="history-preview" style={{ marginRight: '0px' }}>
+  //                         {renderDocumentThumbnail(upload, true)}
+  //                       </div>
+
+  //                       {/* Document Info */}
+  //                       <div className="history-info" style={{ flex: 1 }}>
+  //                         <div className="history-date" style={{
+  //                           fontSize: '14px',
+  //                           fontWeight: '500',
+  //                           color: '#495057',
+  //                           marginBottom: '4px'
+  //                         }}>
+  //                           {formatDate(upload.uploadedAt)}
+  //                         </div>
+  //                         <div className="history-status">
+  //                           <span className={`${getStatusBadgeClass(upload.status)}`} style={{
+  //                             fontSize: '12px',
+  //                             padding: '4px 8px'
+  //                           }}>
+  //                             {upload.status}
+  //                           </span>
+  //                         </div>
+  //                         {upload.fileUrl && (
+  //                           <div className="history-actions" style={{ marginTop: '8px' }}>
+  //                             <a
+  //                               href={upload.fileUrl}
+  //                               download
+  //                               className="btn btn-sm btn-outline-primary"
+  //                               target="_blank"
+  //                               rel="noopener noreferrer"
+  //                               style={{
+  //                                 fontSize: '11px',
+  //                                 padding: '2px 8px',
+  //                                 textDecoration: 'none'
+  //                               }}
+  //                             >
+  //                               <i className="fas fa-download me-1"></i>
+  //                               Download
+  //                             </a>
+  //                             <button
+  //                               className="btn btn-sm btn-outline-secondary ms-2"
+  //                               style={{
+  //                                 fontSize: '11px',
+  //                                 padding: '2px 8px'
+  //                               }}
+  //                               onClick={() => {
+  //                                 // Switch main preview to this upload
+  //                                 setCurrentPreviewUpload(upload);
+  //                               }}
+  //                             >
+  //                               <i className="fas fa-eye me-1"></i>
+  //                               Preview
+  //                             </button>
+  //                           </div>
+  //                         )}
+  //                       </div>
+  //                     </div>
+  //                   ))}
+  //                 </div>
+  //               </div>
+  //             )}
+  //           </div>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // };
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
 
