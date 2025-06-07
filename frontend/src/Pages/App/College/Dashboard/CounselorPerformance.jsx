@@ -1027,50 +1027,6 @@ const CounselorPerformance = () => {
   return (
     <div className="enhanced-counselor-performance">
 
-      {/* <div className="breadcrumb-navigation">
-        <div className="breadcrumb">
-          <span className={`breadcrumb-item ${viewMode === 'overview' ? 'active' : ''}`} 
-                onClick={() => setViewMode('overview')}>
-            📊 Overview
-          </span>
-          {selectedCounselor && (
-            <>
-              <i className="fas fa-chevron-right"></i>
-              <span className={`breadcrumb-item ${viewMode === 'counselor' ? 'active' : ''}`}
-                    onClick={() => setViewMode('counselor')}>
-                👨‍💼 {selectedCounselor.name}
-              </span>
-            </>
-          )}
-          {selectedCenter && (
-            <>
-              <i className="fas fa-chevron-right"></i>
-              <span className={`breadcrumb-item ${viewMode === 'center' ? 'active' : ''}`}
-                    onClick={() => setViewMode('center')}>
-                🏢 {selectedCenter.centerName}
-              </span>
-            </>
-          )}
-          {selectedBatch && (
-            <>
-              <i className="fas fa-chevron-right"></i>
-              <span className={`breadcrumb-item ${viewMode === 'batch' ? 'active' : ''}`}
-                    onClick={() => setViewMode('batch')}>
-                📚 {selectedBatch.batchName}
-              </span>
-            </>
-          )}
-          {selectedStudent && (
-            <>
-              <i className="fas fa-chevron-right"></i>
-              <span className={`breadcrumb-item ${viewMode === 'student' ? 'active' : ''}`}>
-                👨‍🎓 {selectedStudent.name}
-              </span>
-            </>
-          )}
-        </div>
-      </div> */}
-
       <div className="view-content">
         {viewMode === 'overview' && renderOverviewTab()}
         {viewMode === 'counselor' && renderCounselorTab()}

@@ -39,36 +39,36 @@ const Lead = () => {
 
     // Daily leads trend (last 30 days)
     dailyTrend: [
-      { date: '01 Jun', newLeads: 15, conversions: 3, followups: 8, revenue: 12000 },
-      { date: '02 Jun', newLeads: 22, conversions: 5, followups: 12, revenue: 18500 },
-      { date: '03 Jun', newLeads: 18, conversions: 2, followups: 9, revenue: 14200 },
-      { date: '04 Jun', newLeads: 25, conversions: 7, followups: 15, revenue: 22800 },
-      { date: '05 Jun', newLeads: 20, conversions: 4, followups: 11, revenue: 16700 },
-      { date: '06 Jun', newLeads: 28, conversions: 6, followups: 14, revenue: 24300 },
-      { date: '07 Jun', newLeads: 32, conversions: 8, followups: 18, revenue: 28900 },
-      { date: '08 Jun', newLeads: 19, conversions: 3, followups: 10, revenue: 15400 },
-      { date: '09 Jun', newLeads: 26, conversions: 6, followups: 13, revenue: 21600 },
-      { date: '10 Jun', newLeads: 30, conversions: 9, followups: 16, revenue: 31200 }
+      { date: '01 Jun', newLeads: 15, conversions: 3, followups: 8 },
+      { date: '02 Jun', newLeads: 22, conversions: 5, followups: 12 },
+      { date: '03 Jun', newLeads: 18, conversions: 2, followups: 9 },
+      { date: '04 Jun', newLeads: 25, conversions: 7, followups: 15 },
+      { date: '05 Jun', newLeads: 20, conversions: 4, followups: 11 },
+      { date: '06 Jun', newLeads: 28, conversions: 6, followups: 14 },
+      { date: '07 Jun', newLeads: 32, conversions: 8, followups: 18 },
+      { date: '08 Jun', newLeads: 19, conversions: 3, followups: 10 },
+      { date: '09 Jun', newLeads: 26, conversions: 6, followups: 13 },
+      { date: '10 Jun', newLeads: 30, conversions: 9, followups: 16 }
     ],
 
     // Monthly performance
     monthlyPerformance: [
-      { month: 'Jan', leads: 456, conversions: 67, revenue: 245000, conversionRate: 14.7 },
-      { month: 'Feb', leads: 512, conversions: 79, revenue: 287000, conversionRate: 15.4 },
-      { month: 'Mar', leads: 478, conversions: 72, revenue: 298000, conversionRate: 15.1 },
-      { month: 'Apr', leads: 534, conversions: 88, revenue: 312000, conversionRate: 16.5 },
-      { month: 'May', leads: 567, conversions: 91, revenue: 328000, conversionRate: 16.1 },
-      { month: 'Jun', leads: 589, conversions: 96, revenue: 345000, conversionRate: 16.3 }
+      { month: 'Jan', leads: 456, conversions: 67, conversionRate: 14.7 },
+      { month: 'Feb', leads: 512, conversions: 79, conversionRate: 15.4 },
+      { month: 'Mar', leads: 478, conversions: 72, conversionRate: 15.1 },
+      { month: 'Apr', leads: 534, conversions: 88, conversionRate: 16.5 },
+      { month: 'May', leads: 567, conversions: 91, conversionRate: 16.1 },
+      { month: 'Jun', leads: 589, conversions: 96, conversionRate: 16.3 }
     ],
 
     // Lead sources
     leadSources: [
-      { source: 'Website', leads: 45, percentage: 32, color: '#0d6efd', revenue: 125000 },
-      { source: 'Social Media', leads: 28, percentage: 20, color: '#198754', revenue: 89000 },
-      { source: 'Email Campaign', leads: 22, percentage: 16, color: '#dc3545', revenue: 67000 },
-      { source: 'Referrals', leads: 18, percentage: 13, color: '#ffc107', revenue: 78000 },
-      { source: 'Phone Calls', leads: 15, percentage: 11, color: '#6f42c1', revenue: 45000 },
-      { source: 'Other', leads: 11, percentage: 8, color: '#fd7e14', revenue: 23000 }
+      { source: 'Website', leads: 45, percentage: 32, color: '#0d6efd' },
+      { source: 'Social Media', leads: 28, percentage: 20, color: '#198754'},
+      { source: 'Email Campaign', leads: 22, percentage: 16, color: '#dc3545'},
+      { source: 'Referrals', leads: 18, percentage: 13, color: '#ffc107'},
+      { source: 'Phone Calls', leads: 15, percentage: 11, color: '#6f42c1'},
+      { source: 'Other', leads: 11, percentage: 8, color: '#fd7e14'}
     ],
 
     // Conversion funnel
@@ -82,11 +82,11 @@ const Lead = () => {
 
     // Team performance
     teamPerformance: [
-      { name: 'Rahul Sharma', leads: 67, conversions: 12, conversionRate: 17.9, revenue: 125000, status: 'online' },
-      { name: 'Priya Singh', leads: 54, conversions: 9, conversionRate: 16.7, revenue: 98000, status: 'online' },
-      { name: 'Amit Kumar', leads: 48, conversions: 8, conversionRate: 16.3, revenue: 87000, status: 'away' },
-      { name: 'Sneha Patel', leads: 41, conversions: 6, conversionRate: 14.6, revenue: 76000, status: 'offline' },
-      { name: 'Vikash Gupta', leads: 38, conversions: 5, conversionRate: 13.2, revenue: 65000, status: 'online' }
+      { name: 'Rahul Sharma', leads: 67, conversions: 12, conversionRate: 17.9, status: 'online' },
+      { name: 'Priya Singh', leads: 54, conversions: 9, conversionRate: 16.7,status: 'online' },
+      { name: 'Amit Kumar', leads: 48, conversions: 8, conversionRate: 16.3,status: 'away' },
+      { name: 'Sneha Patel', leads: 41, conversions: 6, conversionRate: 14.6,status: 'offline' },
+      { name: 'Vikash Gupta', leads: 38, conversions: 5, conversionRate: 13.2,status: 'online' }
     ],
 
     // Recent activities
@@ -494,7 +494,7 @@ const Lead = () => {
         <div className="col-xl-6 mb-4">
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white border-0 pb-0">
-              <h6 className="card-title mb-0 fw-semibold">📊 Lead Sources & Revenue</h6>
+              <h6 className="card-title mb-0 fw-semibold">📊 Lead Sources</h6>
             </div>
             <div className="card-body">
               <div style={{ height: '300px' }}>
@@ -523,7 +523,7 @@ const Lead = () => {
                     </div>
                     <div className="text-end">
                       <div className="fw-bold">{source.leads} leads</div>
-                      <small className="text-success">{formatCurrency(source.revenue)}</small>
+                      <small className="text-success">{formatCurrency(source)}</small>
                     </div>
                   </div>
                 ))}
@@ -576,7 +576,6 @@ const Lead = () => {
                       <th className="border-0 text-muted small fw-semibold">LEADS</th>
                       <th className="border-0 text-muted small fw-semibold">CONVERSIONS</th>
                       <th className="border-0 text-muted small fw-semibold">CONVERSION RATE</th>
-                      <th className="border-0 text-muted small fw-semibold">REVENUE</th>
                       <th className="border-0 text-muted small fw-semibold">STATUS</th>
                     </tr>
                   </thead>
@@ -607,7 +606,6 @@ const Lead = () => {
                             <span className="small fw-semibold">{member.conversionRate}%</span>
                           </div>
                         </td>
-                        <td><span className="fw-semibold text-success">{formatCurrency(member.revenue)}</span></td>
                         <td>
                           <span className={`badge ${member.status === 'online' ? 'bg-success' : member.status === 'away' ? 'bg-warning' : 'bg-secondary'}`}>
                             {member.status}

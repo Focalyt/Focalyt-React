@@ -93,6 +93,8 @@ const CRMDashboard = () => {
   const [admissionFilters, setAdmissionFilters] = useState([
     { _id: 'pendingDocs', name: 'Pending For Batch Assign', count: 856, milestone: '' },
     { _id: 'documentDone', name: 'Batch Assigned', count: 624, milestone: 'Completed' },
+    { _id: 'zeroPeriod', name: 'Zero Period', count: 4, milestone: '' },
+    { _id: 'batchFreeze', name: 'Batch Freeze', count: 4, milestone: '' },
     { _id: 'dropout', name: 'Dropout', count: 1480, milestone: '' },
     { _id: 'alladmission', name: 'All Lists', count: 1480, milestone: '' },
   ]);
@@ -416,6 +418,18 @@ const CRMDashboard = () => {
           return counts.pendingDocs > 0;
         });
       } else if (selectedFilter._id === 'documentDone') {
+        filteredData = filteredData.filter(profile => {
+          const docs = profile._candidate?.documents;
+          const counts = getDocumentCounts(docs);
+          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+        });
+      } else if (selectedFilter._id === 'zeroPeriod') {
+        filteredData = filteredData.filter(profile => {
+          const docs = profile._candidate?.documents;
+          const counts = getDocumentCounts(docs);
+          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+        });
+      } else if (selectedFilter._id === 'batchFreeze') {
         filteredData = filteredData.filter(profile => {
           const docs = profile._candidate?.documents;
           const counts = getDocumentCounts(docs);

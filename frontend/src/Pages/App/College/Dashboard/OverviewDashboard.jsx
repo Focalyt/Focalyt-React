@@ -15,7 +15,6 @@ const OverviewDashboard = () => {
       totalStudents: 3456,
       newEnrollments: 23,
       activeClasses: 47,
-      todayRevenue: 125400,
       todayLeads: 18,
       yesterdayLeads: 15,
       conversionRate: 24.5,
@@ -30,13 +29,13 @@ const OverviewDashboard = () => {
       { label: 'Total Students', value: 3456, icon: 'bi-mortarboard', color: 'dark', change: '+18%' }
     ],
     leadsData: [
-      { day: 'Mon', leads: 15, conversions: 8, revenue: 12000 },
-      { day: 'Tue', leads: 22, conversions: 12, revenue: 18500 },
-      { day: 'Wed', leads: 18, conversions: 9, revenue: 14200 },
-      { day: 'Thu', leads: 25, conversions: 15, revenue: 22800 },
-      { day: 'Fri', leads: 20, conversions: 11, revenue: 16700 },
-      { day: 'Sat', leads: 18, conversions: 10, revenue: 15300 },
-      { day: 'Today', leads: 18, conversions: 7, revenue: 13500 }
+      { day: 'Mon', leads: 15, conversions: 8},
+      { day: 'Tue', leads: 22, conversions: 12},
+      { day: 'Wed', leads: 18, conversions: 9},
+      { day: 'Thu', leads: 25, conversions: 15},
+      { day: 'Fri', leads: 20, conversions: 11},
+      { day: 'Sat', leads: 18, conversions: 10},
+      { day: 'Today', leads: 18, conversions: 7}
     ],
     revenueChart: [
       { month: 'Jan', students: 2800, leads: 456 },
@@ -53,11 +52,11 @@ const OverviewDashboard = () => {
       { name: 'Marketing', value: 15, students: 516, color: '#ffc107' }
     ],
     centerPerformance: [
-      { name: 'Mumbai Center', students: 856, attendance: 94, satisfaction: 4.6, revenue: 125000 },
-      { name: 'Delhi Center', students: 723, attendance: 91, satisfaction: 4.4, revenue: 108000 },
-      { name: 'Bangalore Center', students: 654, attendance: 96, satisfaction: 4.7, revenue: 98000 },
-      { name: 'Chennai Center', students: 543, attendance: 89, satisfaction: 4.2, revenue: 87000 },
-      { name: 'Pune Center', students: 445, attendance: 93, satisfaction: 4.5, revenue: 76000 }
+      { name: 'Mumbai Center', students: 856, attendance: 94, satisfaction: 4.6 },
+      { name: 'Delhi Center', students: 723, attendance: 91, satisfaction: 4.4 },
+      { name: 'Bangalore Center', students: 654, attendance: 96, satisfaction: 4.7},
+      { name: 'Chennai Center', students: 543, attendance: 89, satisfaction: 4.2},
+      { name: 'Pune Center', students: 445, attendance: 93, satisfaction: 4.5}
     ]
   });
 
@@ -143,7 +142,7 @@ const OverviewDashboard = () => {
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white border-0 pb-0">
               <div className="d-flex justify-content-between align-items-center">
-                <h6 className="card-title mb-0 fw-semibold">📈 Revenue & Growth Trends</h6>
+                <h6 className="card-title mb-0 fw-semibold">Growth Trends</h6>
                 <div className="btn-group btn-group-sm">
                  
                   <button 
@@ -312,7 +311,6 @@ const OverviewDashboard = () => {
                       <th className="border-0 text-muted small fw-semibold">STUDENTS</th>
                       <th className="border-0 text-muted small fw-semibold">ATTENDANCE</th>
                       <th className="border-0 text-muted small fw-semibold">SATISFACTION</th>
-                      <th className="border-0 text-muted small fw-semibold">REVENUE</th>
                       <th className="border-0 text-muted small fw-semibold">STATUS</th>
                     </tr>
                   </thead>
@@ -353,9 +351,6 @@ const OverviewDashboard = () => {
                               ))}
                             </div>
                           </div>
-                        </td>
-                        <td>
-                          <span className="fw-semibold text-success">{formatCurrency(center.revenue)}</span>
                         </td>
                         <td>
                           <span className={`badge ${center.attendance >= 95 ? 'bg-success' : center.attendance >= 90 ? 'bg-warning' : 'bg-danger'}`}>
