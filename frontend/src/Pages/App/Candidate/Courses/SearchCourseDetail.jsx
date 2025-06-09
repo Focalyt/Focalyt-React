@@ -677,7 +677,7 @@ const CourseDetails = () => {
                             <div className="course_dt mb-4">
                               <h6>Course feature</h6>
                               <p className="text-capitalize mb-0">
-                                <ul className="contact-info text-start text-white pl-4">
+                                <ul className="contact-info text-start text-black pl-4">
                                   {course.courseFeatures.split('\n').map((feature, i) => (
                                     <li key={i}>{feature}</li>
                                   ))}
@@ -692,7 +692,7 @@ const CourseDetails = () => {
                             <div className="course_dt mb-4">
                               <h6>Course terms</h6>
                               <p className="text-capitalize mb-0">
-                                <ul className="contact-info text-start text-white pl-4">
+                                <ul className="contact-info text-start text-black pl-4">
                                   {course.importantTerms.split('\n').map((term, i) => (
                                     <li key={i}>{term}</li>
                                   ))}
@@ -707,7 +707,7 @@ const CourseDetails = () => {
                             <div className="course_dt mb-4">
                               <h6>Required Documents</h6>
                               <p className="text-capitalize mb-0">
-                                <ul className="contact-info text-start text-white pl-4">
+                                <ul className="contact-info text-start text-black pl-4">
                                   {course.requiredDocuments.split('\n').map((doc, i) => (
                                     <li key={i}>{doc}</li>
                                   ))}
