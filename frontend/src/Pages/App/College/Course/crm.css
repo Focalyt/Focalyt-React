@@ -808,6 +808,7 @@
 
     .document-preview-section {
         min-width: auto;
+        overflow-y: auto;
     }
 
     .document-preview-container {
@@ -920,6 +921,7 @@
 
 .document-history {
     margin-top: 20px;
+    height: 90vh;
 }
 
 .history-item {

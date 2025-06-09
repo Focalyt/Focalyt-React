@@ -462,7 +462,7 @@ const CRMDashboard = () => {
         );
       } else if (fileType === 'pdf') {
         return (
-          <div style={{ position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', overflow: 'hidden', height: '100%' }}>
             <iframe
               src={fileUrl}
               className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
@@ -708,10 +708,11 @@ const CRMDashboard = () => {
                         marginBottom: '8px',
                         backgroundColor: '#f8f9fa',
                         borderRadius: '8px',
-                        border: '1px solid #e9ecef'
+                        border: '1px solid #e9ecef',
+                        height: '100%'
                       }}>
                         {/* Document Preview Thumbnail using iframe/img */}
-                        <div className="history-preview" style={{ marginRight: '0px' }}>
+                        <div className="history-preview" style={{ marginRight: '0px' , height: '100%'}}>
                           {renderDocumentThumbnail(upload, true)}
                         </div>
 
