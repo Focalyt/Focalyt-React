@@ -44,6 +44,7 @@ const appliedCoursesSchema = new Schema(
     kycStage: { type: Boolean, default: false },
     kyc: { type: Boolean, default: false },
     admissionDone: { type: Boolean, default: false },
+    dropout: { type: Boolean, default: false },
     // Followup info (optional, alag se track karenge)
     followupDate: {
       type: Date,
