@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -8,7 +8,54 @@ import axios from 'axios'
 import './CourseCrm.css';
 import './crm.css';
 
-const CRMDashboard = () => {
+// Add this at the top of the file, after imports
+const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
+  const [reason, setReason] = useState('');
+  const reasonRef = useRef('');
+
+  const handleReasonChange = (e) => {
+    reasonRef.current = e.target.value;
+    setReason(e.target.value);
+  };
+
+  const handleConfirm = () => {
+    onConfirm(reasonRef.current);
+  };
+
+  return (
+    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+      <h4>Provide Rejection Reason</h4>
+      <textarea
+        value={reason}
+        onChange={handleReasonChange}
+        placeholder="Please provide a detailed reason for rejection..."
+        rows="8"
+        className="form-control mb-3"
+      />
+      <div className="d-flex gap-2">
+        <button
+          className="btn btn-danger"
+          onClick={handleConfirm}
+          disabled={!reason.trim()}
+        >
+          Confirm Rejection
+        </button>
+        <button
+          className="btn btn-secondary"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+});
+
+const KYCManagement = () => {
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
   // ========================================
   // 🎯 Main Tab State
   // ========================================
@@ -43,37 +90,40 @@ const CRMDashboard = () => {
   const [documentRotation, setDocumentRotation] = useState(0);
   const [showRejectionForm, setShowRejectionForm] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const rejectionReasonRef = useRef('');
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
+  const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
+
 
   // Static document data for demonstration
-    useEffect(() => {
-  // Initialize circular progress
-  const containers = document.querySelectorAll('.circular-progress-container');
-  containers.forEach(container => {
-    const percent = container.getAttribute('data-percent');
-    const circle = container.querySelector('circle.circle-progress');
-    const progressText = container.querySelector('.progress-text');
-    
-    if (circle && progressText) {
-      if (percent === 'NA' || percent === null || percent === undefined) {
-        // Handle NA case
-        circle.style.strokeDasharray = 0;
-        circle.style.strokeDashoffset = 0;
-        progressText.innerText = 'NA';
-      } else {
-        // Handle numeric percentage
-        const radius = 16;
-        const circumference = 2 * Math.PI * radius;
-        const offset = circumference - (percent / 100) * circumference;
+  useEffect(() => {
+    // Initialize circular progress
+    const containers = document.querySelectorAll('.circular-progress-container');
+    containers.forEach(container => {
+      const percent = container.getAttribute('data-percent');
+      const circle = container.querySelector('circle.circle-progress');
+      const progressText = container.querySelector('.progress-text');
 
-        circle.style.strokeDasharray = circumference;
-        circle.style.strokeDashoffset = offset;
-        progressText.innerText = percent + '%';
+      if (circle && progressText) {
+        if (percent === 'NA' || percent === null || percent === undefined) {
+          // Handle NA case
+          circle.style.strokeDasharray = 0;
+          circle.style.strokeDashoffset = 0;
+          progressText.innerText = 'NA';
+        } else {
+          // Handle numeric percentage
+          const radius = 16;
+          const circumference = 2 * Math.PI * radius;
+          const offset = circumference - (percent / 100) * circumference;
+
+          circle.style.strokeDasharray = circumference;
+          circle.style.strokeDashoffset = offset;
+          progressText.innerText = percent + '%';
+        }
       }
-    }
-  });
-}, [allProfiles]);
+    });
+  }, [allProfiles]);
 
   // Static profile data
   const staticProfileData = [];
@@ -90,18 +140,122 @@ const CRMDashboard = () => {
   // ========================================
   // 🎯 All Admission Filters Configuration
   // ========================================
-  const [admissionFilters, setAdmissionFilters] = useState([
-    { _id: 'pendingDocs', name: 'Pending For Batch Assign', count: 856, milestone: '' },
-    { _id: 'documentDone', name: 'Batch Assigned', count: 624, milestone: 'Completed' },
-    { _id: 'dropout', name: 'Dropout', count: 1480, milestone: '' },
-    { _id: 'alladmission', name: 'All Lists', count: 1480, milestone: '' },
-  ]);
+ 
+
+  // open model for upload documents 
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedDocumentForUpload, setSelectedDocumentForUpload] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadPreview, setUploadPreview] = useState(null);
+
+  const openUploadModal = (document) => {
+    setSelectedDocumentForUpload(document);
+    setShowUploadModal(true);
+    setSelectedFile(null);
+    setUploadPreview(null);
+    setUploadProgress(0);
+    setIsUploading(false)
+  };
+
+  const closeUploadModal = () => {
+    setShowUploadModal(false);
+    setSelectedDocumentForUpload(null);
+    setSelectedFile(null);
+    setUploadPreview(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type (images and PDFs)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a valid file (JPG, PNG, GIF, or PDF)');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('File size should be less than 10MB');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUploadPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setUploadPreview(null);
+    }
+  };
+
+
+  // Simulate file upload with progress
+  const handleFileUpload = async () => {
+    if (!selectedFile || !selectedDocumentForUpload) return;
+
+    console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Simulate upload progress
+      for (let i = 0; i <= 100; i += 10) {
+        setUploadProgress(i);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('doc', selectedDocumentForUpload.docsId);
+
+      const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+
+      console.log('response', response)
+
+      if (response.data.status) {
+        alert('Document uploaded successfully! Status: Pending Review');
+
+        // Optionally refresh data here
+        closeUploadModal();
+        fetchProfileData()
+      } else {
+        alert('Failed to upload file');
+      }
+
+
+
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // ========================================
   // 🎯 Get Current Filters Function
   // ========================================
   const getCurrentFilters = () => {
-    return mainTab === 'Ekyc' ? ekycFilters : admissionFilters;
+    return mainTab === 'Ekyc' ? ekycFilters : [];
   };
 
   // Initialize data
@@ -112,23 +266,15 @@ const CRMDashboard = () => {
 
   // Document functions
   // Fixed openDocumentModal function
-  const openDocumentModal = (document) => {
-    // Check if this is the same document that was already open
-    const isSameDocument = selectedDocument && selectedDocument._id === document._id;
-
+  const openDocumentModal = (document, profile) => {
+    console.log(profile, 'profile');
+    if (profile) {
+      setSelectedProfile(profile);
+    }
     setSelectedDocument(document);
     setShowDocumentModal(true);
-
-    // Only reset zoom and rotation if it's a NEW document or first time opening modal
-    if (!isSameDocument) {
-      setDocumentZoom(1);
-      setDocumentRotation(0);
-      setIsNewModalOpen(true);
-    } else {
-      setIsNewModalOpen(false);
-    }
-
-    document.body?.classList.add('no-scroll');
+    setDocumentZoom(1);
+    setDocumentRotation(0);
   };
 
   const closeDocumentModal = () => {
@@ -160,22 +306,54 @@ const CRMDashboard = () => {
     setDocumentRotation(0);
   };
 
-  const updateDocumentStatus = (uploadId, status) => {
-    console.log(`Updating document ${uploadId} to ${status}`);
-    if (status === 'Rejected' && !rejectionReason.trim()) {
-      alert('Please provide a rejection reason');
-      return;
+  const updateDocumentStatus = async (uploadId, status, rejectionReason) => {
+    try {
+      if (!selectedProfile || !selectedProfile._id) {
+        alert('No profile selected');
+        return;
+      }
+
+      // Add confirmation dialog
+      const confirmMessage = status === 'Verified' 
+        ? 'Are you sure you want to verify this document?'
+        : 'Are you sure you want to reject this document?';
+      
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+
+      const response = await axios.put(
+        `${backendUrl}/college/verify-document/${selectedProfile._id}/${uploadId}`,
+        {
+          status,
+          rejectionReason
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        // If KYC was updated, show a success message
+        if (response.data.kycUpdated) {
+          alert('All documents verified! KYC status has been updated.');
+        } else {
+          alert(`Document ${status.toLowerCase()} successfully!`);
+        }
+        
+        // Refresh the profile data
+        await fetchProfileData();
+        closeDocumentModal();
+      } else {
+        alert(response.data.message || 'Failed to update document status');
+      }
+    } catch (error) {
+      console.error('Error updating document status:', error);
+      alert('Failed to update document status');
     }
-    if (status === 'Verified') {
-      // Update profile eKYC status to 'done'
-      setAllProfiles(prevProfiles => prevProfiles.map(profile =>
-        profile._id === selectedProfile._id
-          ? { ...profile, ekycStatus: 'done' }
-          : profile
-      ));
-    }
-    alert(`Document ${status} successfully!`);
-    closeDocumentModal();
   };
 
   const getStatusBadgeClass = (status) => {
@@ -267,7 +445,7 @@ const CRMDashboard = () => {
   // 🎯 Tab-Specific Filter Logic
   // ========================================
   const applyFiltersForTab = (mainTabName, filterIndex) => {
-    const currentFilters = mainTabName === 'Ekyc' ? ekycFilters : admissionFilters;
+    const currentFilters = mainTabName === 'Ekyc' ? ekycFilters : [];
     const selectedFilter = currentFilters[filterIndex];
 
     let filteredData = [...allProfilesData];
@@ -301,6 +479,18 @@ const CRMDashboard = () => {
           const counts = getDocumentCounts(docs);
           return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
         });
+      } else if (selectedFilter._id === 'zeroPeriod') {
+        filteredData = filteredData.filter(profile => {
+          const docs = profile._candidate?.documents;
+          const counts = getDocumentCounts(docs);
+          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+        });
+      } else if (selectedFilter._id === 'batchFreeze') {
+        filteredData = filteredData.filter(profile => {
+          const docs = profile._candidate?.documents;
+          const counts = getDocumentCounts(docs);
+          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+        });
       } else if (selectedFilter._id === 'dropout') {
         filteredData = filteredData.filter(profile => {
           const docs = profile._candidate?.documents;
@@ -309,7 +499,7 @@ const CRMDashboard = () => {
         });
       } else if (selectedFilter._id === 'alladmission') {
         filteredData = filteredData.filter(profile => {
-          const docs = profile._candidate?.documents ;
+          const docs = profile._candidate?.documents;
           const counts = getDocumentCounts(docs);
           return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
         });
@@ -367,8 +557,6 @@ const CRMDashboard = () => {
 
   const [subStatuses, setSubStatuses] = useState([]);
 
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
   const tabs = [
     'Lead Details',
@@ -430,8 +618,17 @@ const CRMDashboard = () => {
     setTimeout(() => applyFilters(newFilterData), 100);
   };
 
+
   const formatDate = (date) => {
-    if (!date) return '';
+    // If the date is not a valid Date object, try to convert it
+    if (date && !(date instanceof Date)) {
+      date = new Date(date);
+    }
+
+    // Check if the date is valid
+    if (!date || isNaN(date)) return ''; // Return an empty string if invalid
+
+    // Now call toLocaleDateString
     return date.toLocaleDateString('en-GB');
   };
 
@@ -599,6 +796,65 @@ const CRMDashboard = () => {
     setSelectedStatus(e.target.value);
   };
 
+  const handleMoveToAdmission = async(profile) => {
+    try {
+      if (!profile || !profile._id) {
+        alert('No profile selected');
+        return;
+      }
+
+      // Check if all documents are verified using docCounts
+      if (profile.docCounts.verifiedCount !== profile.docCounts.totalRequired) {
+        alert('All documents must be verified before moving to admission list');
+        return;
+      }
+
+      // Show confirmation dialog
+      const confirmMove = window.confirm('Do you really want to move this profile to admission list?');
+      if (!confirmMove) {
+        return;
+      }
+
+      // Check if backend URL and token exist
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      // Send PUT request to backend API to update status
+      const response = await axios.put(
+        `${backendUrl}/college/update/${profile._id}`,
+        {
+          admissionDone: true, // Set admission as done
+          remarks: 'Moved to admission'
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        alert('Profile moved to admission successfully!');
+        // Refresh the profile data
+        await fetchProfileData();
+      } else {
+        console.error('API returned error:', response.data);
+        alert(response.data.message || 'Failed to move to admission');
+      }
+    } catch (error) {
+      console.error('Error moving to admission:', error);
+      alert('Failed to move to admission');
+    }
+  };
+
   const handleTimeChange = (e) => {
     if (!followupDate) {
       alert('Select date first');
@@ -631,9 +887,7 @@ const CRMDashboard = () => {
 
   const fetchStatus = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+
 
       const response = await axios.get(`${backendUrl}/college/status`, {
         headers: { 'x-auth': token }
@@ -655,9 +909,7 @@ const CRMDashboard = () => {
 
   const fetchSubStatus = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+
 
       const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
         headers: { 'x-auth': token }
@@ -673,40 +925,185 @@ const CRMDashboard = () => {
   };
 
   const handleUpdateStatus = async () => {
-    console.log('Function called');
-    try {
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
-
-      let followupDateTime = '';
-      if (followupDate && followupTime) {
-        followupDateTime = new Date(`${followupDate}T${followupTime}`);
-      }
-
-      const data = {
-        _leadStatus: seletectedStatus?._id || seletectedStatus,
-        _leadSubStatus: seletectedSubStatus?._id || '',
-        followup: followupDateTime ? followupDateTime.toISOString() : '',
-        remarks
-      };
-
-      const response = await axios.put(`${backendUrl}/college/lead/status_change/${selectedProfile._id}`, data, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json'
+      console.log('Function called');
+  
+      try {
+      if(showEditPanel){
+             // Validation checks
+        if (!selectedProfile || !selectedProfile._id) {
+          alert('No profile selected');
+          return;
         }
-      });
-
-      if (response.data.success) {
-        alert('Status updated successfully!');
-        closeEditPanel();
-      } else {
-        alert('Failed to update status');
+  
+        if (!seletectedStatus) {
+          alert('Please select a status');
+          return;
+        }
+  
+        // Combine date and time into a single Date object (if both are set)
+        let followupDateTime = '';
+        if (followupDate && followupTime) {
+          // Create proper datetime string
+          const dateStr = followupDate instanceof Date
+            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+            : followupDate;
+  
+          followupDateTime = new Date(`${dateStr}T${followupTime}`);
+  
+          // Validate the datetime
+          if (isNaN(followupDateTime.getTime())) {
+            alert('Invalid date/time combination');
+            return;
+          }
+        }
+  
+        // Prepare the request body
+        const data = {
+          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
+          _leadSubStatus: seletectedSubStatus?._id || null,
+          followup: followupDateTime ? followupDateTime.toISOString() : null,
+          remarks: remarks || ''
+        };
+  
+        
+  
+        // Check if backend URL and token exist
+        if (!backendUrl) {
+          alert('Backend URL not configured');
+          return;
+        }
+  
+        if (!token) {
+          alert('Authentication token missing');
+          return;
+        }
+  
+        // Send PUT request to backend API
+        const response = await axios.put(
+          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+          data,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+  
+        console.log('API response:', response.data);
+  
+        if (response.data.success) {
+          alert('Status updated successfully!');
+  
+          // Reset form
+          setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupDate('');
+          setFollowupTime('');
+          setRemarks('');
+  
+          // Refresh data and close panel
+          await fetchProfileData();
+          closeEditPanel();
+        } else {
+          console.error('API returned error:', response.data);
+          alert(response.data.message || 'Failed to update status');
+        }
+  
       }
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  };
+      if(showFollowupPanel){
+        
+  
+        // Combine date and time into a single Date object (if both are set)
+        let followupDateTime = '';
+        if (followupDate && followupTime) {
+          // Create proper datetime string
+          const dateStr = followupDate instanceof Date
+            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+            : followupDate;
+  
+          followupDateTime = new Date(`${dateStr}T${followupTime}`);
+  
+          // Validate the datetime
+          if (isNaN(followupDateTime.getTime())) {
+            alert('Invalid date/time combination');
+            return;
+          }
+        }
+  
+        // Prepare the request body
+        const data = {
+          followup: followupDateTime ? followupDateTime.toISOString() : null,
+          remarks: remarks || ''
+        };
+  
+        
+  
+        // Check if backend URL and token exist
+        if (!backendUrl) {
+          alert('Backend URL not configured');
+          return;
+        }
+  
+        if (!token) {
+          alert('Authentication token missing');
+          return;
+        }
+  
+        // Send PUT request to backend API
+        const response = await axios.put(
+          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+          data,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+  
+        console.log('API response:', response.data);
+  
+        if (response.data.success) {
+          alert('Status updated successfully!');
+  
+          // Reset form
+          setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupDate('');
+          setFollowupTime('');
+          setRemarks('');
+  
+          // Refresh data and close panel
+          await fetchProfileData();
+          closeEditPanel();
+        } else {
+          console.error('API returned error:', response.data);
+          alert(response.data.message || 'Failed to update status');
+        }
+  
+      }
+      } 
+      catch (error) {
+        console.error('Error updating status:', error);
+  
+        // More detailed error handling
+        if (error.response) {
+          // Server responded with error status
+          console.error('Error Response:', error.response.data);
+          console.error('Error Status:', error.response.status);
+          alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
+        } else if (error.request) {
+          // Request was made but no response received
+          console.error('No response received:', error.request);
+          alert('Network error: Unable to reach server');
+        } else {
+          // Something else happened
+          console.error('Error:', error.message);
+          alert(`Error: ${error.message}`);
+        }
+      }
+    };
 
   const [user, setUser] = useState({
     image: '',
@@ -723,8 +1120,7 @@ const CRMDashboard = () => {
 
   const fetchProfileData = async () => {
     try {
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
+
       if (!token) {
         console.warn('No token found in session storage.');
         return;
@@ -737,6 +1133,7 @@ const CRMDashboard = () => {
       });
 
       if (response.data.success && response.data.data) {
+        console.log('backend response', response.data.data)
         setAllProfiles(response.data.data);
         setAllProfilesData(response.data.data)
         setTotalPages(response.data.totalPages)
@@ -745,7 +1142,7 @@ const CRMDashboard = () => {
 
         const filter = [
           { _id: 'pendingEkyc', name: 'Ekyc Pending', count: pendingKycCount, milestone: '' },
-          { _id: 'doneEkyc', name: 'Ekyc Done', count: doneKycCount, milestone: 'Ekyc Done' },
+          { _id: 'doneEkyc', name: 'Ekyc Verified', count: doneKycCount, milestone: 'Ekyc Done' },
           { _id: 'All', name: 'All', count: totalCount, milestone: '' }
         ];
 
@@ -934,13 +1331,282 @@ const CRMDashboard = () => {
 
   const today = new Date();
 
-  // Document Modal Component
- const DocumentModal = () => {
+  const DocumentControls = React.memo(({ 
+    onZoomIn, 
+    onZoomOut, 
+    onRotate, 
+    onReset, 
+    onDownload, 
+    zoomLevel, 
+    fileType 
+  }) => {
+    return (
+      <div className="preview-controls">
+        <button
+          onClick={onZoomIn}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Zoom In"
+        >
+          <i className="fas fa-search-plus"></i> Zoom In
+        </button>
+
+        <button
+          onClick={onZoomOut}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Zoom Out"
+        >
+          <i className="fas fa-search-minus"></i> Zoom Out
+        </button>
+
+        {/* Show rotation button only for images */}
+        {fileType === 'image' && (
+          <button
+            onClick={onRotate}
+            className="control-btn"
+            style={{ whiteSpace: 'nowrap' }}
+            title="Rotate 90°"
+          >
+            <i className="fas fa-redo"></i> Rotate
+          </button>
+        )}
+
+        {/* Reset View Button */}
+        <button
+          onClick={onReset}
+          className="control-btn"
+          style={{ whiteSpace: 'nowrap' }}
+          title="Reset View"
+        >
+          <i className="fas fa-sync-alt"></i> Reset
+        </button>
+
+        {/* Download Button */}
+        <a
+          href={onDownload}
+          download
+          className="control-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
+          title="Download Document"
+        >
+          <i className="fas fa-download"></i> Download
+        </a>
+
+        {/* Zoom Level Indicator */}
+        <div className="zoom-indicator" style={{
+          fontSize: '12px',
+          color: '#666',
+          marginLeft: '10px',
+          padding: '5px 10px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '4px'
+        }}>
+          {Math.round(zoomLevel * 100)}%
+        </div>
+      </div>
+    );
+  });
+
+  const DocumentModal = () => {
+    const [showRejectionForm, setShowRejectionForm] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [documentZoom, setDocumentZoom] = useState(1);
+    const [documentRotation, setDocumentRotation] = useState(0);
+
+    const latestUpload = useMemo(() => {
+      if (!selectedDocument) return null;
+      return selectedDocument.uploads && selectedDocument.uploads.length > 0
+        ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+        : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+    }, [selectedDocument]);
+
+    const handleZoomIn = useCallback(() => {
+      setDocumentZoom(prev => Math.min(prev + 0.1, 2));
+    }, []);
+
+    const handleZoomOut = useCallback(() => {
+      setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
+    }, []);
+
+    const handleRotate = useCallback(() => {
+      setDocumentRotation(prev => (prev + 90) % 360);
+    }, []);
+
+    const handleReset = useCallback(() => {
+      setDocumentZoom(1);
+      setDocumentRotation(0);
+    }, []);
+
+    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+    const fileType = fileUrl ? getFileType(fileUrl) : null;
+
+    const handleRejectClick = useCallback(() => {
+      setShowRejectionForm(true);
+    }, []);
+
+    const handleCancelRejection = useCallback(() => {
+      setShowRejectionForm(false);
+      setRejectionReason('');
+    }, []);
+
+    const handleConfirmRejection = useCallback(() => {
+      if (rejectionReason.trim()) {
+        updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
+        handleCancelRejection();
+      }
+    }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
+
     if (!showDocumentModal || !selectedDocument) return null;
 
-    const latestUpload = selectedDocument.uploads && selectedDocument.uploads.length > 0
-      ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-      : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+    // Helper function to render document preview thumbnail using iframe/img
+    const renderDocumentThumbnail = (upload, isSmall = true) => {
+      const fileUrl = upload?.fileUrl;
+      if (!fileUrl) {
+        return (
+          <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #dee2e6',
+            borderRadius: '4px',
+            width: isSmall ? '100%' : '150px',
+            height: isSmall ? '100%' : '100px',
+            fontSize: isSmall ? '16px' : '24px',
+            color: '#6c757d'
+          }}>
+            📄
+          </div>
+        );
+      }
+
+      const fileType = getFileType(fileUrl);
+
+      if (fileType === 'image') {
+        return (
+          <img
+            src={fileUrl}
+            alt="Document Preview"
+            className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+            style={{
+              width: isSmall ? '100%' : '150px',
+              height: isSmall ? '100%' : '100px',
+              objectFit: 'cover',
+              borderRadius: '4px',
+              border: '1px solid #dee2e6',
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              if (isSmall) {
+                // Set this upload as the current preview
+                setCurrentPreviewUpload(upload);
+              }
+            }}
+          />
+        );
+      } else if (fileType === 'pdf') {
+        return (
+          <div style={{ position: 'relative', overflow: 'hidden' }}>
+            <iframe
+              src={fileUrl}
+              className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+              style={{
+                width: isSmall ? '100%' : '150px',
+                height: isSmall ? '100%' : '100px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                pointerEvents: 'none', // Prevent interaction in thumbnail
+                transform: 'scale(0.3)',
+                transformOrigin: 'top left',
+                overflow: 'hidden'
+              }}
+              title="PDF Thumbnail"
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}
+            />
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(220, 53, 69, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#dc3545',
+              fontSize: isSmall ? '10px' : '12px',
+              fontWeight: 'bold',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}>
+              PDF
+            </div>
+          </div>
+        );
+      } else {
+        // For other document types, try to use iframe as well
+        return (
+          <div style={{ position: 'relative' }}>
+            <iframe
+              src={fileUrl}
+              className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+              style={{
+                width: isSmall ? '100%' : '150px',
+                height: isSmall ? '100%' : '100px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                pointerEvents: 'none',
+                backgroundColor: '#f8f9fa'
+              }}
+              title="Document Thumbnail"
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}
+            />
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 123, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#007bff',
+              fontSize: isSmall ? '16px' : '24px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}>
+              {fileType === 'document' ? '📄' :
+                fileType === 'spreadsheet' ? '📊' : '📁'}
+            </div>
+          </div>
+        );
+      }
+    };
+
 
     return (
       <div className="document-modal-overlay" onClick={closeDocumentModal}>
@@ -1055,83 +1721,15 @@ const CRMDashboard = () => {
                         );
                       }
                     })()}
-                    <div className="preview-controls">
-                      <button
-                        onClick={zoomIn}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Zoom In"
-                      >
-                        <i className="fas fa-search-plus"></i> Zoom In
-                      </button>
-
-                      <button
-                        onClick={zoomOut}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Zoom Out"
-                      >
-                        <i className="fas fa-search-minus"></i> Zoom Out
-                      </button>
-
-                      {/* Show rotation button only for images */}
-                      {getFileType(latestUpload?.fileUrl || selectedDocument?.fileUrl) === 'image' && (
-                        <button
-                          onClick={rotateDocument}
-                          className="control-btn"
-                          style={{ whiteSpace: 'nowrap' }}
-                          title="Rotate 90°"
-                        >
-                          <i className="fas fa-redo"></i> Rotate
-                        </button>
-                      )}
-
-                      {/* Reset View Button */}
-                      <button
-                        onClick={resetView}
-                        className="control-btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        title="Reset View"
-                      >
-                        <i className="fas fa-sync-alt"></i> Reset
-                      </button>
-
-                      {/* Download Button */}
-                      {(latestUpload?.fileUrl || selectedDocument?.fileUrl) ? (
-                        <a
-                          href={latestUpload?.fileUrl || selectedDocument?.fileUrl}
-                          download
-                          className="control-btn"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
-                          title="Download Document"
-                        >
-                          <i className="fas fa-download"></i> Download
-                        </a>
-                      ) : (
-                        <button
-                          className="control-btn"
-                          style={{ whiteSpace: 'nowrap', opacity: 0.5 }}
-                          disabled
-                          title="File URL not available"
-                        >
-                          <i className="fas fa-download"></i> Download
-                        </button>
-                      )}
-
-                      {/* Zoom Level Indicator */}
-                      <div className="zoom-indicator" style={{
-                        fontSize: '12px',
-                        color: '#666',
-                        marginLeft: '10px',
-                        padding: '5px 10px',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '4px'
-                      }}>
-                        {Math.round(documentZoom * 100)}%
-                      </div>
-                    </div>
+                    <DocumentControls
+                      onZoomIn={handleZoomIn}
+                      onZoomOut={handleZoomOut}
+                      onRotate={handleRotate}
+                      onReset={handleReset}
+                      onDownload={fileUrl}
+                      zoomLevel={documentZoom}
+                      fileType={fileType}
+                    />
                   </>
                 ) : (
                   <div className="no-document">
@@ -1140,6 +1738,84 @@ const CRMDashboard = () => {
                   </div>
                 )}
               </div>
+
+              {/* document preview container  */}
+
+               {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+                <div className="info-card mt-4">
+                  <h4>Document History</h4>
+                  <div className="document-history">
+                    {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
+                      <div key={index} className="history-item" style={{
+                        display: 'block',
+                        padding: '12px',
+                        marginBottom: '8px',
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '8px',
+                        border: '1px solid #e9ecef'
+                      }}>
+                        {/* Document Preview Thumbnail using iframe/img */}
+                        <div className="history-preview" style={{ marginRight: '0px' }}>
+                          {renderDocumentThumbnail(upload, true)}
+                        </div>
+
+                        {/* Document Info */}
+                        <div className="history-info" style={{ flex: 1 }}>
+                          <div className="history-date" style={{
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#495057',
+                            marginBottom: '4px'
+                          }}>
+                            {formatDate(upload.uploadedAt)}
+                          </div>
+                          <div className="history-status">
+                            <span className={`${getStatusBadgeClass(upload.status)}`} style={{
+                              fontSize: '12px',
+                              padding: '4px 8px'
+                            }}>
+                              {upload.status}
+                            </span>
+                          </div>
+                          {upload.fileUrl && (
+                            <div className="history-actions" style={{ marginTop: '8px' }}>
+                              <a
+                                href={upload.fileUrl}
+                                download
+                                className="btn btn-sm btn-outline-primary"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                <i className="fas fa-download me-1"></i>
+                                Download
+                              </a>
+                              <button
+                                className="btn btn-sm btn-outline-secondary ms-2"
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px'
+                                }}
+                                onClick={() => {
+                                  // Switch main preview to this upload
+                                  setCurrentPreviewUpload(upload);
+                                }}
+                              >
+                                <i className="fas fa-eye me-1"></i>
+                                Preview
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="document-info-section">
@@ -1164,83 +1840,174 @@ const CRMDashboard = () => {
                 </div>
               </div>
 
-              {(latestUpload?.status === 'Pending' || selectedDocument?.status === 'Pending') && (
-                <div className="verification-section">
-                  <div className="info-card">
-                    <h4>Verification Steps</h4>
-                    <ol className="verification-steps">
-                      <li>Check if the document is clearly visible</li>
-                      <li>Verify the document belongs to the candidate</li>
-                      <li>Confirm all required details are present</li>
-                      <li>Check the document validity dates</li>
-                      <li>Ensure there are no signs of tampering</li>
-                    </ol>
+              {/* Document Actions */}
+              {(latestUpload?.status || selectedDocument?.status) === 'Pending' && (
+              <div className="document-actions mt-4">
+                {!showRejectionForm ? (
+                  <div className="action-buttons">
+                    <button
+                      className="btn btn-success me-2"
+                      onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
+                    >
+                      <i className="fas fa-check"></i> Approve Document
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleRejectClick}
+                    >
+                      <i className="fas fa-times"></i> Reject Document
+                    </button>
                   </div>
-
-                  {!showRejectionForm ? (
-                    <div className="action-buttons">
-                      <button
-                        className="btn btn-success me-2"
-                        onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
-                      >
-                        <i className="fas fa-check"></i> Approve Document
-                      </button>
+                ) : (
+                  <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Please provide a detailed reason for rejection..."
+                      rows="8"
+                      className="form-control mb-3"
+                    />
+                    <div className="d-flex gap-2">
                       <button
                         className="btn btn-danger"
-                        onClick={() => setShowRejectionForm(true)}
+                        onClick={handleConfirmRejection}
                       >
-                        <i className="fas fa-times"></i> Reject Document
+                        Confirm Rejection
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={handleCancelRejection}
+                      >
+                        Cancel
                       </button>
                     </div>
-                  ) : (
-                    <div className="rejection-form">
-                      <h4>Provide Rejection Reason</h4>
-                      <textarea
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Please provide a detailed reason for rejection..."
-                        rows="4"
-                        className="form-control mb-3"
-                      />
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-danger"
-                          onClick={() => updateDocumentStatus(latestUpload._id, 'Rejected')}
-                        >
-                          Confirm Rejection
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => setShowRejectionForm(false)}
-                        >
-                          Cancel
-                        </button>
+                  </div>
+                )}
+              </div>)}
+
+             
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const UploadModal = () => {
+    if (!showUploadModal || !selectedDocumentForUpload) return null;
+
+    return (
+      <div className="upload-modal-overlay" onClick={closeUploadModal}>
+        <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="upload-modal-header">
+            <h3>
+              <i className="fas fa-cloud-upload-alt me-2"></i>
+              Upload {selectedDocumentForUpload.Name}
+            </h3>
+            <button className="close-btn" onClick={closeUploadModal}>&times;</button>
+          </div>
+
+          <div className="upload-modal-body">
+            <div className="upload-section">
+              {!selectedFile ? (
+                <div className="file-drop-zone">
+                  <div className="drop-zone-content">
+                    <i className="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h4>Choose a file to upload</h4>
+                    <p>Drag and drop a file here, or click to select</p>
+                    <div className="file-types">
+                      <span>Supported: JPG, PNG, GIF, PDF</span>
+                      <span>Max size: 10MB</span>
+                    </div>
+                    <input
+                      type="file"
+                      id="file-input"
+                      accept=".jpg,.jpeg,.png,.gif,.pdf"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => document.getElementById('file-input').click()}
+                    >
+                      <i className="fas fa-folder-open me-2"></i>
+                      Choose File
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="file-preview-section">
+                  <div className="selected-file-info">
+                    <h4>Selected File:</h4>
+                    <div className="file-details">
+                      <div className="file-icon">
+                        <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
                       </div>
+                      <div className="file-info">
+                        <p className="file-name">{selectedFile.name}</p>
+                        <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                      </div>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setUploadPreview(null);
+                        }}
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  {uploadPreview && (
+                    <div className="upload-preview">
+                      <h5>Preview:</h5>
+                      <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
+                    </div>
+                  )}
+
+                  {isUploading && (
+                    <div className="upload-progress-section">
+                      <h5>Uploading...</h5>
+                      <div className="progress-bar-container">
+                        <div
+                          className="progress-bar"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                      <p>{uploadProgress}% Complete</p>
                     </div>
                   )}
                 </div>
               )}
-
-              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-                <div className="info-card">
-                  <h4>Document History</h4>
-                  <div className="document-history">
-                    {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
-                      <div key={index} className="history-item">
-                        <div className="history-date">
-                          {formatDate(upload.uploadedAt)}
-                        </div>
-                        <div className="history-status">
-                          <span className={`${getStatusBadgeClass(upload.status)}`}>
-                            {upload.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
+          </div>
+
+          <div className="upload-modal-footer">
+            <button
+              className="btn btn-secondary"
+              onClick={closeUploadModal}
+              disabled={isUploading}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleFileUpload}
+              disabled={!selectedFile || isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <i className="fas fa-spinner fa-spin me-2"></i>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-upload me-2"></i>
+                  Upload Document
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -1408,7 +2175,7 @@ const CRMDashboard = () => {
                 onClick={handleUpdateStatus}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
-                UPDATE STATUS
+                SET FOLLOWUP
               </button>
             </div>
           </form>
@@ -1723,6 +2490,64 @@ const CRMDashboard = () => {
     ) : null;
   };
 
+  const handleRejectionReasonChange = (e) => {
+    rejectionReasonRef.current = e.target.value;
+    setRejectionReason(e.target.value);
+  };
+
+  const handleMarkDropout = async(profile) => {
+    try {
+      if (!profile || !profile._id) {
+        alert('No profile selected');
+        return;
+      }
+
+      // Show confirmation dialog
+      const confirmDropout = window.confirm('Do you really want to mark this profile as dropout?');
+      if (!confirmDropout) {
+        return;
+      }
+
+      // Check if backend URL and token exist
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      // Send PUT request to backend API to update status
+      const response = await axios.put(
+        `${backendUrl}/college/update/${profile._id}`,
+        {
+          isDropout: true, // Set dropout status
+          remarks: 'Marked as dropout'
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        alert('Profile marked as dropout successfully!');
+        // Refresh the profile data
+        await fetchProfileData();
+      } else {
+        console.error('API returned error:', response.data);
+        alert(response.data.message || 'Failed to mark as dropout');
+      }
+    } catch (error) {
+      console.error('Error marking as dropout:', error);
+      alert('Failed to mark as dropout');
+    }
+  };
+
   return (
     <div className="container-fluid">
       <div className="row">
@@ -1732,35 +2557,41 @@ const CRMDashboard = () => {
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
                 <div className="col-md-6 d-md-block d-sm-none">
-                  <div className="main-tabs-container">
-                    <ul className="nav nav-tabs nav-tabs-main border-0">
-                      {/* eKYC Management Tab */}
-                      <li className="nav-item">
-                        <button
-                          className={`nav-link main-tab ${mainTab === 'Ekyc' ? 'active' : ''}`}
-                          onClick={() => handleMainTabChange('Ekyc')}
-                        >
-                          <i className="fas fa-id-card me-2"></i>
-                          eKYC Management
-                          <span className="tab-badge">
-                            {ekycFilters.filter(filter => filter._id !== 'All').reduce((sum, filter) => sum + filter.count, 0)}
-                          </span>
-                        </button>
-                      </li>
-                      {/* All Admission Tab */}
-                      <li className="nav-item">
-                        <button
-                          className={`nav-link main-tab ${mainTab === 'AllAdmission' ? 'active' : ''}`}
-                          onClick={() => handleMainTabChange('AllAdmission')}
-                        >
-                          <i className="fas fa-graduation-cap me-2"></i>
-                          Admission List
-                          <span className="tab-badge">
-                            {admissionFilters.reduce((sum, filter) => sum + filter.count, 0)}
-                          </span>
-                        </button>
-                      </li>
-                    </ul>
+                  <div className="main-tabs-container sticky-top" style={{ zIndex: 10, background: '#fff' }}>
+                    <div className="btn-group" role="group" aria-label="eKYC Filters">
+                      {ekycFilters.map((filter, index) => (
+                        <div key={filter._id} className="position-relative d-inline-block me-2">
+                          <button
+                            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                            onClick={() => handleCrmFilterClick(filter._id, index)}
+                          >
+                            <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
+                            {filter.name}
+                            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
+                          </button>
+                          {filter.milestone && (
+                            <span
+                              className="bg-success d-flex align-items-center milestoneResponsive"
+                              style={{
+                                fontSize: '0.75rem',
+                                color: 'white',
+                                verticalAlign: 'middle',
+                                padding: '0.25em 0.5em',
+                                transform: 'translate(15%, -100%)',
+                                position: 'absolute',
+                                borderRadius: '3px',
+                                top: '-10px',
+                                left: '50%',
+                                zIndex: 1
+                              }}
+                              title={`Milestone: ${filter.milestone}`}
+                            >
+                              🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1825,7 +2656,7 @@ const CRMDashboard = () => {
               </div>
             </div>
 
-            <div className="container-fluid pb-2">
+            {/* <div className="container-fluid pb-2">
               <div className="card-body p-3 mt-3">
                 <div className="d-flex flex-wrap gap-2 align-items-center mbResponsive">
                   {getCurrentFilters().map((filter, index) => (
@@ -1857,7 +2688,10 @@ const CRMDashboard = () => {
                               padding: '0.25em 0.5em',
                               transform: 'translate(15%, -100%)',
                               position: 'absolute',
-                              borderRadius: '3px'
+                              borderRadius: '3px',
+                              top: '-10px',
+                              left: '50%',
+                              zIndex: 1
                             }}
                             title={`Milestone: ${filter.milestone}`}
                           >
@@ -1869,7 +2703,7 @@ const CRMDashboard = () => {
                   ))}
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Advanced Filters */}
@@ -1925,7 +2759,7 @@ const CRMDashboard = () => {
                                           <input className="form-check-input" type="checkbox" />
                                         </div>
                                         <div className="me-3">
-                                          <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired >0 ? profile.docCounts.uploadPercentage: 'NA'}>
+                                          <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                             <svg width="40" height="40">
                                               <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
                                               <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
@@ -1944,7 +2778,7 @@ const CRMDashboard = () => {
                                           <img
                                             src="/Assets/public_assets/images/ekyc_done.png"
                                             alt="ekyc done"
-                                            style={{ width: 100, height: 'auto', marginLeft: 8, display: profile.kyc === true ? 'inline-block' : 'none' }}
+                                            style={{ width: 100, height: 'auto', display: profile.kyc === true ? 'inline-block' : 'none' }}
                                           />
                                           <img
                                             src="/Assets/public_assets/images/ekyc_pending.png"
@@ -2011,8 +2845,9 @@ const CRMDashboard = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
+                                              onClick={() => handleMoveToAdmission(profile)}
                                             >
-                                              Assign Batch
+                                              Move to Admission
                                             </button>
                                             <button
                                               className="dropdown-item"
@@ -2026,7 +2861,7 @@ const CRMDashboard = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
-                                              onClick={() => alert("dropout")}
+                                              onClick={() => handleMarkDropout(profile)}
                                             >
                                               Mark Dropout
                                             </button>
@@ -2140,8 +2975,9 @@ const CRMDashboard = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
+                                              onClick={() => handleMoveToAdmission(profile)}
                                             >
-                                              Assign Batch
+                                              Move to Admission
                                             </button>
                                             <button
                                               className="dropdown-item"
@@ -2155,7 +2991,7 @@ const CRMDashboard = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
-                                              onClick={() => alert("dropout")}
+                                              onClick={() => handleMarkDropout(profile)}
                                             >
                                               Mark Dropout
                                             </button>
@@ -2421,7 +3257,25 @@ const CRMDashboard = () => {
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
                                                       <div className="info-label">NEXT ACTION DATE</div>
-                                                      <div className="info-value">{profile.followupDate ? new Date(profile.followupDate).toLocaleString() : 'N/A'}</div>
+                                                      <div className="info-value">
+                                                        {profile.followups.length>0
+                                                          ? (() => {
+                                                            const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
+                                                            const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                              day: '2-digit',
+                                                              month: 'short',
+                                                              year: 'numeric',
+                                                            }).replace(/ /g, '/');
+                                                            const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                              hour: '2-digit',
+                                                              minute: '2-digit',
+                                                              hour12: true,
+                                                            });
+                                                            return `${datePart}, ${timePart}`;
+                                                          })()
+                                                          : 'N/A'}
+                                                      </div>
+
                                                     </div>
                                                   </div>
 
@@ -2824,337 +3678,345 @@ const CRMDashboard = () => {
                                       </div>
                                     )}
 
-                                   
+
                                     {/* Documents Tab */}
                                     {(activeTab[profileIndex] || 0) === 4 && (
-                                    <div className="tab-pane active" id='studentsDocuments'>
-                                      {(() => {
-                                        const documentsToDisplay = profile.uploadedDocs || profile._candidate?.documents || [];
-                                        const totalRequired = profile?.docCounts?.totalRequired || 0;
+                                      <div className="tab-pane active" id='studentsDocuments'>
+                                        {(() => {
+                                          const documentsToDisplay = profile.uploadedDocs || profile._candidate?.documents || [];
+                                          const totalRequired = profile?.docCounts?.totalRequired || 0;
 
-                                        // If no documents are required, show a message
-                                        if (totalRequired === 0) {
-                                          return (
-                                            <div className="col-12 text-center py-5">
-                                              <div className="text-muted">
-                                                <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                <h5 className="text-success">No Documents Required</h5>
-                                                <p>This course does not require any document verification.</p>
-                                              </div>
-                                            </div>
-
-                                          );
-                                        }
-
-                                        // If documents are required, show the full interface
-                                        return (
-                                          <div className="enhanced-documents-panel">
-                                            {/* Enhanced Stats Grid */}
-                                            <div className="stats-grid">
-                                              {(() => {
-                                                // Use backend counts only, remove static document fallback
-                                                const backendCounts = profile?.docCounts || {};
-                                                return (
-                                                  <>
-                                                    <div className="stat-card total-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-file-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.totalRequired || 0}</h4>
-                                                        <p>Total Required</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-list"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card uploaded-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-cloud-upload-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                        <p>Uploaded</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card pending-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-clock"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                        <p>Pending Review</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-exclamation-triangle"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card verified-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-check-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                        <p>Approved</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-thumbs-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card rejected-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-times-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                        <p>Rejected</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-down"></i>
-                                                      </div>
-                                                    </div>
-                                                  </>
-                                                );
-                                              })()}
-                                            </div>
-
-                                            {/* Enhanced Filter Section */}
-                                            <div className="filter-section-enhanced">
-                                              <div className="filter-tabs-container">
-                                                <h5 className="filter-title">
-                                                  <i className="fas fa-filter me-2"></i>
-                                                  Filter Documents
-                                                </h5>
-                                                <div className="filter-tabs">
-                                                  {(() => {
-                                                    const backendCounts = profile?.docCounts || {};
-                                                    return (
-                                                      <>
-                                                        <button
-                                                          className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('all')}
-                                                        >
-                                                          <i className="fas fa-list-ul"></i>
-                                                          All Documents
-                                                          <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('pending')}
-                                                        >
-                                                          <i className="fas fa-clock"></i>
-                                                          Pending
-                                                          <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('verified')}
-                                                        >
-                                                          <i className="fas fa-check-circle"></i>
-                                                          Verified
-                                                          <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('rejected')}
-                                                        >
-                                                          <i className="fas fa-times-circle"></i>
-                                                          Rejected
-                                                          <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                        </button>
-                                                      </>
-                                                    );
-                                                  })()}
+                                          // If no documents are required, show a message
+                                          if (totalRequired === 0) {
+                                            return (
+                                              <div className="col-12 text-center py-5">
+                                                <div className="text-muted">
+                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                  <h5 className="text-success">No Documents Required</h5>
+                                                  <p>This course does not require any document verification.</p>
                                                 </div>
                                               </div>
-                                            </div>
 
-                                            {/* Enhanced Documents Grid */}
-                                            <div className="documents-grid-enhanced">
-                                              {(() => {
-                                                // Filter documents based on status filter
-                                                const filteredDocs = filterDocuments(documentsToDisplay);
+                                            );
+                                          }
 
-                                                if (filteredDocs.length === 0) {
+                                          // If documents are required, show the full interface
+                                          return (
+                                            <div className="enhanced-documents-panel">
+                                              {/* Enhanced Stats Grid */}
+                                              <div className="stats-grid">
+                                                {(() => {
+                                                  // Use backend counts only, remove static document fallback
+                                                  const backendCounts = profile?.docCounts || {};
                                                   return (
-                                                    <div className="col-12 text-center py-5">
-                                                      <div className="text-muted">
-                                                        <i className="fas fa-filter fa-3x mb-3"></i>
-                                                        <h5>No Documents Found</h5>
-                                                        <p>No documents match the current filter criteria.</p>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                }
-
-                                                return filteredDocs.map((doc, index) => {
-                                                  // Check if this is a document with upload data or just uploaded file info
-                                                  const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                    ? doc.uploads[doc.uploads.length - 1]
-                                                    : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                  return (
-                                                    <div key={doc._id || index} className="document-card-enhanced">
-                                                      <div className="document-image-container">
-                                                        {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                          <>
-                                                            {(() => {
-                                                              const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                              const fileType = getFileType(fileUrl);
-
-                                                              if (fileType === 'image') {
-                                                                return (
-                                                                  <img
-                                                                    src={fileUrl}
-                                                                    alt="Document Preview"
-                                                                    className="document-image"
-                                                                  />
-                                                                );
-                                                              } else if (fileType === 'pdf') {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className="fas fa-file-pdf" style={{ fontSize: '40px', color: '#dc3545' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                  </div>
-                                                                );
-                                                              } else {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className={`fas ${fileType === 'document' ? 'fa-file-word' :
-                                                                      fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                      }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                      {fileType === 'document' ? 'Document' :
-                                                                        fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                    </p>
-                                                                  </div>
-                                                                );
-                                                              }
-                                                            })()}
-                                                            <div className="image-overlay">
-                                                              <button
-                                                                className="preview-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                              >
-                                                                <i className="fas fa-search-plus"></i>
-                                                                Preview
-                                                              </button>
-                                                            </div>
-                                                          </>
-                                                        ) : (
-                                                          <div className="no-document-placeholder">
-                                                            <i className="fas fa-file-upload"></i>
-                                                            <p>No Document</p>
-                                                          </div>
-                                                        )}
-
-                                                        {/* Status Badge Overlay */}
-                                                        <div className="status-badge-overlay">
-                                                          {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                            <span className="status-badge-new pending">
-                                                              <i className="fas fa-clock"></i>
-                                                              Pending
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                            <span className="status-badge-new verified">
-                                                              <i className="fas fa-check-circle"></i>
-                                                              Verified
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                            <span className="status-badge-new rejected">
-                                                              <i className="fas fa-times-circle"></i>
-                                                              Rejected
-                                                            </span>
-                                                          )}
-                                                          {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                            <span className="status-badge-new not-uploaded">
-                                                              <i className="fas fa-upload"></i>
-                                                              Required
-                                                            </span>
-                                                          )}
+                                                    <>
+                                                      <div className="stat-card total-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-file-alt"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.totalRequired || 0}</h4>
+                                                          <p>Total Required</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-list"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="document-info-section">
-                                                        <div className="document-header">
-                                                          <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
-                                                          <div className="document-actions">
-                                                            {(!latestUpload && doc.status === "Not Uploaded") ? (
-                                                              <button className="action-btn upload-btn" title="Upload Document">
-                                                                <i className="fas fa-cloud-upload-alt"></i>
-                                                                Upload
-                                                              </button>
-                                                            ) : ((latestUpload?.status || doc.status) === 'Pending') ? (
-                                                              <button
-                                                                className="action-btn verify-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                                title="Verify Document"
-                                                              >
-                                                                <i className="fas fa-search"></i>
-                                                                Verify
-                                                              </button>
-                                                            ) : (
-                                                              <button
-                                                                className="action-btn view-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                                title="View Document"
-                                                              >
-                                                                <i className="fas fa-eye"></i>
-                                                                View
-                                                              </button>
+                                                      <div className="stat-card uploaded-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-cloud-upload-alt"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                          <p>Uploaded</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-arrow-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card pending-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-clock"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                          <p>Pending Review</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-exclamation-triangle"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card verified-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-check-circle"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                          <p>Approved</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-thumbs-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card rejected-docs">
+                                                        <div className="stat-icon">
+                                                          <i className="fas fa-times-circle"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                          <p>Rejected</p>
+                                                        </div>
+                                                        <div className="stat-trend">
+                                                          <i className="fas fa-arrow-down"></i>
+                                                        </div>
+                                                      </div>
+                                                    </>
+                                                  );
+                                                })()}
+                                              </div>
+
+                                              {/* Enhanced Filter Section */}
+                                              <div className="filter-section-enhanced">
+                                                <div className="filter-tabs-container">
+                                                  <h5 className="filter-title">
+                                                    <i className="fas fa-filter me-2"></i>
+                                                    Filter Documents
+                                                  </h5>
+                                                  <div className="filter-tabs">
+                                                    {(() => {
+                                                      const backendCounts = profile?.docCounts || {};
+                                                      return (
+                                                        <>
+                                                          <button
+                                                            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('all')}
+                                                          >
+                                                            <i className="fas fa-list-ul"></i>
+                                                            All Documents
+                                                            <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('pending')}
+                                                          >
+                                                            <i className="fas fa-clock"></i>
+                                                            Pending
+                                                            <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('verified')}
+                                                          >
+                                                            <i className="fas fa-check-circle"></i>
+                                                            Verified
+                                                            <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('rejected')}
+                                                          >
+                                                            <i className="fas fa-times-circle"></i>
+                                                            Rejected
+                                                            <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                          </button>
+                                                        </>
+                                                      );
+                                                    })()}
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              {/* Enhanced Documents Grid */}
+                                              <div className="documents-grid-enhanced">
+                                                {(() => {
+                                                  // Filter documents based on status filter
+                                                  const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                  if (filteredDocs.length === 0) {
+                                                    return (
+                                                      <div className="col-12 text-center py-5">
+                                                        <div className="text-muted">
+                                                          <i className="fas fa-filter fa-3x mb-3"></i>
+                                                          <h5>No Documents Found</h5>
+                                                          <p>No documents match the current filter criteria.</p>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  }
+
+                                                  return filteredDocs.map((doc, index) => {
+                                                    
+                                                    // Check if this is a document with upload data or just uploaded file info
+                                                    const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                      ? doc.uploads[doc.uploads.length - 1]
+                                                      : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                    return (
+                                                      <div key={doc._id || index} className="document-card-enhanced">
+                                                        <div className="document-image-container">
+                                                        <h5 className='badge position-absolute'>{latestUpload.status}</h5>
+                                                          {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                            <>
+                                                              {(() => {
+                                                                const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                const fileType = getFileType(fileUrl);
+
+                                                                if (fileType === 'image') {
+                                                                  return (
+                                                                                                                                      
+                                                                    <img
+                                                                      src={fileUrl}
+                                                                      alt="Document Preview"
+                                                                      className="document-image"
+                                                                    />
+                                                                  );
+                                                                } else if (fileType === 'pdf') {
+                                                                  return (
+                                                                    <div className="document-preview-icon">
+                                                                      <i className="fas fa-file-pdf" style={{ fontSize: '40px', color: '#dc3545' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                    </div>
+                                                                  );
+                                                                } else {
+                                                                  return (
+                                                                    <div className="document-preview-icon">
+                                                                      <i className={`fas ${fileType === 'document' ? 'fa-file-word' :
+                                                                        fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                        }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                        {fileType === 'document' ? 'Document' :
+                                                                          fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                      </p>
+                                                                    </div>
+                                                                  );
+                                                                }
+                                                              })()}
+                                                              <div className="image-overlay">
+                                                                <button
+                                                                  className="preview-btn"
+                                                                  onClick={() => openDocumentModal(doc, profile)}
+                                                                >
+                                                                  <i className="fas fa-search-plus"></i>
+                                                                  Preview
+                                                                </button>
+                                                              </div>
+                                                            </>
+                                                          ) : (
+                                                            <div className="no-document-placeholder">
+                                                              <i className="fas fa-file-upload"></i>
+                                                              <p>No Document</p>
+                                                            </div>
+                                                          )}
+
+                                                          {/* Status Badge Overlay */}
+                                                          <div className="status-badge-overlay">
+                                                            {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                              <span className="status-badge-new pending">
+                                                                <i className="fas fa-clock"></i>
+                                                                Pending
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                              <span className="status-badge-new verified">
+                                                                <i className="fas fa-check-circle"></i>
+                                                                Verified
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                              <span className="status-badge-new rejected">
+                                                                <i className="fas fa-times-circle"></i>
+                                                                Rejected
+                                                              </span>
+                                                            )}
+                                                            {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                              <span className="status-badge-new not-uploaded">
+                                                                <i className="fas fa-upload"></i>
+                                                                Required
+                                                              </span>
                                                             )}
                                                           </div>
                                                         </div>
-
-                                                        <div className="document-meta">
-                                                          <div className="meta-item">
-                                                            <i className="fas fa-calendar-alt text-muted"></i>
-                                                            <span className="meta-text">
-                                                              {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                  day: '2-digit',
-                                                                  month: 'short',
-                                                                  year: 'numeric'
-                                                                }) :
-                                                                'Not uploaded'
-                                                              }
-                                                            </span>
+                                                        
+                                                        <div className="document-info-section">
+                                                          
+                                                          <div className="document-header">
+                                                            <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
+                                                            <div className="document-actions">
+                                                              {((!latestUpload) || (latestUpload?.status || doc.status) === 'Rejected')? (
+                                                                <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                                  setSelectedProfile(profile); // Set the current profile
+                                                                  openUploadModal(doc);        // Open the upload modal
+                                                                }}>
+                                                                  <i className="fas fa-cloud-upload-alt"></i>
+                                                                  Upload
+                                                                </button>
+                                                              ) : ((latestUpload?.status || doc.status) === 'Pending') ? (
+                                                                <button
+                                                                  className="action-btn verify-btn"
+                                                                  onClick={() => openDocumentModal(doc, profile)}
+                                                                  title="Verify Document"
+                                                                >
+                                                                  <i className="fas fa-check"></i>
+                                                                  VERIFY
+                                                                </button>
+                                                              ) : (
+                                                                <button
+                                                                  className="action-btn view-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                  title="View Document"
+                                                                >
+                                                                  <i className="fas fa-eye"></i>
+                                                                  View
+                                                                </button>
+                                                              )}
+                                                            </div>
                                                           </div>
 
-                                                          {latestUpload && (
+                                                          <div className="document-meta">
                                                             <div className="meta-item">
-                                                              <i className="fas fa-clock text-muted"></i>
+                                                              <i className="fas fa-calendar-alt text-muted"></i>
                                                               <span className="meta-text">
-                                                                {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                  hour: '2-digit',
-                                                                  minute: '2-digit'
-                                                                })}
+                                                                {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                  new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric'
+                                                                  }) :
+                                                                  'Not uploaded'
+                                                                }
                                                               </span>
                                                             </div>
-                                                          )}
+
+                                                            {latestUpload && (
+                                                              <div className="meta-item">
+                                                                <i className="fas fa-clock text-muted"></i>
+                                                                <span className="meta-text">
+                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                  })}
+                                                                </span>
+                                                              </div>
+                                                            )}
+                                                          </div>
                                                         </div>
                                                       </div>
-                                                    </div>
-                                                  );
-                                                });
-                                              })()}
-                                            </div>
+                                                    );
+                                                  });
+                                                })()}
+                                              </div>
 
-                                            <DocumentModal />
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
+                                              <DocumentModal />
+                                              <UploadModal />
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -3232,6 +4094,8 @@ const CRMDashboard = () => {
               </nav>
             </section>
           </div>
+
+
         </div>
 
         {/* Right Sidebar for Desktop - Panels */}
@@ -3249,6 +4113,9 @@ const CRMDashboard = () => {
         {isMobile && renderEditPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
+
+
+
       </div>
 
       <style>
@@ -3365,6 +4232,244 @@ const CRMDashboard = () => {
           color: #495057;
         }
 
+
+.upload-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.upload-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.upload-modal-header {
+  display: flex;
+  justify-content: between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.upload-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.3s;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.upload-modal-body {
+  padding: 25px;
+}
+
+.file-drop-zone {
+  border: 3px dashed #ddd;
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  background: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.file-drop-zone:hover {
+  border-color: #007bff;
+  background: #f0f8ff;
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #007bff;
+  margin-bottom: 10px;
+}
+
+.drop-zone-content h4 {
+  margin: 0;
+  color: #333;
+  font-weight: 600;
+}
+
+.drop-zone-content p {
+  margin: 0;
+  color: #666;
+}
+
+.file-types {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.file-types span {
+  font-size: 12px;
+  color: #999;
+}
+
+.file-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.selected-file-info h4 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.file-details {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.file-icon {
+  width: 50px;
+  height: 50px;
+  background: #007bff;
+  color: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.file-info {
+  flex: 1;
+}
+
+.file-name {
+  margin: 0;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.file-size {
+  margin: 5px 0 0 0;
+  color: #666;
+  font-size: 12px;
+}
+
+.upload-preview {
+  text-align: center;
+}
+
+.upload-preview h5 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  border: 2px solid #eee;
+}
+
+.upload-progress-section {
+  text-align: center;
+}
+
+.upload-progress-section h5 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  transition: width 0.3s ease;
+}
+
+.upload-modal-footer {
+  padding: 20px 25px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #fafafa;
+  border-radius: 0 0 12px 12px;
+}
+
+@media (max-width: 768px) {
+  .upload-modal-content {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .upload-modal-header {
+    padding: 15px 20px;
+  }
+  
+  .upload-modal-body {
+    padding: 20px;
+  }
+  
+  .file-drop-zone {
+    padding: 30px 15px;
+  }
+}
+
+
+        /* ========================================
+           🎯 NEW: Responsive Design (ADD THESE STYLES)
+           ======================================== */
         /* Responsive Design */
         @media(max-width:1920px) {
           .stickyBreakpoints {
@@ -3403,4 +4508,4 @@ const CRMDashboard = () => {
   );
 };
 
-export default CRMDashboard;
+export default KYCManagement;

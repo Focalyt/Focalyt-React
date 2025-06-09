@@ -1,5 +1,6 @@
 const express = require("express");
 const uuid = require('uuid/v1');
+const cron = require('node-cron');
 
 const { isCollege, auth1, authenti } = require("../../../helpers");
 const { extraEdgeAuthToken, extraEdgeUrl, env, baseUrl } = require("../../../config");
@@ -88,6 +89,77 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage }).single('file');
+
+// Utility function to check and convert string to ObjectId
+const validateAndConvertId = (id) => {
+  try {
+    // If it's already an ObjectId, return it
+    if (id instanceof mongoose.Types.ObjectId) {
+      return id;
+    }
+    
+    // If it's a string, check if it's a valid ObjectId
+    if (typeof id === 'string') {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new Error('Invalid ObjectId format');
+      }
+      return new mongoose.Types.ObjectId(id);
+    }
+    
+    throw new Error('Invalid ID type');
+  } catch (error) {
+    throw new Error(`ID validation failed: ${error.message}`);
+  }
+};
+
+// Function to update followups at 11:55 PM IST
+const updateFollowupsToMissed = async () => {
+	try {
+		// Get current time in IST (UTC+5:30)
+		const now = new Date();
+		const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+		const hours = istTime.getUTCHours();
+		const minutes = istTime.getUTCMinutes();
+
+		// Check if current time is exactly 11:55 PM IST
+		if (hours === 23 && minutes === 55) {
+			// Fetch all profiles with 'Planned' followups
+			const profiles = await AppliedCourses.find({
+				'followups.status': 'Planned',
+				'followups.date': { $lte: new Date() }  // Ensure followup date is in the past or current
+			});
+
+			// Loop through profiles to update 'Planned' followups to 'Missed'
+			for (const profile of profiles) {
+				// Map through followups array and update status
+				const updatedFollowups = profile.followups.map(followup => {
+					if (followup.status === 'Planned') {
+						followup.status = 'Missed';  // Change status to 'Missed'
+					}
+					return followup;
+				});
+
+				// Update the followups array and save the changes
+				profile.followups = updatedFollowups;
+
+				// Add log entry for the status change
+				profile.logs.push({
+					user: new mongoose.Types.ObjectId('64ab1234abcd5678ef901234'), // System user ID
+					timestamp: new Date(),
+					action: 'Followup Status Changed',
+					remarks: `Followup status automatically changed from 'Planned' to 'Missed' for date ${followup.date}`
+				});
+
+				await profile.save();
+			}
+		}
+	} catch (error) {
+		console.error('Error updating followups to missed:', error);
+	}
+};
+
+// Schedule the cron job to run at 11:55 PM every day
+cron.schedule('55 23 * * *', updateFollowupsToMissed);  // This will run at 11:55 PM every day
 
 router.route('/')
 	.get(async (req, res) => {
@@ -3051,7 +3123,7 @@ router.get("/leads/my-followups", async (req, res) => {
 			};
 		});
 
-		console.log('result', result);
+
 
 		res.status(200).json({
 			success: true,
@@ -3067,6 +3139,147 @@ router.get("/leads/my-followups", async (req, res) => {
 		res.status(500).json({ error: "Server Error" });
 	}
 });
+
+// Get admission list
+router.route("/admission-list").get(async (req, res) => {
+	try {
+		const page = parseInt(req.query.page) || 1;      // Default page 1
+		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+		const skip = (page - 1) * limit;
+
+		const appliedCourses = await AppliedCourses.find({
+			admissionDone: true
+		})
+			.populate({
+				path: '_course',
+				select: 'name description docsRequired',
+				populate: {
+					path: 'sectors',
+					select: 'name'
+				}
+			})
+			.populate('_leadStatus')
+			.populate('registeredBy')
+			.populate({
+				path: '_candidate',
+				populate: [
+					{
+						path: '_appliedCourses',
+						populate: [
+							{ path: '_course', select: 'name description' },
+							{ path: 'registeredBy', select: 'name email' },
+							{ path: '_center', select: 'name location' },
+							{ path: '_leadStatus', select: 'title' }
+						]
+					}
+				]
+			})
+			.populate({
+				path: 'logs',
+				populate: {
+					path: 'user',
+					select: 'name'
+				}
+			})
+			.sort({ updatedAt: -1 })
+			.skip(skip)
+			.limit(limit);
+
+		const totalCount = await AppliedCourses.countDocuments({ admissionDone: true });
+
+		return res.json({
+			success: true,
+			data: appliedCourses,
+			totalCount,
+			page,
+			limit
+		});
+	} catch (err) {
+		console.error("Error fetching admission list:", err);
+		return res.status(500).json({
+			success: false,
+			message: "Error fetching admission list",
+			error: err.message
+		});
+	}
+});
+
+// Verify document and update KYC status
+router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req, res) => {
+	try {
+		const { profileId, uploadId } = req.params;
+		const { status, rejectionReason } = req.body;
+
+		// Validate and convert IDs
+		const validProfileId = validateAndConvertId(profileId);
+		const validUploadId = validateAndConvertId(uploadId);
+
+		// Find the profile
+		const profile = await AppliedCourses.findById(validProfileId);
+
+		if (!profile) {
+			return res.status(404).json({
+				success: false,
+				message: "Profile not found"
+			});
+		}
+
+		// Find the document upload and update its status
+		const documents = profile.uploadedDocs || [];
+		let allDocumentsVerified = true;
+		let verifiedCount = 0;
+		let totalRequired = 0;
+
+		for (const doc of documents) {
+			if (doc._id.toString() === validUploadId.toString()) {
+				doc.status = status;
+				if (status === 'Rejected') {
+					doc.reason = rejectionReason;
+				}
+				if (status === 'Verified') {
+					doc.verifiedBy = req.user._id;
+					doc.verifiedDate = new Date();
+				}
+			}
+			
+			// Count verified documents
+			if (doc.status === 'Verified') {
+				verifiedCount++;
+			}
+			totalRequired++;
+		}
+
+		// Check if all documents are verified
+		allDocumentsVerified = verifiedCount === totalRequired && totalRequired > 0;
+
+		// If all documents are verified, set KYC to true
+		if (allDocumentsVerified) {
+			profile.kyc = true;
+		}
+
+		// Save the updated profile
+		await profile.save();
+
+		return res.json({
+			success: true,
+			message: "Document status updated successfully",
+			kycUpdated: allDocumentsVerified,
+			verifiedCount,
+			totalRequired
+		});
+
+	} catch (err) {
+		console.error("Error verifying document:", err);
+		return res.status(500).json({
+			success: false,
+			message: err.message || "Error verifying document",
+			error: err.message
+		});
+	}
+});
+
+
+
 
 
 
