@@ -280,37 +280,43 @@ module.exports.generateNewToken = async (_id) => {
   return token;
 },
 
-module.exports.verifyOtp = async (req, res) => {
-  try {
-    const { mobile, otp } = req.body;
-    console.log("mobile", mobile, otp);
-    
-    if (!mobile || !otp) {
-      return res.send({
-        status: false,
-        message: 'Mobile number and OTP are required!'
-      });
+  module.exports.verifyOtp = async (req, res) => {
+    try {
+      const body = pick(req.body, ['mobile', 'otp']);
+      // const requireFields = {
+      //   mobile: 'Mobile no', otp: 'OTP',
+      // };
+      const { mobile, otp } = req.body;
+      // const missingField = req.requireFields(body, requireFields);
+      // if (missingField) throw req.ykError(missingField);
+      // const { authkey } = req.msg91Options.headers;
+      const auth = authKey
+      const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
+      const result = await axios.get(url);
+      if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
+        return res.send({
+          status: true,
+          message: 'OTP verified!'
+        });
+      } else {
+        return res.send({
+          status: false,
+          message: 'Invalid OTP!'
+        });
+      }
+      // const user = await Candidate.findOne({ mobile: body.mobile });
+      // if (user && user !== '') {
+      //   token = await user.generateAuthToken();
+      //   completeProfile = user.isProfileCompleted;
+      // } else {
+      //   const newAdd = await Candidate.create({ mobile: body.mobile });
+      //   completeProfile = false;
+      //   token = await newAdd.generateAuthToken();
+      // }
+    } catch (err) {
+      return req.errFunc(err);
     }
-
-    const auth = authKey;
-    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
-    
-    const result = await axios.get(url);
-    if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
-      return res.send({
-        status: true,
-        message: 'OTP verified!'
-      });
-    } else {
-      return res.send({
-        status: false,
-        message: 'Invalid OTP!'
-      });
-    }
-  } catch (err) {
-    return req.errFunc(err);
-  }
-};
+  };
 
 module.exports.verifyPass = async (req, res) => {
   try {
@@ -854,23 +860,6 @@ module.exports.courseSpecializationsList = async (req, res) => {
       data: { specializations: specializations || [] }
     });
 
-  } catch (err) {
-    return req.errFunc(err);
-  }
-};
-
-module.exports.sendOtptoAddLead = async (req, res) => {
-  try {
-
-    const { mobile } = req.body;
-    console.log("mobile" , mobile)
-    const auth = authKey;
-    const template = templateId
-    const url = `https://api.msg91.com/api/v5/otp?template_id=${template}&mobile=91${mobile}&authkey=${auth}`;
-    const data = await axios.get(url);
-
-    if (data.data.type !== 'success') throw req.ykError(data.data.message);
-    return res.send({ status: true, message: 'OTP sent successfully!' });
   } catch (err) {
     return req.errFunc(err);
   }

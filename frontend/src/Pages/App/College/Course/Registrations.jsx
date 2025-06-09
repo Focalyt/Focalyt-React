@@ -282,14 +282,14 @@ const CRMDashboard = () => {
 
     return { totalDocs, uploadedDocs, pendingDocs, verifiedDocs, rejectedDocs };
   };
-  const DocumentControls = React.memo(({ 
-    onZoomIn, 
-    onZoomOut, 
-    onRotate, 
-    onReset, 
-    onDownload, 
-    zoomLevel, 
-    fileType 
+  const DocumentControls = React.memo(({
+    onZoomIn,
+    onZoomOut,
+    onRotate,
+    onReset,
+    onDownload,
+    zoomLevel,
+    fileType
   }) => {
     return (
       <div className="preview-controls">
@@ -464,11 +464,11 @@ const CRMDashboard = () => {
         return (
           <div style={{ position: 'relative', overflow: 'hidden', height: '100%' }}>
             <iframe
-              src={fileUrl}
+              src={fileUrl+ '#navpanes=0&toolbar=0'}
               className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
                 width: isSmall ? '100%' : '150px',
-                height: isSmall ? '360px' : '360px',
+                height: isSmall ? '100%' : '100px',
                 border: '1px solid #dee2e6',
                 borderRadius: '4px',
                 cursor: 'pointer',
@@ -489,7 +489,6 @@ const CRMDashboard = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(220, 53, 69, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -513,7 +512,7 @@ const CRMDashboard = () => {
         return (
           <div style={{ position: 'relative' }}>
             <iframe
-              src={fileUrl}
+              src={fileUrl+ '#navpanes=0&toolbar=0'}
               className={`document-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
                 width: isSmall ? '100%' : '150px',
@@ -607,18 +606,14 @@ const CRMDashboard = () => {
                             return (
                               <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
                                 <iframe
-                                  src={fileUrl+ '#navpanes=0&toolbar=0'}
+                                  src={fileUrl + '#navpanes=0&toolbar=0'}
                                   width="100%"
                                   height="100%"
                                   style={{
                                     border: 'none',
-                                    position: 'absolute',
-                                    top: '50%',
-                                    left: '50%',
-                                    transform: `translate(-50%, -50%) scale(${documentZoom})`,
+                                    transform: `scale(${documentZoom})`,
                                     transformOrigin: 'center center',
                                     transition: 'transform 0.3s ease',
-                                    willChange: 'transform'
                                   }}
                                   title="PDF Document"
                                 />
@@ -697,7 +692,7 @@ const CRMDashboard = () => {
 
               {/* document preview container  */}
 
-               {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
                 <div className="info-card mt-4">
                   <h4>Document History</h4>
                   <div className="document-history">
@@ -708,11 +703,10 @@ const CRMDashboard = () => {
                         marginBottom: '8px',
                         backgroundColor: '#f8f9fa',
                         borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        height: '100%'
+                        border: '1px solid #e9ecef'
                       }}>
                         {/* Document Preview Thumbnail using iframe/img */}
-                        <div className="history-preview" style={{ marginRight: '0px' , height: '100%'}}>
+                        <div className="history-preview" style={{ marginRight: '0px' }}>
                           {renderDocumentThumbnail(upload, true)}
                         </div>
 
@@ -728,45 +722,12 @@ const CRMDashboard = () => {
                           </div>
                           <div className="history-status">
                             <span className={`${getStatusBadgeClass(upload.status)}`} style={{
-                              fontSize: '12px',
+                              fontSize: '25px',
                               padding: '4px 8px'
                             }}>
                               {upload.status}
                             </span>
                           </div>
-                          {upload.fileUrl && (
-                            <div className="history-actions" style={{ marginTop: '8px' }}>
-                              <a
-                                href={upload.fileUrl}
-                                download
-                                className="btn btn-sm btn-outline-primary"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '2px 8px',
-                                  textDecoration: 'none'
-                                }}
-                              >
-                                <i className="fas fa-download me-1"></i>
-                                Download
-                              </a>
-                              <button
-                                className="btn btn-sm btn-outline-secondary ms-2"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '2px 8px'
-                                }}
-                                onClick={() => {
-                                  // Switch main preview to this upload
-                                  setCurrentPreviewUpload(upload);
-                                }}
-                              >
-                                <i className="fas fa-eye me-1"></i>
-                                Preview
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
                     ))}
@@ -795,8 +756,19 @@ const CRMDashboard = () => {
                     {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
                   </span>
                 </div>
-              </div>
              
+                <button
+                  className="action-btn upload-btn"
+                  title="Upload Document"
+                  onClick={() => {
+                    openUploadModal(selectedDocument);   // Just pass the selectedDocument
+                  }}
+                >
+                  <i className="fas fa-cloud-upload-alt"></i>
+                  Upload
+                </button>
+              
+              </div>
             </div>
           </div>
         </div>
@@ -810,7 +782,7 @@ const CRMDashboard = () => {
   //   const latestUpload = selectedDocument.uploads && selectedDocument.uploads.length > 0
   //     ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
   //     : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
-     
+
   //   // Helper function to render document preview thumbnail using iframe/img
   //   const renderDocumentThumbnail = (upload, isSmall = true) => {
   //     const fileUrl = upload?.fileUrl;
@@ -1243,39 +1215,6 @@ const CRMDashboard = () => {
   //                             {upload.status}
   //                           </span>
   //                         </div>
-  //                         {upload.fileUrl && (
-  //                           <div className="history-actions" style={{ marginTop: '8px' }}>
-  //                             <a
-  //                               href={upload.fileUrl}
-  //                               download
-  //                               className="btn btn-sm btn-outline-primary"
-  //                               target="_blank"
-  //                               rel="noopener noreferrer"
-  //                               style={{
-  //                                 fontSize: '11px',
-  //                                 padding: '2px 8px',
-  //                                 textDecoration: 'none'
-  //                               }}
-  //                             >
-  //                               <i className="fas fa-download me-1"></i>
-  //                               Download
-  //                             </a>
-  //                             <button
-  //                               className="btn btn-sm btn-outline-secondary ms-2"
-  //                               style={{
-  //                                 fontSize: '11px',
-  //                                 padding: '2px 8px'
-  //                               }}
-  //                               onClick={() => {
-  //                                 // Switch main preview to this upload
-  //                                 setCurrentPreviewUpload(upload);
-  //                               }}
-  //                             >
-  //                               <i className="fas fa-eye me-1"></i>
-  //                               Preview
-  //                             </button>
-  //                           </div>
-  //                         )}
   //                       </div>
   //                     </div>
   //                   ))}
@@ -2014,162 +1953,162 @@ const CRMDashboard = () => {
     console.log('Function called');
 
     try {
-    if(showEditPanel){
-           // Validation checks
-      if (!selectedProfile || !selectedProfile._id) {
-        alert('No profile selected');
-        return;
-      }
-
-      if (!seletectedStatus) {
-        alert('Please select a status');
-        return;
-      }
-
-      // Combine date and time into a single Date object (if both are set)
-      let followupDateTime = '';
-      if (followupDate && followupTime) {
-        // Create proper datetime string
-        const dateStr = followupDate instanceof Date
-          ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-          : followupDate;
-
-        followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-        // Validate the datetime
-        if (isNaN(followupDateTime.getTime())) {
-          alert('Invalid date/time combination');
+      if (showEditPanel) {
+        // Validation checks
+        if (!selectedProfile || !selectedProfile._id) {
+          alert('No profile selected');
           return;
         }
-      }
 
-      // Prepare the request body
-      const data = {
-        _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-        _leadSubStatus: seletectedSubStatus?._id || null,
-        followup: followupDateTime ? followupDateTime.toISOString() : null,
-        remarks: remarks || ''
-      };
-
-      
-
-      // Check if backend URL and token exist
-      if (!backendUrl) {
-        alert('Backend URL not configured');
-        return;
-      }
-
-      if (!token) {
-        alert('Authentication token missing');
-        return;
-      }
-
-      // Send PUT request to backend API
-      const response = await axios.put(
-        `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-        data,
-        {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      console.log('API response:', response.data);
-
-      if (response.data.success) {
-        alert('Status updated successfully!');
-
-        // Reset form
-        setSelectedStatus('');
-        setSelectedSubStatus(null);
-        setFollowupDate('');
-        setFollowupTime('');
-        setRemarks('');
-
-        // Refresh data and close panel
-        await fetchProfileData();
-        closeEditPanel();
-      } else {
-        console.error('API returned error:', response.data);
-        alert(response.data.message || 'Failed to update status');
-      }
-
-    }
-    if(showFollowupPanel){
-      
-
-      // Combine date and time into a single Date object (if both are set)
-      let followupDateTime = '';
-      if (followupDate && followupTime) {
-        // Create proper datetime string
-        const dateStr = followupDate instanceof Date
-          ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-          : followupDate;
-
-        followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-        // Validate the datetime
-        if (isNaN(followupDateTime.getTime())) {
-          alert('Invalid date/time combination');
+        if (!seletectedStatus) {
+          alert('Please select a status');
           return;
         }
-      }
 
-      // Prepare the request body
-      const data = {
-        followup: followupDateTime ? followupDateTime.toISOString() : null,
-        remarks: remarks || ''
-      };
+        // Combine date and time into a single Date object (if both are set)
+        let followupDateTime = '';
+        if (followupDate && followupTime) {
+          // Create proper datetime string
+          const dateStr = followupDate instanceof Date
+            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+            : followupDate;
 
-      
+          followupDateTime = new Date(`${dateStr}T${followupTime}`);
 
-      // Check if backend URL and token exist
-      if (!backendUrl) {
-        alert('Backend URL not configured');
-        return;
-      }
-
-      if (!token) {
-        alert('Authentication token missing');
-        return;
-      }
-
-      // Send PUT request to backend API
-      const response = await axios.put(
-        `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-        data,
-        {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'application/json'
+          // Validate the datetime
+          if (isNaN(followupDateTime.getTime())) {
+            alert('Invalid date/time combination');
+            return;
           }
         }
-      );
 
-      console.log('API response:', response.data);
+        // Prepare the request body
+        const data = {
+          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
+          _leadSubStatus: seletectedSubStatus?._id || null,
+          followup: followupDateTime ? followupDateTime.toISOString() : null,
+          remarks: remarks || ''
+        };
 
-      if (response.data.success) {
-        alert('Status updated successfully!');
 
-        // Reset form
-        setSelectedStatus('');
-        setSelectedSubStatus(null);
-        setFollowupDate('');
-        setFollowupTime('');
-        setRemarks('');
 
-        // Refresh data and close panel
-        await fetchProfileData();
-        closeEditPanel();
-      } else {
-        console.error('API returned error:', response.data);
-        alert(response.data.message || 'Failed to update status');
+        // Check if backend URL and token exist
+        if (!backendUrl) {
+          alert('Backend URL not configured');
+          return;
+        }
+
+        if (!token) {
+          alert('Authentication token missing');
+          return;
+        }
+
+        // Send PUT request to backend API
+        const response = await axios.put(
+          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+          data,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        console.log('API response:', response.data);
+
+        if (response.data.success) {
+          alert('Status updated successfully!');
+
+          // Reset form
+          setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupDate('');
+          setFollowupTime('');
+          setRemarks('');
+
+          // Refresh data and close panel
+          await fetchProfileData();
+          closeEditPanel();
+        } else {
+          console.error('API returned error:', response.data);
+          alert(response.data.message || 'Failed to update status');
+        }
+
       }
+      if (showFollowupPanel) {
 
+
+        // Combine date and time into a single Date object (if both are set)
+        let followupDateTime = '';
+        if (followupDate && followupTime) {
+          // Create proper datetime string
+          const dateStr = followupDate instanceof Date
+            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+            : followupDate;
+
+          followupDateTime = new Date(`${dateStr}T${followupTime}`);
+
+          // Validate the datetime
+          if (isNaN(followupDateTime.getTime())) {
+            alert('Invalid date/time combination');
+            return;
+          }
+        }
+
+        // Prepare the request body
+        const data = {
+          followup: followupDateTime ? followupDateTime.toISOString() : null,
+          remarks: remarks || ''
+        };
+
+
+
+        // Check if backend URL and token exist
+        if (!backendUrl) {
+          alert('Backend URL not configured');
+          return;
+        }
+
+        if (!token) {
+          alert('Authentication token missing');
+          return;
+        }
+
+        // Send PUT request to backend API
+        const response = await axios.put(
+          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+          data,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        console.log('API response:', response.data);
+
+        if (response.data.success) {
+          alert('Status updated successfully!');
+
+          // Reset form
+          setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupDate('');
+          setFollowupTime('');
+          setRemarks('');
+
+          // Refresh data and close panel
+          await fetchProfileData();
+          closeEditPanel();
+        } else {
+          console.error('API returned error:', response.data);
+          alert(response.data.message || 'Failed to update status');
+        }
+
+      }
     }
-    } 
     catch (error) {
       console.error('Error updating status:', error);
 
@@ -4006,8 +3945,8 @@ const CRMDashboard = () => {
                                                   <div className="info-group">
                                                     <div className="info-label">NEXT ACTION DATE</div>
                                                     <div className="info-value">
-                                                      {profile.followups?.length>0
-                                                        ? 
+                                                      {profile.followups?.length > 0
+                                                        ?
                                                         (() => {
                                                           const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
                                                           const datePart = dateObj.toLocaleDateString('en-GB', {
@@ -4032,38 +3971,38 @@ const CRMDashboard = () => {
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD CREATION DATE</div>
                                                     <div className="info-value">{profile.createdAt ? (() => {
-                                                          const dateObj = new Date(profile.createdAt);
-                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric',
-                                                          }).replace(/ /g, '-');
-                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                            hour12: true,
-                                                          });
-                                                          return `${datePart}, ${timePart}`;
-                                                        })() : 'N/A'}</div>
+                                                      const dateObj = new Date(profile.createdAt);
+                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric',
+                                                      }).replace(/ /g, '-');
+                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        hour12: true,
+                                                      });
+                                                      return `${datePart}, ${timePart}`;
+                                                    })() : 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION DATE</div>
                                                     <div className="info-value">{profile.updatedAt ? (() => {
-                                                          const dateObj = new Date(profile.updatedAt);
-                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric',
-                                                          }).replace(/ /g, '-');
-                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                            hour12: true,
-                                                          });
-                                                          return `${datePart}, ${timePart}`;
-                                                        })() : 'N/A'}</div>
+                                                      const dateObj = new Date(profile.updatedAt);
+                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric',
+                                                      }).replace(/ /g, '-');
+                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        hour12: true,
+                                                      });
+                                                      return `${datePart}, ${timePart}`;
+                                                    })() : 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
@@ -5073,8 +5012,7 @@ const CRMDashboard = () => {
 }
 
 
-        `
-        }
+`}
       </style>
     </div>
   );
