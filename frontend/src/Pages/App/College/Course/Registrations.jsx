@@ -468,7 +468,7 @@ const CRMDashboard = () => {
               className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
                 width: isSmall ? '100%' : '150px',
-                height: isSmall ? '100%' : '100px',
+                height: isSmall ? '360px' : '360px',
                 border: '1px solid #dee2e6',
                 borderRadius: '4px',
                 cursor: 'pointer',
