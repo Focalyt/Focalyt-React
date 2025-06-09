@@ -1410,6 +1410,11 @@ const KYCManagement = () => {
     );
   });
 
+  // यह function DocumentModal के बाहर, component के अंदर कहीं भी define करें:
+
+// Auto Height Document Thumbnail Function - DocumentModal के बाहर define करें
+
+
   const DocumentModal = () => {
     const [showRejectionForm, setShowRejectionForm] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
@@ -1462,167 +1467,167 @@ const KYCManagement = () => {
     if (!showDocumentModal || !selectedDocument) return null;
 
     // Helper function to render document preview thumbnail using iframe/img
-    // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
-
-const renderDocumentThumbnail = (upload, isSmall = true) => {
-  const fileUrl = upload?.fileUrl;
-  if (!fileUrl) {
-    return (
-      <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f8f9fa',
-        border: '1px solid #dee2e6',
-        borderRadius: '4px',
-        width: isSmall ? '100%' : '150px',
-        height: isSmall ? 'auto' : '100px',
-        minHeight: '50px',
-        fontSize: isSmall ? '16px' : '24px',
-        color: '#6c757d'
-      }}>
-        📄
-      </div>
-    );
-  }
-
-  const fileType = getFileType(fileUrl);
-
-  if (fileType === 'image') {
-    return (
-      <img
-        src={fileUrl}
-        alt="Document Preview"
-        className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-        style={{
-          width: isSmall ? '100%' : '150px',
-          height: 'auto', // Completely auto height
-          maxWidth: '100%',
-          objectFit: 'contain',
-          borderRadius: '4px',
-          border: '1px solid #dee2e6',
-          cursor: 'pointer',
+   // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
+   const renderDocumentThumbnail = (upload, isSmall = true) => {
+    const fileUrl = upload?.fileUrl;
+    if (!fileUrl) {
+      return (
+        <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           backgroundColor: '#f8f9fa',
-          display: 'block'
-        }}
-        onClick={() => {
-          if (isSmall) {
-            setCurrentPreviewUpload(upload);
-          }
-        }}
-      />
-    );
-  } else if (fileType === 'pdf') {
-    return (
-      <div style={{ 
-        position: 'relative', 
-        overflow: 'visible', // Allow content to expand
-        width: isSmall ? '100%' : '150px',
-        height: 'auto' // Auto height for container
-      }}>
-        <iframe
-          src={fileUrl + '#view=FitH'} // Add FitH parameter for better PDF display
-          className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
-          style={{
-            width: '100%',
-            height: isSmall ? 'auto' : '100px',
-            minHeight: isSmall ? '100vh' : '100px', // Use viewport height for full view
-            border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            pointerEvents: isSmall ? 'auto' : 'none',
-            transform: isSmall ? 'scale(1)' : 'scale(0.3)',
-            transformOrigin: 'top left',
-            backgroundColor: '#fff'
-          }}
-          title="PDF Document"
-          onClick={() => {
-            if (isSmall) {
-              setCurrentPreviewUpload(upload);
-            }
-          }}
-          scrolling={isSmall ? 'auto' : 'no'}
-        />
-        {!isSmall && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(220, 53, 69, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#dc3545',
-            fontSize: '12px',
-            fontWeight: 'bold',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-            onClick={() => {
-              setCurrentPreviewUpload(upload);
-            }}>
-            PDF
-          </div>
-        )}
-      </div>
-    );
-  } else {
-    return (
-      <div style={{ 
-        position: 'relative',
-        width: isSmall ? '100%' : '150px',
-        height: 'auto' // Auto height
-      }}>
-        <iframe
+          border: '1px solid #dee2e6',
+          borderRadius: '4px',
+          width: isSmall ? '100%' : '150px',
+          height: isSmall ? 'auto' : '100px',
+          minHeight: '50px',
+          fontSize: isSmall ? '16px' : '24px',
+          color: '#6c757d'
+        }}>
+          📄
+        </div>
+      );
+    }
+  
+    const fileType = getFileType(fileUrl);
+  
+    if (fileType === 'image') {
+      return (
+        <img
           src={fileUrl}
+          alt="Document Preview"
           className={`document-thumbnail ${isSmall ? 'small' : ''}`}
           style={{
-            width: '100%',
-            height: isSmall ? 'auto' : '100px',
-            minHeight: isSmall ? '80vh' : '100px', // Use viewport height
-            border: '1px solid #dee2e6',
+            width: isSmall ? '100%' : '150px',
+            height: 'auto', // Completely auto height
+            maxWidth: '100%',
+            objectFit: 'contain',
             borderRadius: '4px',
+            border: '1px solid #dee2e6',
             cursor: 'pointer',
-            pointerEvents: isSmall ? 'auto' : 'none',
-            backgroundColor: '#f8f9fa'
+            backgroundColor: '#f8f9fa',
+            display: 'block'
           }}
-          title="Document"
           onClick={() => {
             if (isSmall) {
               setCurrentPreviewUpload(upload);
             }
           }}
-          scrolling={isSmall ? 'auto' : 'no'}
         />
-        {!isSmall && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 123, 255, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#007bff',
-            fontSize: '24px',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
+      );
+    } else if (fileType === 'pdf') {
+      return (
+        <div style={{ 
+          position: 'relative', 
+          overflow: 'visible', // Allow content to expand
+          width: isSmall ? '100%' : '150px',
+          height: 'auto' // Auto height for container
+        }}>
+          <iframe
+            src={fileUrl+ '#navpanes=0&toolbar=0'} // Add FitH parameter for better PDF display
+            className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+            style={{
+              width: '100%',
+              height: isSmall ? 'auto' : '100px', // Use viewport height for history
+              maxHeight: isSmall ? '600px' : '100px',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              pointerEvents: isSmall ? 'auto' : 'none',
+              transform: isSmall ? 'scale(1)' : 'scale(0.3)',
+              transformOrigin: 'top left',
+              backgroundColor: '#fff'
+            }}
+            title="PDF Document"
             onClick={() => {
-              setCurrentPreviewUpload(upload);
-            }}>
-            {fileType === 'document' ? '📄' :
-              fileType === 'spreadsheet' ? '📊' : '📁'}
-          </div>
-        )}
-      </div>
-    );
-  }
-};
+              if (isSmall) {
+                setCurrentPreviewUpload(upload);
+              }
+            }}
+            scrolling={isSmall ? 'auto' : 'no'}
+          />
+          {!isSmall && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(220, 53, 69, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#dc3545',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+              onClick={() => {
+                setCurrentPreviewUpload(upload);
+              }}>
+              PDF
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      return (
+        <div style={{ 
+          position: 'relative',
+          width: isSmall ? '100%' : '150px',
+          height: 'auto' // Auto height
+        }}>
+          <iframe
+            src={fileUrl}
+            className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+            style={{
+              width: '100%',
+              height: isSmall ? 'auto' : '100px',
+              minHeight: isSmall ? '300px' : '100px',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              pointerEvents: isSmall ? 'auto' : 'none',
+              backgroundColor: '#f8f9fa'
+            }}
+            title="Document"
+            onClick={() => {
+              if (isSmall) {
+                setCurrentPreviewUpload(upload);
+              }
+            }}
+            scrolling={isSmall ? 'auto' : 'no'}
+          />
+          {!isSmall && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 123, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#007bff',
+              fontSize: '24px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+              onClick={() => {
+                setCurrentPreviewUpload(upload);
+              }}>
+              {fileType === 'document' ? '📄' :
+                fileType === 'spreadsheet' ? '📊' : '📁'}
+            </div>
+          )}
+        </div>
+      );
+    }
+  };
+
 
 
     return (
@@ -1635,7 +1640,7 @@ const renderDocumentThumbnail = (upload, isSmall = true) => {
 
           <div className="modal-body">
             <div className="document-preview-section">
-              <div className="document-preview-container">
+              <div className="document-preview-container" style={{height: 'auto'}}>
                 {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
                   (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                   <>
@@ -1670,9 +1675,9 @@ const renderDocumentThumbnail = (upload, isSmall = true) => {
                             );
                           } else if (fileType === 'pdf') {
                             return (
-                              <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
+                              <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
                                 <iframe
-                                  src={fileUrl}
+                                  src={fileUrl+ '#navpanes=0&toolbar=0'}
                                   width="100%"
                                   height="100%"
                                   style={{
@@ -4482,170 +4487,7 @@ const renderDocumentThumbnail = (upload, isSmall = true) => {
     padding: 30px 15px;
   }
 }
-/* Updated CSS for auto height/width documents */
 
-/* Document History Auto Responsive Styles */
-.document-history .history-item {
-  display: block !important;
-  padding: 15px;
-  margin-bottom: 15px;
-  backgroundColor: #f8f9fa;
-  borderRadius: 12px;
-  border: 1px solid #e9ecef;
-  transition: all 0.3s ease;
-}
-
-.document-history .history-item:hover {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  transform: translateY(-2px);
-}
-
-.document-history .history-preview {
-  margin-bottom: 15px;
-  width: 100%;
-  overflow: hidden;
-}
-
-/* Auto sizing for all document types */
-.document-history .history-preview iframe,
-.document-history .history-preview img {
-  width: 100% !important;
-  height: auto !important;
-  max-width: 100%;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  display: block;
-}
-
-/* Specific styling for images to maintain aspect ratio */
-.document-history .history-preview img {
-  object-fit: contain;
-  background-color: #fff;
-}
-
-/* PDF specific styling */
-.document-history .history-preview iframe.pdf-thumbnail {
-  min-height: 400px;
-  max-height: 80vh;
-  background-color: #fff;
-}
-
-/* Container for responsive behavior */
-.document-history .history-preview .document-thumbnail {
-  width: 100% !important;
-  height: auto !important;
-  max-width: 100%;
-}
-
-.document-history .history-info {
-  padding-top: 15px;
-  border-top: 2px solid #e9ecef;
-}
-
-.document-history .history-date {
-  font-size: 14px;
-  font-weight: 600;
-  color: #495057;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.document-history .history-status {
-  margin-bottom: 12px;
-}
-
-.document-history .history-status span {
-  font-size: 12px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.document-history .history-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.document-history .history-actions .btn {
-  font-size: 11px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.document-history .history-actions .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Rejection reason styling */
-.document-history .rejection-reason {
-  margin-top: 10px;
-  padding: 8px 0;
-}
-
-.document-history .rejection-reason strong {
-  color: #856404;
-  font-size: 13px;
-}
-
-/* Auto responsive behavior for different screen sizes */
-@media (max-width: 1200px) {
-  .document-history .history-preview iframe {
-    max-height: 70vh;
-  }
-}
-
-@media (max-width: 768px) {
-  .document-history .history-preview iframe,
-  .document-history .history-preview img {
-    max-height: 60vh;
-    min-height: 200px;
-  }
-  
-  .document-history .history-item {
-    padding: 12px;
-    margin-bottom: 12px;
-  }
-  
-  .document-history .history-actions {
-    flex-direction: column;
-  }
-  
-  .document-history .history-actions .btn {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
-@media (max-width: 480px) {
-  .document-history .history-preview iframe,
-  .document-history .history-preview img {
-    max-height: 50vh;
-    min-height: 150px;
-  }
-}
-
-/* Smooth loading animation */
-.document-history .history-preview iframe,
-.document-history .history-preview img {
-  opacity: 0;
-  transition: opacity 0.3s ease-in-out;
-}
-
-.document-history .history-preview iframe[src],
-.document-history .history-preview img[src] {
-  opacity: 1;
-}
 
         /* ========================================
            🎯 NEW: Responsive Design (ADD THESE STYLES)
@@ -4682,6 +4524,253 @@ const renderDocumentThumbnail = (upload, isSmall = true) => {
             padding: 1px 6px;
           }
         }
+
+
+
+
+        /* Document History Auto Height CSS - Add to your existing styles */
+
+/* Document History Container */
+.document-history {
+  width: 100%;
+  max-height: 1000px;
+  height: auto !important;
+  padding: 0;
+}
+
+/* History Item Styling */
+.document-history .history-item {
+  display: block !important;
+  padding: 15px;
+  margin-bottom: 15px;
+  backgroundColor: #f8f9fa;
+  borderRadius: 12px;
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.document-history .history-item:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+  border-color: #007bff;
+}
+
+/* History Preview Container */
+.document-history .history-preview {
+  margin-bottom: 15px;
+  width: 100%;
+  overflow: visible;
+}
+
+/* Auto Height for All Document Types */
+.document-history .history-preview img {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background-color: #fff;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.document-history .history-preview img:hover {
+  transform: scale(1.02);
+}
+
+/* PDF Auto Height */
+.document-history .history-preview iframe.pdf-thumbnail {
+  width: 100% !important;
+  height: fit-content !important;
+  min-height: 750px;
+  
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background-color: #fff;
+  cursor: pointer;
+}
+
+/* Other Document Types Auto Height */
+
+
+
+
+/* History Info Section */
+.document-history .history-info {
+  padding-top: 15px;
+  border-top: 2px solid #e9ecef;
+  margin-top: 10px;
+}
+
+.document-history .history-date {
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-history .history-status {
+  margin-bottom: 12px;
+}
+
+.document-history .history-status span {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Action Buttons */
+.document-history .history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.document-history .history-actions .btn {
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.document-history .history-actions .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.document-history .history-actions .btn-outline-primary {
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.document-history .history-actions .btn-outline-primary:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+.document-history .history-actions .btn-outline-secondary {
+  border-color: #6c757d;
+  color: #6c757d;
+}
+
+.document-history .history-actions .btn-outline-secondary:hover {
+  background-color: #6c757d;
+  color: white;
+}
+
+/* Rejection Reason Styling */
+.document-history .rejection-reason {
+  margin-top: 10px;
+  padding: 8px 0;
+}
+
+.document-history .rejection-reason strong {
+  color: #856404;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.document-history .rejection-reason p {
+  margin: 0;
+  padding: 8px 12px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #856404;
+  line-height: 1.4;
+}
+
+/* Loading Animation */
+.document-history .history-preview iframe,
+.document-history .history-preview img {
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.document-history .history-preview iframe[src],
+.document-history .history-preview img[src] {
+  opacity: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .document-history .history-preview iframe.pdf-thumbnail {
+    height: auto !important;
+    max-height: 600px;
+  }
+  
+  .document-history .history-preview iframe:not(.pdf-thumbnail) {
+    height: auto !important;
+    max-height: 600px;
+  }
+}
+
+@media (max-width: 768px) {
+  .document-history .history-preview iframe.pdf-thumbnail {
+    height: 50vh !important;
+    min-height: 300px;
+    max-height: 500px;
+  }
+  
+  .document-history .history-preview iframe:not(.pdf-thumbnail) {
+    height: 40vh !important;
+    min-height: 200px;
+    max-height: 400px;
+  }
+  
+  .document-history .history-item {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .document-history .history-actions {
+    flex-direction: column;
+  }
+  
+  .document-history .history-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .document-history .history-preview iframe,
+  .document-history .history-preview img {
+    max-height: 300px;
+    min-height: 150px;
+  }
+  
+  .document-history .history-preview iframe.pdf-thumbnail {
+    height: 40vh !important;
+    min-height: 200px;
+  }
+}
+
+/* Smooth Hover Effects */
+.document-history .history-item {
+  background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+}
+
+.document-history .history-item:hover {
+  background: linear-gradient(145deg, #e9ecef, #f8f9fa);
+}
         `}
       </style>
     </div>
