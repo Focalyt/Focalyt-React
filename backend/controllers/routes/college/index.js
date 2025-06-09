@@ -2602,7 +2602,7 @@ router.route("/kycCandidates").get(async (req, res) => {
 	try {
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
-		const skip = (page - 1) * limit;
+		const skip = (page - 1) * limit;	
 
 
 
@@ -2643,6 +2643,7 @@ router.route("/kycCandidates").get(async (req, res) => {
 			kyc: { $in: [false] },
 
 		});
+		const doneKycCount = totalCount-pendingKycCount
 
 
 		const result = appliedCourses.map(doc => {
@@ -2758,13 +2759,14 @@ router.route("/kycCandidates").get(async (req, res) => {
 			};
 		});
 
-		console.log('result', result)
+		
 
 		res.status(200).json({
 			success: true,
 			count: result.length,
 			page,
 			pendingKycCount,
+			doneKycCount,
 			limit,
 			totalCount,
 			totalPages: Math.ceil(totalCount / limit),
@@ -3210,27 +3212,27 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 		const { profileId, uploadId } = req.params;
 		const { status, rejectionReason } = req.body;
 
-		// Validate and convert IDs
 		const validProfileId = validateAndConvertId(profileId);
 		const validUploadId = validateAndConvertId(uploadId);
 
-		// Find the profile
-		const profile = await AppliedCourses.findById(validProfileId);
-
+		// Populate _course to get docsRequired
+		const profile = await AppliedCourses.findById(validProfileId).populate('_course');
 		if (!profile) {
-			return res.status(404).json({
-				success: false,
-				message: "Profile not found"
-			});
+			return res.status(404).json({ success: false, message: "Profile not found" });
 		}
 
-		// Find the document upload and update its status
-		const documents = profile.uploadedDocs || [];
-		let allDocumentsVerified = true;
+		const requiredCount = profile._course?.docsRequired?.length || 0;
 		let verifiedCount = 0;
-		let totalRequired = 0;
 
-		for (const doc of documents) {
+		// Count already verified docs (excluding the current one)
+		for (const doc of profile.uploadedDocs || []) {
+			if (doc._id.toString() !== validUploadId.toString() && doc.status === 'Verified') {
+				verifiedCount++;
+			}
+		}
+
+		// Find and update the current doc
+		for (const doc of profile.uploadedDocs || []) {
 			if (doc._id.toString() === validUploadId.toString()) {
 				doc.status = status;
 				if (status === 'Rejected') {
@@ -3241,31 +3243,21 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 					doc.verifiedDate = new Date();
 				}
 			}
-			
-			// Count verified documents
-			if (doc.status === 'Verified') {
-				verifiedCount++;
-			}
-			totalRequired++;
 		}
 
-		// Check if all documents are verified
-		allDocumentsVerified = verifiedCount === totalRequired && totalRequired > 0;
-
-		// If all documents are verified, set KYC to true
-		if (allDocumentsVerified) {
+		// If this is the last required doc being verified, set KYC true
+		if (status === 'Verified' && verifiedCount === requiredCount - 1) {
 			profile.kyc = true;
 		}
 
-		// Save the updated profile
 		await profile.save();
 
 		return res.json({
 			success: true,
 			message: "Document status updated successfully",
-			kycUpdated: allDocumentsVerified,
-			verifiedCount,
-			totalRequired
+			kycUpdated: profile.kyc === true,
+			verifiedCount: verifiedCount + (status === 'Verified' ? 1 : 0),
+			requiredCount
 		});
 
 	} catch (err) {

@@ -55,6 +55,7 @@ const KYCManagement = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const user = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
   // ========================================
   // 🎯 Main Tab State
@@ -132,9 +133,7 @@ const KYCManagement = () => {
   // 🎯 eKYC Filters Configuration
   // ========================================
   const [ekycFilters, setEkycFilters] = useState([
-    { _id: 'pendingEkyc', name: 'Ekyc Pending', count: 0, milestone: '' },
-    { _id: 'doneEkyc', name: 'Ekyc Done', count: 0, milestone: 'Ekyc Done' },
-    { _id: 'All', name: 'All', count: 0, milestone: '' }
+   
   ]);
 
   // ========================================
@@ -205,7 +204,7 @@ const KYCManagement = () => {
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
 
-    console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
+    console.log('selectedDocumentForUpload', selectedDocumentForUpload)
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -219,7 +218,7 @@ const KYCManagement = () => {
 
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('doc', selectedDocumentForUpload.docsId);
+      formData.append('doc', selectedDocumentForUpload._id);
 
       const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
         headers: {
@@ -258,11 +257,7 @@ const KYCManagement = () => {
     return mainTab === 'Ekyc' ? ekycFilters : [];
   };
 
-  // Initialize data
-  useEffect(() => {
-    setAllProfiles(staticProfileData);
-    setAllProfilesData(staticProfileData);
-  }, []);
+ 
 
   // Document functions
   // Fixed openDocumentModal function
@@ -519,7 +514,25 @@ const KYCManagement = () => {
   // ========================================
   // 🎯 Filter Click Handler
   // ========================================
-  const handleCrmFilterClick = (_id, index) => {
+  const handleCrmFilterClick = (index) => {
+    if (index === 0) {
+      // Filter profiles where kyc is false
+      const filtered = allProfilesData.filter(profile => profile.kyc === false);
+      setAllProfiles(filtered);
+      setActiveCrmFilter(index);
+      return;
+    }
+    if (index === 1) {
+      // Filter profiles where kyc is true
+      const filtered = allProfilesData.filter(profile => profile.kyc === true);
+      setAllProfiles(filtered);
+      setActiveCrmFilter(index);
+      return;
+    } else if (index === 2) {
+      setAllProfiles(allProfilesData);
+      setActiveCrmFilter(index);
+      return;
+    }
     setActiveCrmFilter(index);
     applyFiltersForTab(mainTab, index);
   };
@@ -1105,14 +1118,15 @@ const KYCManagement = () => {
       }
     };
 
-  const [user, setUser] = useState({
-    image: '',
-    name: 'John Doe'
-  });
+    
+ 
 
   useEffect(() => {
     fetchProfileData();
   }, []);
+  useEffect(() => {
+    handleCrmFilterClick(activeCrmFilter);
+  }, [allProfiles]);
 
   useEffect(() => {
     fetchProfileData();
@@ -1133,11 +1147,6 @@ const KYCManagement = () => {
       });
 
       if (response.data.success && response.data.data) {
-        console.log('backend response', response.data.data)
-        setAllProfiles(response.data.data);
-        setAllProfilesData(response.data.data)
-        setTotalPages(response.data.totalPages)
-
         const { totalCount = 0, pendingKycCount = 0, doneKycCount = 0 } = response.data;
 
         const filter = [
@@ -1147,6 +1156,12 @@ const KYCManagement = () => {
         ];
 
         setEkycFilters(filter);
+        console.log('backend response', response.data.data)
+        setAllProfiles(response.data.data);
+        setAllProfilesData(response.data.data)
+        setTotalPages(response.data.totalPages)
+
+        
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -2585,7 +2600,7 @@ const KYCManagement = () => {
                         <div key={filter._id} className="position-relative d-inline-block me-2">
                           <button
                             className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                            onClick={() => handleCrmFilterClick(filter._id, index)}
+                            onClick={() => handleCrmFilterClick( index)}
                           >
                             <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
                             {filter.name}
@@ -2855,6 +2870,7 @@ const KYCManagement = () => {
                                               display: showPopup === profileIndex ? "block" : "none"
                                             }}
                                           >
+                                            {Boolean(profile.kyc) && (
                                             <button
                                               className="dropdown-item"
                                               style={{
@@ -2870,7 +2886,7 @@ const KYCManagement = () => {
                                               onClick={() => handleMoveToAdmission(profile)}
                                             >
                                               Move to Admission
-                                            </button>
+                                            </button>)}
                                             <button
                                               className="dropdown-item"
                                               style={{
@@ -2985,7 +3001,8 @@ const KYCManagement = () => {
                                               display: showPopup === profileIndex ? "block" : "none"
                                             }}
                                           >
-                                            <button
+                                            {Boolean(profile.kyc) &&(
+                                              <button
                                               className="dropdown-item"
                                               style={{
                                                 width: "100%",
@@ -3000,7 +3017,7 @@ const KYCManagement = () => {
                                               onClick={() => handleMoveToAdmission(profile)}
                                             >
                                               Move to Admission
-                                            </button>
+                                            </button>)}
                                             <button
                                               className="dropdown-item"
                                               style={{
