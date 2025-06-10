@@ -663,47 +663,9 @@ const MyFollowups = () => {
                   </div>
                 )}
               </div>
-            </div>
 
-            <div className="document-info-section">
-              <div className="info-card">
-                <h4>Document Information</h4>
-                <div className="info-row">
-                  <strong>Document Name:</strong> {selectedDocument.Name}
-                </div>
-                <div className="info-row">
-                  <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
-                    new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric'
-                    }) : 'N/A'}
-                </div>
-                <div className="info-row">
-                  <strong>Status:</strong>
-                  <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
-                    {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
-                  </span>
-                </div>
-              </div>
-
-              {(latestUpload?.status === 'Pending' || selectedDocument?.status === 'Pending') && (
-                <div className="verification-section">
-                  <div className="info-card">
-                    <h4>Verification Steps</h4>
-                    <ol className="verification-steps">
-                      <li>Check if the document is clearly visible</li>
-                      <li>Verify the document belongs to the candidate</li>
-                      <li>Confirm all required details are present</li>
-                      <li>Check the document validity dates</li>
-                      <li>Ensure there are no signs of tampering</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
-
-              {/* Enhanced Document History with iframe/img Preview */}
-              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+                {/* Enhanced Document History with iframe/img Preview */}
+                {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
                 <div className="info-card">
                   <h4>Document History</h4>
                   <div className="document-history">
@@ -757,20 +719,7 @@ const MyFollowups = () => {
                                 <i className="fas fa-download me-1"></i>
                                 Download
                               </a>
-                              <button
-                                className="btn btn-sm btn-outline-secondary ms-2"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '2px 8px'
-                                }}
-                                onClick={() => {
-                                  // Switch main preview to this upload
-                                  setCurrentPreviewUpload(upload);
-                                }}
-                              >
-                                <i className="fas fa-eye me-1"></i>
-                                Preview
-                              </button>
+                             
                             </div>
                           )}
                         </div>
@@ -779,6 +728,46 @@ const MyFollowups = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="document-info-section">
+              <div className="info-card">
+                <h4>Document Information</h4>
+                <div className="info-row">
+                  <strong>Document Name:</strong> {selectedDocument.Name}
+                </div>
+                <div className="info-row">
+                  <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
+                    new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    }) : 'N/A'}
+                </div>
+                <div className="info-row">
+                  <strong>Status:</strong>
+                  <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
+                    {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+                  </span>
+                </div>
+              </div>
+
+              {(latestUpload?.status === 'Pending' || selectedDocument?.status === 'Pending') && (
+                <div className="verification-section">
+                  <div className="info-card">
+                    <h4>Verification Steps</h4>
+                    <ol className="verification-steps">
+                      <li>Check if the document is clearly visible</li>
+                      <li>Verify the document belongs to the candidate</li>
+                      <li>Confirm all required details are present</li>
+                      <li>Check the document validity dates</li>
+                      <li>Ensure there are no signs of tampering</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
+            
             </div>
           </div>
         </div>
