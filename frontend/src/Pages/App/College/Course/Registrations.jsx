@@ -4998,6 +4998,45 @@ const CRMDashboard = () => {
   transition: width 0.3s ease;
   border-radius: 4px;
 }
+  /* Document Modal Styles */
+.document-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1500;
+  backdrop-filter: blur(2px);
+}
+
+.document-modal-content {
+  background-color: white;
+  border-radius: 12px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  position: relative;
+  z-index: 1501;
+}
+
+/* Upload Modal Styles */
+.upload-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2050;
+  backdrop-filter: blur(2px);
+}
 
 @media(max-width:1920px) {
     .stickyBreakpoints {

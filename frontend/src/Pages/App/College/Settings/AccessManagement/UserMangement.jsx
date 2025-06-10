@@ -252,10 +252,6 @@ const UserManagement = ({
         {
 
           `
-          .form-check-input{
-          height: 25px;
-          width:45px!important;
-          }
           .form-check-input:checked {
   background-color: #FC2B5A !important;
   border-color: #FC2B5A !important;

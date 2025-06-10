@@ -125,7 +125,7 @@ const AdmissionList = () => {
     });
   }, [allProfiles]);
 
- 
+
 
 
   // ========================================
@@ -209,11 +209,11 @@ const AdmissionList = () => {
 
   // Initialize data
   useEffect(() => {
-    
+
   }, []);
 
-   // Simulate file upload with progress
-   const handleFileUpload = async () => {
+  // Simulate file upload with progress
+  const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
 
     console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
@@ -423,45 +423,45 @@ const AdmissionList = () => {
 
     let filteredData = [...allProfilesData];
 
-    
-      if (selectedFilter._id === 'pendingDocs') {
-        filteredData = filteredData.filter(profile => {
-          const docs = profile._candidate?.documents;
-          const counts = getDocumentCounts(docs);
-          return counts.pendingDocs > 0;
-        });
-      } else if (selectedFilter._id === 'documentDone') {
-        filteredData = filteredData.filter(profile => {
-          const docs = profile._candidate?.documents;
-          const counts = getDocumentCounts(docs);
-          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-        });
-      } else if (selectedFilter._id === 'zeroPeriod') {
-        filteredData = filteredData.filter(profile => {
-          const docs = profile._candidate?.documents;
-          const counts = getDocumentCounts(docs);
-          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-        });
-      } else if (selectedFilter._id === 'batchFreeze') {
-        filteredData = filteredData.filter(profile => {
-          const docs = profile._candidate?.documents;
-          const counts = getDocumentCounts(docs);
-          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-        });
-      } else if (selectedFilter._id === 'dropout') {
-        filteredData = filteredData.filter(profile => {
-          const docs = profile._candidate?.documents;
-          const counts = getDocumentCounts(docs);
-          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-        });
-      } else if (selectedFilter._id === 'alladmission') {
-        filteredData = filteredData.filter(profile => {
-          const docs = profile._candidate?.documents;
-          const counts = getDocumentCounts(docs);
-          return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-        });
-      }
-    
+
+    if (selectedFilter._id === 'pendingDocs') {
+      filteredData = filteredData.filter(profile => {
+        const docs = profile._candidate?.documents;
+        const counts = getDocumentCounts(docs);
+        return counts.pendingDocs > 0;
+      });
+    } else if (selectedFilter._id === 'documentDone') {
+      filteredData = filteredData.filter(profile => {
+        const docs = profile._candidate?.documents;
+        const counts = getDocumentCounts(docs);
+        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+      });
+    } else if (selectedFilter._id === 'zeroPeriod') {
+      filteredData = filteredData.filter(profile => {
+        const docs = profile._candidate?.documents;
+        const counts = getDocumentCounts(docs);
+        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+      });
+    } else if (selectedFilter._id === 'batchFreeze') {
+      filteredData = filteredData.filter(profile => {
+        const docs = profile._candidate?.documents;
+        const counts = getDocumentCounts(docs);
+        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+      });
+    } else if (selectedFilter._id === 'dropout') {
+      filteredData = filteredData.filter(profile => {
+        const docs = profile._candidate?.documents;
+        const counts = getDocumentCounts(docs);
+        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+      });
+    } else if (selectedFilter._id === 'alladmission') {
+      filteredData = filteredData.filter(profile => {
+        const docs = profile._candidate?.documents;
+        const counts = getDocumentCounts(docs);
+        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
+      });
+    }
+
 
     console.log(`Filter applied: ${selectedFilter.name}`, {
       original: allProfilesData.length,
@@ -882,21 +882,21 @@ const AdmissionList = () => {
   };
 
   const handleUpdateStatus = async () => {
-      console.log('Function called');
-  
-      try {
-      if(showEditPanel){
-             // Validation checks
+    console.log('Function called');
+
+    try {
+      if (showEditPanel) {
+        // Validation checks
         if (!selectedProfile || !selectedProfile._id) {
           alert('No profile selected');
           return;
         }
-  
+
         if (!seletectedStatus) {
           alert('Please select a status');
           return;
         }
-  
+
         // Combine date and time into a single Date object (if both are set)
         let followupDateTime = '';
         if (followupDate && followupTime) {
@@ -904,16 +904,16 @@ const AdmissionList = () => {
           const dateStr = followupDate instanceof Date
             ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
             : followupDate;
-  
+
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
-  
+
           // Validate the datetime
           if (isNaN(followupDateTime.getTime())) {
             alert('Invalid date/time combination');
             return;
           }
         }
-  
+
         // Prepare the request body
         const data = {
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
@@ -921,20 +921,20 @@ const AdmissionList = () => {
           followup: followupDateTime ? followupDateTime.toISOString() : null,
           remarks: remarks || ''
         };
-  
-        
-  
+
+
+
         // Check if backend URL and token exist
         if (!backendUrl) {
           alert('Backend URL not configured');
           return;
         }
-  
+
         if (!token) {
           alert('Authentication token missing');
           return;
         }
-  
+
         // Send PUT request to backend API
         const response = await axios.put(
           `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
@@ -946,19 +946,19 @@ const AdmissionList = () => {
             }
           }
         );
-  
+
         console.log('API response:', response.data);
-  
+
         if (response.data.success) {
           alert('Status updated successfully!');
-  
+
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
           setFollowupDate('');
           setFollowupTime('');
           setRemarks('');
-  
+
           // Refresh data and close panel
           await fetchProfileData();
           closeEditPanel();
@@ -966,11 +966,11 @@ const AdmissionList = () => {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
         }
-  
+
       }
-      if(showFollowupPanel){
-        
-  
+      if (showFollowupPanel) {
+
+
         // Combine date and time into a single Date object (if both are set)
         let followupDateTime = '';
         if (followupDate && followupTime) {
@@ -978,35 +978,35 @@ const AdmissionList = () => {
           const dateStr = followupDate instanceof Date
             ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
             : followupDate;
-  
+
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
-  
+
           // Validate the datetime
           if (isNaN(followupDateTime.getTime())) {
             alert('Invalid date/time combination');
             return;
           }
         }
-  
+
         // Prepare the request body
         const data = {
           followup: followupDateTime ? followupDateTime.toISOString() : null,
           remarks: remarks || ''
         };
-  
-        
-  
+
+
+
         // Check if backend URL and token exist
         if (!backendUrl) {
           alert('Backend URL not configured');
           return;
         }
-  
+
         if (!token) {
           alert('Authentication token missing');
           return;
         }
-  
+
         // Send PUT request to backend API
         const response = await axios.put(
           `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
@@ -1018,19 +1018,19 @@ const AdmissionList = () => {
             }
           }
         );
-  
+
         console.log('API response:', response.data);
-  
+
         if (response.data.success) {
           alert('Status updated successfully!');
-  
+
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
           setFollowupDate('');
           setFollowupTime('');
           setRemarks('');
-  
+
           // Refresh data and close panel
           await fetchProfileData();
           closeEditPanel();
@@ -1038,29 +1038,29 @@ const AdmissionList = () => {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
         }
-  
+
       }
-      } 
-      catch (error) {
-        console.error('Error updating status:', error);
-  
-        // More detailed error handling
-        if (error.response) {
-          // Server responded with error status
-          console.error('Error Response:', error.response.data);
-          console.error('Error Status:', error.response.status);
-          alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
-        } else if (error.request) {
-          // Request was made but no response received
-          console.error('No response received:', error.request);
-          alert('Network error: Unable to reach server');
-        } else {
-          // Something else happened
-          console.error('Error:', error.message);
-          alert(`Error: ${error.message}`);
-        }
+    }
+    catch (error) {
+      console.error('Error updating status:', error);
+
+      // More detailed error handling
+      if (error.response) {
+        // Server responded with error status
+        console.error('Error Response:', error.response.data);
+        console.error('Error Status:', error.response.status);
+        alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
+      } else if (error.request) {
+        // Request was made but no response received
+        console.error('No response received:', error.request);
+        alert('Network error: Unable to reach server');
+      } else {
+        // Something else happened
+        console.error('Error:', error.message);
+        alert(`Error: ${error.message}`);
       }
-    };
+    }
+  };
 
   const [user, setUser] = useState({
     image: '',
@@ -1095,7 +1095,7 @@ const AdmissionList = () => {
         setAllProfilesData(response.data.data)
         setTotalPages(response.data.totalPages)
 
-        
+
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -1280,14 +1280,14 @@ const AdmissionList = () => {
 
   const today = new Date();
 
-  const DocumentControls = React.memo(({ 
-    onZoomIn, 
-    onZoomOut, 
-    onRotate, 
-    onReset, 
-    onDownload, 
-    zoomLevel, 
-    fileType 
+  const DocumentControls = React.memo(({
+    onZoomIn,
+    onZoomOut,
+    onRotate,
+    onReset,
+    onDownload,
+    zoomLevel,
+    fileType
   }) => {
     return (
       <div className="preview-controls">
@@ -1371,6 +1371,13 @@ const AdmissionList = () => {
         ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
         : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
     }, [selectedDocument]);
+
+    // ✅ ADD THIS: Memoized callbacks
+    const handlePreviewClick = useCallback((upload) => {
+      setCurrentPreviewUpload(upload);
+      setDocumentZoom(1);
+      setDocumentRotation(0);
+    }, []);
 
     const handleZoomIn = useCallback(() => {
       setDocumentZoom(prev => Math.min(prev + 0.1, 2));
@@ -1690,7 +1697,7 @@ const AdmissionList = () => {
 
               {/* document preview container  */}
 
-               {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
                 <div className="info-card mt-4">
                   <h4>Document History</h4>
                   <div className="document-history">
@@ -1833,7 +1840,7 @@ const AdmissionList = () => {
                 )}
               </div>
 
-             
+
             </div>
           </div>
         </div>
@@ -2443,7 +2450,7 @@ const AdmissionList = () => {
     setRejectionReason(e.target.value);
   };
 
-  const handleMarkDropout = async(profile) => {
+  const handleMarkDropout = async (profile) => {
     try {
       if (!profile || !profile._id) {
         alert('No profile selected');
@@ -2507,21 +2514,21 @@ const AdmissionList = () => {
                 <div className="col-md-9 d-md-block d-sm-none">
                   <div className="main-tabs-container">
                     <ul className="nav nav-tabs nav-tabs-main border-0">
-                      
+
                       {/* All Admission Tab */}
                       {getCurrentFilters().map((filter, index) => (
-                      <li className="nav-item">
-                      <button
-                          className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                          onClick={() => handleCrmFilterClick(filter._id, index)}
-                        >
-                          
-                          {filter.name}
-                          <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                            ({filter.count})
-                          </span>
-                        </button>
-                      </li>))}
+                        <li className="nav-item">
+                          <button
+                            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                            onClick={() => handleCrmFilterClick(filter._id, index)}
+                          >
+
+                            {filter.name}
+                            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                              ({filter.count})
+                            </span>
+                          </button>
+                        </li>))}
                     </ul>
                   </div>
                 </div>
@@ -3141,7 +3148,7 @@ const AdmissionList = () => {
                                                     <div className="info-group">
                                                       <div className="info-label">NEXT ACTION DATE</div>
                                                       <div className="info-value">
-                                                        {profile.followups.length>0
+                                                        {profile.followups.length > 0
                                                           ? (() => {
                                                             const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
                                                             const datePart = dateObj.toLocaleDateString('en-GB', {
@@ -3996,8 +4003,6 @@ const AdmissionList = () => {
 
 
       </div>
-
-     
     </div>
   );
 };
