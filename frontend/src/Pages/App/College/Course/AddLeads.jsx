@@ -1,30 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-
+import axios from 'axios';
+import { useParams } from 'react-router-dom';
+import moment from 'moment';
 const AddLeads = () => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+  const { courseId } = useParams();
   // Props that would come from parent component or context
-  const course = {
-    center: [
-      { _id: 'center1', name: 'Training Center 1' },
-      { _id: 'center2', name: 'Training Center 2' }
-    ],
-    docsRequired: [
-      { _id: 'doc1', Name: 'Aadhar Card' },
-      { _id: 'doc2', Name: 'PAN Card' },
-      { _id: 'doc3', Name: 'Educational Certificate' }
-    ]
-  };
-  
-  const courseId = 'sample-course-id';
-  const highestQualification = [
-    { _id: 'qual1', name: '10th Pass' },
-    { _id: 'qual2', name: '12th Pass' },
-    { _id: 'qual3', name: 'Graduate' },
-    { _id: 'qual4', name: 'Post Graduate' }
-  ];
+  const [course, setCourse] = useState({});
+
+  // const courseId = '';
+  const [highestQualification, setHighestQualification] = useState([]);
 
   // State management
   const [candidateNumber, setCandidateNumber] = useState('');
@@ -64,6 +52,35 @@ const AddLeads = () => {
   // Refs
   const addressInputRef = useRef(null);
 
+  useEffect(() => {
+    console.log("course", course);
+  }, [course]);
+
+
+  useEffect(() => {
+    const fetchCourseDetails = async () => {
+      const response = await axios.get(`${backendUrl}/college/courses/course-details/${courseId}`, {
+        
+        headers: {
+          'x-auth': token,
+        }
+      });
+
+      if(response.status === true || response.data.status === true || response.data.status === "true"){
+        const data = response.data;
+        console.log("data", data);
+        setCourse(data.course);
+        setHighestQualification(data.highestQualification);
+      } else {
+        alert(response?.msg || "Failed to fetch course details");
+      }
+
+      
+      //
+    };
+    fetchCourseDetails();
+  }, []);
+
   // Google Maps initialization
   useEffect(() => {
     const initMap = () => {
@@ -76,7 +93,7 @@ const AddLeads = () => {
       setTimeout(() => {
         if (addressInputRef.current && window.google) {
           const autocomplete = new window.google.maps.places.Autocomplete(
-            addressInputRef.current, 
+            addressInputRef.current,
             options
           );
 
@@ -88,12 +105,12 @@ const AddLeads = () => {
               return;
             }
 
-            // Update form data with location details
             const latitude = place.geometry.location.lat();
             const longitude = place.geometry.location.lng();
 
             let state = "";
             let city = "";
+            let country = "";           
 
             place.address_components.forEach(component => {
               const types = component.types;
@@ -103,10 +120,17 @@ const AddLeads = () => {
               if (types.includes('locality') || types.includes('sublocality')) {
                 city = component.long_name;
               }
+              if (types.includes("country")) {
+                country = component.long_name;
+              }
             });
+
+            const address = [city, state, country].filter(Boolean).join(", ");
+
 
             setFormData(prev => ({
               ...prev,
+              address,
               latitude: latitude.toString(),
               longitude: longitude.toString(),
               state,
@@ -117,8 +141,10 @@ const AddLeads = () => {
               latitude,
               longitude,
               state,
-              city
+              city, address
             });
+
+            addressInputRef.current.value = place.formatted_address || place.name || "";
           });
         }
       }, 500);
@@ -136,6 +162,10 @@ const AddLeads = () => {
       initMap();
     }
   }, []);
+
+  useEffect(() => {
+    console.log("formData.address", formData.address);
+  }, [formData.address]);
 
   // Helper functions
   const removeDisabled = (elementClass) => {
@@ -177,33 +207,46 @@ const AddLeads = () => {
 
     const formData = new FormData();
     formData.append("file", files[0]);
-    formData.append("docsName", docsname);
     formData.append("courseId", courseId);
     formData.append("docsId", docsId);
     formData.append("mobile", candidateNumber);
 
+    console.log("Upload request details:");
+    console.log("Course ID:", courseId);
+    console.log("Docs ID:", docsId);
+    console.log("Mobile:", candidateNumber);
+    console.log("File:", files[0]);
+    console.log("Token:", token);
+
     try {
-      const result = await fetch(`/admin/courses/${courseId}/candidate/upload-docs`, {
-        method: 'POST',
+      console.log("Sending request to:", `${backendUrl}/college/courses/${courseId}/candidate/upload-docs`);
+
+      const result = await axios.post(`${backendUrl}/college/courses/${courseId}/candidate/upload-docs`, formData, {
         headers: {
           'x-auth': token,
           'Content-Type': 'multipart/form-data',
-        },
-        body: formData
+        }
       });
 
-      if (result.ok) {
+
+
+
+
+      if (result.status === true || result.data.status === true || result.data.status === "true") {
         alert("Your documents uploaded successfully");
-        
+
         // Update uploaded files state
         setUploadedFiles(prev => ({
           ...prev,
           [docsname]: true
         }));
+      } else {
+        alert(result?.msg || "Failed to upload document");
       }
 
     } catch (err) {
-      console.log(err.message);
+      console.error("Error uploading document:", err);
+      alert("Error uploading document. Please try again.");
     }
   };
 
@@ -217,7 +260,7 @@ const AddLeads = () => {
 
   const handleSendOtp = async (e) => {
     e.preventDefault();
-    
+
     if (candidateNumber.length !== 10) {
       alert("Please enter a valid 10-digit mobile number.");
       return;
@@ -225,7 +268,7 @@ const AddLeads = () => {
 
     const body = { mobile: candidateNumber };
 
-    
+
     try {
       const response = await fetch(`${backendUrl}/api/sendOtptoAddLead`, {
         method: 'POST',
@@ -236,7 +279,7 @@ const AddLeads = () => {
         body: JSON.stringify(body)
       });
       const data = await response.json();
-      
+
       if (data.status === true) {
         setShowOtpField(true);
         setShowOtpActions(true);
@@ -258,11 +301,11 @@ const AddLeads = () => {
       return;
     }
 
-    const body = { 
-      mobile: candidateNumber, 
-      otp: otp 
+    const body = {
+      mobile: candidateNumber,
+      otp: otp
     };
-    
+
     try {
       console.log("Sending verification request with:", body);
       const response = await fetch(`${backendUrl}/api/verifyOtp`, {
@@ -275,26 +318,27 @@ const AddLeads = () => {
       });
       const data = await response.json();
       console.log("Verification response:", data);
-      
+
       if (data.status === true) {
         setShowOtpField(false);
         setShowOtpActions(false);
-        
+
         const verifyBody = { ...body, courseId };
         alert("Candidate OTP verified successfully.");
-        
-        const verifyResponse = await fetch("/admin/candidate/verifyuser", {
+
+        const verifyResponse = await fetch(`${backendUrl}/college/candidate/verifyuser`, {
           method: 'POST',
           headers: {
+            'x-auth': token,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(verifyBody)
         });
         const verifyData = await verifyResponse.json();
-        
+
         if (verifyData.status === true && verifyData.appliedStatus === true) {
           alert("Course already applied");
-          window.location.href = `/admin/courses/${courseId}/candidate/addleads`;
+          window.location.href = `${backendUrl}/institute/viewcourse/${courseId}/candidate/addleads`;
         } else if (verifyData.status === true && verifyData.appliedStatus === false) {
           if (course.center?.length > 0) {
             setShowSelectCenter(true);
@@ -320,7 +364,7 @@ const AddLeads = () => {
     }
 
     const body = { mobile: candidateNumber };
-    
+
     try {
       const response = await fetch(`${backendUrl}/api/sendOtptoAddLead`, {
         method: 'POST',
@@ -331,7 +375,7 @@ const AddLeads = () => {
         body: JSON.stringify(body)
       });
       const data = await response.json();
-      
+
       if (data.status === true) {
         alert("OTP resent successfully.");
       } else {
@@ -346,38 +390,49 @@ const AddLeads = () => {
   const handleApplyCourse = async (e) => {
     e.preventDefault();
     const body = { mobile: candidateNumber };
-    
+
     if (course.center?.length > 0) {
       body.selectedCenter = selectedCenter;
     }
 
     try {
-      const response = await fetch(`/admin/candidate/course/${courseId}/apply`, {
+      console.log("Request body:", body);
+      console.log("Token:", token);
+      console.log("Course ID:", courseId);
+
+      const response = await fetch(`${backendUrl}/college/candidate/course/${courseId}/apply`, {
         method: 'POST',
         headers: {
+          'x-auth': token,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(body)
       });
+
+      console.log("Response status:", response.status);
+      console.log("Response headers:", response.headers);
+
       const data = await response.json();
-      
+      console.log("Response data:", data);
+
       if (response.ok) {
         alert("Course applied successfully");
         setIsApplyBtnDisabled(true);
-        
+
         if (course.center?.length > 0) {
           setIsCenterSelectDisabled(true);
         }
-        
+
         if (course.docsRequired && course.docsRequired.length > 0) {
           setShowAddDocs(true);
         } else {
-          window.location.href = `/admin/courses/${courseId}/candidate/addleads`;
+          window.location.href = `${backendUrl}/institute/viewcourse/${courseId}/candidate/addleads`;
         }
       } else {
         alert(data?.msg || "Something went wrong");
       }
     } catch (error) {
+      console.error("Error applying for course:", error);
       alert("Something went wrong");
     }
   };
@@ -398,22 +453,23 @@ const AddLeads = () => {
     console.log("Final Form Data Object:", data);
 
     try {
-      const response = await fetch("/admin/candidate/addleaddandcourseapply", {
+      const response = await fetch(`${backendUrl}/college/candidate/addleaddandcourseapply`, {
         method: 'POST',
         headers: {
+          'x-auth': token,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(data)
       });
-      
-      if (response.ok) {
+
+      if (response.status) {
         alert("Candidate added and Course applied");
         setShowCandidateDetails(false);
-        
+
         if (course.docsRequired && course.docsRequired.length > 0) {
           setShowAddDocs(true);
         } else {
-          window.location.href = `/admin/courses/${courseId}/candidate/addleads`;
+          window.location.href = `${backendUrl}/institute/viewcourse/${courseId}/candidate/addleads`;
         }
       }
     } catch (error) {
@@ -461,7 +517,7 @@ const AddLeads = () => {
 
       <div className="content-body">
         {/* Flash messages would go here */}
-        
+
         <section id="add-leads">
           <div className="row">
             <div className="col-xl-12 col-lg-12">
@@ -814,9 +870,8 @@ const AddLeads = () => {
                             <button
                               id="add__dcs"
                               type="button"
-                              className={`btn px-lg-2 ml-1 waves-effect waves-light ${
-                                uploadedFiles[doc.Name] ? 'btn-secondary' : 'btn-success'
-                              }`}
+                              className={`btn px-lg-2 ml-1 waves-effect waves-light ${uploadedFiles[doc.Name] ? 'btn-secondary' : 'btn-success'
+                                }`}
                               onClick={() => uploadFile(doc.Name, doc._id, fileInputs[doc.Name] ? [fileInputs[doc.Name]] : [])}
                               disabled={uploadedFiles[doc.Name]}
                             >

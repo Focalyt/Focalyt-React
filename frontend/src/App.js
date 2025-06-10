@@ -183,7 +183,9 @@ const Layout = () => {
           <Route path='statusdesign' element={<Status/>}/>
           <Route path = 'myfollowup' element={<MyFollowup/>}/>
           <Route path = 'crmaccess' element={<CrmAccessManagement/>}/>
-          <Route path = 'addleads' element={<AddLeads/>}/>
+          {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
+          <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
+
         </Route>
 
 
