@@ -69,8 +69,7 @@ import ClgCourse from './Pages/App/College/Settings/Course';
 import ApprovalManagement from './Pages/App/College/ApprovalManagement/ApprovalManagement';
 import Status from './Pages/App/College/Status/status';
 import MyFollowup from './Pages/App/College/MyFollowup/MyFollowup';
-import CrmAccessManagement from './Pages/App/College/Settings/CrmAccessManagement';
-
+import AddLeads from './Pages/App/College/Course/AddLeads';
 
 const Layout = () => {
   const location = useLocation();
@@ -182,7 +181,10 @@ const Layout = () => {
           <Route path='approvalManagement' element={<ApprovalManagement/>}/>
           <Route path='statusdesign' element={<Status/>}/>
           <Route path = 'myfollowup' element={<MyFollowup/>}/>
-          <Route path = 'crmaccess' element={<CrmAccessManagement/>}/>
+    
+          {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
+          <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
+
         </Route>
 
 
