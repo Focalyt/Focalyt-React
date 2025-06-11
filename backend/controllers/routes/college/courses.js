@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require("path");
 const { auth1, isAdmin } = require("../../../helpers");
 const moment = require("moment");
-const { Courses, Country, Qualification, CourseSectors, Candidate, AppliedCourses, Center } = require("../../models");
+const { Courses, Country, Qualification, CourseSectors, Candidate, AppliedCourses, Center,College } = require("../../models");
 const candidateServices = require('../services/candidate')
 const { candidateCashbackEventName } = require('../../db/constant');
 const router = express.Router();
@@ -100,6 +100,12 @@ router.route("/").get(async (req, res) => {
 		const user = req.user
 
 
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+		console.log('college', college);
+
+
 		const data = req.query;
 		const fields = {
 			isDeleted: false
@@ -129,41 +135,10 @@ router.route("/").get(async (req, res) => {
 		fields["status"] = status;
 		let courses;
 		// ✅ Role 11 specific filtering
-		if (user.role === 11) {
-			const userDetails = req.session.user;
-			let courseIds = userDetails.access.courseAccess.map(id => id.toString());
-			let centerIds = userDetails.access.centerAccess.map(id => id.toString());
-
-			const allCourses = await Courses.find(fields).populate("sectors");
-
-			console.log("All courses before filter =>");
-			allCourses.forEach(course => {
-				console.log({
-					courseId: course._id.toString(),
-					centerId: course.center?.toString()
-				});
-			});
-
-
-			let filteredCourses = allCourses.filter(course => {
-				const courseId = course._id?.toString();
-				const courseCenterIds = Array.isArray(course.center)
-					? course.center.map(c => c.toString())
-					: [];
-
-				const hasMatchingCenter = courseCenterIds.some(cid => centerIds.includes(cid));
-				const hasMatchingCourse = courseIds.includes(courseId);
-
-				return hasMatchingCenter && hasMatchingCourse;
-			});
-
-
-
-
-			courses = filteredCourses;
-		} else {
-			courses = await Courses.find(fields).populate("sectors");
-		}
+		courses = await Courses.find({
+			...fields,
+			college: college._id
+		}).populate("sectors");
 
 
 

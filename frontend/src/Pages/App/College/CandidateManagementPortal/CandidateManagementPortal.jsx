@@ -5,8 +5,9 @@ import "./CandidateManagment.css"
 
 const CandidateManagementPortal = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  const token = userData.token;
+  const userStr = sessionStorage.getItem("user");
+  const user = (userStr && userStr !== "undefined") ? JSON.parse(userStr) : {};
+  const token = user.token;
   const [activeVerticalTab, setActiveVerticalTab] = useState('Active Verticals');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);

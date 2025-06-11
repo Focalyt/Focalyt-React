@@ -133,6 +133,9 @@ const KYCManagement = () => {
   // 🎯 eKYC Filters Configuration
   // ========================================
   const [ekycFilters, setEkycFilters] = useState([
+    { _id: 'pendingEkyc', name: 'Ekyc Pending', count: 0, milestone: '' },
+   { _id: 'doneEkyc', name: 'Ekyc Verified', count: 0, milestone: 'Ekyc Done' },
+   { _id: 'All', name: 'All', count: 0, milestone: '' }
    
   ]);
 
@@ -592,12 +595,10 @@ const KYCManagement = () => {
   }, []);
 
   useEffect(() => {
-    fetchSubStatus()
+    if (seletectedStatus) {
+      fetchSubStatus();
+    }
   }, [seletectedStatus]);
-
-  useEffect(() => {
-    console.log('seletectedSubStatus', seletectedSubStatus)
-  }, [seletectedSubStatus]);
 
   // Format date range for display
   const formatDateRange = (fromDate, toDate) => {
@@ -628,7 +629,7 @@ const KYCManagement = () => {
       [fieldName]: date
     };
     setFilterData(newFilterData);
-    setTimeout(() => applyFilters(newFilterData), 100);
+    applyFilters(newFilterData);
   };
 
 
@@ -661,22 +662,16 @@ const KYCManagement = () => {
     }
 
     setFilterData(newFilterData);
-    setTimeout(() => applyFilters(newFilterData), 100);
+    applyFilters(newFilterData);
   };
 
   const handleDateChange = (date, fieldName) => {
-    setFilterData(prev => ({
-      ...prev,
+    const newFilterData = {
+      ...filterData,
       [fieldName]: date
-    }));
-
-    setTimeout(() => {
-      const newFilterData = {
-        ...filterData,
-        [fieldName]: date
-      };
-      applyFilters(newFilterData);
-    }, 100);
+    };
+    setFilterData(newFilterData);
+    applyFilters(newFilterData);
   };
 
   const clearCreatedDate = () => {
@@ -685,11 +680,11 @@ const KYCManagement = () => {
       createdFromDate: null,
       createdToDate: null
     }));
-    setTimeout(() => applyFilters({
+    applyFilters({
       ...filterData,
       createdFromDate: null,
       createdToDate: null
-    }), 100);
+    });
   };
 
   const clearModifiedDate = () => {
@@ -698,11 +693,11 @@ const KYCManagement = () => {
       modifiedFromDate: null,
       modifiedToDate: null
     }));
-    setTimeout(() => applyFilters({
+    applyFilters({
       ...filterData,
       modifiedFromDate: null,
       modifiedToDate: null
-    }), 100);
+    });
   };
 
   const clearNextActionDate = () => {
@@ -711,11 +706,11 @@ const KYCManagement = () => {
       nextActionFromDate: null,
       nextActionToDate: null
     }));
-    setTimeout(() => applyFilters({
+    applyFilters({
       ...filterData,
       nextActionFromDate: null,
       nextActionToDate: null
-    }), 100);
+    });
   };
 
   const handleSearch = (searchTerm) => {
@@ -1124,9 +1119,9 @@ const KYCManagement = () => {
   useEffect(() => {
     fetchProfileData();
   }, []);
-  useEffect(() => {
-    handleCrmFilterClick(activeCrmFilter);
-  }, [allProfiles]);
+  // useEffect(() => {
+  //   handleCrmFilterClick(activeCrmFilter);
+  // }, [allProfiles]);
 
   useEffect(() => {
     fetchProfileData();

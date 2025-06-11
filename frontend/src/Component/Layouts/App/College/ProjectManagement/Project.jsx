@@ -3,7 +3,22 @@ import Center from '../../../../Layouts/App/College/ProjectManagement/Center';
 
 const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  
+  // Safe session storage access with fallback
+  const getUserData = () => {
+    try {
+      const userStr = sessionStorage.getItem("user");
+      if (!userStr || userStr === "undefined" || userStr === "null") {
+        return {};
+      }
+      return JSON.parse(userStr);
+    } catch (error) {
+      console.error("Error parsing user data from sessionStorage:", error);
+      return {};
+    }
+  };
+
+  const userData = getUserData();
   const token = userData.token;
 
   const [activeProjectTab, setActiveProjectTab] = useState('Active Projects');
@@ -37,9 +52,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     { id: 2, code: 'GSE', name: 'Guest Service Associates' }
   ];
 
-  const [projects, setProjects] = useState([
-
-  ]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -54,30 +67,22 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   }, [selectedVertical]);
 
   const filteredProjects = projects.filter(project => {
-    // Vertical filter (agar selectedVertical hai)
-
-
     // Status filter based on activeProjectTab
-    if (activeProjectTab === 'Active Projects' && project.status.toLowerCase() !== 'active') {
+    if (activeProjectTab === 'Active Projects' && project.status?.toLowerCase() !== 'active') {
       return false;
     }
-    if (activeProjectTab === 'Inactive Projects' && project.status.toLowerCase() !== 'inactive') {
+    if (activeProjectTab === 'Inactive Projects' && project.status?.toLowerCase() !== 'inactive') {
       return false;
     }
 
     // Search filter on name, code, or vertical (case-insensitive)
     const search = searchQuery.toLowerCase();
-    const nameMatch = project.name?.toLowerCase().includes(search);
-    const codeMatch = project.code?.toLowerCase().includes(search);
-    const verticalMatch = project.vertical?.toLowerCase().includes(search);
+    const nameMatch = project.name?.toLowerCase().includes(search) || false;
+    const codeMatch = project.code?.toLowerCase().includes(search) || false;
+    const verticalMatch = project.vertical?.toLowerCase().includes(search) || false;
 
     return nameMatch || codeMatch || verticalMatch;
   });
-
-
-  useEffect(() => {
-
-  }, [selectedVertical]);
 
   const resetForm = () => {
     setFormData({
@@ -99,12 +104,12 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   const handleEdit = (project) => {
     setEditingProject(project);
     setFormData({
-      code: project.code,
-      name: project.name,
-      description: project.description,
-      vertical: project.vertical,
-      status: project.status,
-      priority: project.priority
+      code: project.code || '',
+      name: project.name || '',
+      description: project.description || '',
+      vertical: project.vertical || '',
+      status: project.status || 'active',
+      priority: project.priority || 'medium'
     });
     setShowEditForm(true);
   };
@@ -115,7 +120,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   };
 
   const confirmDelete = async () => {
-    if (!projectToDelete) return;
+    if (!projectToDelete || !token) return;
 
     try {
       const response = await fetch(`${backendUrl}/college/delete_project/${projectToDelete._id}`, {
@@ -131,59 +136,139 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
       }
 
       // Backend delete successful, local state update karo
-      fetchProjects()
+      fetchProjects();
 
       // Modal close karo
       setShowDeleteModal(false);
       setProjectToDelete(null);
 
     } catch (error) {
+      console.error('Delete error:', error);
       alert(error.message || 'Something went wrong while deleting');
     }
   };
 
-  useEffect(() => {
-
-    fetchProjects();
-
-  }, []);
   const fetchProjects = async () => {
+    // Pehle check karo ke selectedVertical properly set hai ya nahi
+    if (!selectedVertical || !selectedVertical.id) {
+      console.warn('selectedVertical or selectedVertical.id not available:', selectedVertical);
+      setProjects([]);
+      setError('No vertical selected');
+      return;
+    }
 
-    console.log('selectedVertical', selectedVertical)
+    // Token check karo
+    if (!token) {
+      console.warn('No authentication token available');
+      setError('Authentication required');
+      return;
+    }
+
+    console.log('Fetching projects for selectedVertical:', selectedVertical);
     setLoading(true);
+    setError(null);
 
-    fetch(`${backendUrl}/college/list-projects?vertical=${selectedVertical.id}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch projects');
-        return res.json();
-      })
-      .then(data => {
-        if (data.success) {
-          setProjects(data.data);
-          setError(null);
-        } else {
-          setError('Failed to load projects');
+    try {
+      const url = `${backendUrl}/college/list-projects?vertical=${selectedVertical.id}`;
+      console.log('Fetching from URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json'
         }
-      })
-      .catch(err => {
-        setError(err.message);
-      })
-      .finally(() => setLoading(false));
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText || 'Failed to fetch projects'}`);
+      }
+
+      // Response text pehle check karo
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+      
+      if (!responseText || responseText.trim() === '') {
+        console.warn('Empty response received');
+        setProjects([]);
+        return;
+      }
+
+      // Ab safely JSON parse karo
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        console.error('Response text that failed to parse:', responseText);
+        throw new Error('Invalid JSON response from server');
+      }
+      
+      console.log('Parsed data:', data);
+      
+      if (data && data.success && Array.isArray(data.data)) {
+        setProjects(data.data);
+        console.log('Projects set successfully:', data.data.length, 'projects');
+      } else if (data && data.data && Array.isArray(data.data)) {
+        // Agar success field nahi hai but data array hai
+        setProjects(data.data);
+        console.log('Projects set (no success field):', data.data.length, 'projects');
+      } else {
+        console.warn('Unexpected data format:', data);
+        setProjects([]);
+        setError('No projects found for this vertical');
+      }
+    } catch (err) {
+      console.error('Fetch projects error:', err);
+      setError(err.message || 'Failed to load projects');
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) return <p>Loading projects...</p>;
-  if (error) return <p style={{ color: 'red' }}>{error}</p>;
-
+  useEffect(() => {
+    // Component mount hone par immediately fetch mat karo
+    // Pehle check karo ke selectedVertical properly set hai
+    console.log('useEffect triggered with selectedVertical:', selectedVertical);
+    
+    if (selectedVertical && selectedVertical.id && token) {
+      // Small delay add karo to ensure component properly mounted hai
+      const timeoutId = setTimeout(() => {
+        fetchProjects();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      console.log('Not fetching projects:', { 
+        hasSelectedVertical: !!selectedVertical, 
+        hasId: !!selectedVertical?.id, 
+        hasToken: !!token 
+      });
+      setProjects([]);
+      setLoading(false);
+    }
+  }, [selectedVertical?.id, token]); // Dependencies ko specific rakho
 
   const handleSubmit = async () => {
-    console.log('selecetedVertical', selectedVertical)
-    if (!formData.name.trim() || !formData.vertical.trim()) {
+    console.log('selectedVertical', selectedVertical);
+    
+    if (!formData.name?.trim() || !formData.vertical?.toString().trim()) {
       alert('Please fill in all required fields');
       return;
     }
 
+    if (!token) {
+      alert('Authentication token not found. Please login again.');
+      return;
+    }
+
     try {
-      console.log('formData', JSON.stringify(formData))
+      console.log('formData', JSON.stringify(formData));
 
       if (editingProject) {
         // Edit existing project - PUT request
@@ -196,9 +281,12 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           body: JSON.stringify(formData),
         });
 
-        if (!response.ok) throw new Error('Failed to update project');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update project');
+        }
 
-        fetchProjects()
+        fetchProjects();
         setShowEditForm(false);
       } else {
         // Add new project - POST request
@@ -211,19 +299,22 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           body: JSON.stringify(formData),
         });
 
-        if (!response.ok) throw new Error('Failed to add project');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to add project');
+        }
 
-        fetchProjects()
+        fetchProjects();
         setShowAddForm(false);
       }
 
       resetForm();
       setEditingProject(null);
     } catch (error) {
+      console.error('Submit error:', error);
       alert(error.message || 'Something went wrong');
     }
   };
-
 
   const handleShare = (project) => {
     setSelectedProject(project);
@@ -257,7 +348,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   };
 
   const getProgressPercentage = (completed, total) => {
-    if (total === 0) return 0;
+    if (!total || total === 0) return 0;
     return Math.round((completed / total) * 100);
   };
 
@@ -290,12 +381,62 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     );
   };
 
+  // Early return conditions with better error handling
+  if (!token) {
+    return (
+      <div className="container py-4">
+        <div className="alert alert-warning">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          Authentication required. Please login again.
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedVertical) {
+    return (
+      <div className="container py-4">
+        <div className="alert alert-warning">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          No vertical selected. Please select a vertical first.
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return (
+    <div className="container py-4">
+      <div className="text-center">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <p className="mt-2">Loading projects...</p>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="container py-4">
+      <div className="alert alert-danger">
+        <i className="bi bi-exclamation-circle me-2"></i>
+        {error}
+        <button className="btn btn-sm btn-outline-danger ms-2" onClick={fetchProjects}>
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+
   // If showing centers, render the Center component
   if (showCenters && selectedProjectForCenters) {
     return (
       <div>
-
-        <Center selectedProject={selectedProjectForCenters} onBackToProjects={handleBackToProjects} onBackToVerticals={onBackToVerticals} selectedVertical={selectedVertical} />
+        <Center 
+          selectedProject={selectedProjectForCenters} 
+          onBackToProjects={handleBackToProjects} 
+          onBackToVerticals={onBackToVerticals} 
+          selectedVertical={selectedVertical} 
+        />
       </div>
     );
   }
@@ -306,9 +447,10 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
           <div className="d-flex align-items-center gap-3">
-
             <div className='d-flex align-items-center'>
-              <h4 onClick={onBackToVerticals} style={{ cursor: 'pointer' }} className=" me-2">{selectedVertical.name} Vertical</h4>
+              <h4 onClick={onBackToVerticals} style={{ cursor: 'pointer' }} className="me-2">
+                {selectedVertical?.name || 'Unknown'} Vertical
+              </h4>
               <span className="mx-2"> &gt; </span>
               <h5 className="breadcrumb-item mb-0" style={{ whiteSpace: 'nowrap' }} aria-current="page">
                 Project
@@ -317,7 +459,6 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           </div>
         </div>
         <div className='d-flex'>
-
           {onBackToVerticals && (
             <button
               onClick={onBackToVerticals}
@@ -328,8 +469,6 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
               <span>Back</span>
             </button>
           )}
-
-
 
           <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
@@ -364,7 +503,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
         {filteredProjects.map(project => {
           const progressPercentage = getProgressPercentage(project.completedTasks, project.tasks);
           return (
-            <div key={project.id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`}>
+            <div key={project.id || project._id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`}>
               <div className="card h-100 border rounded shadow-sm position-relative">
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-start mb-2">
@@ -376,14 +515,14 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                       <div className="d-flex align-items-center mb-2">
                         <i className="bi bi-kanban-fill text-primary fs-3 me-2"></i>
                         <div>
-                          <h5 className="card-title mb-1">{project.code}</h5>
-                          <p className="text-muted mb-1">{project.name}</p>
+                          <h5 className="card-title mb-1">{project.code || 'N/A'}</h5>
+                          <p className="text-muted mb-1">{project.name || 'Unnamed Project'}</p>
                         </div>
                       </div>
-                      <p className="text-muted small mb-2">{project.description}</p>
+                      <p className="text-muted small mb-2">{project.description || 'No description'}</p>
                       <div className="d-flex flex-wrap gap-2 mb-2">
                         <span className={`${project.status === 'active' ? 'text-success' : 'bg-secondary'}`}>
-                          {project.status}
+                          {project.status || 'unknown'}
                         </span>
                       </div>
                     </div>
@@ -400,28 +539,13 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                     </div>
                   </div>
 
-                  {/* Progress Bar */}
-                  {/* <div className="mb-3">
-                    <div className="d-flex justify-content-between small text-muted mb-1">
-                      <span>Progress</span>
-                      <span>{project.completedTasks}/{project.tasks} tasks ({progressPercentage}%)</span>
-                    </div>
-                    <div className="progress" style={{ height: '6px' }}>
-                      <div 
-                        className="progress-bar text-success" 
-                        role="progressbar" 
-                        style={{ width: `${progressPercentage}%` }}
-                      ></div>
-                    </div>
-                  </div> */}
-
                   <div className="small text-muted">
                     <div className="row">
                       <div className="col-4">
-                        <i className="bi bi-calendar me-1"></i>Created: <strong>{project.createdAt}</strong>
+                        <i className="bi bi-calendar me-1"></i>Created: <strong>{project.createdAt || 'N/A'}</strong>
                       </div>
                       <div className="col-4">
-                        <i className="bi bi-calendar-check me-1"></i>Due: <strong>{project.dueDate}</strong>
+                        <i className="bi bi-calendar-check me-1"></i>Due: <strong>{project.dueDate || 'N/A'}</strong>
                       </div>
                       <div className="col-4">
                         <span
@@ -429,7 +553,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                           style={{ cursor: 'pointer', textDecoration: 'underline' }}
                           onClick={() => handleProjectClick(project)}
                         >
-                          <i className="bi bi-building me-1"></i>{project.centers} Centers
+                          <i className="bi bi-building me-1"></i>{project.centers || 0} Centers
                         </span>
                       </div>
                     </div>
@@ -441,7 +565,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
         })}
       </div>
 
-      {filteredProjects.length === 0 && (
+      {filteredProjects.length === 0 && !loading && (
         <div className="text-center py-5">
           <i className="bi bi-kanban fs-1 text-muted"></i>
           <h5 className="text-muted mt-3">No projects found</h5>
@@ -469,7 +593,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                     <input
                       type="text"
                       className="form-control"
-                      value={formData.name}
+                      value={formData.name || ''}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Enter project name"
                     />
@@ -479,7 +603,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                     <textarea
                       className="form-control"
                       rows="3"
-                      value={formData.description}
+                      value={formData.description || ''}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="Enter project description"
                     ></textarea>
@@ -490,14 +614,13 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                     <label className="form-label">Status</label>
                     <select
                       className="form-select"
-                      value={formData.status}
+                      value={formData.status || 'active'}
                       onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                     </select>
                   </div>
-
                 </div>
               </div>
               <div className="modal-footer">
@@ -522,7 +645,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           <div className="modal-dialog modal-dialog-centered modal-lg" onClick={() => setShowShareModal(false)}>
             <div className="modal-content" onClick={e => e.stopPropagation()}>
               <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title">Manage Access - {selectedProject.code}</h5>
+                <h5 className="modal-title">Manage Access - {selectedProject.code || 'Project'}</h5>
                 <button type="button" className="btn-close btn-close-white" onClick={() => setShowShareModal(false)}></button>
               </div>
               <div className="modal-body">
@@ -562,10 +685,10 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
 
                 <h6 className="mb-3">Current Access</h6>
                 <ul className="list-group">
-                  {selectedProject.access.map((a, index) => (
+                  {(selectedProject.access || []).map((a, index) => (
                     <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
                       <div>
-                        <strong>{a.name}</strong>
+                        <strong>{a.name || 'Unknown User'}</strong>
                       </div>
                       <select className="form-select w-auto">
                         <option value="Viewer" selected={a.role === 'Viewer'}>Viewer</option>
@@ -584,20 +707,18 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           </div>
         </div>
       )}
+      
       <style>
-        {
-          `
+        {`
           @media(max-width:768px){
-          .verticals{
-          font-size:15px;
+            .verticals{
+              font-size:15px;
+            }
           }
-          }
-          `
-        }
+        `}
       </style>
     </div>
   );
 };
 
 export default Project;
-

@@ -305,13 +305,19 @@ router.route("/register")
 			return res.send({ status: false, error: err.message });
 		}
 	});
-router.route("/appliedCandidates").get(async (req, res) => {
+router.route("/appliedCandidates").get(isCollege,async (req, res) => {
+
 	try {
+		const user = req.user;	
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+		console.log('college', college);
+		
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;
 
-		const totalCount = await AppliedCourses.countDocuments();
 
 		const appliedCourses = await AppliedCourses.find({
 			kycStage: { $nin: [true] },
@@ -320,7 +326,7 @@ router.route("/appliedCandidates").get(async (req, res) => {
 		})
 			.populate({
 				path: '_course',
-				select: 'name description docsRequired', // Select the necessary fields
+				select: 'name description docsRequired college', // Select the necessary fields
 				populate: {
 					path: 'sectors',
 					select: 'name'
@@ -345,10 +351,15 @@ router.route("/appliedCandidates").get(async (req, res) => {
 			.skip(skip)
 			.limit(limit);
 
+		console.log('appliedCourses', appliedCourses);
 
+		const filteredAppliedCourses = appliedCourses.filter(doc => {
+			// _course must be populated!
+			return doc._course && String(doc._course.college) === String(college._id);
+		});
 
-
-		const result = appliedCourses.map(doc => {
+		console.log('filteredAppliedCourses', filteredAppliedCourses);
+		const result = filteredAppliedCourses.map(doc => {
 			let selectedSubstatus = null;
 
 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
@@ -457,6 +468,11 @@ router.route("/appliedCandidates").get(async (req, res) => {
 				}
 			};
 		});
+
+
+
+		const totalCount = result.length
+
 
 		res.status(200).json({
 			success: true,
@@ -2568,38 +2584,60 @@ router.get('/get_batches', async (req, res) => {
 
 //Applied data update api
 
-router.put('/update/:id', async (req, res) => {
-	try {
-		const { id } = req.params; // Extract the ID from URL parameters
-		const updatedData = req.body; // Get the data to update from the request body
+router.put('/update/:id', isCollege, async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    const updateData = req.body;
 
-		console.log('updatedData', updatedData)
+    const appliedCourse = await AppliedCourses.findById(id);
+    if (!appliedCourse) {
+      return res.status(404).json({ success: false, message: "Applied course not found" });
+    }
 
-		// Find the document by ID and update it with the provided data
-		const updatedDocument = await AppliedCourses.findByIdAndUpdate(
-			id,
-			updatedData, // Dynamically pass the updated fields
-			{ new: true, runValidators: true } // Return the updated document and validate the update
-		);
+    // Update fields
+    Object.keys(updateData).forEach(key => {
+      appliedCourse[key] = updateData[key];
+    });
 
-		console.log('updatedDocument', updatedDocument)
+    // Add log for Move to KYC
+    if (typeof updateData.kycStage !== 'undefined' && updateData.kycStage === true) {
+      appliedCourse.logs.push({
+        user: user._id,
+        timestamp: new Date(),
+        action: 'Moved to KYC',
+        remarks: 'Profile moved to KYC by College'
+      });
+    }
 
-		if (!updatedDocument) {
-			return res.status(404).json({ success: false, message: 'Document not found' });
-		}
+    // Add log for Move to Admission List
+    if (typeof updateData.admissionDone !== 'undefined' && updateData.admissionDone === true) {
+      appliedCourse.logs.push({
+        user: user._id,
+        timestamp: new Date(),
+        action: 'Moved to Admission List',
+        remarks: 'Profile moved to Admission List by College'
+      });
+    }
 
-		// Return the updated document as a response
-		res.json({ success: true, data: updatedDocument });
-	} catch (error) {
-		console.error('Error updating document:', error);
-		res.status(500).json({ success: false, message: 'Server error' });
-	}
+    await appliedCourse.save();
+    return res.json({ success: true, message: "Profile updated successfully" });
+  } catch (err) {
+    console.error("Error updating profile:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 //KYC Leads
 
-router.route("/kycCandidates").get(async (req, res) => {
+router.route("/kycCandidates").get(isCollege, async (req, res) => {
 	try {
+		const user = req.user;	
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+		console.log('college', college);
+		
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;	
@@ -2612,7 +2650,7 @@ router.route("/kycCandidates").get(async (req, res) => {
 		})
 			.populate({
 				path: '_course',
-				select: 'name description docsRequired', // Select the necessary fields
+				select: 'name description docsRequired college', // Select the necessary fields
 				populate: {
 					path: 'sectors',
 					select: 'name'
@@ -2637,16 +2675,23 @@ router.route("/kycCandidates").get(async (req, res) => {
 			.skip(skip)
 			.limit(limit);
 
-		const totalCount = appliedCourses.length
-		const pendingKycCount = await AppliedCourses.countDocuments({
-			kycStage: { $in: [true] },
-			kyc: { $in: [false] },
+		
 
+		const filteredAppliedCourses = appliedCourses.filter(doc => {
+			// _course must be populated!
+			return doc._course && String(doc._course.college) === String(college._id);
 		});
+		console.log('filteredAppliedCourses', filteredAppliedCourses);
+
+		const totalCount = filteredAppliedCourses.length;
+		const pendingKycCount = filteredAppliedCourses.filter(doc => 
+			doc.kycStage === true && doc.kyc === false
+		).length;
 		const doneKycCount = totalCount-pendingKycCount
 
 
-		const result = appliedCourses.map(doc => {
+
+		const result = filteredAppliedCourses.map(doc => {
 			let selectedSubstatus = null;
 
 
@@ -2834,98 +2879,117 @@ router.put("/update_kyc/:id", async (req, res) => {
 
 
 //doccumnet upload
-router.put("/upload_docs/:id", async (req, res) => {
-	try {
-		let { id } = req.params;
-		let { doc } = req.body;
-		let docsId = doc;
-		console.log('doc', doc)
-		if (!docsId) {
-			return res.status(400).json({ error: "docs id not found." });
-		}
-		if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
-			docsId = new mongoose.Types.ObjectId(docsId);
-		}
+router.put("/upload_docs/:id", isCollege, async (req, res) => {
+  try {
+    const user = req.user;	
+    const college = await College.findOne({
+      '_concernPerson._id': user._id
+    });
+    
+    let { id } = req.params;
+    let { doc } = req.body;
+    let docsId = doc;
+    console.log('doc', doc);
+    
+    if (!docsId) {
+      return res.status(400).json({ error: "docs id not found." });
+    }
+    
+    if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
+      docsId = new mongoose.Types.ObjectId(docsId);
+    }
 
-		if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
-			id = new mongoose.Types.ObjectId(id);
-		}
+    if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+      id = new mongoose.Types.ObjectId(id);
+    }
 
-		const appliedCourse = await AppliedCourses.findOne({ _id: id });
+    const appliedCourse = await AppliedCourses.findOne({ _id: id }).populate({
+      path: '_course',
+      select: 'docsRequired'
+    });
 
-		if (!appliedCourse) {
-			return res.status(400).json({ error: "You have not applied for this course." });
-		}
+    if (!appliedCourse) {
+      return res.status(400).json({ error: "You have not applied for this course." });
+    }
 
+    // Find document name from course's docsRequired
+    const docName = appliedCourse._course?.docsRequired?.find(d => d._id.toString() === docsId.toString())?.name || 'Unknown Document';
 
+    const files = req.files?.file;
+    if (!files) {
+      return res.status(400).send({ status: false, message: "No files uploaded" });
+    }
 
-		const files = req.files?.file;
-		if (!files) {
-			return res.status(400).send({ status: false, message: "No files uploaded" });
-		}
+    const filesArray = Array.isArray(files) ? files : [files];
+    const uploadedFiles = [];
+    const uploadPromises = [];
 
+    filesArray.forEach((item) => {
+      const { name, mimetype } = item;
+      const ext = name?.split('.').pop().toLowerCase();
 
-		const filesArray = Array.isArray(files) ? files : [files];
-		const uploadedFiles = [];
-		const uploadPromises = [];
+      if (!allowedExtensions.includes(ext)) {
+        throw new Error(`File type not supported: ${ext}`);
+      }
 
-		filesArray.forEach((item) => {
-			const { name, mimetype } = item;
-			const ext = name?.split('.').pop().toLowerCase();
+      let fileType = "document";
+      if (allowedImageExtensions.includes(ext)) {
+        fileType = "image";
+      } else if (allowedVideoExtensions.includes(ext)) {
+        fileType = "video";
+      }
 
-			if (!allowedExtensions.includes(ext)) {
-				throw new Error(`File type not supported: ${ext}`);
-			}
+      const key = `Documents for course/${appliedCourse._course}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
+      const params = {
+        Bucket: bucketName,
+        Key: key,
+        Body: item.data,
+        ContentType: mimetype,
+      };
 
-			let fileType = "document";
-			if (allowedImageExtensions.includes(ext)) {
-				fileType = "image";
-			} else if (allowedVideoExtensions.includes(ext)) {
-				fileType = "video";
-			}
+      uploadPromises.push(
+        s3.upload(params).promise().then((uploadResult) => {
+          uploadedFiles.push({
+            fileURL: uploadResult.Location,
+            fileType,
+          });
+        })
+      );
+    });
 
-			const key = `Documents for course/${appliedCourse._course}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
-			const params = {
-				Bucket: bucketName,
-				Key: key,
-				Body: item.data,
-				ContentType: mimetype,
-			};
+    await Promise.all(uploadPromises);
+    const fileUrl = uploadedFiles[0].fileURL;
 
-			uploadPromises.push(
-				s3.upload(params).promise().then((uploadResult) => {
-					uploadedFiles.push({
-						fileURL: uploadResult.Location,
-						fileType,
-					});
-				})
-			);
-		});
+    // Add document to uploadedDocs array
+    appliedCourse.uploadedDocs.push({
+      docsId: new mongoose.Types.ObjectId(docsId),
+      fileUrl: fileUrl,
+      status: "Pending",
+      uploadedAt: new Date()
+    });
 
-		await Promise.all(uploadPromises);
-		const fileUrl = uploadedFiles[0].fileURL;
+    // Add log for document upload with document name
+    appliedCourse.logs.push({
+      user: user._id,
+      timestamp: new Date(),
+      action: 'Document Uploaded',
+      remarks: `${docName} uploaded for verification`
+    });
 
-		appliedCourse.uploadedDocs.push({
-			docsId: new mongoose.Types.ObjectId(docsId),
-			fileUrl: fileUrl,
-			status: "Pending",
-			uploadedAt: new Date()
-		});
+    await appliedCourse.save();
+    console.log('appliedCourse', appliedCourse);
 
-		await appliedCourse.save();
-		console.log('appliedCourse', appliedCourse)
+    return res.status(200).json({
+      status: true,
+      message: "Document uploaded successfully",
+      data: appliedCourse
+    });
 
-		return res.status(200).json({
-			status: true,
-			message: "Document uploaded successfully",
-			data: appliedCourse
-		});
-
-	} catch (err) {
-		console.log(err)
-		return res.status(500).send({ status: false, message: err.message });
-	}
-})
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({ status: false, message: err.message });
+  }
+});
 
 
 //my followups
@@ -3143,68 +3207,7 @@ router.get("/leads/my-followups", async (req, res) => {
 });
 
 // Get admission list
-router.route("/admission-list").get(async (req, res) => {
-	try {
-		const page = parseInt(req.query.page) || 1;      // Default page 1
-		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
-		const skip = (page - 1) * limit;
 
-		const appliedCourses = await AppliedCourses.find({
-			admissionDone: true
-		})
-			.populate({
-				path: '_course',
-				select: 'name description docsRequired',
-				populate: {
-					path: 'sectors',
-					select: 'name'
-				}
-			})
-			.populate('_leadStatus')
-			.populate('registeredBy')
-			.populate({
-				path: '_candidate',
-				populate: [
-					{
-						path: '_appliedCourses',
-						populate: [
-							{ path: '_course', select: 'name description' },
-							{ path: 'registeredBy', select: 'name email' },
-							{ path: '_center', select: 'name location' },
-							{ path: '_leadStatus', select: 'title' }
-						]
-					}
-				]
-			})
-			.populate({
-				path: 'logs',
-				populate: {
-					path: 'user',
-					select: 'name'
-				}
-			})
-			.sort({ updatedAt: -1 })
-			.skip(skip)
-			.limit(limit);
-
-		const totalCount = await AppliedCourses.countDocuments({ admissionDone: true });
-
-		return res.json({
-			success: true,
-			data: appliedCourses,
-			totalCount,
-			page,
-			limit
-		});
-	} catch (err) {
-		console.error("Error fetching admission list:", err);
-		return res.status(500).json({
-			success: false,
-			message: "Error fetching admission list",
-			error: err.message
-		});
-	}
-});
 
 // Verify document and update KYC status
 router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req, res) => {
@@ -3269,6 +3272,199 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 		});
 	}
 });
+
+//admission list
+router.route("/admission-list").get(isCollege, async (req, res) => {
+	try {
+		const user = req.user;	
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+		console.log('college', college);
+		
+		const page = parseInt(req.query.page) || 1;      // Default page 1
+		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+		const skip = (page - 1) * limit;
+
+		const appliedCourses = await AppliedCourses.find({
+			admissionDone: { $in: [true] }
+		})
+			.populate({
+				path: '_course',
+				select: 'name description docsRequired college', // Select the necessary fields
+				populate: {
+					path: 'sectors',
+					select: 'name'
+				}
+			})
+			.populate('_leadStatus')
+			.populate('registeredBy')
+			.populate({
+				path: '_candidate',
+				populate: [
+					{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+				]
+			})
+			.populate({
+				path: 'logs',
+				populate: {
+					path: 'user',
+					select: 'name'
+				}
+			})
+			.sort({ createdAt: -1 })
+			.skip(skip)
+			.limit(limit);
+
+		const filteredAppliedCourses = appliedCourses.filter(doc => {
+			// _course must be populated!
+			return doc._course && String(doc._course.college) === String(college._id);
+		});
+
+		const totalCount = filteredAppliedCourses.length
+		const pendingKycCount = filteredAppliedCourses.filter(doc => 
+			doc.kycStage === true && doc.kyc === false
+		).length;
+		const doneKycCount = totalCount-pendingKycCount
+
+
+		const result = filteredAppliedCourses.map(doc => {
+			let selectedSubstatus = null;
+
+
+
+			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+				selectedSubstatus = doc._leadStatus.substatuses.find(
+					sub => sub._id.toString() === doc._leadSubStatus.toString()
+				);
+			}
+
+			const docObj = doc.toObject();
+
+			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+			if (docObj._course) {
+				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+			}
+
+			const requiredDocs = docObj._course?.docsRequired || [];
+			const uploadedDocs = docObj.uploadedDocs || [];
+
+			// Map uploaded docs by docsId for quick lookup
+			const uploadedDocsMap = {};
+			uploadedDocs.forEach(d => {
+				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+			});
+			// Prepare combined docs array
+			const allDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					// Agar uploaded hai to uploadedDoc details bhejo
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						_id: reqDoc._id
+					};
+				} else {
+					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
+
+
+			// Prepare combined docs array
+			if (requiredDocs) {
+				docsRequired = requiredDocs
+
+				// Create a merged array with both required docs and uploaded docs info
+				combinedDocs = docsRequired.map(reqDoc => {
+					// Convert Mongoose document to plain object
+					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+					// Find matching uploaded docs for this required doc
+					const matchingUploads = uploadedDocs.filter(
+						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+					);
+
+					return {
+						_id: docObj._id,
+						Name: docObj.Name || 'Document',
+						description: docObj.description || '',
+						uploads: matchingUploads || []
+					};
+				});
+
+
+			} else {
+				console.log("Course not found or no docs required");
+			};
+
+			// Count calculations
+			let verifiedCount = 0;
+			let RejectedCount = 0;
+			let pendingVerificationCount = 0;
+			let notUploadedCount = 0;
+
+			allDocs.forEach(doc => {
+				if (doc.status === "Verified") verifiedCount++;
+				else if (doc.status === "Rejected") RejectedCount++;
+				else if (doc.status === "Pending") pendingVerificationCount++;
+				else if (doc.status === "Not Uploaded") notUploadedCount++;
+			});
+
+			const totalRequired = allDocs.length;
+			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
+			const uploadPercentage = totalRequired > 0
+				? Math.round((uploadedCount / totalRequired) * 100)
+				: 0;
+			return {
+				...docObj,
+				selectedSubstatus,
+				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				docCounts: {
+					totalRequired,
+					RejectedCount,
+					uploadedCount,
+					verifiedCount,
+					pendingVerificationCount,
+					notUploadedCount,
+					uploadPercentage
+				}
+			};
+		});
+
+		console.log('result', result)
+		
+
+		res.status(200).json({
+			success: true,
+			count: result.length,
+			page,
+			pendingKycCount,
+			doneKycCount,
+			limit,
+			totalCount,
+			totalPages: Math.ceil(totalCount / limit),
+			data: result,
+		});
+
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
+
 
 
 

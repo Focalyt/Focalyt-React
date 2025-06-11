@@ -1083,7 +1083,7 @@ const AdmissionList = () => {
         return;
       }
 
-      const response = await axios.get(`${backendUrl}/college/kycCandidates?page=${currentPage}`, {
+      const response = await axios.get(`${backendUrl}/college/admission-list?page=${currentPage}`, {
         headers: {
           'x-auth': token,
         },
@@ -2642,7 +2642,7 @@ const AdmissionList = () => {
                                           <input className="form-check-input" type="checkbox" />
                                         </div>
                                         <div className="me-3">
-                                          <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                          <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                             <svg width="40" height="40">
                                               <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
                                               <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
