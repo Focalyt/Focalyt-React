@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
 import './CollegeRegister.css';
 
-const CollegeRegister = () => {
+const CollegeRegister = ({ embedded = false }) => {
     const urlLocation = useLocation();
     const queryParams = new URLSearchParams(urlLocation.search);
     const returnUrl = queryParams.get('returnUrl');
-
+    const navigate = useNavigate();
     const [collegeName, setCollegeName] = useState('');
     const [concernedPerson, setConcernedPerson] = useState('');
     const [email, setEmail] = useState('');
@@ -283,9 +283,11 @@ const CollegeRegister = () => {
                             sessionStorage.setItem("user", JSON.stringify(loginRes.data.userData));
 
                             if (returnUrl) {
-                                window.location.href = decodeURIComponent(returnUrl);
+                                // window.location.href = decodeURIComponent(returnUrl);
+                                navigate(decodeURIComponent(returnUrl));
                             } else {
-                                window.location.href = "/institute/dashboard";
+                                // window.location.href = "/institute/dashboard";
+                                navigate("/institute/dashboard");
                             }
 
                         } else {
@@ -337,7 +339,257 @@ const CollegeRegister = () => {
         }
     };
 
-    return (
+    const renderForm = () => (
+        <form onSubmit={(e) => e.preventDefault()} className='collegeRegistration'>
+            <div className="row">
+                <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <input
+                        type="text"
+                        className="form-control"
+                        id="collegeName"
+                        placeholder="Institute Name"
+                        value={collegeName}
+                        onChange={(e) => setCollegeName(e.target.value)}
+                        onKeyPress={(e) => {
+                            if (e.target.value.length === 50) {
+                                e.preventDefault();
+                                return false;
+                            }
+                        }}
+                    />
+                    <div className="form-control-position">
+                        <i className="fa-regular fa-user"></i>
+                    </div>
+                    <label htmlFor="user-name"></label>
+                </fieldset>
+
+                <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <input
+                        type="text"
+                        className="form-control"
+                        id="concernedPerson"
+                        placeholder="Concerned Person Name"
+                        value={concernedPerson}
+                        onChange={(e) => setConcernedPerson(e.target.value)}
+                        onKeyPress={(e) => {
+                            if (e.target.value.length === 15) {
+                                e.preventDefault();
+                                return false;
+                            }
+                            handleConcernedPersonKeyPress(e);
+                        }}
+                    />
+                    <div className="form-control-position">
+                        <i className="fa-regular fa-user"></i>
+                    </div>
+                    <label htmlFor="user-name"></label>
+                </fieldset>
+
+                <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <input
+                        type="text"
+                        className="form-control"
+                        id="user-mail"
+                        placeholder="Email ID"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onKeyPress={(e) => {
+                            if (e.target.value.length === 30) {
+                                e.preventDefault();
+                                return false;
+                            }
+                        }}
+                    />
+                    <div className="form-control-position">
+                        <i className="fa-regular fa-envelope"></i>
+                    </div>
+                    <label htmlFor="user-name"></label>
+                </fieldset>
+
+                <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+
+                    <select
+                        className="form-control"
+                        id="select"
+                        value={instituteType}
+                        onChange={(e) => setInstituteType(e.target.value)}
+                    >
+                        <option value="" >Type of Institute</option>
+                        <option value="School">School</option>
+                        <option value="College">College</option>
+                        <option value="Computer Center">Computer Center</option>
+                        <option value="university">University</option>
+                    </select>
+                    <div className="form-control-position">
+                        <i className="fa-solid fa-check"></i>
+                    </div>
+                </fieldset>
+
+                <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <input
+                        type={showPassword ? "text" : "password"}
+                        className="form-control"
+                        id="pass"
+                        placeholder="Create Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        style={verifyPassword()}
+                    />
+                    <div
+                        className="form-control-position"
+                        onClick={togglePassword}
+                    >
+                        <i
+                            className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}
+                            id="toggleIcon"
+                        ></i>
+                    </div>
+                </fieldset>
+
+                <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        className="form-control"
+                        id="confirmPass"
+                        placeholder="Confirm Password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        style={verifyPassword()}
+                    />
+                    <div
+                        className="form-control-position"
+                        onClick={confirmTogglePassword}
+                    >
+                        <i
+                            className={`fa-regular ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}
+                            id="toggleBtn"
+                        ></i>
+                    </div>
+                </fieldset>
+
+                <fieldset className="input-group form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <input
+                        type="tel"
+                        className="form-control"
+                        maxLength="10"
+                        id="user-number"
+                        pattern="[0-9]{10}"
+                        placeholder="Mobile"
+                        value={phoneNumber}
+                        onChange={handlePhoneNumberChange}
+                        onKeyPress={(e) => {
+                            if (e.target.value.length === 10) {
+                                e.preventDefault();
+                                return false;
+                            }
+                            handlePhoneNumberKeyPress(e);
+                            handlePhoneKeyPress(e);
+                        }}
+                        aria-label="Mobile Number"
+                        aria-describedby="basic-addon2"
+                    />
+                    <div className="form-control-position">
+                        <i className="fa-solid fa-phone"></i>
+                    </div>
+                    <div className="input-group-append">
+                        {showGenerateOTP && (
+                            <button
+                                className="btn btn-primary float-right btn-inline waves-effect waves-light text-white sendOTP"
+                                type="button"
+                                id="generate-otp"
+                                onClick={handleGenerateOTP}
+                                ref={generateOTPRef}
+                            >
+                                Send OTP
+                            </button>
+                        )}
+                    </div>
+                </fieldset>
+                {showOtpInput && (
+                    <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                        <input
+                            type="number"
+                            className="form-control"
+                            id="user-otp"
+                            placeholder="Enter your OTP"
+                            value={otp}
+                            onChange={handleOtpChange}
+                            disabled={otpDisabled}
+                            ref={otpInputRef}
+                            onKeyPress={handleKeyPress}
+                        />
+                        <div className="form-control-position">
+                            <i className="fa-solid fa-lock"></i>
+                        </div>
+
+                    </fieldset>
+                )}
+
+                <p className="pt-0 px-1" style={{fontSize: '12px', color: '#666', marginBottom: '20px'}}>
+                    I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
+                </p>
+
+                <div className="row">
+                    <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
+                        {showSignupBtn && (
+                            <a
+                                className="btn btn-primary btn-block waves-effect waves-light text-white"
+                                id="submit-button"
+                                style={{ padding: '1rem' }}
+                                onClick={handleSignup}
+                                ref={signupBtnRef}
+                            >
+                                Signup
+                            </a>
+                        )}
+                    </div>
+                    <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
+                        {showResendBtn && (
+                            <div
+                                className={`btn btn-primary btn-block waves-effect waves-light text-white ${isResendDisabled ? 'disabled' : ''}`}
+                                id="resend-btn"
+                                style={{ padding: '1rem' }}
+                                onClick={handleResendOTP}
+                            >
+                                {resendBtnText}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div>&nbsp;</div>
+
+                <div
+                    id="error"
+                    style={{
+                        color: 'rgb(243, 56, 56)',
+                        fontWeight: 'bold',
+                        display: errorMessage ? 'block' : 'none'
+                    }}
+                >
+                    {errorMessage}
+                </div>
+
+                <div
+                    id="success"
+                    style={{
+                        color: 'green',
+                        fontWeight: 'bold',
+                        display: successMessage ? 'block' : 'none'
+                    }}
+                >
+                    {successMessage}
+                </div>
+
+                <div id="msg">{message}</div>
+            </div>
+        </form>
+    );
+
+
+    return embedded ? (<div className="embedded-signup-form">
+        {renderForm()}
+    </div>) : (
         <div
             className="vertical-layout vertical-menu-modern 1-column navbar-floating footer-static bg-full-screen-image blank-page blank-page"
             data-open="click"
@@ -361,7 +613,7 @@ const CollegeRegister = () => {
                                                 className="img-fluid brand_logo brand-custom"
                                             />
                                         </div>
-                                        <div className="col-lg-12 col-12 p-0">
+                                        {/* <div className="col-lg-12 col-12 p-0">
                                             <div className="card rounded-0 mb-0 px-xl-2 px-lg-2 px-md-2 px-sm-0 px-0 card-placement-bottom">
                                                 <div className="mt-2 text-center pb-1 px-1">
                                                     <div className="card-title">
@@ -377,7 +629,8 @@ const CollegeRegister = () => {
                                                                     className="nav-link"
                                                                     id="service-tab-center"
                                                                     data-toggle="tab"
-                                                                    href={`/institute/login${window.location.search}`}
+                                                                    // href={`/institute/login${window.location.search}`}
+                                                                    onClick={() => navigate(`/institute/login${window.location.search}`)}
                                                                     aria-controls="service-center"
                                                                     role="tab"
                                                                     aria-selected="false"
@@ -423,250 +676,7 @@ const CollegeRegister = () => {
                                                                 <div className="rounded-0 mb-0">
                                                                     <div className="card-content">
                                                                         <div className="card-body p-0">
-                                                                            <form onSubmit={(e) => e.preventDefault()} className='collegeRegistration'>
-                                                                                <div className="row">
-                                                                                    <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input
-                                                                                            type="text"
-                                                                                            className="form-control"
-                                                                                            id="collegeName"
-                                                                                            placeholder="Institute Name"
-                                                                                            value={collegeName}
-                                                                                            onChange={(e) => setCollegeName(e.target.value)}
-                                                                                            onKeyPress={(e) => {
-                                                                                                if (e.target.value.length === 50) {
-                                                                                                    e.preventDefault();
-                                                                                                    return false;
-                                                                                                }
-                                                                                            }}
-                                                                                        />
-                                                                                        <div className="form-control-position">
-                                                                                            <i className="fa-regular fa-user"></i>
-                                                                                        </div>
-                                                                                        <label htmlFor="user-name"></label>
-                                                                                    </fieldset>
 
-                                                                                    <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input
-                                                                                            type="text"
-                                                                                            className="form-control"
-                                                                                            id="concernedPerson"
-                                                                                            placeholder="Concerned Person Name"
-                                                                                            value={concernedPerson}
-                                                                                            onChange={(e) => setConcernedPerson(e.target.value)}
-                                                                                            onKeyPress={(e) => {
-                                                                                                if (e.target.value.length === 15) {
-                                                                                                    e.preventDefault();
-                                                                                                    return false;
-                                                                                                }
-                                                                                                handleConcernedPersonKeyPress(e);
-                                                                                            }}
-                                                                                        />
-                                                                                        <div className="form-control-position">
-                                                                                            <i className="fa-regular fa-user"></i>
-                                                                                        </div>
-                                                                                        <label htmlFor="user-name"></label>
-                                                                                    </fieldset>
-
-                                                                                    <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input
-                                                                                            type="text"
-                                                                                            className="form-control"
-                                                                                            id="user-mail"
-                                                                                            placeholder="Email ID"
-                                                                                            value={email}
-                                                                                            onChange={(e) => setEmail(e.target.value)}
-                                                                                            onKeyPress={(e) => {
-                                                                                                if (e.target.value.length === 30) {
-                                                                                                    e.preventDefault();
-                                                                                                    return false;
-                                                                                                }
-                                                                                            }}
-                                                                                        />
-                                                                                        <div className="form-control-position">
-                                                                                            <i className="fa-regular fa-envelope"></i>
-                                                                                        </div>
-                                                                                        <label htmlFor="user-name"></label>
-                                                                                    </fieldset>
-
-                                                                                    <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-
-                                                                                        <select
-                                                                                            className="form-control"
-                                                                                            id="select"
-                                                                                            value={instituteType}
-                                                                                            onChange={(e) => setInstituteType(e.target.value)}
-                                                                                        >
-                                                                                            <option value="" >Type of Institute</option>
-                                                                                            <option value="School">School</option>
-                                                                                            <option value="College">College</option>
-                                                                                            <option value="Computer Center">Computer Center</option>
-                                                                                            <option value="university">University</option>
-                                                                                        </select>
-                                                                                        <div className="form-control-position">
-                                                                                            <i className="fa-solid fa-check"></i>
-                                                                                        </div>
-                                                                                    </fieldset>
-
-                                                                                    <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input
-                                                                                            type={showPassword ? "text" : "password"}
-                                                                                            className="form-control"
-                                                                                            id="pass"
-                                                                                            placeholder="Create Password"
-                                                                                            value={password}
-                                                                                            onChange={(e) => setPassword(e.target.value)}
-                                                                                            style={verifyPassword()}
-                                                                                        />
-                                                                                        <div
-                                                                                            className="form-control-position"
-                                                                                            onClick={togglePassword}
-                                                                                        >
-                                                                                            <i
-                                                                                                className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}
-                                                                                                id="toggleIcon"
-                                                                                            ></i>
-                                                                                        </div>
-                                                                                    </fieldset>
-
-                                                                                    <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input
-                                                                                            type={showConfirmPassword ? "text" : "password"}
-                                                                                            className="form-control"
-                                                                                            id="confirmPass"
-                                                                                            placeholder="Confirm Password"
-                                                                                            value={confirmPassword}
-                                                                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                                                                            style={verifyPassword()}
-                                                                                        />
-                                                                                        <div
-                                                                                            className="form-control-position"
-                                                                                            onClick={confirmTogglePassword}
-                                                                                        >
-                                                                                            <i
-                                                                                                className={`fa-regular ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}
-                                                                                                id="toggleBtn"
-                                                                                            ></i>
-                                                                                        </div>
-                                                                                    </fieldset>
-
-                                                                                    <fieldset className="input-group form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                        <input
-                                                                                            type="tel"
-                                                                                            className="form-control"
-                                                                                            maxLength="10"
-                                                                                            id="user-number"
-                                                                                            pattern="[0-9]{10}"
-                                                                                            placeholder="Mobile"
-                                                                                            value={phoneNumber}
-                                                                                            onChange={handlePhoneNumberChange}
-                                                                                            onKeyPress={(e) => {
-                                                                                                if (e.target.value.length === 10) {
-                                                                                                    e.preventDefault();
-                                                                                                    return false;
-                                                                                                }
-                                                                                                handlePhoneNumberKeyPress(e);
-                                                                                                handlePhoneKeyPress(e);
-                                                                                            }}
-                                                                                            aria-label="Mobile Number"
-                                                                                            aria-describedby="basic-addon2"
-                                                                                        />
-                                                                                        <div className="form-control-position">
-                                                                                            <i className="fa-solid fa-phone"></i>
-                                                                                        </div>
-                                                                                        <div className="input-group-append">
-                                                                                            {showGenerateOTP && (
-                                                                                                <button
-                                                                                                    className="btn btn-primary float-right btn-inline waves-effect waves-light text-white sendOTP"
-                                                                                                    type="button"
-                                                                                                    id="generate-otp"
-                                                                                                    onClick={handleGenerateOTP}
-                                                                                                    ref={generateOTPRef}
-                                                                                                >
-                                                                                                    Send OTP
-                                                                                                </button>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </fieldset>
-                                                                                    {showOtpInput && (
-                                                                                        <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                                                                            <input
-                                                                                                type="number"
-                                                                                                className="form-control"
-                                                                                                id="user-otp"
-                                                                                                placeholder="Enter your OTP"
-                                                                                                value={otp}
-                                                                                                onChange={handleOtpChange}
-                                                                                                disabled={otpDisabled}
-                                                                                                ref={otpInputRef}
-                                                                                                onKeyPress={handleKeyPress}
-                                                                                            />
-                                                                                            <div className="form-control-position">
-                                                                                                <i className="fa-solid fa-lock"></i>
-                                                                                            </div>
-
-                                                                                        </fieldset>
-                                                                                    )}
-
-                                                                                    <p className="pt-0 px-1">
-                                                                                        I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
-                                                                                    </p>
-
-                                                                                    <div className="row">
-                                                                                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                                                                                            {showSignupBtn && (
-                                                                                                <a
-                                                                                                    className="btn btn-primary btn-block waves-effect waves-light text-white"
-                                                                                                    id="submit-button"
-                                                                                                    style={{ padding: '1rem' }}
-                                                                                                    onClick={handleSignup}
-                                                                                                    ref={signupBtnRef}
-                                                                                                >
-                                                                                                    Signup
-                                                                                                </a>
-                                                                                            )}
-                                                                                        </div>
-                                                                                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                                                                                            {showResendBtn && (
-                                                                                                <div
-                                                                                                    className={`btn btn-primary btn-block waves-effect waves-light text-white ${isResendDisabled ? 'disabled' : ''}`}
-                                                                                                    id="resend-btn"
-                                                                                                    style={{ padding: '1rem' }}
-                                                                                                    onClick={handleResendOTP}
-                                                                                                >
-                                                                                                    {resendBtnText}
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-
-                                                                                    <div>&nbsp;</div>
-
-                                                                                    <div
-                                                                                        id="error"
-                                                                                        style={{
-                                                                                            color: 'rgb(243, 56, 56)',
-                                                                                            fontWeight: 'bold',
-                                                                                            display: errorMessage ? 'block' : 'none'
-                                                                                        }}
-                                                                                    >
-                                                                                        {errorMessage}
-                                                                                    </div>
-
-                                                                                    <div
-                                                                                        id="success"
-                                                                                        style={{
-                                                                                            color: 'green',
-                                                                                            fontWeight: 'bold',
-                                                                                            display: successMessage ? 'block' : 'none'
-                                                                                        }}
-                                                                                    >
-                                                                                        {successMessage}
-                                                                                    </div>
-
-                                                                                    <div id="msg">{message}</div>
-                                                                                </div>
-                                                                            </form>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -675,6 +685,9 @@ const CollegeRegister = () => {
                                                     </div>
                                                 </div>
                                             </div>
+                                        </div> */}
+                                        <div  className="col-lg-12 col-12 p-0">
+                                        {renderForm()}
                                         </div>
                                     </div>
                                 </div>

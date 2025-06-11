@@ -467,7 +467,76 @@ function Community() {
         <div className="container-fluid p-0">
           <div className="mainContentLayout">
             <div className="mainContainer">
-             x
+            <div className="leftSidebar">
+                <div className="sidebar">
+                  {/* Notification Banner */}
+                  <div className="notification">
+                    <span className="close">×</span>
+                    <h4>New Lab Program!</h4>
+                    <p>Special offer available for Focalyt future technology labs</p>
+                  </div>
+
+                  {/* Lab Programs */}
+                  <div className="section">
+                    <div className="section-titles">
+                      🧪 Lab Programs
+                    </div>
+                    <div className="lab-card">
+                      <h4>Setup Future Technology Labs</h4>
+                      <p>Starting at ₹0</p>
+                    </div>
+                  </div>
+
+                  {/* Latest Updates */}
+                  <div className="section">
+                    <div className="section-titles">
+                      📰 Latest Updates
+                    </div>
+                    <div className="news-item">
+                      <h4>Summer Industry For Colleges</h4>
+                      <p>Courses Started at ₹3500</p>
+                    </div>
+                    
+                  </div>
+
+                  {/* Special Offers */}
+                  <div className="section">
+                    <div className="section-titles">
+                      🎁 Special Offers For Schools
+                    </div>
+                    <div className="offer-card green">
+                      <strong>Courses Started</strong>
+                      <span>@199 <sup>*conditions apply</sup></span>
+                    </div>
+                    
+                  </div>
+                  <div className="section">
+                    <div className="section-titles">
+                      🎁 Special Offers For Colleges
+                    </div>
+                    <div className="offer-card green">
+                      <strong>Courses Started</strong>
+                      <span>@1999 <sup>*conditions apply</sup></span>
+                    </div>
+                    
+                  </div>
+
+                  {/* Success Stories */}
+                  <div className="section">
+                    <div className="section-titles">
+                      🏆 Success Stories
+                    </div>
+                    <div className="success-item">
+                      <span>🏫</span>
+                      <span>Holy Angels School </span>
+                    </div>
+                    {/* <div className="success-item">
+                      <span>🏫</span>
+                      <span>St. Xavier's - 3 Labs</span>
+                    </div> */}
+                  </div>
+                </div>
+              </div>
               <div className="mainBody">
                 <div className="filter-section container my-4">
                   <div className="row align-items-center">
