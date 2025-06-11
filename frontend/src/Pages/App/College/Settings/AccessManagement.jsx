@@ -19,6 +19,7 @@ import AssignmentRule from './AccessManagement/AssignmentRule';
 import PermissionAnalysis from './AccessManagement/PermissionAnalysis';
 import RoleManagement from './AccessManagement/RoleManagement';
 import Settings from './AccessManagement/Settings';
+import CrmAccessManagement from './CrmAccessManagement';
 
 
 // Import shared components/modals
@@ -430,7 +431,7 @@ const fetchCourses = async () => {
         );
       case 'assignments':
         return (
-          <AssignmentRule
+          <CrmAccessManagement
             assignmentRules={assignmentRules}
             entities={entities}
             users={users}

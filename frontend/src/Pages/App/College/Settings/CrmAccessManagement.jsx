@@ -347,75 +347,21 @@ const CrmAccessManagement = () => {
       />
       
       <div className="min-vh-100 bg-light">
-        <div className="container-fluid p-4">
-          {/* Header */}
-          <div className="row mb-4">
-            <div className="col-12">
-              <div className="d-flex align-items-center mb-4">
-                <div className="p-3 rounded me-3" style={{ backgroundColor: '#ff6b35' }}>
-                  <Settings className="text-white" size={32} />
-                </div>
-                <div>
-                  <h1 className="display-5 fw-bold text-dark mb-2">Assignment Rules</h1>
-                  <p className="text-muted fs-6 mb-0">Intelligently distribute leads to counselors based on criteria</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="row mb-4">
-            <div className="col-md-4 mb-3">
-              <div className="card border-0 shadow-sm bg-white">
-                <div className="card-body p-4">
-                  <div className="d-flex align-items-center">
-                    <div className="p-3 rounded me-3" style={{ backgroundColor: '#ff6b3520' }}>
-                      <Target style={{ color: '#ff6b35' }} size={24} />
-                    </div>
-                    <div>
-                      <h3 className="fw-bold text-dark mb-0">{rules.length}</h3>
-                      <small className="text-muted">Active Rules</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-4 mb-3">
-              <div className="card border-0 shadow-sm bg-white">
-                <div className="card-body p-4">
-                  <div className="d-flex align-items-center">
-                    <div className="p-3 rounded me-3" style={{ backgroundColor: '#28a74520' }}>
-                      <Users style={{ color: '#28a745' }} size={24} />
-                    </div>
-                    <div>
-                      <h3 className="fw-bold text-dark mb-0">{counselors.length}</h3>
-                      <small className="text-muted">Counselors</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-4 mb-3">
-              <div className="card border-0 shadow-sm bg-white">
-                <div className="card-body p-4">
-                  <div className="d-flex align-items-center">
-                    <div className="p-3 rounded me-3" style={{ backgroundColor: '#ffc10720' }}>
-                      <Settings style={{ color: '#ffc107' }} size={24} />
-                    </div>
-                    <div>
-                      <h3 className="fw-bold text-dark mb-0">98%</h3>
-                      <small className="text-muted">Distribution Rate</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
+        <div className="container-fluid">
+        
           {/* Action Bar */}
           <div className="row mb-4">
             <div className="col-12">
-              <div className="card border-0 shadow-sm bg-white">
+              
+            </div>
+          </div>
+
+          {/* Rules Table */}
+          <div className="row">
+            <div className="col-12">
+              <div className="card border-0 shadow bg-white">
+                <div className="card-body p-0">
+
                 <div className="card-body p-4">
                   <div className="row align-items-center">
                     <div className="col-md-4 mb-3 mb-md-0">
@@ -426,7 +372,7 @@ const CrmAccessManagement = () => {
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           placeholder="Search rules or counselors..."
-                          className="form-control ps-5"
+                          className="form-control ps-5 m-0"
                         />
                       </div>
                     </div>
@@ -453,15 +399,8 @@ const CrmAccessManagement = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
+              
 
-          {/* Rules Table */}
-          <div className="row">
-            <div className="col-12">
-              <div className="card border-0 shadow bg-white">
-                <div className="card-body p-0">
                   <div className="table-responsive">
                     <table className="table table-hover mb-0">
                       <thead className="bg-light">
@@ -700,6 +639,21 @@ const CrmAccessManagement = () => {
           )}
         </div>
       </div>
+
+      <style>
+        {
+          `
+          .table-hover thead tr{
+          border-bottom:1px solid #ccc!important;
+          white-space: nowrap;
+          font-size: 12px;
+          }
+          .table-hover tbody tr{
+font-size: 12px;
+        }
+          `
+        }
+      </style>
     </div>
   );
 };
