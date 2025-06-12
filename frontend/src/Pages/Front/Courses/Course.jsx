@@ -655,7 +655,7 @@ console.log( "response callback" , response )
           onClick={() => setVideoSrc("")}
         >
           <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
+            <div className="modal-content" style={{backgroundColor: 'transparent'}}>
               <button type="button" className="close" data-bs-dismiss="modal" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
               </button>
@@ -674,7 +674,7 @@ console.log( "response callback" , response )
         {/* Callback Modal */}
         <div className="modal fade" id="callbackModal" tabIndex="-1" aria-labelledby="callbackModalLabel" aria-hidden="true">
           <div className="modal-dialog modal-dialog-centered newWidth">
-            <div className="modal-content">
+            <div className="modal-content p-0">
               <div className="modal-header">
                 <h5 className="modal-title text-black" id="callbackModalLabel">
                   Request for Call Back

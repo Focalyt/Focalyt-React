@@ -133,8 +133,8 @@ const KYCManagement = () => {
   // 🎯 eKYC Filters Configuration
   // ========================================
   const [ekycFilters, setEkycFilters] = useState([
-    { _id: 'pendingEkyc', name: 'Ekyc Pending', count: 0, milestone: '' },
-   { _id: 'doneEkyc', name: 'Ekyc Verified', count: 0, milestone: 'Ekyc Done' },
+    { _id: 'pendingEkyc', name: 'kyc Pending', count: 0, milestone: '' },
+   { _id: 'doneEkyc', name: 'kyc Verified', count: 0, milestone: 'Ekyc Done' },
    { _id: 'All', name: 'All', count: 0, milestone: '' }
    
   ]);
@@ -2814,7 +2814,7 @@ const KYCManagement = () => {
                                           />
                                           <img
                                             src="/Assets/public_assets/images/ekyc_pending.png"
-                                            alt="ekyc pending"
+                                            alt="kyc pending"
                                             style={{ width: 100, height: 'auto', display: profile.kyc === false ? 'inline-block' : 'none' }}
                                           />
                                         </div>
@@ -4536,8 +4536,6 @@ const KYCManagement = () => {
             padding: 1px 6px;
           }
         }
-
-
 
 
         /* Document History Auto Height CSS - Add to your existing styles */

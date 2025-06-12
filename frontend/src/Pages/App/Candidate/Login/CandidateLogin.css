@@ -3,6 +3,8 @@
   background:url(../../../../../public/Assets/public/images/logo/rename.webp) repeat;
     background-size: auto;
   background-size: contain!important;
+  min-height: 100vh !important;
+  margin: 0 !important;
 }
 
 /* .blank-page {

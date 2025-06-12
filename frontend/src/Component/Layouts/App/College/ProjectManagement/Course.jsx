@@ -467,7 +467,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
 
       {/* Share Modal */}
-      {/* {showShareModal && selectedCourse && (
+      {showShareModal && selectedCourse && (
         <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered modal-lg" onClick={() => setShowShareModal(false)}>
             <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -533,7 +533,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
             </div>
           </div>
         </div>
-      )} */}
+      )}
       <style>
         {`
         .overflowY{
