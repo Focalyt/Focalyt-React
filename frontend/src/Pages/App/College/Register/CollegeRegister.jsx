@@ -125,12 +125,27 @@ const CollegeRegister = ({ embedded = false }) => {
         }
     };
 
+    // const handleConcernedPersonKeyPress = (e) => {
+    //     const charCode = e.which ? e.which : e.keyCode;
+    //     if (!((charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122))) {
+    //         e.preventDefault();
+    //     }
+    // };
+
     const handleConcernedPersonKeyPress = (e) => {
         const charCode = e.which ? e.which : e.keyCode;
-        if (!((charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122))) {
+        // Allow A-Z, a-z, and space
+        if (
+            !(
+                (charCode >= 65 && charCode <= 90) || // A-Z
+                (charCode >= 97 && charCode <= 122) || // a-z
+                charCode === 32 // space
+            )
+        ) {
             e.preventDefault();
         }
     };
+    
 
     const handlePhoneNumberChange = (e) => {
         const value = e.target.value;
@@ -343,6 +358,7 @@ const CollegeRegister = ({ embedded = false }) => {
         <form onSubmit={(e) => e.preventDefault()} className='collegeRegistration'>
             <div className="row">
                 <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <div className="input-field">
                     <input
                         type="text"
                         className="form-control"
@@ -357,13 +373,17 @@ const CollegeRegister = ({ embedded = false }) => {
                             }
                         }}
                     />
-                    <div className="form-control-position">
+                    <div className="form-control-position input-icon">
                         <i className="fa-regular fa-user"></i>
                     </div>
+                   
+                  
                     <label htmlFor="user-name"></label>
+                    </div>
                 </fieldset>
 
                 <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <div className='input-field'>
                     <input
                         type="text"
                         className="form-control"
@@ -379,13 +399,15 @@ const CollegeRegister = ({ embedded = false }) => {
                             handleConcernedPersonKeyPress(e);
                         }}
                     />
-                    <div className="form-control-position">
+                    <div className="form-control-position  input-icon">
                         <i className="fa-regular fa-user"></i>
                     </div>
                     <label htmlFor="user-name"></label>
+                    </div>
                 </fieldset>
 
                 <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                    <div className="input-field" >
                     <input
                         type="text"
                         className="form-control"
@@ -400,19 +422,20 @@ const CollegeRegister = ({ embedded = false }) => {
                             }
                         }}
                     />
-                    <div className="form-control-position">
+                    <div className="form-control-position input-icon">
                         <i className="fa-regular fa-envelope"></i>
                     </div>
                     <label htmlFor="user-name"></label>
+                    </div>
                 </fieldset>
 
                 <fieldset className="form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-
+                <div className="input-field" >
                     <select
                         className="form-control"
                         id="select"
                         value={instituteType}
-                        onChange={(e) => setInstituteType(e.target.value)}
+                        onChange={(e) => setInstituteType(e.target.value)} style={{padding: '0px 6px 0px 40px'}}
                     >
                         <option value="" >Type of Institute</option>
                         <option value="School">School</option>
@@ -420,12 +443,14 @@ const CollegeRegister = ({ embedded = false }) => {
                         <option value="Computer Center">Computer Center</option>
                         <option value="university">University</option>
                     </select>
-                    <div className="form-control-position">
-                        <i className="fa-solid fa-check"></i>
+                    <div className="form-control-position input-icon" style={{top:'50%'}}>
+                        <i className="fa-solid fa-check" ></i>
+                    </div>
                     </div>
                 </fieldset>
 
                 <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                <div className="input-field" >
                     <input
                         type={showPassword ? "text" : "password"}
                         className="form-control"
@@ -436,7 +461,7 @@ const CollegeRegister = ({ embedded = false }) => {
                         style={verifyPassword()}
                     />
                     <div
-                        className="form-control-position"
+                        className="form-control-position  input-icon" style={{top:'50%'}}
                         onClick={togglePassword}
                     >
                         <i
@@ -444,9 +469,11 @@ const CollegeRegister = ({ embedded = false }) => {
                             id="toggleIcon"
                         ></i>
                     </div>
+                    </div>
                 </fieldset>
 
                 <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                <div className="input-field" >
                     <input
                         type={showConfirmPassword ? "text" : "password"}
                         className="form-control"
@@ -457,7 +484,7 @@ const CollegeRegister = ({ embedded = false }) => {
                         style={verifyPassword()}
                     />
                     <div
-                        className="form-control-position"
+                        className="form-control-position input-icon" style={{top :'50%'}}
                         onClick={confirmTogglePassword}
                     >
                         <i
@@ -465,9 +492,11 @@ const CollegeRegister = ({ embedded = false }) => {
                             id="toggleBtn"
                         ></i>
                     </div>
+                    </div>
                 </fieldset>
 
                 <fieldset className="input-group form-label-group form-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                <div className="input-field" >
                     <input
                         type="tel"
                         className="form-control"
@@ -488,8 +517,9 @@ const CollegeRegister = ({ embedded = false }) => {
                         aria-label="Mobile Number"
                         aria-describedby="basic-addon2"
                     />
-                    <div className="form-control-position">
+                    <div className="form-control-position input-icon" style={{top:'50%'}}>
                         <i className="fa-solid fa-phone"></i>
+                    </div>
                     </div>
                     <div className="input-group-append">
                         {showGenerateOTP && (
@@ -507,6 +537,7 @@ const CollegeRegister = ({ embedded = false }) => {
                 </fieldset>
                 {showOtpInput && (
                     <fieldset className="form-label-group position-relative has-icon-left col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+                        <div className="input-field" >
                         <input
                             type="number"
                             className="form-control"
@@ -518,10 +549,10 @@ const CollegeRegister = ({ embedded = false }) => {
                             ref={otpInputRef}
                             onKeyPress={handleKeyPress}
                         />
-                        <div className="form-control-position">
+                        <div className="form-control-position input-icon">
                             <i className="fa-solid fa-lock"></i>
                         </div>
-
+</div>
                     </fieldset>
                 )}
 

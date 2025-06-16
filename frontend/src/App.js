@@ -15,7 +15,7 @@ import Jobs from './Pages/Front/Jobs/Jobs';
 import Contact from './Pages/Front/Contact/Contact';
 import CourseDetails from './Pages/Front/CourseDetails/CourseDetails';
 import "./App.css";
-import CompanyLogin from './Component/Layouts/App/Company/CompanyLogin';
+// import CompanyLogin from './Component/Layouts/App/Company/CompanyLogin';
 import Community from './Pages/Front/Community/Community';
 import CandidateLayout from './Component/Layouts/App/Candidates';
 import CandidateDashboard from './Pages/App/Candidate/Dashboard/CandidateDashboard';
@@ -71,6 +71,22 @@ import Status from './Pages/App/College/Status/status';
 import MyFollowup from './Pages/App/College/MyFollowup/MyFollowup';
 import AddLeads from './Pages/App/College/Course/AddLeads';
 
+import CompanyLayout from './Component/Layouts/App/Company';
+import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
+import CompanyRegister from './Pages/App/Company/CompanyRegister/CompanyRegister';
+import CompanyDashboard from './Pages/App/Company/CompanyDashboard/CompanyDashboard';
+import CompanyProfile from './Pages/App/Company/CompanyProfile/CompanyProfile';
+import Notification from './Pages/App/Company/Notification/Notification';
+import AllJd from './Pages/App/Company/Jobs/AllJd';
+import OngoingHiring from './Pages/App/Company/Hirings/OnGoingHiring';
+import ShortListedCandidate from './Pages/App/Company/Candidate/ShortListedCandidate';
+import AddJd from './Pages/App/Company/Jobs/AddJd';
+import Coins from './Pages/App/Company/Coins/MyPieCoins';
+// import EditJob from './Pages/App/Company/Jobs/editJob';
+import ViewJd from './Pages/App/Company/Jobs/ViewJd';
+import IntCandiate from './Pages/App/Company/Candidate/IntrestedCandidates';
+import ListCandidate from './Pages/App/Company/Candidate/ListCandidate';
+import NearByCandidate from './Pages/App/Company/Candidate/NearByCandidate';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -185,6 +201,29 @@ const Layout = () => {
           {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
           <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
 
+        </Route>
+
+        {/* company  */}
+
+        <Route path="/company/login" element={<CompanyLogin />} />
+        <Route path="/company/register" element={<CompanyRegister />} />
+       
+        <Route path="/company" element={<CompanyLayout />}>
+        <Route path="dashboard" element={<CompanyDashboard />} />
+        <Route path="myProfile" element={<CompanyProfile />} /> 
+        <Route path="list/jobs" element={<AllJd />} />
+        <Route path="shortlisted" element={<ShortListedCandidate />} />
+        <Route path="onGoingHiring" element={<OngoingHiring />} />
+        <Route path="candidate/:candidateId" element={<CandidateProfile />} />
+        
+        <Route path="addJob" element={<AddJd />} />
+        {/* <Route path="editJob/:jobId" element={<editJob />} /> */}
+        <Route path="viewJob/:jobId" element={<ViewJd />} />
+        <Route path="interested-candidates" element ={<IntCandiate/>}/>
+        <Route path='notifications' element={<Notification/>}/>
+        <Route path="list-candidates" element={<ListCandidate/>}/>
+        <Route path="nearbyCandidates" element={<NearByCandidate/>}/>
+        <Route path="Coins" element={<Coins/>}/>
         </Route>
 
 
