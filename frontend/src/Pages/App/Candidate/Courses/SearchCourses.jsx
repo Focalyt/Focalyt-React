@@ -279,7 +279,7 @@ const SearchCourses = () => {
           onClick={() => setVideoSrc("")}
         >
           <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content" style={{backgroundColor: 'transparent'}}>
+            <div className="modal-content">
               <button
                 type="button"
                 className="close"
