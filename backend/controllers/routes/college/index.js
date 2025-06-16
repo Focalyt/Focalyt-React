@@ -1958,7 +1958,9 @@ router.post("/courses/add", [isCollege], async (req, res) => {
 //Vertical APIS
 
 router.get('/getVerticals', [isCollege], async (req, res) => {
+
 	try {
+		const collegeId = req.user.college._id;
 
 
 		const verticals = await Vertical.find({ college: collegeId }).sort({ createdAt: -1 });
@@ -2149,6 +2151,7 @@ router.post('/add_project', [isCollege], async (req, res) => {
 			vertical,
 			createdBy: user._id,
 			status: status !== undefined ? status : 'active',
+			college: collegeId,
 		});
 
 		const savedProject = await newProject.save();
@@ -2194,6 +2197,7 @@ router.put('/edit_project/:id', [isCollege], async (req, res) => {
 		project.name = name;
 		project.description = description || project.description;
 		project.vertical = vertical;
+		project.college = collegeId;
 		project.status = status !== undefined ? status : project.status;
 		project.updatedBy = user._id; // Optional: agar aap update karne wale user ko track karna chahte hain
 
@@ -2301,10 +2305,21 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 	try {
 		const { name, location, status, project } = req.body;
 		const user = req.user; // agar aap authentication middleware laga rahe hain
+		const collegeId = req.user.college._id;
 
 		// Validation
 		if (!name || !project) {
 			return res.status(400).json({ success: false, message: 'Name and project are required.' });
+		}
+
+		const projectDetails = await Project.findById(project);
+
+		if (!projectDetails) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
+
+		if (projectDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({ success: false, message: 'You are not authorized to add center to this project.' });
 		}
 
 		// Ensure project is an array
@@ -2316,6 +2331,7 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 			status: status || 'active',
 			project: projectArray,
 			createdBy: user ? user._id : null,
+			college: collegeId,
 		});
 
 		const savedCenter = await newCenter.save();
@@ -2329,10 +2345,24 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 
 
 
-router.put('/edit_center/:id', async (req, res) => {
+router.put('/edit_center/:id',[isCollege], async (req, res) => {
 	try {
 		const { id } = req.params;
 		const updateData = req.body;
+		const collegeId = req.user.college._id;
+
+		const centerDetails = await Center.findById(id);
+
+		if (!centerDetails) {
+			return res.status(404).json({ success: false, message: 'Center not found' });
+		}
+
+		if (centerDetails.college.toString() !== collegeId.toString()) {
+
+			return res.status(403).json({ success: false, message: 'You are not authorized to edit this center' });
+		}
+
+		updateData.college = collegeId;
 
 		const updatedCenter = await Center.findByIdAndUpdate(id, updateData, { new: true });
 		if (!updatedCenter) {
@@ -2346,14 +2376,33 @@ router.put('/edit_center/:id', async (req, res) => {
 	}
 });
 
-router.put('/asign_center/:id', async (req, res) => {
+router.put('/asign_center/:id', [isCollege], async (req, res) => {
 	try {
 		const { id } = req.params;
 		const { projectId } = req.body; // extract projectId from body
+		const collegeId = req.user.college._id;
+
 
 		if (!projectId) {
 			return res.status(400).json({ success: false, message: 'Project ID is required' });
 		}
+
+		const projectDetails = await Project.findById(projectId);
+
+		if (!projectDetails) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
+
+		if (projectDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({ success: false, message: 'You are not authorized to asign this center to this project' });
+		}
+
+		const centerDetails = await Center.findById(id);
+
+		if (centerDetails.collegeId.toString() !== collegeId.toString()) {
+			return res.status(403).json({ success: false, message: 'You are not authorized to asign this center to this project' });
+		}
+
 
 		// Use $addToSet instead of $push if you want to avoid duplicates
 		const updatedCenter = await Center.findByIdAndUpdate(
@@ -2377,10 +2426,17 @@ router.put('/remove_project_from_center/:id', async (req, res) => {
 	try {
 		const { id } = req.params;
 		const { projectId } = req.body;
-
 		if (!projectId) {
 			return res.status(400).json({ success: false, message: 'Project ID is required' });
 		}
+		const collegeId = req.user.college._id;
+
+		const centerDetails = await Center.findById(id);
+
+		if (centerDetails.collegeId.toString() !== collegeId.toString()) {
+			return res.status(403).json({ success: false, message: 'You are not authorized to remove this project from this center' });
+		}
+		
 
 		const updatedCenter = await Center.findByIdAndUpdate(
 			id,
@@ -2402,18 +2458,26 @@ router.put('/remove_project_from_center/:id', async (req, res) => {
 
 
 
-router.get('/list-centers', async (req, res) => {
+router.get('/list-centers', [isCollege], async (req, res) => {
 	try {
+		const collegeId = req.user.college._id;
 		const projectId = req.query.projectId;
 		if (projectId) {
 			if (!mongoose.Types.ObjectId.isValid(projectId)) {
 				return res.status(400).json({ success: false, message: 'Invalid Project ID' });
 			}
+			const projectDetails = await Project.findById(projectId);
+			if (!projectDetails) {
+				return res.status(404).json({ success: false, message: 'Project not found.' });
+			}
+			if (projectDetails.college.toString() !== collegeId.toString()) {
+				return res.status(403).json({ success: false, message: 'You are not authorized to list centers for this project' });
+			}
 			const centers = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
 			return res.json({ success: true, data: centers });
 		}
 		else {
-			const centers = await Center.find({ status: 'active' }).sort({ createdAt: -1 });
+			const centers = await Center.find({ status: 'active', college: collegeId }).sort({ createdAt: -1 });
 			return res.json({ success: true, data: centers });
 		}
 

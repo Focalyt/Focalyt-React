@@ -20,6 +20,10 @@ const centerSchema = new Schema({
     ref: 'Project',
     required: true,
   }],
+  collegeId: {
+    type: Schema.Types.ObjectId,
+    ref: 'College',
+  },
   createdBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',
