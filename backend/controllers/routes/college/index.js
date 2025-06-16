@@ -1931,7 +1931,7 @@ router.route("/single").get(auth1, function (req, res) {
 		}
 	});
 });
-router.post("/courses/add", async (req, res) => {
+router.post("/courses/add", [isCollege], async (req, res) => {
 	try {
 		const body = req.body;
 
@@ -1961,7 +1961,7 @@ router.get('/getVerticals', [isCollege], async (req, res) => {
 	try {
 
 
-		const verticals = await Vertical.find().sort({ createdAt: -1 });
+		const verticals = await Vertical.find({ college: collegeId }).sort({ createdAt: -1 });
 
 
 		return res.json({
@@ -1982,6 +1982,7 @@ router.post('/addVertical', [isCollege], async (req, res) => {
 	try {
 		const { formData } = req.body;
 		const user = req.user;
+		const collegeId = req.user.college._id;
 
 
 		// Default value handling
@@ -1990,6 +1991,7 @@ router.post('/addVertical', [isCollege], async (req, res) => {
 			description: formData.description,
 			status: formData.status !== undefined ? formData.status : true,
 			createdBy: user._id,
+			college: collegeId,
 		});
 
 
@@ -2013,14 +2015,15 @@ router.put('/editVertical/:id', [isCollege], async (req, res) => {
 	try {
 		const verticalId = req.params.id;
 		const { formData } = req.body;
-
+		const collegeId = req.user.college._id;
 
 		const updated = await Vertical.findByIdAndUpdate(
 			verticalId,
 			{
 				name: formData.name,
 				description: formData.description,
-				status: formData.status
+				status: formData.status,
+				college: collegeId
 			},
 			{ new: true } // return updated document
 		);
@@ -2050,7 +2053,32 @@ router.put('/editVertical/:id', [isCollege], async (req, res) => {
 router.delete('/deleteVertical/:id', [isCollege], async (req, res) => {
 	try {
 		const verticalId = req.params.id;
+		const collegeId = req.user.college._id;
 
+		const vertical = await Vertical.findById(verticalId);
+
+		if (!vertical) {
+			return res.status(404).json({
+				status: false,
+				message: "Vertical not found"
+			});
+		}
+
+		if (vertical.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to delete this vertical"
+			});
+		}
+
+
+		if (vertical.isApproved) {
+
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to delete this vertical"
+			});
+		}
 
 
 		const deleted = await Vertical.findByIdAndDelete(verticalId);
@@ -2084,6 +2112,10 @@ router.post('/add_project', [isCollege], async (req, res) => {
 
 		let { name, description, vertical, status } = req.body;
 		const user = req.user
+		const collegeId = req.user.college._id;
+
+
+	
 
 
 		// Basic validation
@@ -2091,6 +2123,25 @@ router.post('/add_project', [isCollege], async (req, res) => {
 
 			return res.status(400).json({ success: false, message: 'Name and verticalId are required.' });
 		}
+
+		const verticalDetails = await Vertical.findById(vertical);
+
+		if (!verticalDetails) {
+
+			return res.status(404).json({
+				status: false,
+				message: "Vertical not found"
+			});
+		}	
+
+		if (verticalDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to add project to this vertical"
+			});
+		}
+
+
 		// Create new project document
 		const newProject = new Project({
 			name,
@@ -2114,6 +2165,19 @@ router.put('/edit_project/:id', [isCollege], async (req, res) => {
 		const projectId = req.params.id;
 		const { name, description, vertical, status } = req.body;
 		const user = req.user;
+		const collegeId = req.user.college._id;
+
+		const projectDetails = await Project.findById(projectId);
+		if (!projectDetails) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
+
+		if (projectDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to edit this project"
+			});
+		}
 
 		// Validation
 		if (!name || !vertical) {
@@ -2145,6 +2209,21 @@ router.put('/edit_project/:id', [isCollege], async (req, res) => {
 router.delete('/delete_project/:id', [isCollege], async (req, res) => {
 	try {
 		const projectId = req.params.id;
+		const collegeId = req.user.college._id;
+
+		const projectDetails = await Project.findById(projectId);
+		if (!projectDetails) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
+
+
+		if (projectDetails.college.toString() !== collegeId.toString()) {
+
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to delete this project"
+			});
+		}
 
 		const deletedProject = await Project.findByIdAndDelete(projectId);
 		if (!deletedProject) {
@@ -2161,10 +2240,11 @@ router.delete('/delete_project/:id', [isCollege], async (req, res) => {
 
 
 
-router.get('/list-projects', async (req, res) => {
+router.get('/list-projects', [isCollege], async (req, res) => {
 	try {
 		let filter = {};
 		const vertical = req.query.vertical;
+		const collegeId = req.user.college._id;
 
 		if (vertical) {
 			if (mongoose.Types.ObjectId.isValid(vertical)) {
@@ -2175,6 +2255,24 @@ router.get('/list-projects', async (req, res) => {
 			}
 		}
 
+		const verticalDetails = await Vertical.findById(vertical);
+
+		if (!verticalDetails) {
+			return res.status(404).json({ success: false, message: 'Vertical not found.' });
+		}
+
+		if (verticalDetails.college.toString() !== collegeId.toString()) {
+
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to list projects for this vertical"
+			});
+		}
+
+		filter.college = collegeId;
+
+		
+
 		const projects = await Project.find(filter).sort({ createdAt: -1 });
 		res.json({ success: true, data: projects });
 	} catch (error) {
@@ -2183,11 +2281,12 @@ router.get('/list-projects', async (req, res) => {
 	}
 });
 
-router.get('/list_all_projects', async (req, res) => {
+router.get('/list_all_projects', [isCollege], async (req, res) => {
 	try {
+		const collegeId = req.user.college._id;
 
-
-		const projects = await Project.find({ status: 'active' }).sort({ createdAt: -1 });
+	
+		const projects = await Project.find({ status: 'active', college: collegeId }).sort({ createdAt: -1 });
 		res.json({ success: true, data: projects });
 	} catch (error) {
 		console.error('Error fetching projects:', error);
