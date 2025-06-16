@@ -1965,9 +1965,7 @@ router.get('/getVerticals', [isCollege], async (req, res) => {
 
 		const verticals = await Vertical.find({ college: collegeId }).sort({ createdAt: -1 });
 
-
-		return res.json({
-			status: true,
+		return res.json({			status: true,
 			message: "Verticals fetched successfully",
 			data: verticals
 		});
