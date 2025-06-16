@@ -11,16 +11,15 @@ const centerSchema = new Schema({
   },
  
   status: {
-    type: String,
-    enum: ['active', 'inactive'],
-    default: 'active',
+    type: Boolean,
+    default: true,
   },
   projects: [{
     type: Schema.Types.ObjectId,
     ref: 'Project',
     required: true,
   }],
-  collegeId: {
+  college: {
     type: Schema.Types.ObjectId,
     ref: 'College',
   },

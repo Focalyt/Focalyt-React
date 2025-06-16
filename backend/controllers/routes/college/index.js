@@ -2301,7 +2301,7 @@ router.get('/list_all_projects', [isCollege], async (req, res) => {
 // POST /api/centers/add
 router.post('/add_canter', [isCollege], async (req, res) => {
 	try {
-		const { name, location, status, project } = req.body;
+		let { name, location, status, project } = req.body;
 		const user = req.user; // agar aap authentication middleware laga rahe hain
 		const collegeId = req.user.college._id;
 
@@ -2323,16 +2323,26 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 		// Ensure project is an array
 		const projectArray = Array.isArray(project) ? project : [project];
 
+		if (status === 'active') {
+			status = true;
+		}
+		else {
+			status = false;
+		}
+
+		console.log(collegeId,'collegeId');
+
 		const newCenter = new Center({
 			name,
 			address: location,
-			status: status || 'active',
+			status: status,
 			project: projectArray,
 			createdBy: user ? user._id : null,
 			college: collegeId,
 		});
 
 		const savedCenter = await newCenter.save();
+		console.log(savedCenter,'savedCenter');
 
 		res.status(201).json({ success: true, message: 'Center added successfully', data: savedCenter });
 	} catch (error) {
@@ -2397,7 +2407,7 @@ router.put('/asign_center/:id', [isCollege], async (req, res) => {
 
 		const centerDetails = await Center.findById(id);
 
-		if (centerDetails.collegeId.toString() !== collegeId.toString()) {
+		if (centerDetails.college.toString() !== collegeId.toString()) {
 			return res.status(403).json({ success: false, message: 'You are not authorized to asign this center to this project' });
 		}
 
@@ -2471,11 +2481,25 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 			if (projectDetails.college.toString() !== collegeId.toString()) {
 				return res.status(403).json({ success: false, message: 'You are not authorized to list centers for this project' });
 			}
-			const centers = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
+			let allCenters = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
+			const centers = allCenters.map(center => {
+				const centerObj = center.toObject();
+				return {
+				  ...centerObj,
+				  status: centerObj.status ? "active" : "inactive"
+				};
+			  });
 			return res.json({ success: true, data: centers });
 		}
 		else {
-			const centers = await Center.find({ status: 'active', college: collegeId }).sort({ createdAt: -1 });
+			const allCenters = await Center.find({ status: true, college: collegeId }).sort({ createdAt: -1 });
+			const centers = allCenters.map(center => {
+				const centerObj = center.toObject();
+				return {
+				  ...centerObj,
+				  status: centerObj.status ? "active" : "inactive"
+				};
+			  });
 			return res.json({ success: true, data: centers });
 		}
 
@@ -2486,11 +2510,18 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 	}
 });
 
-router.get('/list_all_centers', async (req, res) => {
+router.get('/list_all_centers', [isCollege], async (req, res) => {
 	try {
+		const collegeId = req.user.college._id;
 
-
-		const centers = await Center.find({ status: 'active' }).sort({ createdAt: -1 });
+		const allCenters = await Center.find({ status: true, college: collegeId }).sort({ createdAt: -1 });
+		const centers = allCenters.map(center => {
+			const centerObj = center.toObject();
+			return {
+			  ...centerObj,
+			  status: centerObj.status ? "active" : "inactive"
+			};
+		  });
 
 		res.json({ success: true, data: centers });
 	} catch (error) {
