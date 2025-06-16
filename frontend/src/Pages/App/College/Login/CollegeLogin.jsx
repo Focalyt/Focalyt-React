@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import "./CollegeLogin.css";
+import CollegeRegister from '../Register/CollegeRegister';
 
 const CollegeLogin = () => {
     const urlLocation = useLocation();
     const queryParams = new URLSearchParams(urlLocation.search);
     const returnUrl = queryParams.get('returnUrl');
-
+    const navigate = useNavigate();
     const [userInput, setUserInput] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -67,7 +68,8 @@ const CollegeLogin = () => {
                     setSuccessMessage('Password verified');
                     sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
                     if (returnUrl) {
-                        window.location.href = decodeURIComponent(returnUrl);
+                        // window.location.href = decodeURIComponent(returnUrl);
+                        navigate(decodeURIComponent(returnUrl));
                     } else {
                         window.location.href = '/institute/dashboard';
                     }
@@ -96,9 +98,11 @@ const CollegeLogin = () => {
                     setSuccessMessage('OTP verified');
                     sessionStorage.setItem("user", JSON.stringify(verifyRes.data.userData));
                     if (returnUrl) {
-                        window.location.href = decodeURIComponent(returnUrl);
+                        // window.location.href = decodeURIComponent(returnUrl);
+                        navigate(decodeURIComponent(returnUrl));
                     } else {
-                        window.location.href = '/institute/dashboard';
+                        // window.location.href = '/institute/dashboard';
+                        navigate('/institute/dashboard');
                     }
                 } else {
                     setSuccessMessage('');
@@ -272,7 +276,9 @@ const CollegeLogin = () => {
     };
 
     return (
-        <div className="login-page-container">
+
+        <div className="login-page-container blank-page">
+
             <div className="login-card">
                 <div className="logo-container">
                     <img src={logoUrl} alt="Focalyt Logo" className="logo" />
@@ -288,146 +294,160 @@ const CollegeLogin = () => {
                     >
                         Login
                     </span>
-                    <span 
+                    <span
                         className={`tab ${activeTab === 'signup' ? 'active' : ''}`}
-                        onClick={() => window.location.href = `/institute/register${window.location.search}`}
+                        onClick={() => setActiveTab('signup')}
+                    // onClick={() => window.location.href = `/institute/register${window.location.search}`}
+                    // onClick={() => navigate(`/institute/register${window.location.search}`)}
                     >
                         Signup
                     </span>
                 </div>
-
-                <div className="login-content">
-                    <div className="login-method">
-                        <label className="radio-container">
-                            <input
-                                type="radio"
-                                name="loginMethod"
-                                checked={loginMethod === 'password'}
-                                onChange={() => {
-                                    setLoginMethod('password');
-                                    setShowOtpField(false);
-                                }}
-                            />
-                            <span className="radio-label">Password Login</span>
-                        </label>
-                        <label className="radio-container">
-                            <input
-                                type="radio"
-                                name="loginMethod"
-                                checked={loginMethod === 'otp'}
-                                onChange={() => {
-                                    setLoginMethod('otp');
-                                    setShowOtpField(false);
-                                }}
-                            />
-                            <span className="radio-label">OTP Login</span>
-                        </label>
-                    </div>
-
-                    <div className="input-field">
-                        <span className="input-icon">
-                            <i className="fa-regular fa-user"></i>
-                        </span>
-                        <input
-                            type="text"
-                            placeholder="Mobile / Email"
-                            value={userInput}
-                            onChange={(e) => setUserInput(e.target.value)}
-                            disabled={loginMethod === 'otp' && isUserInputDisabled}
-                        />
-                    </div>
-
-                    {loginMethod === 'password' ? (
-                        <div className="input-field">
-                            <span className="input-icon">
-                                <i className="fa-regular fa-lock"></i>
-                            </span>
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                placeholder="Enter your password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                onKeyPress={handleKeyPress}
-                            />
-                            <span className="toggle-password" onClick={togglePassword}>
-                                <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-                            </span>
-                        </div>
-                    ) : (
-                        <div>
-                            {loginMethod === 'otp' && isUserInputDisabled && (
-                                <div className="change-number-container">
-                                    <button
-                                        className="change-number-btn"
-                                        onClick={handleChangeNumber}
-                                    >
-                                        Change Number/Email
-                                    </button>
+                <div className="tab-content">
+                    {activeTab === 'login' && (
+                        <>
+                            <div className="login-content">
+                                <div className="login-method">
+                                    <label className="radio-container">
+                                        <input
+                                            type="radio"
+                                            name="loginMethod"
+                                            checked={loginMethod === 'password'}
+                                            onChange={() => {
+                                                setLoginMethod('password');
+                                                setShowOtpField(false);
+                                            }}
+                                        />
+                                        <span className="radio-label">Password Login</span>
+                                    </label>
+                                    <label className="radio-container">
+                                        <input
+                                            type="radio"
+                                            name="loginMethod"
+                                            checked={loginMethod === 'otp'}
+                                            onChange={() => {
+                                                setLoginMethod('otp');
+                                                setShowOtpField(false);
+                                            }}
+                                        />
+                                        <span className="radio-label">OTP Login</span>
+                                    </label>
                                 </div>
-                            )}
 
-                            {showOtpField && (
                                 <div className="input-field">
                                     <span className="input-icon">
-                                        <i className="fa-regular fa-key"></i>
+                                        <i className="fa-regular fa-user"></i>
                                     </span>
                                     <input
                                         type="text"
-                                        placeholder="Enter OTP"
-                                        maxLength="6"
-                                        value={otp}
-                                        onChange={(e) => setOtp(e.target.value)}
-                                        onKeyPress={handleKeyPress}
+                                        placeholder="Mobile / Email"
+                                        value={userInput}
+                                        onChange={(e) => setUserInput(e.target.value)}
+                                        disabled={loginMethod === 'otp' && isUserInputDisabled}
                                     />
                                 </div>
-                            )}
 
-                            <div className="otp-btn-container">
+                                {loginMethod === 'password' ? (
+                                    <div className="input-field">
+                                        <span className="input-icon">
+                                        <i className="fa-solid fa-lock"></i>
+                                        </span>
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Enter your password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            onKeyPress={handleKeyPress}
+                                        />
+                                        <span className="toggle-password" onClick={togglePassword}>
+                                            <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        {loginMethod === 'otp' && isUserInputDisabled && (
+                                            <div className="change-number-container">
+                                                <button
+                                                    className="change-number-btn"
+                                                    onClick={handleChangeNumber}
+                                                >
+                                                    Change Number/Email
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {showOtpField && (
+                                            <div className="input-field">
+                                                <span className="input-icon">
+                                                    <i className="fa-regular fa-key"></i>
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter OTP"
+                                                    maxLength="6"
+                                                    value={otp}
+                                                    onChange={(e) => setOtp(e.target.value)}
+                                                    onKeyPress={handleKeyPress}
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="otp-btn-container">
+                                            <button
+                                                className="send-otp-btn"
+                                                onClick={sendOtp}
+                                            >
+                                                {showOtpField ? "Resend OTP" : "Send OTP"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {loginMethod === 'password' && (
+                                    <div className="forgot-password">
+                                        <a
+                                            href="#"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                openForgotModal();
+                                            }}
+                                        >
+                                            Forgot Password?
+                                        </a>
+                                    </div>
+                                )}
+
+                                <div className="terms">
+                                    I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
+                                </div>
+
                                 <button
-                                    className="send-otp-btn"
-                                    onClick={sendOtp}
+                                    className="login-btn"
+                                    onClick={handleLogin}
+                                    ref={loginBtnRef}
                                 >
-                                    {showOtpField ? "Resend OTP" : "Send OTP"}
+                                    Login
                                 </button>
+
+                                {errorMessage && (
+                                    <div className="error-message">{errorMessage}</div>
+                                )}
+
+                                {successMessage && (
+                                    <div className="success-message">{successMessage}</div>
+                                )}
                             </div>
-                        </div>
+                        </>
                     )}
-
-                    {loginMethod === 'password' && (
-                        <div className="forgot-password">
-                            <a
-                                href="#"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    openForgotModal();
-                                }}
-                            >
-                                Forgot Password?
-                            </a>
-                        </div>
-                    )}
-
-                    <div className="terms">
-                        I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
-                    </div>
-
-                    <button
-                        className="login-btn"
-                        onClick={handleLogin}
-                        ref={loginBtnRef}
-                    >
-                        Login
-                    </button>
-
-                    {errorMessage && (
-                        <div className="error-message">{errorMessage}</div>
-                    )}
-
-                    {successMessage && (
-                        <div className="success-message">{successMessage}</div>
+                    {activeTab === 'signup' && (
+                        <>
+                            <CollegeRegister embedded={true}/>
+                        </>
                     )}
                 </div>
             </div>
+
+
 
             {/* Forgot Password Modal */}
             {showForgotModal && (
@@ -541,19 +561,20 @@ const CollegeLogin = () => {
                     align-items: center;
                     min-height: 100vh;
                     background-color: #f5f5f5;
-                    background-image: url('/Assets/images/bg.jpg');
+                    // background-image: url('/Assets/images/bg.jpg');
                     background-size: cover;
                     background-position: center;
                 }
                 
                 .login-card {
                     width: 100%;
-                    max-width: 400px;
+                    max-width: 500px;
                     background: white;
                     border-radius: 8px;
                     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
                     padding: 25px;
                     margin: 20px;
+                    transition: all 0.3s ease;
                 }
                 
                 .logo-container {
@@ -659,7 +680,7 @@ const CollegeLogin = () => {
                 .input-icon {
                     position: absolute;
                     left: 15px;
-                    top: 50%;
+                    top: 35%;
                     transform: translateY(-50%);
                     color: #999;
                 }
@@ -667,7 +688,7 @@ const CollegeLogin = () => {
                 .toggle-password {
                     position: absolute;
                     right: 15px;
-                    top: 50%;
+                    top: 35%;
                     transform: translateY(-50%);
                     cursor: pointer;
                     color: #999;

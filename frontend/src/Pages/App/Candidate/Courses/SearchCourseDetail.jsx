@@ -525,7 +525,7 @@ const CourseDetails = () => {
                                   <div key={i} className={`carousel-item ${i === 0 ? 'active' : ''}`}>
                                     <img
                                       className="d-block w-100"
-                                      src={`${bucketUrl}/${photo}`}
+                                      src={`${photo === '' ? '/Assets/public_assets/images/newjoblisting/banner1.jpg' : `${bucketUrl}/${photo}`}`}
                                       alt={`Slide ${i + 1}`}
                                     />
                                   </div>
@@ -533,17 +533,7 @@ const CourseDetails = () => {
                               </div>
                             </>
                           )}
-                          {!course.photos?.length && (
-                            <div className="carousel-inner">
-                              <div className="carousel-item active">
-                                <img
-                                  src="/public_assets/images/newjoblistingbanner2.jpg"
-                                  className="d-block w-100 rounded shadow"
-                                  alt="Default course banner"
-                                />
-                              </div>
-                            </div>
-                          )}
+                          
 
                           {course.photos?.length > 1 && (
                             <>
@@ -1417,7 +1407,7 @@ const CourseDetails = () => {
 
       <div className="modal fade" id="videoModal" tabIndex="-1" role="dialog" aria-labelledby="videoModalTitle" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
+          <div className="modal-content" style={{backgroundColor: 'transparent'}}>
             <button
               type="button"
               className="close"

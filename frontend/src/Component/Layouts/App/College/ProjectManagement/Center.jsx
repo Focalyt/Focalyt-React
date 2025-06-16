@@ -64,17 +64,17 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     }, [formData]);
 
     const filteredCenters = centers.filter(center => {
-  // Check project array safely
- 
+        // Check project array safely
 
-  if (activeCenterTab === 'Active Centers' && center.status !== 'active') return false;
-  if (activeCenterTab === 'Inactive Centers' && center.status !== 'inactive') return false;
 
-  return center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    center.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    center.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    center.location.toLowerCase().includes(searchQuery.toLowerCase());
-});
+        if (activeCenterTab === 'Active Centers' && center.status !== 'active') return false;
+        if (activeCenterTab === 'Inactive Centers' && center.status !== 'inactive') return false;
+
+        return center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            center.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            center.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            center.location.toLowerCase().includes(searchQuery.toLowerCase());
+    });
 
 
 
@@ -256,7 +256,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                     body: JSON.stringify({ projectId: selectedProject._id }),
                 });
 
-                 if (!response.ok) {
+                if (!response.ok) {
                     const err = await response.json();
                     throw new Error(err.message || 'Failed to add center');
                 }
@@ -753,19 +753,20 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
 
                                 <h6 className="mb-3">Current Access</h6>
                                 <ul className="list-group">
-                                    {selectedCenter.access.map((a, index) => (
+                                    {Array.isArray(selectedCenter.access) && selectedCenter.access.map((a, index) => (
                                         <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
                                             <div>
                                                 <strong>{a.name}</strong>
                                             </div>
-                                            <select className="form-select w-auto">
-                                                <option value="Viewer" selected={a.role === 'Viewer'}>Viewer</option>
-                                                <option value="Staff" selected={a.role === 'Staff'}>Staff</option>
-                                                <option value="Manager" selected={a.role === 'Manager'}>Manager</option>
-                                                <option value="Admin" selected={a.role === 'Admin'}>Admin</option>
+                                            <select className="form-select w-auto" defaultValue={a.role}>
+                                                <option value="Viewer">Viewer</option>
+                                                <option value="Staff">Staff</option>
+                                                <option value="Manager">Manager</option>
+                                                <option value="Admin">Admin</option>
                                             </select>
                                         </li>
                                     ))}
+
                                 </ul>
                             </div>
                             <div className="modal-footer">

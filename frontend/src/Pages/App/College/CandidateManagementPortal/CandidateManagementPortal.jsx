@@ -238,7 +238,7 @@ const CandidateManagementPortal = () => {
 
 
         {/* Project Component with filtered data */}
-       <Project selectedVertical={selectedVerticalForProjects} onBackToVerticals={handleBackToVerticals} />
+        <Project selectedVertical={selectedVerticalForProjects} onBackToVerticals={handleBackToVerticals} />
 
       </div>
     );
@@ -444,7 +444,7 @@ const CandidateManagementPortal = () => {
 
                 <h6 className="mb-3">Current Access</h6>
                 <ul className="list-group">
-                  {selectedVertical.access.map((a, index) => (
+                  {/* {selectedVertical.access.map((a, index) => (
                     <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
                       <div>
                         <strong>{a.name}</strong>
@@ -456,7 +456,23 @@ const CandidateManagementPortal = () => {
                         <option value="Manager" selected={a.role === 'Manager'}>Manager</option>
                       </select>
                     </li>
-                  ))}
+                  ))} */}
+
+                  {Array.isArray(selectedVertical.access) &&
+                    selectedVertical.access.map((a, index) => (
+                      <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong>{a.name}</strong>
+                        </div>
+                        <select className="form-select w-auto" defaultValue={a.role}>
+                          <option value="Viewer">Viewer</option>
+                          <option value="Contributor">Contributor</option>
+                          <option value="Content Manager">Content Manager</option>
+                          <option value="Manager">Manager</option>
+                        </select>
+                      </li>
+                    ))}
+
                 </ul>
               </div>
               <div className="modal-footer">
