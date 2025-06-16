@@ -16,10 +16,13 @@ const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
 const candidateRoutes = require("./candidate");
+const leadAssignmentRuleRoutes = require("./leadAssingmentRule");
+const batchRoutes = require("./batches");
 const statusRoutes = require("./status");
 const skillTestRoutes = require("./skillTest");
 const careerObjectiveRoutes = require("../college/careerObjective");
 const todoRoutes = require("./todo");
+const userRoutes = require("./users");
 const smsRoutes = require("./sms");
 const roleManagementRoutes = require("./roleManagement");
 const coverLetterRoutes = require("./coverLetter");
@@ -28,6 +31,9 @@ const coursesRoutes = require("./courses");
 const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
+router.use("/leadAssignmentRule", isCollege, leadAssignmentRuleRoutes);
+router.use("/users", isCollege, userRoutes);
+router.use("/batches", isCollege, batchRoutes);
 router.use("/sms", isCollege, smsRoutes);
 router.use("/roles", isCollege, roleManagementRoutes);
 router.use("/candidate", isCollege, candidateRoutes);
@@ -92,24 +98,24 @@ const upload = multer({ storage }).single('file');
 
 // Utility function to check and convert string to ObjectId
 const validateAndConvertId = (id) => {
-  try {
-    // If it's already an ObjectId, return it
-    if (id instanceof mongoose.Types.ObjectId) {
-      return id;
-    }
-    
-    // If it's a string, check if it's a valid ObjectId
-    if (typeof id === 'string') {
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new Error('Invalid ObjectId format');
-      }
-      return new mongoose.Types.ObjectId(id);
-    }
-    
-    throw new Error('Invalid ID type');
-  } catch (error) {
-    throw new Error(`ID validation failed: ${error.message}`);
-  }
+	try {
+		// If it's already an ObjectId, return it
+		if (id instanceof mongoose.Types.ObjectId) {
+			return id;
+		}
+
+		// If it's a string, check if it's a valid ObjectId
+		if (typeof id === 'string') {
+			if (!mongoose.Types.ObjectId.isValid(id)) {
+				throw new Error('Invalid ObjectId format');
+			}
+			return new mongoose.Types.ObjectId(id);
+		}
+
+		throw new Error('Invalid ID type');
+	} catch (error) {
+		throw new Error(`ID validation failed: ${error.message}`);
+	}
 };
 
 // Function to update followups at 11:55 PM IST
@@ -175,7 +181,6 @@ router.route("/login")
 
 	.post(async (req, res) => {
 		try {
-			console.log('body data', req.body)
 
 			const { userInput, password } = req.body;
 
@@ -194,7 +199,6 @@ router.route("/login")
 				query.$or.push({ mobile: mobileNumber, role: 2 });
 			}
 
-			console.log('query', query)
 
 			const user = await User.findOne(query);
 
@@ -213,7 +217,6 @@ router.route("/login")
 			const college = await College.findOne({
 				_concernPerson: { $elemMatch: { _id: userId } }
 			}, "name _concernPerson");
-			console.log('college', college)
 
 			if (!college || college === null) {
 				console.log('Missing College!');
@@ -241,7 +244,6 @@ router.route("/login")
 router.route("/register")
 	.post(async (req, res) => {
 		try {
-			console.log('recieved data', req.body)
 			const { collegeName, concernedPerson, email, mobile, type, password, confirmPassword, location } = req.body;
 
 			const { value, error } = await CollegeValidators.register(req.body)
@@ -273,7 +275,10 @@ router.route("/register")
 						email,
 						mobile,
 						role: 2,
-						password
+						password,
+						permissions: {
+							permission_type: 'Admin',
+						}
 					});
 					if (!user) {
 						return res.send({
@@ -305,15 +310,14 @@ router.route("/register")
 			return res.send({ status: false, error: err.message });
 		}
 	});
-router.route("/appliedCandidates").get(isCollege,async (req, res) => {
+router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 	try {
-		const user = req.user;	
+		const user = req.user;
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
-		console.log('college', college);
-		
+
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;
@@ -351,14 +355,12 @@ router.route("/appliedCandidates").get(isCollege,async (req, res) => {
 			.skip(skip)
 			.limit(limit);
 
-		console.log('appliedCourses', appliedCourses);
 
 		const filteredAppliedCourses = appliedCourses.filter(doc => {
 			// _course must be populated!
 			return doc._course && String(doc._course.college) === String(college._id);
 		});
 
-		console.log('filteredAppliedCourses', filteredAppliedCourses);
 		const result = filteredAppliedCourses.map(doc => {
 			let selectedSubstatus = null;
 
@@ -497,7 +499,6 @@ router.route("/appliedCandidates").get(isCollege,async (req, res) => {
 
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
-	console.log('User', req.user)
 	let college = await College.findOne({ _concernPerson: { $elemMatch: { _id: req.user._id } }, status: true })
 
 	let totalShortlisted
@@ -1163,7 +1164,7 @@ router.route("/myprofile")
 				{ _id: req.session.user.collegeId },
 				updatedFields,
 				{ new: true }
-			).populate({ path: '_concernPerson' }); console.log(collegeUpdate)
+			).populate({ path: '_concernPerson' });
 
 			if (!collegeUpdate) throw req.ykError("Candidate not updated!");
 			req.flash("success", "Company updated successfully!");
@@ -1526,7 +1527,6 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 						qual['collegePlace'] = college.place
 
 						addCandidate['qualifications'] = qual
-						console.log(addCandidate)
 						const candidate = await Candidate.create(addCandidate)
 						if (!candidate) {
 							console.log(addCandidate, "candidate not created", "row number is =>>>>>>>", recordCount)
@@ -1689,7 +1689,6 @@ router
 			const email = req.body.email;
 			const name = req.body.name;
 			var id = req.session.user._id;
-			console.log(email, name, id);
 
 			var userData = await User.findOne({ email: email });
 			if (!userData)
@@ -1935,7 +1934,6 @@ router.route("/single").get(auth1, function (req, res) {
 router.post("/courses/add", async (req, res) => {
 	try {
 		const body = req.body;
-		console.log("Incoming course data:", req.body);
 
 		const newCourse = new Course(req.body);
 		await newCourse.save();
@@ -1965,7 +1963,6 @@ router.get('/getVerticals', [isCollege], async (req, res) => {
 
 		const verticals = await Vertical.find().sort({ createdAt: -1 });
 
-		console.log(verticals)
 
 		return res.json({
 			status: true,
@@ -1985,8 +1982,7 @@ router.post('/addVertical', [isCollege], async (req, res) => {
 	try {
 		const { formData } = req.body;
 		const user = req.user;
-		console.log("📥 Incoming vertical data:", formData);
-		console.log("📥 Incoming user data:", user);
+
 
 		// Default value handling
 		const newVertical = new Vertical({
@@ -2018,8 +2014,6 @@ router.put('/editVertical/:id', [isCollege], async (req, res) => {
 		const verticalId = req.params.id;
 		const { formData } = req.body;
 
-		console.log("📝 Editing vertical:", verticalId);
-		console.log("📦 Updated data:", formData);
 
 		const updated = await Vertical.findByIdAndUpdate(
 			verticalId,
@@ -2057,7 +2051,7 @@ router.delete('/deleteVertical/:id', [isCollege], async (req, res) => {
 	try {
 		const verticalId = req.params.id;
 
-		console.log("🗑 Deleting vertical:", verticalId);
+
 
 		const deleted = await Vertical.findByIdAndDelete(verticalId);
 
@@ -2194,7 +2188,6 @@ router.get('/list_all_projects', async (req, res) => {
 
 
 		const projects = await Project.find({ status: 'active' }).sort({ createdAt: -1 });
-		console.log('projects', projects)
 		res.json({ success: true, data: projects });
 	} catch (error) {
 		console.error('Error fetching projects:', error);
@@ -2318,12 +2311,10 @@ router.get('/list-centers', async (req, res) => {
 				return res.status(400).json({ success: false, message: 'Invalid Project ID' });
 			}
 			const centers = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
-			console.log('centers', centers)
 			return res.json({ success: true, data: centers });
 		}
 		else {
 			const centers = await Center.find({ status: 'active' }).sort({ createdAt: -1 });
-			console.log('centers', centers)
 			return res.json({ success: true, data: centers });
 		}
 
@@ -2339,7 +2330,6 @@ router.get('/list_all_centers', async (req, res) => {
 
 
 		const centers = await Center.find({ status: 'active' }).sort({ createdAt: -1 });
-		console.log('centers', centers)
 
 		res.json({ success: true, data: centers });
 	} catch (error) {
@@ -2370,7 +2360,6 @@ router.delete('/center_delete/:id', async (req, res) => {
 //lead status change
 router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 	try {
-		console.log('api hitting')
 		const { id } = req.params;
 		const {
 			_leadStatus,
@@ -2463,7 +2452,6 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 router.get('/all_courses', async (req, res) => {
 	try {
 		const courses = await Courses.find({ status: true }).sort({ createdAt: -1 });
-		console.log('centers', courses)
 
 		res.json({ success: true, data: courses });
 	} catch (error) {
@@ -2480,15 +2468,12 @@ router.get('/all_courses_centerwise', async (req, res) => {
 			project: projectId
 
 		}
-		console.log('req.params', req.params)
 		if (!centerId || !projectId) {
 			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
 
 		}
 		const courses = await Courses.find(filter).sort({ createdAt: -1 });
 		// Update the 'status' field based on the boolean value
-
-		console.log('centers', courses)
 
 		res.json({ success: true, data: courses });
 	} catch (error) {
@@ -2499,7 +2484,7 @@ router.get('/all_courses_centerwise', async (req, res) => {
 
 //Batch APi
 
-router.post('/add_batch', async (req, res) => {
+router.post('/add_batch', isCollege, async (req, res) => {
 	try {
 		// Destructure the data sent in the request body
 		const {
@@ -2514,8 +2499,13 @@ router.post('/add_batch', async (req, res) => {
 			instructor,
 			courseId,
 			centerId,
-			createdBy
+
 		} = req.body;
+
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
 
 		// Validation: Ensure all required fields are provided
 		if (!name || !startDate || !endDate || !zeroPeriodStartDate || !zeroPeriodEndDate || !courseId || !centerId) {
@@ -2535,7 +2525,8 @@ router.post('/add_batch', async (req, res) => {
 			status,  // Default to active if not provided
 			courseId,
 			centerId,
-			createdBy
+			createdBy: user._id,
+			college: college._id
 		});
 
 		// Save the batch to the database
@@ -2585,62 +2576,61 @@ router.get('/get_batches', async (req, res) => {
 //Applied data update api
 
 router.put('/update/:id', isCollege, async (req, res) => {
-  try {
-    const user = req.user;
-    const { id } = req.params;
-    const updateData = req.body;
+	try {
+		const user = req.user;
+		const { id } = req.params;
+		const updateData = req.body;
 
-    const appliedCourse = await AppliedCourses.findById(id);
-    if (!appliedCourse) {
-      return res.status(404).json({ success: false, message: "Applied course not found" });
-    }
+		const appliedCourse = await AppliedCourses.findById(id);
+		if (!appliedCourse) {
+			return res.status(404).json({ success: false, message: "Applied course not found" });
+		}
 
-    // Update fields
-    Object.keys(updateData).forEach(key => {
-      appliedCourse[key] = updateData[key];
-    });
+		// Update fields
+		Object.keys(updateData).forEach(key => {
+			appliedCourse[key] = updateData[key];
+		});
 
-    // Add log for Move to KYC
-    if (typeof updateData.kycStage !== 'undefined' && updateData.kycStage === true) {
-      appliedCourse.logs.push({
-        user: user._id,
-        timestamp: new Date(),
-        action: 'Moved to KYC',
-        remarks: 'Profile moved to KYC by College'
-      });
-    }
+		// Add log for Move to KYC
+		if (typeof updateData.kycStage !== 'undefined' && updateData.kycStage === true) {
+			appliedCourse.logs.push({
+				user: user._id,
+				timestamp: new Date(),
+				action: 'Moved to KYC',
+				remarks: 'Profile moved to KYC by College'
+			});
+		}
 
-    // Add log for Move to Admission List
-    if (typeof updateData.admissionDone !== 'undefined' && updateData.admissionDone === true) {
-      appliedCourse.logs.push({
-        user: user._id,
-        timestamp: new Date(),
-        action: 'Moved to Admission List',
-        remarks: 'Profile moved to Admission List by College'
-      });
-    }
+		// Add log for Move to Admission List
+		if (typeof updateData.admissionDone !== 'undefined' && updateData.admissionDone === true) {
+			appliedCourse.logs.push({
+				user: user._id,
+				timestamp: new Date(),
+				action: 'Moved to Admission List',
+				remarks: 'Profile moved to Admission List by College'
+			});
+		}
 
-    await appliedCourse.save();
-    return res.json({ success: true, message: "Profile updated successfully" });
-  } catch (err) {
-    console.error("Error updating profile:", err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
+		await appliedCourse.save();
+		return res.json({ success: true, message: "Profile updated successfully" });
+	} catch (err) {
+		console.error("Error updating profile:", err);
+		return res.status(500).json({ success: false, message: err.message });
+	}
 });
 
 //KYC Leads
 
 router.route("/kycCandidates").get(isCollege, async (req, res) => {
 	try {
-		const user = req.user;	
+		const user = req.user;
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
-		console.log('college', college);
-		
+
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
-		const skip = (page - 1) * limit;	
+		const skip = (page - 1) * limit;
 
 
 
@@ -2675,19 +2665,18 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			.skip(skip)
 			.limit(limit);
 
-		
+
 
 		const filteredAppliedCourses = appliedCourses.filter(doc => {
 			// _course must be populated!
 			return doc._course && String(doc._course.college) === String(college._id);
 		});
-		console.log('filteredAppliedCourses', filteredAppliedCourses);
 
 		const totalCount = filteredAppliedCourses.length;
-		const pendingKycCount = filteredAppliedCourses.filter(doc => 
+		const pendingKycCount = filteredAppliedCourses.filter(doc =>
 			doc.kycStage === true && doc.kyc === false
 		).length;
-		const doneKycCount = totalCount-pendingKycCount
+		const doneKycCount = totalCount - pendingKycCount
 
 
 
@@ -2804,7 +2793,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			};
 		});
 
-		
+
 
 		res.status(200).json({
 			success: true,
@@ -2833,7 +2822,6 @@ router.put("/update_kyc/:id", async (req, res) => {
 		let { id } = req.params;
 		let { doc, kycStatus } = req.body;
 		let docsId = doc;
-		console.log('doc', doc)
 		if (!docsId) {
 			return res.status(400).json({ error: "docs id not found." });
 		}
@@ -2863,7 +2851,6 @@ router.put("/update_kyc/:id", async (req, res) => {
 		});
 
 		await appliedCourse.save();
-		console.log('appliedCourse', appliedCourse)
 
 		return res.status(200).json({
 			status: true,
@@ -2880,115 +2867,113 @@ router.put("/update_kyc/:id", async (req, res) => {
 
 //doccumnet upload
 router.put("/upload_docs/:id", isCollege, async (req, res) => {
-  try {
-    const user = req.user;	
-    const college = await College.findOne({
-      '_concernPerson._id': user._id
-    });
-    
-    let { id } = req.params;
-    let { doc } = req.body;
-    let docsId = doc;
-    console.log('doc', doc);
-    
-    if (!docsId) {
-      return res.status(400).json({ error: "docs id not found." });
-    }
-    
-    if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
-      docsId = new mongoose.Types.ObjectId(docsId);
-    }
+	try {
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
 
-    if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
-      id = new mongoose.Types.ObjectId(id);
-    }
+		let { id } = req.params;
+		let { doc } = req.body;
+		let docsId = doc;
 
-    const appliedCourse = await AppliedCourses.findOne({ _id: id }).populate({
-      path: '_course',
-      select: 'docsRequired'
-    });
+		if (!docsId) {
+			return res.status(400).json({ error: "docs id not found." });
+		}
 
-    if (!appliedCourse) {
-      return res.status(400).json({ error: "You have not applied for this course." });
-    }
+		if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
+			docsId = new mongoose.Types.ObjectId(docsId);
+		}
 
-    // Find document name from course's docsRequired
-    const docName = appliedCourse._course?.docsRequired?.find(d => d._id.toString() === docsId.toString())?.name || 'Unknown Document';
+		if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+			id = new mongoose.Types.ObjectId(id);
+		}
 
-    const files = req.files?.file;
-    if (!files) {
-      return res.status(400).send({ status: false, message: "No files uploaded" });
-    }
+		const appliedCourse = await AppliedCourses.findOne({ _id: id }).populate({
+			path: '_course',
+			select: 'docsRequired'
+		});
 
-    const filesArray = Array.isArray(files) ? files : [files];
-    const uploadedFiles = [];
-    const uploadPromises = [];
+		if (!appliedCourse) {
+			return res.status(400).json({ error: "You have not applied for this course." });
+		}
 
-    filesArray.forEach((item) => {
-      const { name, mimetype } = item;
-      const ext = name?.split('.').pop().toLowerCase();
+		// Find document name from course's docsRequired
+		const docName = appliedCourse._course?.docsRequired?.find(d => d._id.toString() === docsId.toString())?.name || 'Unknown Document';
 
-      if (!allowedExtensions.includes(ext)) {
-        throw new Error(`File type not supported: ${ext}`);
-      }
+		const files = req.files?.file;
+		if (!files) {
+			return res.status(400).send({ status: false, message: "No files uploaded" });
+		}
 
-      let fileType = "document";
-      if (allowedImageExtensions.includes(ext)) {
-        fileType = "image";
-      } else if (allowedVideoExtensions.includes(ext)) {
-        fileType = "video";
-      }
+		const filesArray = Array.isArray(files) ? files : [files];
+		const uploadedFiles = [];
+		const uploadPromises = [];
 
-      const key = `Documents for course/${appliedCourse._course}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
-      const params = {
-        Bucket: bucketName,
-        Key: key,
-        Body: item.data,
-        ContentType: mimetype,
-      };
+		filesArray.forEach((item) => {
+			const { name, mimetype } = item;
+			const ext = name?.split('.').pop().toLowerCase();
 
-      uploadPromises.push(
-        s3.upload(params).promise().then((uploadResult) => {
-          uploadedFiles.push({
-            fileURL: uploadResult.Location,
-            fileType,
-          });
-        })
-      );
-    });
+			if (!allowedExtensions.includes(ext)) {
+				throw new Error(`File type not supported: ${ext}`);
+			}
 
-    await Promise.all(uploadPromises);
-    const fileUrl = uploadedFiles[0].fileURL;
+			let fileType = "document";
+			if (allowedImageExtensions.includes(ext)) {
+				fileType = "image";
+			} else if (allowedVideoExtensions.includes(ext)) {
+				fileType = "video";
+			}
 
-    // Add document to uploadedDocs array
-    appliedCourse.uploadedDocs.push({
-      docsId: new mongoose.Types.ObjectId(docsId),
-      fileUrl: fileUrl,
-      status: "Pending",
-      uploadedAt: new Date()
-    });
+			const key = `Documents for course/${appliedCourse._course}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
+			const params = {
+				Bucket: bucketName,
+				Key: key,
+				Body: item.data,
+				ContentType: mimetype,
+			};
 
-    // Add log for document upload with document name
-    appliedCourse.logs.push({
-      user: user._id,
-      timestamp: new Date(),
-      action: 'Document Uploaded',
-      remarks: `${docName} uploaded for verification`
-    });
+			uploadPromises.push(
+				s3.upload(params).promise().then((uploadResult) => {
+					uploadedFiles.push({
+						fileURL: uploadResult.Location,
+						fileType,
+					});
+				})
+			);
+		});
 
-    await appliedCourse.save();
-    console.log('appliedCourse', appliedCourse);
+		await Promise.all(uploadPromises);
+		const fileUrl = uploadedFiles[0].fileURL;
 
-    return res.status(200).json({
-      status: true,
-      message: "Document uploaded successfully",
-      data: appliedCourse
-    });
+		// Add document to uploadedDocs array
+		appliedCourse.uploadedDocs.push({
+			docsId: new mongoose.Types.ObjectId(docsId),
+			fileUrl: fileUrl,
+			status: "Pending",
+			uploadedAt: new Date()
+		});
 
-  } catch (err) {
-    console.log(err);
-    return res.status(500).send({ status: false, message: err.message });
-  }
+		// Add log for document upload with document name
+		appliedCourse.logs.push({
+			user: user._id,
+			timestamp: new Date(),
+			action: 'Document Uploaded',
+			remarks: `${docName} uploaded for verification`
+		});
+
+		await appliedCourse.save();
+
+		return res.status(200).json({
+			status: true,
+			message: "Document uploaded successfully",
+			data: appliedCourse
+		});
+
+	} catch (err) {
+		console.log(err);
+		return res.status(500).send({ status: false, message: err.message });
+	}
 });
 
 
@@ -3276,12 +3261,11 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 //admission list
 router.route("/admission-list").get(isCollege, async (req, res) => {
 	try {
-		const user = req.user;	
+		const user = req.user;
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
-		console.log('college', college);
-		
+
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;
@@ -3322,10 +3306,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		});
 
 		const totalCount = filteredAppliedCourses.length
-		const pendingKycCount = filteredAppliedCourses.filter(doc => 
+		const pendingKycCount = filteredAppliedCourses.filter(doc =>
 			doc.kycStage === true && doc.kyc === false
 		).length;
-		const doneKycCount = totalCount-pendingKycCount
+		const doneKycCount = totalCount - pendingKycCount
 
 
 		const result = filteredAppliedCourses.map(doc => {
@@ -3441,8 +3425,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			};
 		});
 
-		console.log('result', result)
-		
+
 
 		res.status(200).json({
 			success: true,
@@ -3468,15 +3451,376 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 
 
 
+// GET API for users with pagination and filtering
+// router.get('/users', isCollege, async (req, res) => {
+//     try {
+//         const user = req.user;
 
+//         // Find colleges where user is concern person
+//         const colleges = await College.find({
+//             '_concernPerson._id': user._id
+//         });
 
+//         // Extract all concern person IDs
+//         const concernPersonIds = colleges.flatMap(college => 
+//             college._concernPerson.map(cp => cp._id)
+//         );
 
+//         // Get actual users
+//         const users = await User.find({
+//             _id: { $in: concernPersonIds }
+//         });
 
+//         res.json({
+//             success: true,
+//             data: { users }
+//         });
 
+//     } catch (err) {
+//         console.error('Error in GET /users:', err);
+//         res.status(500).json({
+//             success: false,
+//             message: "Server Error"
+//         });
+//     }
+// });
 
+router.get('/users', isCollege, async (req, res) => {
+	try {
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 10;
+		const user = req.user;
 
+		const query = { '_concernPerson._id': user._id };
+		const totalCount = await College.countDocuments(query);
 
+		const colleges = await College.find(query)
+			.populate({
+				path: '_concernPerson._id',
+				select: 'name email mobile designation permissions reporting_managers createdAt status'
+			})
+			.skip((page - 1) * limit)
+			.limit(limit)
+			.sort({ createdAt: -1 });
 
+			// Helper to resolve verify permissions parent entities - Add this near other helper functions
+const resolveParentEntities = async (parentEntities) => {
+    const resolved = [];
+    for (const parentEntity of parentEntities) {
+        try {
+            const entities = await getEntityNames([parentEntity.entity_id], parentEntity.entity_type);
+            if (entities.length > 0) {
+                resolved.push({
+                    id: parentEntity.entity_id,
+                    name: entities[0].name,
+                    type: parentEntity.entity_type,
+                    originalName: parentEntity.entity_name
+                });
+            }
+        } catch (error) {
+            console.error('Error resolving parent entity:', parentEntity, error);
+        }
+    }
+    return resolved;
+};
 
+		// Helper function to get entity names with correct model names
+		const getEntityNames = async (entityIds, entityType) => {
+			try {
+				let Model;
+				switch (entityType) {
+					case 'VERTICAL':
+						Model = Vertical;
+						break;
+					case 'PROJECT':
+						Model = Project;
+						break;
+					case 'CENTER':
+						Model = Center;
+						break;
+					case 'COURSE':
+						Model = Courses; // ← आपका correct model name
+						break;
+					case 'BATCH':
+						Model = Batch;
+						break;
+					default:
+						console.log(`Unknown entity type: ${entityType}`);
+						return [];
+				}
+
+				const entities = await Model.find({
+					_id: { $in: entityIds }
+				}).select('name').lean();
+
+				return entities.map(entity => ({
+					id: entity._id.toString(),
+					name: entity.name
+				}));
+			} catch (error) {
+				console.error(`Error fetching ${entityType}:`, error);
+				return [];
+			}
+		};
+
+		// Helper to resolve entity_names format (like "CENTER_id")
+		const resolveEntityNames = async (entityKeys) => {
+			console.log('entityKeys', entityKeys); // Debug log
+			const resolved = [];
+
+			for (const key of entityKeys) {
+				try {
+					const [type, id] = key.split('_');
+					console.log(`Resolving: ${type} with ID: ${id}`); // Debug log
+
+					const entities = await getEntityNames([id], type);
+					if (entities.length > 0) {
+						resolved.push({
+							id: id,
+							name: entities[0].name,
+							type: type
+						});
+						console.log(`Resolved: ${entities[0].name} (${type})`); // Debug log
+					} else {
+						console.log(`No entity found for ${type}_${id}`); // Debug log
+					}
+				} catch (error) {
+					console.error('Error resolving entity:', key, error);
+				}
+			}
+			return resolved;
+		};
+
+		// Process users (rest of the code remains same)
+		const usersWithSimplifiedAccess = await Promise.all(
+			colleges.flatMap(college =>
+				college._concernPerson.map(async (concernPerson) => {
+					const userData = concernPerson._id;
+					const permissions = userData.permissions || {};
+
+					// 1. VIEW PERMISSIONS
+					let viewPermissions = {
+						type: permissions.view_permissions?.global ? 'Global' : 'Specific',
+						global: permissions.view_permissions?.global || false,
+						entities: {
+							verticals: [],
+							projects: [],
+							centers: [],
+							courses: [],
+							batches: []
+						},
+						summary: { verticals: 0, projects: 0, centers: 0, courses: 0, batches: 0 }
+					};
+
+					if (!permissions.view_permissions?.global && permissions.view_permissions?.hierarchical_selection) {
+						const hs = permissions.view_permissions.hierarchical_selection;
+
+						if (hs.selected_verticals?.length > 0) {
+							viewPermissions.entities.verticals = await getEntityNames(hs.selected_verticals, 'VERTICAL');
+							viewPermissions.summary.verticals = viewPermissions.entities.verticals.length;
+						}
+						if (hs.selected_projects?.length > 0) {
+							viewPermissions.entities.projects = await getEntityNames(hs.selected_projects, 'PROJECT');
+							viewPermissions.summary.projects = viewPermissions.entities.projects.length;
+						}
+						if (hs.selected_centers?.length > 0) {
+							viewPermissions.entities.centers = await getEntityNames(hs.selected_centers, 'CENTER');
+							viewPermissions.summary.centers = viewPermissions.entities.centers.length;
+						}
+						if (hs.selected_courses?.length > 0) {
+							viewPermissions.entities.courses = await getEntityNames(hs.selected_courses, 'COURSE');
+							viewPermissions.summary.courses = viewPermissions.entities.courses.length;
+						}
+						if (hs.selected_batches?.length > 0) {
+							viewPermissions.entities.batches = await getEntityNames(hs.selected_batches, 'BATCH');
+							viewPermissions.summary.batches = viewPermissions.entities.batches.length;
+						}
+					}
+
+					// 2. ADD PERMISSIONS
+					let addPermissions = {
+						type: permissions.add_permissions?.global ? 'Global' : 'Specific',
+						global: permissions.add_permissions?.global || false,
+						permissions: [],
+						count: 0
+					};
+
+					if (!permissions.add_permissions?.global && permissions.add_permissions?.specific_permissions) {
+						for (const perm of permissions.add_permissions.specific_permissions) {
+							let entities = [];
+							if (perm.selected_entities?.length > 0) {
+								entities = await getEntityNames(perm.selected_entities, perm.permission_level);
+							}
+
+							addPermissions.permissions.push({
+								level: perm.permission_level,
+								entities: entities,
+								canAddTypes: perm.can_add_types || [],
+								summary: `Can add ${(perm.can_add_types || []).join(', ')} in ${entities.length} ${perm.permission_level?.toLowerCase()}(s)`
+							});
+						}
+						addPermissions.count = addPermissions.permissions.length;
+					}
+
+					// 3. EDIT PERMISSIONS
+					let editPermissions = {
+						type: permissions.edit_permissions?.global ? 'Global' : 'Specific',
+						global: permissions.edit_permissions?.global || false,
+						permissions: [],
+						count: 0
+					};
+
+					if (!permissions.edit_permissions?.global && permissions.edit_permissions?.specific_permissions) {
+						for (const perm of permissions.edit_permissions.specific_permissions) {
+							let entities = [];
+							let summary = '';
+
+							if (perm.edit_type === 'specific_entity_level') {
+								summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels`;
+							} else if (perm.edit_type === 'specific_entity_with_children') {
+								summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels + children`;
+							} else if (perm.entity_names?.length > 0) {
+								entities = await resolveEntityNames(perm.entity_names);
+								summary = `Can edit specific entities: ${entities.map(e => e.name).join(', ')}`;
+							}
+
+							editPermissions.permissions.push({
+								editType: perm.edit_type,
+								levels: perm.permission_levels || [],
+								entities: entities,
+								withChildren: perm.with_child_levels || false,
+								summary: summary
+							});
+						}
+						editPermissions.count = editPermissions.permissions.length;
+					}
+
+					// 4. VERIFY PERMISSIONS - Add this after editPermissions
+					let verifyPermissions = {
+						type: permissions.verify_permissions?.type || 'Not set',
+						global: permissions.verify_permissions?.global || false,
+						permissions: [],
+						count: 0,
+						summary: 'No verify permissions set'
+					};
+
+					if (permissions.verify_permissions?.type) {
+						if (permissions.verify_permissions.type === 'global') {
+							verifyPermissions.summary = 'Can verify any content anywhere in the system';
+							verifyPermissions.count = 1;
+						}
+						else if (permissions.verify_permissions.type === 'entity_children') {
+							// Specific Entity's Children
+							if (permissions.verify_permissions.parent_entities?.length > 0) {
+								const parentEntities = await resolveParentEntities(permissions.verify_permissions.parent_entities);
+								verifyPermissions.permissions = [{
+									type: 'entity_children',
+									parentEntities: parentEntities,
+									summary: `Can verify all children of: ${parentEntities.map(e => `${e.name} (${e.type})`).join(', ')}`
+								}];
+								verifyPermissions.count = parentEntities.length;
+								verifyPermissions.summary = `Can verify children of ${parentEntities.length} parent entities`;
+							}
+						}
+						else if (permissions.verify_permissions.type === 'specific_levels_children') {
+							// Specific Entity Levels' Children
+							if (permissions.verify_permissions.selected_levels?.length > 0) {
+								const selectedLevels = permissions.verify_permissions.selected_levels;
+								verifyPermissions.permissions = [{
+									type: 'levels_children',
+									selectedLevels: selectedLevels,
+									summary: `Can verify children of entities at: ${selectedLevels.join(', ')} levels`
+								}];
+								verifyPermissions.count = selectedLevels.length;
+								verifyPermissions.summary = `Can verify children at ${selectedLevels.length} entity levels`;
+							}
+						}
+					}
+
+					// 4. LEAD PERMISSIONS
+					const leadPermissions = {
+						enabled: Object.values(permissions.lead_permissions || {}).filter(Boolean).length,
+						details: permissions.lead_permissions || {}
+					};
+
+					return {
+						_id: userData._id,
+						name: userData.name,
+						email: userData.email,
+						mobile: userData.mobile,
+						designation: userData.designation,
+						status: userData.status,
+						createdAt: userData.createdAt,
+						defaultAdmin: concernPerson.defaultAdmin,
+						college: {
+							_id: college._id,
+							name: college.name,
+							type: college.type
+						},
+						accessSummary: {
+							permissionType: permissions.permission_type || 'Not set',
+							viewPermissions,
+							addPermissions,
+							editPermissions,
+							leadPermissions,
+							verifyPermissions,
+							reportingManagers: userData.reporting_managers?.length || 0
+						}
+					};
+				})
+			)
+		);
+
+		res.json({
+			success: true,
+			data: {
+				users: usersWithSimplifiedAccess,
+				pagination: {
+					currentPage: page,
+					totalPages: Math.ceil(totalCount / limit),
+					totalUsers: totalCount,
+					limit
+				}
+			}
+		});
+
+	} catch (err) {
+		console.error('Error in GET /users:', err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
+
+router.post('/add-user', isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const { name, email, mobile, designation, reporting_managers, permissions } = req.body;
+
+		const newUser = new User({
+			name,
+			email,
+			mobile,
+			designation,
+			reporting_managers,
+			permissions
+		});
+
+		await newUser.save();
+
+		res.json({
+			success: true,
+			message: 'User added successfully',
+			data: newUser
+		});
+	} catch (err) {	
+		console.error('Error in POST /add-user:', err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
 
 module.exports = router;

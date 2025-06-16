@@ -50,7 +50,6 @@ router.post('/meta/track-conversion', [isCandidate], async (req, res) => {
 
         // 🔍 Find candidate
         const candidate = await CandidateProfile.findOne({ mobile }).lean();
-        console.log('candidate', candidate)
         if (!candidate) {
             return res.status(404).json({ status: false, message: "Candidate not found" });
         }

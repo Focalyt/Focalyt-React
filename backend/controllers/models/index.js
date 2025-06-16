@@ -80,4 +80,5 @@ module.exports.Roles = require("./roleManagement");
 module.exports.UserActivityLog = require("./userActivityLog");
 module.exports.Status = require("./status");
 module.exports.ApprovalRequest = require("./approval");
+module.exports.LeadAssignmentRule = require("./leadAssignmentRule");
 // module.exports.Manager = required("");

@@ -878,9 +878,7 @@ router.route("/course/:courseId/apply")
 			// ✅ Create CandidateProfile
 			const candidate = await Candidate.create(candidateData);
 
-			console.log('courseId' , typeof courseId)
 			console.log('selectedCenter' , typeof selectedCenter)
-			console.log('userId' , typeof userId)
 			// ✅ Insert AppliedCourses Record
 			const appliedCourseEntry = await AppliedCourses.create({
 				_candidate: candidate._id,

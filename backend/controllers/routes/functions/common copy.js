@@ -796,7 +796,6 @@ module.exports.educationCoursesList = async (req, res) => {
   try {
 
     const qualificationId = req.params.qualificationId; // or req.body based on your use case
-    console.log("Qualification ID:", qualificationId);
     if (!qualificationId) {
       return res.status(400).json({
         status: false,
@@ -833,7 +832,6 @@ module.exports.courseSpecializationsList = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    console.log('courseId', courseId)
 
     if (!courseId) {
       return res.status(400).json({

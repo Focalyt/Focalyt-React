@@ -108,7 +108,9 @@ module.exports.isCollege = async (req, res, next) => {
       if (!token) throw error;
       const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
       
-      user = await User.findById(decoded.id);     
+      user = await User.findById(decoded.id);
+      const college = await College.findOne({'_concernPerson._id': user._id})
+      user.college = college
 
       req.user = user;
     if (!user || user.role !== 2) throw error;
@@ -120,6 +122,26 @@ module.exports.isCollege = async (req, res, next) => {
     req.flash("error", err.message);
     return res.redirect("/college/login");
   }
+};
+
+const checkPermission = (permission) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    if (!hasPermission(req.user, permission)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions'
+      });
+    }
+
+    next();
+  };
 };
 
 module.exports.isCompany = async (req, res, next) => {
