@@ -821,7 +821,7 @@ router.route("/course/:courseId/apply")
 		}
 	});
 
-	router.route("/addleaddandcourseapply")
+router.route("/addleaddandcourseapply")
 	.post(isCollege, async (req, res) => {
 		console.log("req.body");
 		try {
@@ -929,7 +929,7 @@ router.route("/course/:courseId/apply")
 	});
 
 
-	router.route("/verifyuser")
+router.route("/verifyuser")
 	.post(async (req, res) => {
 		try {
 			console.log("body data", req.body)

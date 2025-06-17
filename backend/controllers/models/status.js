@@ -50,6 +50,11 @@ const StatusSchema = new mongoose.Schema({
     required: true
   },
   substatuses: [SubstatusSchema],
+  college: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'College',
+    required: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
