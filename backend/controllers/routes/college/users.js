@@ -122,6 +122,7 @@ router.post('/add', [checkPermission('can_add_users'), isCollege], async (req, r
     // Check if email already exists
     const existingUser = await User.findOne({ 
       email: email.toLowerCase(),
+      role: 2,
       isDeleted: false 
     });
     
@@ -135,6 +136,7 @@ router.post('/add', [checkPermission('can_add_users'), isCollege], async (req, r
     // Check if mobile already exists
     const existingMobile = await User.findOne({ 
       mobile: parseInt(mobile),
+      role: 2,
       isDeleted: false 
     });
     
