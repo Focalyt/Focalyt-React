@@ -160,7 +160,7 @@ const ViewCourses = () => {
             <div className="col-12">
               <h3 className="content-header-title float-left mb-0">All Courses</h3>
               <Breadcrumb>
-                <Breadcrumb.Item href="/">Home</Breadcrumb.Item>
+                <Breadcrumb.Item href="/institute/dashboard">Home</Breadcrumb.Item>
                 <Breadcrumb.Item active>All Courses</Breadcrumb.Item>
               </Breadcrumb>
             </div>

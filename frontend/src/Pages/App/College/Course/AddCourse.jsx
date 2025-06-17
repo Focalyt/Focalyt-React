@@ -615,7 +615,7 @@ const AddCourse = () => {
               <h3 className="content-header-title float-left mb-0">Add Course</h3>
               <div className="breadcrumb-wrapper col-12">
                 <ol className="breadcrumb">
-                  <li className="breadcrumb-item"><a href="/admin">Home</a></li>
+                  <li className="breadcrumb-item"><a href="/institute/dashboard">Home</a></li>
                   <li className="breadcrumb-item active">Add Course</li>
                 </ol>
               </div>

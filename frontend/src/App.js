@@ -216,7 +216,7 @@ const Layout = () => {
         <Route path="onGoingHiring" element={<OngoingHiring />} />
         <Route path="candidate/:candidateId" element={<CandidateProfile />} />
         
-        <Route path="addJob" element={<AddJd />} />
+        <Route path="addjobs" element={<AddJd />} />
         {/* <Route path="editJob/:jobId" element={<editJob />} /> */}
         <Route path="viewJob/:jobId" element={<ViewJd />} />
         <Route path="interested-candidates" element ={<IntCandiate/>}/>

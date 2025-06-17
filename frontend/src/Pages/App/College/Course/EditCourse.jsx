@@ -777,7 +777,7 @@ const handleSubmit = async (e) => {
               <h3 className="content-header-title float-left mb-0">Edit Course</h3>
               <div className="breadcrumb-wrapper col-12">
                 <ol className="breadcrumb">
-                  <li className="breadcrumb-item"><a href="/institute">Home</a></li>
+                  <li className="breadcrumb-item"><a href="/institute/dashboard">Home</a></li>
                   <li className="breadcrumb-item active">Edit Course</li>
                 </ol>
               </div>

@@ -842,7 +842,7 @@ router.post("/removeVideoJd/:_id", isCompany, async (req, res) => {
 router.get("/list/jobs", isCompany, async (req, res) => {
   try {
     const menu = "jobList";
-    const userId = req.session.user._id;
+    const userId = req.user._id;
     const user = await User.findOne({ _id: userId })
     const company = await Company.findOne({ _concernPerson: userId, status: true })
     let shortlistedCandCount;
@@ -1154,22 +1154,10 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
 
 
 router
-  .get("/addjobs/:id?", isCompany, async (req, res) => {
+  .get("/addjobsdetails", isCompany, async (req, res) => {
     try {
-      const { id } = req.params;
-      let vacancy, city;
-      if (id) {
-        vacancy = await Vacancy.findOne({ _id: id, status: true });
-      }
-      if (vacancy) {
-        let st = {};
-        if (vacancy?.state) {
-          st = await State.findOne({ _id: vacancy?.state, status: { $ne: false } });
-        }
-        city = await City.find({ stateId: st.stateId, status: { $ne: false } })
-      }
+
       let company = await Company.findOne({ _concernPerson: req.companyUser }).select('name creditLeft availableCredit')
-      const menu = "addjobs";
       const coinsRequired = await CoinsAlgo.findOne().select("contactcoins")
       const industry = await Industry.find({ status: true });
       const jobCategory = await JobCategory.find({ status: true });
@@ -1178,8 +1166,10 @@ router
       const state = await State.find({ countryId: "101" });
       const techskills = await Skill.find({ type: "technical", status: true });
       const nontechskills = await Skill.find({ type: "non technical", status: true });
-      res.render(`${req.vPath}/app/corporate/add-jd`, {
-        menu,
+      
+      console.log("industry" , industry)
+        return res.json ({
+        
         industry,
         jobCategory,
         qualification,
@@ -1187,8 +1177,6 @@ router
         techskills,
         nontechskills,
         subQualification,
-        vacancy,
-        city,
         company,
         coinsRequired,
       });
