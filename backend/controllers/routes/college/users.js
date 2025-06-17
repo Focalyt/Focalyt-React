@@ -68,7 +68,13 @@ const checkPermission = (permission) => {
  * @route   POST /api/users/add
  * @desc    Add new user
  * @access  Private (requires can_add_users permission)
+ * 
+ * 
  */
+
+router.get('/', isCollege, async (req, res) => {
+	
+})
 router.post('/add', [checkPermission('can_add_users'), isCollege], async (req, res) => {
   console.log('api called add user')
   try {
@@ -614,6 +620,40 @@ router.get('/permissions/matrix', checkPermission('can_view_users'), async (req,
       message: 'Error fetching permissions matrix'
     });
   }
+});
+
+router.post('/reset-password', async (req, res) => {
+	try {
+		const { module, userInput, password } = req.body;
+
+		console.log('userInput', userInput, 'module', module)
+		let user = null;
+		const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
+
+		if (isMobile) {
+			user = await User.findOne({ mobile: parseInt(userInput), role: 2 });
+		} else {
+			user = await User.findOne({ email: userInput.toLowerCase(), role: 2 });
+		}
+
+		if (!user) {
+			return res.status(404).json({ success: false, message: 'User not found' });
+		}
+
+		user.password = password;
+		await user.save();
+		res.json({
+			status: true,
+			message: 'Password reset successfully',
+			data: user
+		});
+	} catch (err) {
+		console.error('Error in POST /add-user:', err);
+		res.status(500).json({
+			status: false,
+			message: "Server Error"
+		});
+	}
 });
 
 module.exports = router;
