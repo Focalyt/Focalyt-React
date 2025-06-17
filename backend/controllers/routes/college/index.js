@@ -18,6 +18,7 @@ let path = require("path");
 const candidateRoutes = require("./candidate");
 const digitalLeadRoutes = require('./digitallead');
 const leadAssignmentRuleRoutes = require("./leadAssingmentRule");
+
 const batchRoutes = require("./batches");
 const statusRoutes = require("./status");
 const skillTestRoutes = require("./skillTest");
