@@ -30,7 +30,6 @@ router.route("/addleaddandcourseapply")
       
             const centerName = Field4?.trim(); // Trim kar diya yahan
             const selectedCenterName = await Center.findOne({name: centerName, college: course.college});
-            console.log("selectedCenter", selectedCenter);
             if(!selectedCenterName){
                 return res.status(400).json({ status: false, msg: "Center not found" });
             }         
