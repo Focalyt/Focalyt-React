@@ -209,8 +209,8 @@ router.post('/add', [checkPermission('can_add_users'), isCollege], async (req, r
         permission_type: permissionType,
         custom_permissions: customPermissions
       },
-      passReset: true,
       status: true,
+      password: 'Focalyt',
       isDeleted: false,
       userAddedby: currentUserId
     });
