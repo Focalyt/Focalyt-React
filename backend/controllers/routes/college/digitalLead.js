@@ -1,13 +1,13 @@
 // server.js
-const express = require("express");
-const mongoose = require('mongoose');
-const cors = require('cors');
-const router = express.Router();
+let express = require("express");
+let mongoose = require('mongoose');
+let cors = require('cors');
+let router = express.Router();
 
 
 // Status Model
-const Status = require('../../models/status');
-const { AppliedCourses, CandidateProfile, Courses, Center } = require('../../models');
+let Status = require('../../models/status');
+let { AppliedCourses, CandidateProfile, Courses, Center } = require('../../models');
 
 // @route   GET api/statuses
 // @desc    Get All Statuses
@@ -20,21 +20,21 @@ router.route("/addleaddandcourseapply")
             console.log("Incoming body:", req.body);
 
             let { name, MobileNumber, sex, dob, email, courseId, Field4} = req.body;
-            const mobile = MobileNumber;
-            const courseName = Field4?.trim();
+            let mobile = MobileNumber;
+            let courseName = Field4?.trim();
 
-            const course = await Courses.findById(courseId);
+            let course = await Courses.findById(courseId);
             if (!course) {
                 return res.status(400).json({ status: false, msg: "Course not found" });
             }
       
-            const centerName = Field4?.trim(); // Trim kar diya yahan
-            const selectedCenterName = await Center.findOne({name: centerName, college: course.college});
+            let centerName = Field4?.trim(); // Trim kar diya yahan
+            let selectedCenterName = await Center.findOne({name: centerName, college: course.college});
             if(!selectedCenterName){
                 return res.status(400).json({ status: false, msg: "Center not found" });
             }         
 
-            const selectedCenter = selectedCenterName._id;
+            let selectedCenter = selectedCenterName._id;
 
             if (mongoose.Types.ObjectId.isValid(courseId)) courseId = new mongoose.Types.ObjectId(courseId);
             if (mongoose.Types.ObjectId.isValid(selectedCenter)) selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
@@ -44,15 +44,15 @@ router.route("/addleaddandcourseapply")
             // Fetch course
             
 
-            const existingCandidate = await CandidateProfile.findOne({ mobile });
+            let existingCandidate = await CandidateProfile.findOne({ mobile });
             if (existingCandidate) {
-                const appliedCourseEntry = await AppliedCourses.create({
+                let appliedCourseEntry = await AppliedCourses.create({
                     _candidate: existingCandidate._id,
                     _course: courseId,
                     _center: selectedCenter
                 });
 
-                return res.json({ status: true, msg: "Candidate already exists and course applied successfully", data: existingCandidate });
+                return res.json({ status: true, msg: "Candidate already exists and course applied successfully", data:{existingCandidate, appliedCourseEntry} });
 
             }
 
@@ -76,11 +76,11 @@ router.route("/addleaddandcourseapply")
             console.log("Final Candidate Data:", candidateData);
 
             // ✅ Create CandidateProfile
-            const candidate = await CandidateProfile.create(candidateData);
+            let candidate = await CandidateProfile.create(candidateData);
 
             console.log('selectedCenter', typeof selectedCenter)
             // ✅ Insert AppliedCourses Record
-            const appliedCourseEntry = await AppliedCourses.create({
+            let appliedCourseEntry = await AppliedCourses.create({
                 _candidate: candidate._id,
                 _course: courseId,
                 _center: selectedCenter
@@ -91,7 +91,7 @@ router.route("/addleaddandcourseapply")
             // ✅ Optional: Update your Google Spreadsheet
 
 
-            res.json({ status: true, msg: "Candidate added and course applied successfully", data: candidate });
+            res.json({ status: true, msg: "Candidate added and course applied successfully", data:{candidate, appliedCourseEntry} });
         }
 
         } catch (err) {
