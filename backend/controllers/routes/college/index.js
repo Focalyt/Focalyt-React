@@ -16,7 +16,7 @@ const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
 const candidateRoutes = require("./candidate");
-const digitalLeadRoutes = require('./digitallead');
+const digitalLeadRoutes = require('./digitalLead');
 const leadAssignmentRuleRoutes = require("./leadAssingmentRule");
 
 const batchRoutes = require("./batches");
