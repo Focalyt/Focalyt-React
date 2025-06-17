@@ -7,7 +7,7 @@ const router = express.Router();
 
 // Status Model
 const Status = require('../../models/status');
-const { AppliedCourses, CandidateProfile, Courses } = require('../../models');
+const { AppliedCourses, CandidateProfile, Courses, Center } = require('../../models');
 
 // @route   GET api/statuses
 // @desc    Get All Statuses
