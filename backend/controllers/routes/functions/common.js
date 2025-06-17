@@ -282,18 +282,29 @@ module.exports.generateNewToken = async (_id) => {
 
 module.exports.verifyOtp = async (req, res) => {
   try {
-    const { mobile, otp } = req.body;
-    console.log("mobile", mobile, otp);
-    
-    if (!mobile || !otp) {
-      return res.send({
-        status: false,
-        message: 'Mobile number and OTP are required!'
-      });
-    }
 
+    let { mobile, otp, userInput } = req.body;
     const auth = authKey;
-    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
+    if (userInput ) {
+      console.log('userInput', userInput, 'module', module)
+    
+    const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
+
+    let user = null;
+
+    if (isMobile) {
+      user = await User.findOne({ mobile: parseInt(userInput), role: 2 });
+    } else {
+      user = await User.findOne({ email: userInput.toLowerCase(), role: 2 });
+    }
+      if (!user) {
+        return res.send({
+          status: false,
+          message: 'User not found!'
+        });
+      }
+
+      const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${user.mobile}&otp=${otp}`;
     
     const result = await axios.get(url);
     if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
@@ -307,6 +318,33 @@ module.exports.verifyOtp = async (req, res) => {
         message: 'Invalid OTP!'
       });
     }
+    }
+    else
+  {
+    console.log("mobile", mobile, otp);
+    
+    if (!mobile || !otp) {
+      return res.send({
+        status: false,
+        message: 'Mobile number and OTP are required!'
+      });
+    }
+
+   
+    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
+    
+    const result = await axios.get(url);
+    if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
+      return res.send({
+        status: true,
+        message: 'OTP verified!'
+      });
+    } else {
+      return res.send({
+        status: false,
+        message: 'Invalid OTP!'
+      });
+    }}
   } catch (err) {
     return req.errFunc(err);
   }
@@ -790,7 +828,6 @@ module.exports.educationCoursesList = async (req, res) => {
   try {
 
     const qualificationId = req.params.qualificationId; // or req.body based on your use case
-    console.log("Qualification ID:", qualificationId);
     if (!qualificationId) {
       return res.status(400).json({
         status: false,
@@ -800,6 +837,8 @@ module.exports.educationCoursesList = async (req, res) => {
 
     if (typeof qualificationId === 'String') {
       console.log("Id is string")
+
+      qualificationId = new mongoose.Types.ObjectId(qualificationId);
 
     }
 
@@ -827,7 +866,6 @@ module.exports.courseSpecializationsList = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    console.log('courseId', courseId)
 
     if (!courseId) {
       return res.status(400).json({

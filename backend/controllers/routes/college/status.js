@@ -3,7 +3,7 @@ const express = require("express");
 const mongoose = require('mongoose');
 const cors = require('cors');
 const router = express.Router();
-
+const { isCollege, auth1, authenti } = require("../../../helpers");
 
 // Status Model
 const Status = require('../../models/status');
@@ -12,11 +12,12 @@ const AppliedCourses = require('../../models/appliedCourses');
 // @route   GET api/statuses
 // @desc    Get All Statuses
 // @access  Public
-router.get('/', async (req, res) => {
+router.get('/', isCollege, async (req, res) => {
  try {
-    const statuses = await Status.find().sort({ index: 1 });
+    const statuses = await Status.find({college: req.user.college._id}).sort({ index: 1 });
 
     // For each status, get count of AppliedCourses with _leadStatus = status._id
+
     const statusesWithCount = await Promise.all(
       statuses.map(async (status) => {
         const count = await AppliedCourses.countDocuments({ _leadStatus: status._id, kycStage: { $nin: [true] },
@@ -47,9 +48,10 @@ router.get('/', async (req, res) => {
 // @route   POST api/statuses
 // @desc    Create A Status
 // @access  Public
-router.post('/add', async (req, res) => {
+router.post('/add', isCollege, async (req, res) => {
   try {
     const { title, description, milestone } = req.body;
+    const college = req.user.college;
     
     // Find the highest index to add new status at the end
     const highestIndexStatus = await Status.findOne().sort('-index');
@@ -60,7 +62,8 @@ router.post('/add', async (req, res) => {
       description,
       index: newIndex,
       milestone,
-      substatuses: []
+      substatuses: [],
+      college: college._id
     });
     
     const data = await newStatus.save();

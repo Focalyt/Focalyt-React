@@ -6,7 +6,11 @@ import {
   Building,
   Target,
   Users,
-  MapPin
+  MapPin,
+  Eye,
+  Edit,
+  CheckCircle,
+  Layers
 } from 'lucide-react';
 
 const UserDetailsModal = ({ 
@@ -16,53 +20,16 @@ const UserDetailsModal = ({
 }) => {
   if (!user) return null;
 
-  const getUserTypeIcon = (permissionType) => {
-    switch (permissionType) {
-      case 'hierarchical':
-        return <Building className="text-info" size={20} />;
-      case 'lead_based':
-        return <Target className="text-success" size={20} />;
-      case 'hybrid':
-        return <Shield className="text-warning" size={20} />;
-      default:
-        return <User className="text-secondary" size={20} />;
-    }
-  };
-
-  const getUserTypeName = (permissionType) => {
-    switch (permissionType) {
-      case 'hierarchical':
-        return 'Content Management';
-      case 'lead_based':
-        return 'Lead Management';
-      case 'hybrid':
-        return 'Hybrid Access';
-      default:
-        return 'Unknown';
-    }
-  };
-
-  const getUserTypeDescription = (permissionType) => {
-    switch (permissionType) {
-      case 'hierarchical':
-        return 'Manages content through hierarchical structure (Vertical → Project → Center → Course → Batch)';
-      case 'lead_based':
-        return 'Manages leads through team-based assignments and reporting structure';
-      case 'hybrid':
-        return 'Combines both content management and lead management capabilities';
-      default:
-        return '';
-    }
-  };
+  const { accessSummary } = user;
 
   return (
     <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-      <div className="modal-dialog modal-lg">
+      <div className="modal-dialog modal-xl modal-dialog-scrollable">
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title d-flex align-items-center gap-2">
-              <User size={20} />
-              User Details - {user.name}
+              <Shield className="text-primary" size={20} />
+              User Details & Permissions - {user.name}
             </h5>
             <button
               type="button"
@@ -70,193 +37,373 @@ const UserDetailsModal = ({
               onClick={onClose}
             ></button>
           </div>
+          
           <div className="modal-body">
-            {/* Basic Information */}
             <div className="row g-4">
+              
+              {/* Basic Information */}
               <div className="col-12">
-                <h6 className="fw-bold border-bottom pb-2 mb-3">Basic Information</h6>
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <div className="d-flex align-items-center gap-2 mb-2">
-                      <User size={16} className="text-muted" />
-                      <strong>Name:</strong>
-                    </div>
-                    <div className="ps-4">{user.name}</div>
+                <div className="card">
+                  <div className="card-header">
+                    <h6 className="mb-0">👤 Basic Information</h6>
                   </div>
-                  <div className="col-md-6">
-                    <div className="d-flex align-items-center gap-2 mb-2">
-                      <Mail size={16} className="text-muted" />
-                      <strong>Email:</strong>
-                    </div>
-                    <div className="ps-4">{user.email}</div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="d-flex align-items-center gap-2 mb-2">
-                      <Shield size={16} className="text-muted" />
-                      <strong>Role:</strong>
-                    </div>
-                    <div className="ps-4">
-                      <span className="badge bg-primary">{allRoles[user.role]?.name || user.role}</span>
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="d-flex align-items-center gap-2 mb-2">
-                      <strong>Status:</strong>
-                    </div>
-                    <div className="ps-4">
-                      <span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-danger'}`}>
-                        {user.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Permission Type */}
-              <div className="col-12">
-                <h6 className="fw-bold border-bottom pb-2 mb-3">Permission Type</h6>
-                <div className="card border-0" style={{ backgroundColor: '#f8f9fa' }}>
                   <div className="card-body">
-                    <div className="d-flex align-items-center gap-3 mb-2">
-                      {getUserTypeIcon(user.permission_type)}
-                      <div>
-                        <h6 className="mb-0">{getUserTypeName(user.permission_type)}</h6>
-                        <small className="text-muted">{user.permission_type}</small>
+                    <div className="row">
+                      <div className="col-md-6">
+                        <strong>Name:</strong> {user.name}<br />
+                        <strong>Email:</strong> {user.email}<br />
+                        <strong>Mobile:</strong> {user.mobile}
+                      </div>
+                      <div className="col-md-6">
+                        <strong>Designation:</strong> {user.designation}<br />
+                        <strong>Status:</strong> <span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-danger'}`}>{user.status}</span><br />
+                        <strong>Permission Type:</strong> <span className="badge bg-primary">{accessSummary?.permissionType}</span>
                       </div>
                     </div>
-                    <p className="text-muted small mb-0">
-                      {getUserTypeDescription(user.permission_type)}
-                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Access Details */}
-              <div className="col-12">
-                <h6 className="fw-bold border-bottom pb-2 mb-3">Access Details</h6>
-                
-                {/* Hierarchical Access */}
-                {(user.permission_type === 'hierarchical' || user.permission_type === 'hybrid') && (
-                  <div className="mb-3">
-                    <div className="d-flex align-items-center gap-2 mb-2">
-                      <Building size={16} className="text-info" />
-                      <strong className="text-info">Content Management Access</strong>
+              {/* College Information */}
+              {user.college && (
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h6 className="mb-0">🏢 College Information</h6>
                     </div>
-                    <div className="ps-4">
-                      {user.entity_name ? (
-                        <div className="small">
-                          <div><strong>Entity:</strong> {user.entity_name}</div>
-                          <div className="text-muted">Can manage content within this entity and its children</div>
+                    <div className="card-body">
+                      <strong>College:</strong> {user.college.name}<br />
+                      <strong>Type:</strong> {user.college.type}<br />
+                      <strong>Default Admin:</strong> {user.defaultAdmin ? 'Yes' : 'No'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Overview */}
+              <div className="col-12">
+                <div className="card">
+                  <div className="card-header">
+                    <h6 className="mb-0">📊 Permissions Overview</h6>
+                  </div>
+                  <div className="card-body">
+                    <div className="row text-center">
+                      <div className="col-md-2">
+                        <div className="border rounded p-3">
+                          <Eye className="text-info mb-2" size={24} />
+                          <div className="fw-bold">{accessSummary?.viewPermissions?.type || 'Not set'}</div>
+                          <small className="text-muted">View Access</small>
+                        </div>
+                      </div>
+                      <div className="col-md-2">
+                        <div className="border rounded p-3">
+                          <Edit className="text-success mb-2" size={24} />
+                          <div className="fw-bold">{accessSummary?.addPermissions?.count || 0}</div>
+                          <small className="text-muted">Add Permissions</small>
+                        </div>
+                      </div>
+                      <div className="col-md-2">
+                        <div className="border rounded p-3">
+                          <CheckCircle className="text-warning mb-2" size={24} />
+                          <div className="fw-bold">{accessSummary?.editPermissions?.count || 0}</div>
+                          <small className="text-muted">Edit Permissions</small>
+                        </div>
+                      </div>
+                      <div className="col-md-2">
+                        <div className="border rounded p-3">
+                          <Shield className="text-danger mb-2" size={24} />
+                          <div className="fw-bold">{accessSummary?.verifyPermissions?.count || 0}</div>
+                          <small className="text-muted">Verify Permissions</small>
+                        </div>
+                      </div>
+                      <div className="col-md-2">
+                        <div className="border rounded p-3">
+                          <Target className="text-primary mb-2" size={24} />
+                          <div className="fw-bold">{accessSummary?.leadPermissions?.enabled || 0}</div>
+                          <small className="text-muted">Lead Permissions</small>
+                        </div>
+                      </div>
+                      <div className="col-md-2">
+                        <div className="border rounded p-3">
+                          <Users className="text-secondary mb-2" size={24} />
+                          <div className="fw-bold">{accessSummary?.userManagement?.enabledCount || 0}</div>
+                          <small className="text-muted">User Management</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* View Permissions */}
+              {accessSummary?.viewPermissions && (
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h6 className="mb-0">
+                        <Eye className="me-2" size={16} />
+                        View Permissions - {accessSummary.viewPermissions.type}
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      {accessSummary.viewPermissions.global ? (
+                        <div className="alert alert-success">
+                          🌍 <strong>Global Access:</strong> Can view all content across the entire system
                         </div>
                       ) : (
-                        <div className="text-muted small">No specific entity assigned</div>
+                        <div>
+                          {/* Summary counts */}
+                          <div className="row mb-3">
+                            {Object.entries(accessSummary.viewPermissions.summary || {}).map(([key, count]) => (
+                              count > 0 && (
+                                <div key={key} className="col-md-2 mb-2">
+                                  <div className="text-center border rounded p-2">
+                                    <div className="fw-bold text-primary">{count}</div>
+                                    <small className="text-muted text-capitalize">{key}</small>
+                                  </div>
+                                </div>
+                              )
+                            ))}
+                          </div>
+                          
+                          {/* Entity names */}
+                          {Object.entries(accessSummary.viewPermissions.entities || {}).map(([type, entities]) => (
+                            entities.length > 0 && (
+                              <div key={type} className="mb-3">
+                                <strong className="text-capitalize">{type}:</strong>
+                                <div className="mt-1">
+                                  {entities.map((entity, index) => (
+                                    <span key={index} className="badge bg-light text-dark me-1 mb-1">
+                                      {entity.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Lead-based Access */}
-                {(user.permission_type === 'lead_based' || user.permission_type === 'hybrid') && (
-                  <div className="mb-3">
-                    <div className="d-flex align-items-center gap-2 mb-2">
-                      <Target size={16} className="text-success" />
-                      <strong className="text-success">Lead Management Access</strong>
+              {/* Add Permissions */}
+              {accessSummary?.addPermissions?.count > 0 && (
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h6 className="mb-0">
+                        <Edit className="me-2" size={16} />
+                        Add Permissions ({accessSummary.addPermissions.count})
+                      </h6>
                     </div>
-                    <div className="ps-4">
-                      <div className="row g-2 small">
-                        <div className="col-md-6">
-                          <strong>Assigned Leads:</strong> {user.assigned_leads?.length || 0}
+                    <div className="card-body">
+                      {accessSummary.addPermissions.global ? (
+                        <div className="alert alert-success">
+                          🌍 <strong>Global Add Permission:</strong> Can add content anywhere
                         </div>
-                        <div className="col-md-6">
-                          <strong>Center Access:</strong> {user.centers_access?.length || 0} centers
+                      ) : (
+                        <div className="row">
+                          {accessSummary.addPermissions.permissions?.map((perm, index) => (
+                            <div key={index} className="col-md-6 mb-3">
+                              <div className="border rounded p-3">
+                                <div className="fw-medium text-success">#{index + 1} - {perm.level} Level</div>
+                                <div><strong>Entities:</strong> {perm.entities?.length || 0}</div>
+                                <div><strong>Can Add:</strong> {perm.canAddTypes?.join(', ')}</div>
+                                <small className="text-muted">{perm.summary}</small>
+                                
+                                {perm.entities?.length > 0 && (
+                                  <div className="mt-2">
+                                    {perm.entities.map((entity, i) => (
+                                      <span key={i} className="badge bg-light text-dark me-1 small">
+                                        {entity.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        {user.reporting_managers && user.reporting_managers.length > 0 && (
-                          <div className="col-12">
-                            <strong>Reporting Managers:</strong> {user.reporting_managers.length} manager(s)
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit Permissions */}
+              {accessSummary?.editPermissions?.count > 0 && (
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h6 className="mb-0">
+                        <CheckCircle className="me-2" size={16} />
+                        Edit Permissions ({accessSummary.editPermissions.count})
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      {accessSummary.editPermissions.global ? (
+                        <div className="alert alert-warning">
+                          🌍 <strong>Global Edit Permission:</strong> Can edit content anywhere
+                        </div>
+                      ) : (
+                        <div className="row">
+                          {accessSummary.editPermissions.permissions?.map((perm, index) => (
+                            <div key={index} className="col-md-6 mb-3">
+                              <div className="border rounded p-3">
+                                <div className="fw-medium text-warning">#{index + 1} - {perm.editType}</div>
+                                {perm.levels?.length > 0 && (
+                                  <div><strong>Levels:</strong> {perm.levels.join(', ')}</div>
+                                )}
+                                {perm.entities?.length > 0 && (
+                                  <div>
+                                    <strong>Entities:</strong>
+                                    <div className="mt-1">
+                                      {perm.entities.map((entity, i) => (
+                                        <span key={i} className="badge bg-light text-dark me-1 small">
+                                          {entity.name} ({entity.type})
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <small className="text-muted">{perm.summary}</small>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Verify Permissions */}
+              {accessSummary?.verifyPermissions?.count > 0 && (
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h6 className="mb-0">
+                        <Shield className="me-2" size={16} />
+                        Verify Permissions - {accessSummary.verifyPermissions.type}
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="alert alert-info">
+                        <strong>Summary:</strong> {accessSummary.verifyPermissions.summary}
+                      </div>
+                      
+                      {accessSummary.verifyPermissions.permissions?.map((perm, index) => (
+                        <div key={index} className="border rounded p-3 mb-2">
+                          {perm.parentEntities && (
+                            <div>
+                              <strong>Parent Entities:</strong>
+                              <div className="mt-1">
+                                {perm.parentEntities.map((entity, i) => (
+                                  <span key={i} className="badge bg-light text-dark me-1">
+                                    {entity.name} ({entity.type})
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {perm.selectedLevels && (
+                            <div><strong>Levels:</strong> {perm.selectedLevels.join(', ')}</div>
+                          )}
+                          <small className="text-muted">{perm.summary}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Lead Permissions */}
+              {accessSummary?.leadPermissions?.enabled > 0 && (
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h6 className="mb-0">
+                        <Target className="me-2" size={16} />
+                        Lead Management ({accessSummary.leadPermissions.enabled} enabled)
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        {Object.entries(accessSummary.leadPermissions.details || {}).map(([key, value]) => (
+                          value && (
+                            <div key={key} className="col-md-4 mb-2">
+                              <CheckCircle className="text-success me-2" size={16} />
+                              <span className="text-capitalize">{key.replace(/_/g, ' ')}</span>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* User Management */}
+              {accessSummary?.userManagement?.enabledCount > 0 && (
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h6 className="mb-0">
+                        <Users className="me-2" size={16} />
+                        User Management ({accessSummary.userManagement.enabledCount} enabled)
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        {accessSummary.userManagement.canViewUsers && (
+                          <div className="col-md-4 mb-2">
+                            <CheckCircle className="text-success me-2" size={16} />
+                            Can View Users
+                          </div>
+                        )}
+                        {accessSummary.userManagement.canAddUsers && (
+                          <div className="col-md-4 mb-2">
+                            <CheckCircle className="text-success me-2" size={16} />
+                            Can Add Users
+                          </div>
+                        )}
+                        {accessSummary.userManagement.canDeleteUsers && (
+                          <div className="col-md-4 mb-2">
+                            <CheckCircle className="text-success me-2" size={16} />
+                            Can Delete Users
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* Reporting Structure */}
-              {user.reporting_managers && user.reporting_managers.length > 0 && (
-                <div className="col-12">
-                  <h6 className="fw-bold border-bottom pb-2 mb-3">Reporting Structure</h6>
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <Users size={16} className="text-primary" />
-                    <strong>Reports To:</strong>
-                  </div>
-                  <div className="ps-4">
-                    {user.reporting_managers.map((managerId, index) => (
-                      <span key={managerId} className="badge bg-light text-dark me-2">
-                        Manager {index + 1}
-                      </span>
-                    ))}
-                    {user.reporting_managers.length > 1 && (
-                      <div className="small text-warning mt-1">
-                        <strong>Matrix Reporting:</strong> Reports to multiple managers
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
 
-              {/* Center Access */}
-              {user.centers_access && user.centers_access.length > 0 && (
+              {/* Reporting Managers */}
+              {accessSummary?.reportingManagers > 0 && (
                 <div className="col-12">
-                  <h6 className="fw-bold border-bottom pb-2 mb-3">Center Access</h6>
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <MapPin size={16} className="text-info" />
-                    <strong>Accessible Centers:</strong>
-                  </div>
-                  <div className="ps-4">
-                    <div className="d-flex flex-wrap gap-2">
-                      {user.centers_access.map((centerId, index) => (
-                        <span key={centerId} className="badge bg-info">
-                          Center {index + 1}
-                        </span>
-                      ))}
+                  <div className="card">
+                    <div className="card-header">
+                      <h6 className="mb-0">
+                        <Users className="me-2" size={16} />
+                        Reporting Structure
+                      </h6>
                     </div>
-                    <div className="small text-muted mt-2">
-                      Can access leads and perform operations in these centers
+                    <div className="card-body">
+                      <strong>Reporting Managers:</strong> {accessSummary.reportingManagers} manager(s)
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* User ID for Admin Reference */}
-              <div className="col-12">
-                <div className="alert alert-light py-2">
-                  <small className="text-muted">
-                    <strong>User ID:</strong> {user.user_id} 
-                    <span className="ms-3"><strong>Permission Type:</strong> {user.permission_type}</span>
-                  </small>
-                </div>
-              </div>
             </div>
           </div>
+          
           <div className="modal-footer">
-            <button 
-              type="button" 
-              className="btn btn-outline-secondary"
-              onClick={onClose}
-            >
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
               Close
-            </button>
-            <button 
-              type="button" 
-              className="btn btn-outline-primary"
-            >
-              Edit User
-            </button>
-            <button 
-              type="button" 
-              className="btn btn-outline-info"
-            >
-              View Permissions
             </button>
           </div>
         </div>

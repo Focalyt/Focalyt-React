@@ -515,8 +515,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                       <div className="d-flex align-items-center mb-2">
                         <i className="bi bi-kanban-fill text-primary fs-3 me-2"></i>
                         <div>
-                          <h5 className="card-title mb-1">{project.code || 'N/A'}</h5>
-                          <p className="text-muted mb-1">{project.name || 'Unnamed Project'}</p>
+                          <h3 className="text-muted mb-1">{project.name || 'Unnamed Project'}</h3>
                         </div>
                       </div>
                       <p className="text-muted small mb-2">{project.description || 'No description'}</p>

@@ -43,23 +43,7 @@ const CourseDetails = () => {
   const [longitude, setLongitude] = useState('');
   const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
   
-  useEffect(() => {
-    if (candidate) {
-      const isProfileComplete = 
-        candidate.sex && 
-        candidate.dob && 
-        candidate.highestQualification && 
-        candidate.personalInfo && 
-        (candidate.personalInfo.totalExperience !== undefined && 
-         candidate.personalInfo.totalExperience !== '') &&
-        ((candidate.personalInfo.location && 
-          candidate.personalInfo.location.fullAddress) || 
-         (candidate.personalInfo.currentAddress && 
-          candidate.personalInfo.currentAddress.fullAddress));
-      
-      setCanApply(isProfileComplete);
-    }
-  }, [candidate]);
+
   
 
   useEffect(() => {
@@ -1268,7 +1252,8 @@ const CourseDetails = () => {
                   </>)}
               </div>
             </div>
-          ) : (
+          ) : 
+          (
 
             <div className="modal-content">
               <div className="modal-header">

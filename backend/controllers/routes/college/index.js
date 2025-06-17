@@ -16,10 +16,16 @@ const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
 const candidateRoutes = require("./candidate");
+const digitalLeadRoutes = require('./digitalLead');
+const leadAssignmentRuleRoutes = require("./leadAssingmentRule");
+
+
+const batchRoutes = require("./batches");
 const statusRoutes = require("./status");
 const skillTestRoutes = require("./skillTest");
 const careerObjectiveRoutes = require("../college/careerObjective");
 const todoRoutes = require("./todo");
+const userRoutes = require("./users");
 const smsRoutes = require("./sms");
 const roleManagementRoutes = require("./roleManagement");
 const coverLetterRoutes = require("./coverLetter");
@@ -28,6 +34,10 @@ const coursesRoutes = require("./courses");
 const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
+router.use("/digitalLead",  digitalLeadRoutes);
+router.use("/leadAssignmentRule", isCollege, leadAssignmentRuleRoutes);
+router.use("/users", isCollege, userRoutes);
+router.use("/batches", isCollege, batchRoutes);
 router.use("/sms", isCollege, smsRoutes);
 router.use("/roles", isCollege, roleManagementRoutes);
 router.use("/candidate", isCollege, candidateRoutes);
@@ -92,24 +102,24 @@ const upload = multer({ storage }).single('file');
 
 // Utility function to check and convert string to ObjectId
 const validateAndConvertId = (id) => {
-  try {
-    // If it's already an ObjectId, return it
-    if (id instanceof mongoose.Types.ObjectId) {
-      return id;
-    }
-    
-    // If it's a string, check if it's a valid ObjectId
-    if (typeof id === 'string') {
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new Error('Invalid ObjectId format');
-      }
-      return new mongoose.Types.ObjectId(id);
-    }
-    
-    throw new Error('Invalid ID type');
-  } catch (error) {
-    throw new Error(`ID validation failed: ${error.message}`);
-  }
+	try {
+		// If it's already an ObjectId, return it
+		if (id instanceof mongoose.Types.ObjectId) {
+			return id;
+		}
+
+		// If it's a string, check if it's a valid ObjectId
+		if (typeof id === 'string') {
+			if (!mongoose.Types.ObjectId.isValid(id)) {
+				throw new Error('Invalid ObjectId format');
+			}
+			return new mongoose.Types.ObjectId(id);
+		}
+
+		throw new Error('Invalid ID type');
+	} catch (error) {
+		throw new Error(`ID validation failed: ${error.message}`);
+	}
 };
 
 // Function to update followups at 11:55 PM IST
@@ -175,7 +185,6 @@ router.route("/login")
 
 	.post(async (req, res) => {
 		try {
-			console.log('body data', req.body)
 
 			const { userInput, password } = req.body;
 
@@ -194,7 +203,6 @@ router.route("/login")
 				query.$or.push({ mobile: mobileNumber, role: 2 });
 			}
 
-			console.log('query', query)
 
 			const user = await User.findOne(query);
 
@@ -213,7 +221,6 @@ router.route("/login")
 			const college = await College.findOne({
 				_concernPerson: { $elemMatch: { _id: userId } }
 			}, "name _concernPerson");
-			console.log('college', college)
 
 			if (!college || college === null) {
 				console.log('Missing College!');
@@ -241,7 +248,6 @@ router.route("/login")
 router.route("/register")
 	.post(async (req, res) => {
 		try {
-			console.log('recieved data', req.body)
 			const { collegeName, concernedPerson, email, mobile, type, password, confirmPassword, location } = req.body;
 
 			const { value, error } = await CollegeValidators.register(req.body)
@@ -273,7 +279,10 @@ router.route("/register")
 						email,
 						mobile,
 						role: 2,
-						password
+						password,
+						permissions: {
+							permission_type: 'Admin',
+						}
 					});
 					if (!user) {
 						return res.send({
@@ -305,15 +314,14 @@ router.route("/register")
 			return res.send({ status: false, error: err.message });
 		}
 	});
-router.route("/appliedCandidates").get(isCollege,async (req, res) => {
+router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 	try {
-		const user = req.user;	
+		const user = req.user;
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
-		console.log('college', college);
-		
+
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;
@@ -351,14 +359,12 @@ router.route("/appliedCandidates").get(isCollege,async (req, res) => {
 			.skip(skip)
 			.limit(limit);
 
-		console.log('appliedCourses', appliedCourses);
 
 		const filteredAppliedCourses = appliedCourses.filter(doc => {
 			// _course must be populated!
 			return doc._course && String(doc._course.college) === String(college._id);
 		});
 
-		console.log('filteredAppliedCourses', filteredAppliedCourses);
 		const result = filteredAppliedCourses.map(doc => {
 			let selectedSubstatus = null;
 
@@ -497,7 +503,6 @@ router.route("/appliedCandidates").get(isCollege,async (req, res) => {
 
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
-	console.log('User', req.user)
 	let college = await College.findOne({ _concernPerson: { $elemMatch: { _id: req.user._id } }, status: true })
 
 	let totalShortlisted
@@ -1163,7 +1168,7 @@ router.route("/myprofile")
 				{ _id: req.session.user.collegeId },
 				updatedFields,
 				{ new: true }
-			).populate({ path: '_concernPerson' }); console.log(collegeUpdate)
+			).populate({ path: '_concernPerson' });
 
 			if (!collegeUpdate) throw req.ykError("Candidate not updated!");
 			req.flash("success", "Company updated successfully!");
@@ -1526,7 +1531,6 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 						qual['collegePlace'] = college.place
 
 						addCandidate['qualifications'] = qual
-						console.log(addCandidate)
 						const candidate = await Candidate.create(addCandidate)
 						if (!candidate) {
 							console.log(addCandidate, "candidate not created", "row number is =>>>>>>>", recordCount)
@@ -1689,7 +1693,6 @@ router
 			const email = req.body.email;
 			const name = req.body.name;
 			var id = req.session.user._id;
-			console.log(email, name, id);
 
 			var userData = await User.findOne({ email: email });
 			if (!userData)
@@ -1932,10 +1935,9 @@ router.route("/single").get(auth1, function (req, res) {
 		}
 	});
 });
-router.post("/courses/add", async (req, res) => {
+router.post("/courses/add", [isCollege], async (req, res) => {
 	try {
 		const body = req.body;
-		console.log("Incoming course data:", req.body);
 
 		const newCourse = new Course(req.body);
 		await newCourse.save();
@@ -1960,12 +1962,12 @@ router.post("/courses/add", async (req, res) => {
 //Vertical APIS
 
 router.get('/getVerticals', [isCollege], async (req, res) => {
+
 	try {
+		const collegeId = req.user.college._id;
 
 
-		const verticals = await Vertical.find().sort({ createdAt: -1 });
-
-		console.log(verticals)
+		const verticals = await Vertical.find({ college: collegeId }).sort({ createdAt: -1 });
 
 		return res.json({
 			status: true,
@@ -1985,8 +1987,8 @@ router.post('/addVertical', [isCollege], async (req, res) => {
 	try {
 		const { formData } = req.body;
 		const user = req.user;
-		console.log("📥 Incoming vertical data:", formData);
-		console.log("📥 Incoming user data:", user);
+		const collegeId = req.user.college._id;
+
 
 		// Default value handling
 		const newVertical = new Vertical({
@@ -1994,6 +1996,7 @@ router.post('/addVertical', [isCollege], async (req, res) => {
 			description: formData.description,
 			status: formData.status !== undefined ? formData.status : true,
 			createdBy: user._id,
+			college: collegeId,
 		});
 
 
@@ -2017,16 +2020,15 @@ router.put('/editVertical/:id', [isCollege], async (req, res) => {
 	try {
 		const verticalId = req.params.id;
 		const { formData } = req.body;
-
-		console.log("📝 Editing vertical:", verticalId);
-		console.log("📦 Updated data:", formData);
+		const collegeId = req.user.college._id;
 
 		const updated = await Vertical.findByIdAndUpdate(
 			verticalId,
 			{
 				name: formData.name,
 				description: formData.description,
-				status: formData.status
+				status: formData.status,
+				college: collegeId
 			},
 			{ new: true } // return updated document
 		);
@@ -2056,8 +2058,33 @@ router.put('/editVertical/:id', [isCollege], async (req, res) => {
 router.delete('/deleteVertical/:id', [isCollege], async (req, res) => {
 	try {
 		const verticalId = req.params.id;
+		const collegeId = req.user.college._id;
 
-		console.log("🗑 Deleting vertical:", verticalId);
+		const vertical = await Vertical.findById(verticalId);
+
+		if (!vertical) {
+			return res.status(404).json({
+				status: false,
+				message: "Vertical not found"
+			});
+		}
+
+		if (vertical.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to delete this vertical"
+			});
+		}
+
+
+		if (vertical.isApproved) {
+
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to delete this vertical"
+			});
+		}
+
 
 		const deleted = await Vertical.findByIdAndDelete(verticalId);
 
@@ -2090,6 +2117,10 @@ router.post('/add_project', [isCollege], async (req, res) => {
 
 		let { name, description, vertical, status } = req.body;
 		const user = req.user
+		const collegeId = req.user.college._id;
+
+
+
 
 
 		// Basic validation
@@ -2097,6 +2128,25 @@ router.post('/add_project', [isCollege], async (req, res) => {
 
 			return res.status(400).json({ success: false, message: 'Name and verticalId are required.' });
 		}
+
+		const verticalDetails = await Vertical.findById(vertical);
+
+		if (!verticalDetails) {
+
+			return res.status(404).json({
+				status: false,
+				message: "Vertical not found"
+			});
+		}
+
+		if (verticalDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to add project to this vertical"
+			});
+		}
+
+
 		// Create new project document
 		const newProject = new Project({
 			name,
@@ -2104,6 +2154,7 @@ router.post('/add_project', [isCollege], async (req, res) => {
 			vertical,
 			createdBy: user._id,
 			status: status !== undefined ? status : 'active',
+			college: collegeId,
 		});
 
 		const savedProject = await newProject.save();
@@ -2120,6 +2171,19 @@ router.put('/edit_project/:id', [isCollege], async (req, res) => {
 		const projectId = req.params.id;
 		const { name, description, vertical, status } = req.body;
 		const user = req.user;
+		const collegeId = req.user.college._id;
+
+		const projectDetails = await Project.findById(projectId);
+		if (!projectDetails) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
+
+		if (projectDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to edit this project"
+			});
+		}
 
 		// Validation
 		if (!name || !vertical) {
@@ -2136,6 +2200,7 @@ router.put('/edit_project/:id', [isCollege], async (req, res) => {
 		project.name = name;
 		project.description = description || project.description;
 		project.vertical = vertical;
+		project.college = collegeId;
 		project.status = status !== undefined ? status : project.status;
 		project.updatedBy = user._id; // Optional: agar aap update karne wale user ko track karna chahte hain
 
@@ -2151,6 +2216,21 @@ router.put('/edit_project/:id', [isCollege], async (req, res) => {
 router.delete('/delete_project/:id', [isCollege], async (req, res) => {
 	try {
 		const projectId = req.params.id;
+		const collegeId = req.user.college._id;
+
+		const projectDetails = await Project.findById(projectId);
+		if (!projectDetails) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
+
+
+		if (projectDetails.college.toString() !== collegeId.toString()) {
+
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to delete this project"
+			});
+		}
 
 		const deletedProject = await Project.findByIdAndDelete(projectId);
 		if (!deletedProject) {
@@ -2167,10 +2247,11 @@ router.delete('/delete_project/:id', [isCollege], async (req, res) => {
 
 
 
-router.get('/list-projects', async (req, res) => {
+router.get('/list-projects', [isCollege], async (req, res) => {
 	try {
 		let filter = {};
 		const vertical = req.query.vertical;
+		const collegeId = req.user.college._id;
 
 		if (vertical) {
 			if (mongoose.Types.ObjectId.isValid(vertical)) {
@@ -2181,6 +2262,24 @@ router.get('/list-projects', async (req, res) => {
 			}
 		}
 
+		const verticalDetails = await Vertical.findById(vertical);
+
+		if (!verticalDetails) {
+			return res.status(404).json({ success: false, message: 'Vertical not found.' });
+		}
+
+		if (verticalDetails.college.toString() !== collegeId.toString()) {
+
+			return res.status(403).json({
+				status: false,
+				message: "You are not authorized to list projects for this vertical"
+			});
+		}
+
+		filter.college = collegeId;
+
+
+
 		const projects = await Project.find(filter).sort({ createdAt: -1 });
 		res.json({ success: true, data: projects });
 	} catch (error) {
@@ -2189,12 +2288,12 @@ router.get('/list-projects', async (req, res) => {
 	}
 });
 
-router.get('/list_all_projects', async (req, res) => {
+router.get('/list_all_projects', [isCollege], async (req, res) => {
 	try {
+		const collegeId = req.user.college._id;
 
 
-		const projects = await Project.find({ status: 'active' }).sort({ createdAt: -1 });
-		console.log('projects', projects)
+		const projects = await Project.find({ status: 'active', college: collegeId }).sort({ createdAt: -1 });
 		res.json({ success: true, data: projects });
 	} catch (error) {
 		console.error('Error fetching projects:', error);
@@ -2207,26 +2306,48 @@ router.get('/list_all_projects', async (req, res) => {
 // POST /api/centers/add
 router.post('/add_canter', [isCollege], async (req, res) => {
 	try {
-		const { name, location, status, project } = req.body;
+		let { name, location, status, project } = req.body;
 		const user = req.user; // agar aap authentication middleware laga rahe hain
+		const collegeId = req.user.college._id;
 
 		// Validation
 		if (!name || !project) {
 			return res.status(400).json({ success: false, message: 'Name and project are required.' });
 		}
 
+		const projectDetails = await Project.findById(project);
+
+		if (!projectDetails) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
+
+		if (projectDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({ success: false, message: 'You are not authorized to add center to this project.' });
+		}
+
 		// Ensure project is an array
 		const projectArray = Array.isArray(project) ? project : [project];
+
+		if (status === 'active') {
+			status = true;
+		}
+		else {
+			status = false;
+		}
+
+		console.log(collegeId, 'collegeId');
 
 		const newCenter = new Center({
 			name,
 			address: location,
-			status: status || 'active',
+			status: status,
 			project: projectArray,
 			createdBy: user ? user._id : null,
+			college: collegeId,
 		});
 
 		const savedCenter = await newCenter.save();
+		console.log(savedCenter, 'savedCenter');
 
 		res.status(201).json({ success: true, message: 'Center added successfully', data: savedCenter });
 	} catch (error) {
@@ -2237,10 +2358,24 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 
 
 
-router.put('/edit_center/:id', async (req, res) => {
+router.put('/edit_center/:id', [isCollege], async (req, res) => {
 	try {
 		const { id } = req.params;
 		const updateData = req.body;
+		const collegeId = req.user.college._id;
+
+		const centerDetails = await Center.findById(id);
+
+		if (!centerDetails) {
+			return res.status(404).json({ success: false, message: 'Center not found' });
+		}
+
+		if (centerDetails.college.toString() !== collegeId.toString()) {
+
+			return res.status(403).json({ success: false, message: 'You are not authorized to edit this center' });
+		}
+
+		updateData.college = collegeId;
 
 		const updatedCenter = await Center.findByIdAndUpdate(id, updateData, { new: true });
 		if (!updatedCenter) {
@@ -2254,14 +2389,33 @@ router.put('/edit_center/:id', async (req, res) => {
 	}
 });
 
-router.put('/asign_center/:id', async (req, res) => {
+router.put('/asign_center/:id', [isCollege], async (req, res) => {
 	try {
 		const { id } = req.params;
 		const { projectId } = req.body; // extract projectId from body
+		const collegeId = req.user.college._id;
+
 
 		if (!projectId) {
 			return res.status(400).json({ success: false, message: 'Project ID is required' });
 		}
+
+		const projectDetails = await Project.findById(projectId);
+
+		if (!projectDetails) {
+			return res.status(404).json({ success: false, message: 'Project not found.' });
+		}
+
+		if (projectDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({ success: false, message: 'You are not authorized to asign this center to this project' });
+		}
+
+		const centerDetails = await Center.findById(id);
+
+		if (centerDetails.college.toString() !== collegeId.toString()) {
+			return res.status(403).json({ success: false, message: 'You are not authorized to asign this center to this project' });
+		}
+
 
 		// Use $addToSet instead of $push if you want to avoid duplicates
 		const updatedCenter = await Center.findByIdAndUpdate(
@@ -2285,10 +2439,17 @@ router.put('/remove_project_from_center/:id', async (req, res) => {
 	try {
 		const { id } = req.params;
 		const { projectId } = req.body;
-
 		if (!projectId) {
 			return res.status(400).json({ success: false, message: 'Project ID is required' });
 		}
+		const collegeId = req.user.college._id;
+
+		const centerDetails = await Center.findById(id);
+
+		if (centerDetails.collegeId.toString() !== collegeId.toString()) {
+			return res.status(403).json({ success: false, message: 'You are not authorized to remove this project from this center' });
+		}
+
 
 		const updatedCenter = await Center.findByIdAndUpdate(
 			id,
@@ -2310,20 +2471,40 @@ router.put('/remove_project_from_center/:id', async (req, res) => {
 
 
 
-router.get('/list-centers', async (req, res) => {
+router.get('/list-centers', [isCollege], async (req, res) => {
 	try {
+		const collegeId = req.user.college._id;
 		const projectId = req.query.projectId;
 		if (projectId) {
 			if (!mongoose.Types.ObjectId.isValid(projectId)) {
 				return res.status(400).json({ success: false, message: 'Invalid Project ID' });
 			}
-			const centers = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
-			console.log('centers', centers)
+			const projectDetails = await Project.findById(projectId);
+			if (!projectDetails) {
+				return res.status(404).json({ success: false, message: 'Project not found.' });
+			}
+			if (projectDetails.college.toString() !== collegeId.toString()) {
+				return res.status(403).json({ success: false, message: 'You are not authorized to list centers for this project' });
+			}
+			let allCenters = await Center.find({ projects: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 });
+			const centers = allCenters.map(center => {
+				const centerObj = center.toObject();
+				return {
+					...centerObj,
+					status: centerObj.status ? "active" : "inactive"
+				};
+			});
 			return res.json({ success: true, data: centers });
 		}
 		else {
-			const centers = await Center.find({ status: 'active' }).sort({ createdAt: -1 });
-			console.log('centers', centers)
+			const allCenters = await Center.find({ status: true, college: collegeId }).sort({ createdAt: -1 });
+			const centers = allCenters.map(center => {
+				const centerObj = center.toObject();
+				return {
+					...centerObj,
+					status: centerObj.status ? "active" : "inactive"
+				};
+			});
 			return res.json({ success: true, data: centers });
 		}
 
@@ -2334,12 +2515,18 @@ router.get('/list-centers', async (req, res) => {
 	}
 });
 
-router.get('/list_all_centers', async (req, res) => {
+router.get('/list_all_centers', [isCollege], async (req, res) => {
 	try {
+		const collegeId = req.user.college._id;
 
-
-		const centers = await Center.find({ status: 'active' }).sort({ createdAt: -1 });
-		console.log('centers', centers)
+		const allCenters = await Center.find({ status: true, college: collegeId }).sort({ createdAt: -1 });
+		const centers = allCenters.map(center => {
+			const centerObj = center.toObject();
+			return {
+				...centerObj,
+				status: centerObj.status ? "active" : "inactive"
+			};
+		});
 
 		res.json({ success: true, data: centers });
 	} catch (error) {
@@ -2370,7 +2557,6 @@ router.delete('/center_delete/:id', async (req, res) => {
 //lead status change
 router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 	try {
-		console.log('api hitting')
 		const { id } = req.params;
 		const {
 			_leadStatus,
@@ -2463,7 +2649,6 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 router.get('/all_courses', async (req, res) => {
 	try {
 		const courses = await Courses.find({ status: true }).sort({ createdAt: -1 });
-		console.log('centers', courses)
 
 		res.json({ success: true, data: courses });
 	} catch (error) {
@@ -2480,15 +2665,12 @@ router.get('/all_courses_centerwise', async (req, res) => {
 			project: projectId
 
 		}
-		console.log('req.params', req.params)
 		if (!centerId || !projectId) {
 			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
 
 		}
 		const courses = await Courses.find(filter).sort({ createdAt: -1 });
 		// Update the 'status' field based on the boolean value
-
-		console.log('centers', courses)
 
 		res.json({ success: true, data: courses });
 	} catch (error) {
@@ -2499,7 +2681,7 @@ router.get('/all_courses_centerwise', async (req, res) => {
 
 //Batch APi
 
-router.post('/add_batch', async (req, res) => {
+router.post('/add_batch', isCollege, async (req, res) => {
 	try {
 		// Destructure the data sent in the request body
 		const {
@@ -2514,8 +2696,13 @@ router.post('/add_batch', async (req, res) => {
 			instructor,
 			courseId,
 			centerId,
-			createdBy
+
 		} = req.body;
+
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
 
 		// Validation: Ensure all required fields are provided
 		if (!name || !startDate || !endDate || !zeroPeriodStartDate || !zeroPeriodEndDate || !courseId || !centerId) {
@@ -2535,7 +2722,8 @@ router.post('/add_batch', async (req, res) => {
 			status,  // Default to active if not provided
 			courseId,
 			centerId,
-			createdBy
+			createdBy: user._id,
+			college: college._id
 		});
 
 		// Save the batch to the database
@@ -2585,62 +2773,61 @@ router.get('/get_batches', async (req, res) => {
 //Applied data update api
 
 router.put('/update/:id', isCollege, async (req, res) => {
-  try {
-    const user = req.user;
-    const { id } = req.params;
-    const updateData = req.body;
+	try {
+		const user = req.user;
+		const { id } = req.params;
+		const updateData = req.body;
 
-    const appliedCourse = await AppliedCourses.findById(id);
-    if (!appliedCourse) {
-      return res.status(404).json({ success: false, message: "Applied course not found" });
-    }
+		const appliedCourse = await AppliedCourses.findById(id);
+		if (!appliedCourse) {
+			return res.status(404).json({ success: false, message: "Applied course not found" });
+		}
 
-    // Update fields
-    Object.keys(updateData).forEach(key => {
-      appliedCourse[key] = updateData[key];
-    });
+		// Update fields
+		Object.keys(updateData).forEach(key => {
+			appliedCourse[key] = updateData[key];
+		});
 
-    // Add log for Move to KYC
-    if (typeof updateData.kycStage !== 'undefined' && updateData.kycStage === true) {
-      appliedCourse.logs.push({
-        user: user._id,
-        timestamp: new Date(),
-        action: 'Moved to KYC',
-        remarks: 'Profile moved to KYC by College'
-      });
-    }
+		// Add log for Move to KYC
+		if (typeof updateData.kycStage !== 'undefined' && updateData.kycStage === true) {
+			appliedCourse.logs.push({
+				user: user._id,
+				timestamp: new Date(),
+				action: 'Moved to KYC',
+				remarks: 'Profile moved to KYC by College'
+			});
+		}
 
-    // Add log for Move to Admission List
-    if (typeof updateData.admissionDone !== 'undefined' && updateData.admissionDone === true) {
-      appliedCourse.logs.push({
-        user: user._id,
-        timestamp: new Date(),
-        action: 'Moved to Admission List',
-        remarks: 'Profile moved to Admission List by College'
-      });
-    }
+		// Add log for Move to Admission List
+		if (typeof updateData.admissionDone !== 'undefined' && updateData.admissionDone === true) {
+			appliedCourse.logs.push({
+				user: user._id,
+				timestamp: new Date(),
+				action: 'Moved to Admission List',
+				remarks: 'Profile moved to Admission List by College'
+			});
+		}
 
-    await appliedCourse.save();
-    return res.json({ success: true, message: "Profile updated successfully" });
-  } catch (err) {
-    console.error("Error updating profile:", err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
+		await appliedCourse.save();
+		return res.json({ success: true, message: "Profile updated successfully" });
+	} catch (err) {
+		console.error("Error updating profile:", err);
+		return res.status(500).json({ success: false, message: err.message });
+	}
 });
 
 //KYC Leads
 
 router.route("/kycCandidates").get(isCollege, async (req, res) => {
 	try {
-		const user = req.user;	
+		const user = req.user;
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
-		console.log('college', college);
-		
+
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
-		const skip = (page - 1) * limit;	
+		const skip = (page - 1) * limit;
 
 
 
@@ -2675,19 +2862,18 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			.skip(skip)
 			.limit(limit);
 
-		
+
 
 		const filteredAppliedCourses = appliedCourses.filter(doc => {
 			// _course must be populated!
 			return doc._course && String(doc._course.college) === String(college._id);
 		});
-		console.log('filteredAppliedCourses', filteredAppliedCourses);
 
 		const totalCount = filteredAppliedCourses.length;
-		const pendingKycCount = filteredAppliedCourses.filter(doc => 
+		const pendingKycCount = filteredAppliedCourses.filter(doc =>
 			doc.kycStage === true && doc.kyc === false
 		).length;
-		const doneKycCount = totalCount-pendingKycCount
+		const doneKycCount = totalCount - pendingKycCount
 
 
 
@@ -2804,7 +2990,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			};
 		});
 
-		
+
 
 		res.status(200).json({
 			success: true,
@@ -2833,7 +3019,6 @@ router.put("/update_kyc/:id", async (req, res) => {
 		let { id } = req.params;
 		let { doc, kycStatus } = req.body;
 		let docsId = doc;
-		console.log('doc', doc)
 		if (!docsId) {
 			return res.status(400).json({ error: "docs id not found." });
 		}
@@ -2863,7 +3048,6 @@ router.put("/update_kyc/:id", async (req, res) => {
 		});
 
 		await appliedCourse.save();
-		console.log('appliedCourse', appliedCourse)
 
 		return res.status(200).json({
 			status: true,
@@ -2880,115 +3064,113 @@ router.put("/update_kyc/:id", async (req, res) => {
 
 //doccumnet upload
 router.put("/upload_docs/:id", isCollege, async (req, res) => {
-  try {
-    const user = req.user;	
-    const college = await College.findOne({
-      '_concernPerson._id': user._id
-    });
-    
-    let { id } = req.params;
-    let { doc } = req.body;
-    let docsId = doc;
-    console.log('doc', doc);
-    
-    if (!docsId) {
-      return res.status(400).json({ error: "docs id not found." });
-    }
-    
-    if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
-      docsId = new mongoose.Types.ObjectId(docsId);
-    }
+	try {
+		const user = req.user;
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
 
-    if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
-      id = new mongoose.Types.ObjectId(id);
-    }
+		let { id } = req.params;
+		let { doc } = req.body;
+		let docsId = doc;
 
-    const appliedCourse = await AppliedCourses.findOne({ _id: id }).populate({
-      path: '_course',
-      select: 'docsRequired'
-    });
+		if (!docsId) {
+			return res.status(400).json({ error: "docs id not found." });
+		}
 
-    if (!appliedCourse) {
-      return res.status(400).json({ error: "You have not applied for this course." });
-    }
+		if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
+			docsId = new mongoose.Types.ObjectId(docsId);
+		}
 
-    // Find document name from course's docsRequired
-    const docName = appliedCourse._course?.docsRequired?.find(d => d._id.toString() === docsId.toString())?.name || 'Unknown Document';
+		if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+			id = new mongoose.Types.ObjectId(id);
+		}
 
-    const files = req.files?.file;
-    if (!files) {
-      return res.status(400).send({ status: false, message: "No files uploaded" });
-    }
+		const appliedCourse = await AppliedCourses.findOne({ _id: id }).populate({
+			path: '_course',
+			select: 'docsRequired'
+		});
 
-    const filesArray = Array.isArray(files) ? files : [files];
-    const uploadedFiles = [];
-    const uploadPromises = [];
+		if (!appliedCourse) {
+			return res.status(400).json({ error: "You have not applied for this course." });
+		}
 
-    filesArray.forEach((item) => {
-      const { name, mimetype } = item;
-      const ext = name?.split('.').pop().toLowerCase();
+		// Find document name from course's docsRequired
+		const docName = appliedCourse._course?.docsRequired?.find(d => d._id.toString() === docsId.toString())?.name || 'Unknown Document';
 
-      if (!allowedExtensions.includes(ext)) {
-        throw new Error(`File type not supported: ${ext}`);
-      }
+		const files = req.files?.file;
+		if (!files) {
+			return res.status(400).send({ status: false, message: "No files uploaded" });
+		}
 
-      let fileType = "document";
-      if (allowedImageExtensions.includes(ext)) {
-        fileType = "image";
-      } else if (allowedVideoExtensions.includes(ext)) {
-        fileType = "video";
-      }
+		const filesArray = Array.isArray(files) ? files : [files];
+		const uploadedFiles = [];
+		const uploadPromises = [];
 
-      const key = `Documents for course/${appliedCourse._course}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
-      const params = {
-        Bucket: bucketName,
-        Key: key,
-        Body: item.data,
-        ContentType: mimetype,
-      };
+		filesArray.forEach((item) => {
+			const { name, mimetype } = item;
+			const ext = name?.split('.').pop().toLowerCase();
 
-      uploadPromises.push(
-        s3.upload(params).promise().then((uploadResult) => {
-          uploadedFiles.push({
-            fileURL: uploadResult.Location,
-            fileType,
-          });
-        })
-      );
-    });
+			if (!allowedExtensions.includes(ext)) {
+				throw new Error(`File type not supported: ${ext}`);
+			}
 
-    await Promise.all(uploadPromises);
-    const fileUrl = uploadedFiles[0].fileURL;
+			let fileType = "document";
+			if (allowedImageExtensions.includes(ext)) {
+				fileType = "image";
+			} else if (allowedVideoExtensions.includes(ext)) {
+				fileType = "video";
+			}
 
-    // Add document to uploadedDocs array
-    appliedCourse.uploadedDocs.push({
-      docsId: new mongoose.Types.ObjectId(docsId),
-      fileUrl: fileUrl,
-      status: "Pending",
-      uploadedAt: new Date()
-    });
+			const key = `Documents for course/${appliedCourse._course}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
+			const params = {
+				Bucket: bucketName,
+				Key: key,
+				Body: item.data,
+				ContentType: mimetype,
+			};
 
-    // Add log for document upload with document name
-    appliedCourse.logs.push({
-      user: user._id,
-      timestamp: new Date(),
-      action: 'Document Uploaded',
-      remarks: `${docName} uploaded for verification`
-    });
+			uploadPromises.push(
+				s3.upload(params).promise().then((uploadResult) => {
+					uploadedFiles.push({
+						fileURL: uploadResult.Location,
+						fileType,
+					});
+				})
+			);
+		});
 
-    await appliedCourse.save();
-    console.log('appliedCourse', appliedCourse);
+		await Promise.all(uploadPromises);
+		const fileUrl = uploadedFiles[0].fileURL;
 
-    return res.status(200).json({
-      status: true,
-      message: "Document uploaded successfully",
-      data: appliedCourse
-    });
+		// Add document to uploadedDocs array
+		appliedCourse.uploadedDocs.push({
+			docsId: new mongoose.Types.ObjectId(docsId),
+			fileUrl: fileUrl,
+			status: "Pending",
+			uploadedAt: new Date()
+		});
 
-  } catch (err) {
-    console.log(err);
-    return res.status(500).send({ status: false, message: err.message });
-  }
+		// Add log for document upload with document name
+		appliedCourse.logs.push({
+			user: user._id,
+			timestamp: new Date(),
+			action: 'Document Uploaded',
+			remarks: `${docName} uploaded for verification`
+		});
+
+		await appliedCourse.save();
+
+		return res.status(200).json({
+			status: true,
+			message: "Document uploaded successfully",
+			data: appliedCourse
+		});
+
+	} catch (err) {
+		console.log(err);
+		return res.status(500).send({ status: false, message: err.message });
+	}
 });
 
 
@@ -3276,12 +3458,11 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 //admission list
 router.route("/admission-list").get(isCollege, async (req, res) => {
 	try {
-		const user = req.user;	
+		const user = req.user;
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
-		console.log('college', college);
-		
+
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;
@@ -3322,10 +3503,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		});
 
 		const totalCount = filteredAppliedCourses.length
-		const pendingKycCount = filteredAppliedCourses.filter(doc => 
+		const pendingKycCount = filteredAppliedCourses.filter(doc =>
 			doc.kycStage === true && doc.kyc === false
 		).length;
-		const doneKycCount = totalCount-pendingKycCount
+		const doneKycCount = totalCount - pendingKycCount
 
 
 		const result = filteredAppliedCourses.map(doc => {
@@ -3441,8 +3622,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			};
 		});
 
-		console.log('result', result)
-		
+
 
 		res.status(200).json({
 			success: true,
@@ -3468,10 +3648,39 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 
 
 
+// GET API for users with pagination and filtering
+// router.get('/users', isCollege, async (req, res) => {
+//     try {
+//         const user = req.user;
 
+//         // Find colleges where user is concern person
+//         const colleges = await College.find({
+//             '_concernPerson._id': user._id
+//         });
 
+//         // Extract all concern person IDs
+//         const concernPersonIds = colleges.flatMap(college => 
+//             college._concernPerson.map(cp => cp._id)
+//         );
 
+//         // Get actual users
+//         const users = await User.find({
+//             _id: { $in: concernPersonIds }
+//         });
 
+//         res.json({
+//             success: true,
+//             data: { users }
+//         });
+
+//     } catch (err) {
+//         console.error('Error in GET /users:', err);
+//         res.status(500).json({
+//             success: false,
+//             message: "Server Error"
+//         });
+//     }
+// });
 
 
 

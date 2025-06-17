@@ -6,6 +6,8 @@ import "./CollegeLogin.css";
 import CollegeRegister from '../Register/CollegeRegister';
 
 const CollegeLogin = () => {
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
     const urlLocation = useLocation();
     const queryParams = new URLSearchParams(urlLocation.search);
     const returnUrl = queryParams.get('returnUrl');
@@ -249,7 +251,7 @@ const CollegeLogin = () => {
                 module: 'college'
             };
 
-            const resetRes = await axios.post(`${backendUrl}/college/reset-password`, body);
+            const resetRes = await axios.post(`${backendUrl}/college/users/reset-password`, body);
 
             if (resetRes.data.status === true) {
                 setErrorMessage('');
@@ -350,7 +352,7 @@ const CollegeLogin = () => {
                                 {loginMethod === 'password' ? (
                                     <div className="input-field">
                                         <span className="input-icon">
-                                        <i className="fa-solid fa-lock"></i>
+                                            <i className="fa-solid fa-lock"></i>
                                         </span>
                                         <input
                                             type={showPassword ? "text" : "password"}
@@ -441,7 +443,7 @@ const CollegeLogin = () => {
                     )}
                     {activeTab === 'signup' && (
                         <>
-                            <CollegeRegister embedded={true}/>
+                            <CollegeRegister embedded={true} />
                         </>
                     )}
                 </div>

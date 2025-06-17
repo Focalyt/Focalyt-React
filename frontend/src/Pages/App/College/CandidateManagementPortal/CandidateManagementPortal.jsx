@@ -309,7 +309,7 @@ const CandidateManagementPortal = () => {
                 </div>
                 <div className="small text-muted mt-3">
                   <div><i className="bi bi-calendar me-1"></i>Created: <strong>{vertical.createdAt}</strong></div>
-                  <div>
+                  {/* <div>
                     <i className="bi bi-clipboard-data me-1"></i>
                     <span
                       className="text-primary"
@@ -318,7 +318,7 @@ const CandidateManagementPortal = () => {
                     >
                       {vertical.projects} Projects
                     </span>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>

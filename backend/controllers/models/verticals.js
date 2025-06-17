@@ -21,6 +21,10 @@ const verticalSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User',
   },
+  college: {
+    type: Schema.Types.ObjectId,
+    ref: 'College',
+  },
   isApproved:{
     type:Boolean,
     default:false

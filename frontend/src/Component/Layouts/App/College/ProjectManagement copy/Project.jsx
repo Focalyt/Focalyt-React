@@ -374,8 +374,7 @@ const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
                       <div className="d-flex align-items-center mb-2">
                         <i className="bi bi-kanban-fill text-primary fs-3 me-2"></i>
                         <div>
-                          <h5 className="card-title mb-1">{project.code}</h5>
-                          <p className="text-muted mb-1">{project.name}</p>
+                          <h3 className="text-muted mb-1">{project.name}</h3>
                         </div>
                       </div>
                       <p className="text-muted small mb-2">{project.description}</p>

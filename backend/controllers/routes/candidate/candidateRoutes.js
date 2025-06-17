@@ -990,12 +990,7 @@ router.get("/job/:jobId", [isCandidate], async (req, res) => {
   
 }
 
-console.log('candidate.name',candidate.name)
-console.log('candidate.highestQualification',candidate.highestQualification)
-console.log('candidate.sex',candidate.sex)
-console.log('candidate.personalInfo.totalExperience',candidate.personalInfo.totalExperience)
-console.log('candidate.personalInfo.location',candidate.personalInfo.location)
-console.log('canApply',canApply)
+
 
   let isRegisterInterview = false;
   const checkJobRegister = await AppliedJobs.findOne({
@@ -1369,7 +1364,6 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
 router.get("/course/:courseId/", isCandidate, async (req, res) => {
   try {
     const { courseId } = req.params;
-    console.log('courseId', courseId)
     const contact = await Contact.find({ status: true, isDeleted: false }).sort({ createdAt: 1 });
     const userMobile = req.user.mobile;
 
@@ -1380,7 +1374,6 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
     }
 
     let course = await Courses.findById(courseId).populate('sectors').populate('center').lean();
-    console.log('course', course)
 
 
     if (!course || course?.status === false) {
@@ -1390,7 +1383,6 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
     const candidate = await Candidate.findOne({ mobile: userMobile }).populate('highestQualification').lean();
     const highestQualification = await Qualification.find({ status: true });
 
-    console.log('candidate', candidate)
 
 
     let docsRequired = false;
@@ -1400,8 +1392,7 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
 
     const requiredDocs = course.docsRequired ? course.docsRequired.length : 0;
 
-    console.log('requiredCenter', requiredCenter)
-    console.log('requiredDocs', requiredDocs)
+    
 
     if (requiredCenter > 0) {
       centerRequired = true
@@ -1420,6 +1411,9 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
       
     }
 
+    console.log('canApply', canApply)
+    
+
     let isApplied = false;
     let assignedCourseData = null;
 
@@ -1428,7 +1422,8 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
         return c.courseId && c.courseId.toString() === courseId.toString();
       });
 
-      console.log('applied:', applied);
+      console.log('applied', applied) 
+
 
       if (applied) {
         isApplied = true;
@@ -2233,7 +2228,6 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
     return res.send({ status: false, msg: "Vacancy not Found!" });
   }
   let candidate = await Candidate.findOne({ mobile: candidateMobile })
-  console.log('candidate', candidate)
 
 
   if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
@@ -4413,7 +4407,6 @@ console.log('updateQuery',updateQuery)
       updateQuery
     );
 
-    console.log('candidate',candidate)
 
     return res.send({ status: true, message: `${fieldName} updated successfully` });
 

@@ -19,7 +19,9 @@ import AssignmentRule from './AccessManagement/AssignmentRule';
 import PermissionAnalysis from './AccessManagement/PermissionAnalysis';
 import RoleManagement from './AccessManagement/RoleManagement';
 import Settings from './AccessManagement/Settings';
-import CrmAccessManagement from './CrmAccessManagement';
+import LeadAssignmentRule from './leadAssignmentRule';
+import qs from 'query-string';
+
 
 
 // Import shared components/modals
@@ -48,28 +50,7 @@ const AccessManagement = () => {
 
   // All users data
   const [users, setUsers] = useState([
-    {
-      user_id: 'user_3',
-      name: 'Anil Verma',
-      email: 'anil@company.com',
-      role: 'COUNSELLOR',
-      status: 'active',
-      permission_type: 'lead_based',
-      reporting_managers: ['user_5', 'user_6'],
-      assigned_leads: ['lead_1', 'lead_2'],
-      centers_access: ['center_1', 'center_2']
-    },
-    {
-      user_id: 'user_4',
-      name: 'Sneha Patel',
-      email: 'sneha@company.com',
-      role: 'SALES_EXECUTIVE',
-      status: 'active',
-      permission_type: 'lead_based',
-      reporting_managers: ['user_6'],
-      assigned_leads: ['lead_3', 'lead_4'],
-      centers_access: ['center_2', 'center_3']
-    }
+    
   ]);
 
   const [enhancedEntities, setEnhancedEntities] = useState({
@@ -85,11 +66,7 @@ const AccessManagement = () => {
     COURSE: [
       
     ],
-    BATCH: [
-      { id: 'batch_1', name: 'React Batch Jan 2025', parent_id: 'course_1' },
-      { id: 'batch_2', name: 'Node.js Batch Feb 2025', parent_id: 'course_2' },
-      { id: 'batch_3', name: 'MERN Batch Mar 2025', parent_id: 'course_3' }
-    ]
+    BATCH: []
   });
 
   // All roles data
@@ -113,167 +90,21 @@ const AccessManagement = () => {
 
   // Organization tree data
   const [organizationTree] = useState({
-    'user_5': {
-      user_id: 'user_5',
-      name: 'Kavita Desai',
-      role: 'TL_COUNSELLOR',
-      email: 'kavita@company.com',
-      direct_reports: ['user_3'],
-      level: 1,
-      department: 'COUNSELLING'
-    },
-    'user_6': {
-      user_id: 'user_6',
-      name: 'Amit Sharma',
-      role: 'CENTER_SALES_HEAD',
-      email: 'amit@company.com',
-      direct_reports: ['user_4'],
-      level: 1,
-      department: 'SALES'
-    },
-    'user_3': {
-      user_id: 'user_3',
-      name: 'Anil Verma',
-      role: 'COUNSELLOR',
-      email: 'anil@company.com',
-      direct_reports: [],
-      reporting_to: ['user_5', 'user_6'],
-      level: 2,
-      department: 'COUNSELLING'
-    },
-    'user_4': {
-      user_id: 'user_4',
-      name: 'Sneha Patel',
-      role: 'SALES_EXECUTIVE',
-      email: 'sneha@company.com',
-      direct_reports: [],
-      reporting_to: ['user_6'],
-      level: 2,
-      department: 'SALES'
-    }
+    
   });
 
   // Leads data
   const [leads] = useState([
-    {
-      lead_id: 'lead_1',
-      name: 'John Doe',
-      email: 'john@email.com',
-      phone: '+91-9876543210',
-      course_interested: 'Python Course',
-      center: 'center_1',
-      center_name: 'Delhi Center',
-      assigned_to: 'user_3',
-      status: 'contacted',
-      priority: 'high',
-      created_date: '2024-01-15'
-    },
-    {
-      lead_id: 'lead_2',
-      name: 'Sarah Wilson',
-      email: 'sarah@email.com',
-      phone: '+91-9876543211',
-      course_interested: 'Data Science',
-      center: 'center_2',
-      center_name: 'Mumbai Center',
-      assigned_to: 'user_3',
-      status: 'new',
-      priority: 'medium',
-      created_date: '2024-01-16'
-    },
-    {
-      lead_id: 'lead_3',
-      name: 'David Smith',
-      email: 'david@email.com',
-      phone: '+91-9876543212',
-      course_interested: 'React Development',
-      center: 'center_2',
-      center_name: 'Mumbai Center',
-      assigned_to: 'user_4',
-      status: 'qualified',
-      priority: 'high',
-      created_date: '2024-01-17'
-    }
+   
   ]);
 
   // Assignment rules data
   const [assignmentRules] = useState([
-    {
-      id: 'rule_1',
-      name: 'Geographic Assignment',
-      type: 'location_based',
-      description: 'Auto-assign leads based on center location',
-      active: true,
-      conditions: {
-        center_mapping: {
-          'center_1': ['user_3', 'user_5'],
-          'center_2': ['user_4', 'user_6'],
-          'center_3': ['user_4']
-        }
-      }
-    },
-    {
-      id: 'rule_2',
-      name: 'Course Specialization',
-      type: 'course_based',
-      description: 'Assign based on counsellor expertise',
-      active: true,
-      conditions: {
-        course_mapping: {
-          'Python Course': ['user_3'],
-          'Data Science': ['user_3', 'user_5'],
-          'React Development': ['user_4']
-        }
-      }
-    },
-    {
-      id: 'rule_3',
-      name: 'Workload Balancing',
-      type: 'load_based',
-      description: 'Distribute leads evenly among team members',
-      active: false,
-      conditions: {
-        max_leads_per_user: 10,
-        rebalance_frequency: 'weekly'
-      }
-    }
+    
   ]);
 
   // Entities data
-  const [entities] = useState({
-    VERTICAL: [
-      { id: 'vertical_1', name: 'Technology Vertical' },
-      { id: 'vertical_2', name: 'Business Vertical' }
-    ],
-    PROJECT: [
-      { id: 'project_1', name: 'AI Development Project', parent_id: 'vertical_1' },
-      { id: 'project_2', name: 'Web Development Project', parent_id: 'vertical_1' },
-      { id: 'project_3', name: 'Mobile App Project', parent_id: 'vertical_2' },
-      { id: 'project_4', name: 'Data Science Project', parent_id: 'vertical_2' }
-    ],
-    CENTER: [
-      { id: 'center_1', name: 'Delhi Center', parent_id: 'project_1' },
-      { id: 'center_2', name: 'Mumbai Center', parent_id: 'project_1' },
-      { id: 'center_3', name: 'Bangalore Center', parent_id: 'project_2' },
-      { id: 'center_4', name: 'Pune Center', parent_id: 'project_2' },
-      { id: 'center_5', name: 'Chennai Center', parent_id: 'project_3' },
-      { id: 'center_6', name: 'Hyderabad Center', parent_id: 'project_4' }
-    ],
-    COURSE: [
-      { id: 'course_1', name: 'Python Fundamentals', parent_id: 'center_1' },
-      { id: 'course_2', name: 'React Development', parent_id: 'center_1' },
-      { id: 'course_3', name: 'Machine Learning', parent_id: 'center_2' },
-      { id: 'course_4', name: 'Data Structures', parent_id: 'center_3' },
-      { id: 'course_5', name: 'Mobile Development', parent_id: 'center_5' },
-      { id: 'course_6', name: 'Data Science Basics', parent_id: 'center_6' }
-    ],
-    BATCH: [
-      { id: 'batch_1', name: 'Python Batch A', parent_id: 'course_1' },
-      { id: 'batch_2', name: 'Python Batch B', parent_id: 'course_1' },
-      { id: 'batch_3', name: 'React Batch A', parent_id: 'course_2' },
-      { id: 'batch_4', name: 'ML Batch A', parent_id: 'course_3' }
-    ]
-  });
+ 
 
   // Tab definitions
   const tabs = [
@@ -304,7 +135,45 @@ const AccessManagement = () => {
     fetchVerticals()
     fetchProjects()
     fetchCenters()
+    fetchCourses()
+    fetchBatches()
+    fetchUsers()
   }, []);
+
+
+  
+  
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/users`, {
+        headers: { 'x-auth': token }
+      });
+  
+      if (response.data.success) {
+        console.log('response.data.data.users', response.data.data.users)
+        // Update users state with detailed access summary
+        setUsers(response.data.data.users.map(user => ({
+          user_id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          designation: user.designation,
+          status: user.status ? 'active' : 'inactive',
+          reporting_managers: user.accessSummary?.reportingManagers || 0,
+          role: user.role,
+          roleId: user.roleId,          
+          // ✅ NEW: Add detailed access summary
+          accessSummary: user.accessSummary || {},
+          fullPermissions: user.fullPermissions || {},
+          college: user.college || {},
+          created_at: user.createdAt
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
 
   const fetchVerticals = async () => {
     const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, { headers: { 'x-auth': token } });
@@ -336,8 +205,7 @@ const AccessManagement = () => {
       parent_id:v.vertical,
       createdAt: v.createdAt
     }));
-    console.log('response', response)
-    console.log('projets', list)
+   
 
 
     // Update the whole enhancedEntities but keep other keys unchanged
@@ -365,7 +233,6 @@ const AccessManagement = () => {
       createdAt: center.createdAt
     }));
 
-    console.log('Fetched centers:', list);
 
     // Update enhancedEntities
     setEnhancedEntities(prev => ({
@@ -379,11 +246,16 @@ const AccessManagement = () => {
 
 const fetchCourses = async () => {
   try {
-    const response = await axios.get(`${backendUrl}/college/all_courses`, {
-      headers: { 'x-auth': token }
-    });
+    const user = JSON.parse(sessionStorage.getItem('user'));
+    const headers = {
+      'x-auth': user.token,
+    };
+    
+    const response = await axios.get(`${backendUrl}/college/courses`, { headers });
 
-    const responseData = response.data.data || [];
+    
+
+    const responseData = response.data.courses || [];
 
     // Convert to desired structure
     const list = responseData.map(a => ({
@@ -395,11 +267,41 @@ const fetchCourses = async () => {
       createdAt: a.createdAt
     }));
 
-    console.log('Fetched courses:', list);
     // Update enhancedEntities
     setEnhancedEntities(prev => ({
       ...prev,
       COURSE: list
+    }));
+  } catch (error) {
+    console.error('Error fetching courses:', error);
+  }
+};
+
+
+
+const fetchBatches = async () => {
+  try {
+    const response = await axios.get(`${backendUrl}/college/batches`, {
+      headers: { 'x-auth': token }
+    });
+
+    const responseData = response.data.batches || [];
+
+    // Convert to desired structure
+    const list = responseData.map(a => ({
+      id: a._id,
+      name: a.name,
+      status: a.status === true ? 'active' : 'inactive',
+      center: a.centerId? a.centerId : "", // convert to array safely
+      course:a.courseId?a.courseId :'',
+      createdAt: a.createdAt
+    }));
+
+    console.log('Fetched batchs:', list);
+    // Update enhancedEntities
+    setEnhancedEntities(prev => ({
+      ...prev,
+      BATCH: list
     }));
   } catch (error) {
     console.error('Error fetching courses:', error);
@@ -413,6 +315,7 @@ const fetchCourses = async () => {
         return (
           <UserManagement
             users={users}
+            handleAddUser={handleAddUser}
             allRoles={allRoles}
             permissionMode={permissionMode}
             searchTerm={searchTerm}
@@ -431,10 +334,10 @@ const fetchCourses = async () => {
         );
       case 'assignments':
         return (
-          <CrmAccessManagement
-            assignmentRules={assignmentRules}
-            entities={entities}
+          <LeadAssignmentRule
+            assignmentRules={assignmentRules}            
             users={users}
+            enhancedEntities={enhancedEntities}
           />
         );
       case 'analysis':
@@ -465,110 +368,17 @@ const fetchCourses = async () => {
         <div className="container-fluid">
           <div className="d-flex justify-content-between align-items-center py-4">
             <div>
-              <h1 className="h2 fw-bold text-dark mb-1">Unified Permission Management</h1>
+              <h1 className="h2 fw-bold text-dark mb-1">Access Management</h1>
               <p className="text-muted mb-0">Complete permission system with hierarchical content management & lead-based access control</p>
             </div>
-            <div className="d-flex gap-3">
-              {/* Permission Mode Toggle */}
-              <div className="btn-group" role="group">
-                <input
-                  type="radio"
-                  className="btn-check"
-                  name="permissionMode"
-                  id="unified"
-                  checked={permissionMode === 'unified'}
-                  onChange={() => setPermissionMode('unified')}
-                />
-                <label className="btn btn-outline-primary" htmlFor="unified">
-                  <Layers size={16} className="me-1" />
-                  Unified
-                </label>
-
-                <input
-                  type="radio"
-                  className="btn-check"
-                  name="permissionMode"
-                  id="hierarchical"
-                  checked={permissionMode === 'hierarchical'}
-                  onChange={() => setPermissionMode('hierarchical')}
-                />
-                <label className="btn btn-outline-info" htmlFor="hierarchical">
-                  <Building size={16} className="me-1" />
-                  Content
-                </label>
-
-                <input
-                  type="radio"
-                  className="btn-check"
-                  name="permissionMode"
-                  id="lead_based"
-                  checked={permissionMode === 'lead_based'}
-                  onChange={() => setPermissionMode('lead_based')}
-                />
-                <label className="btn btn-outline-success" htmlFor="lead_based">
-                  <Target size={16} className="me-1" />
-                  Leads
-                </label>
-              </div>
-
-              <button
-                onClick={handleAddUser}
-                className="btn btn-success d-flex align-items-center gap-2"
-              >
-                <UserPlus size={16} />
-                <span>Add User</span>
-              </button>
-
-            </div>
+            
           </div>
         </div>
       </div>
 
       <div className="container-fluid py-4">
         {/* Permission Mode Info Banner */}
-        <div className="alert alert-light border mb-4">
-          <div className="row align-items-center">
-            <div className="col-md-8">
-              <div className="d-flex align-items-center gap-3">
-                {permissionMode === 'unified' && (
-                  <>
-                    <Layers className="text-primary" size={24} />
-                    <div>
-                      <div className="fw-medium">Unified View Active</div>
-                      <div className="small text-muted">Complete system showing hierarchical content management + lead-based permissions + hybrid roles</div>
-                    </div>
-                  </>
-                )}
-                {permissionMode === 'hierarchical' && (
-                  <>
-                    <Building className="text-info" size={24} />
-                    <div>
-                      <div className="fw-medium">Content Management Mode</div>
-                      <div className="small text-muted">Hierarchical permissions for content (Vertical → Project → Center → Course → Batch)</div>
-                    </div>
-                  </>
-                )}
-                {permissionMode === 'lead_based' && (
-                  <>
-                    <Target className="text-success" size={24} />
-                    <div>
-                      <div className="fw-medium">Lead Management Mode</div>
-                      <div className="small text-muted">Team-based lead management permissions (Sales, Counselling teams)</div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="col-md-4 text-end">
-              <div className="d-flex gap-2">
-                <span className="badge bg-info">{users.filter(u => u.permission_type === 'hierarchical').length} Content</span>
-                <span className="badge bg-success">{users.filter(u => u.permission_type === 'lead_based').length} Lead</span>
-                <span className="badge bg-warning">{users.filter(u => u.permission_type === 'hybrid').length} Hybrid</span>
-                <span className="badge bg-secondary">{Object.keys(allRoles).length} Roles</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        
 
         {/* Tabs */}
         <div className="border-bottom mb-4">
@@ -600,6 +410,7 @@ const fetchCourses = async () => {
       {showUserDetails && (
         <UserDetailsModal
           user={viewDetailsUser}
+          
           allRoles={allRoles}
           onClose={() => setShowUserDetails(false)}
         />
@@ -609,7 +420,6 @@ const fetchCourses = async () => {
         <AddUserModal
           users={users}
           allRoles={allRoles}
-          entities={entities}
           onClose={() => setShowAddUser(false)}
           onAddUser={(newUser) => {
             setUsers([...users, newUser]);
@@ -622,7 +432,6 @@ const fetchCourses = async () => {
 
       {showAddRole && (
         <AddRoleModal
-          entities={entities}
           onClose={() => setShowAddRole(false)}
           onAddRole={(newRole) => {
             setAllRoles(prev => ({

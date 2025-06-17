@@ -716,7 +716,6 @@ router.route("/registrations")
 						(d) => d.courseId.toString() === candidate.courseId.toString()
 					);
 
-					console.log('candidateDocSet', candidate.docsForCourses)
 
 					let totalRequired = courseDocsRequired.length;
 					let verified = 0;

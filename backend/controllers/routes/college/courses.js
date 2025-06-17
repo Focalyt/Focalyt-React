@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require("path");
 const { auth1, isAdmin, isCollege } = require("../../../helpers");
 const moment = require("moment");
-const { Courses, Country, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
+const { Courses, College, Country, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 const candidateServices = require('../services/candidate')
 const { candidateCashbackEventName } = require('../../db/constant');
@@ -60,9 +60,7 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 
 	const promises = filesArray.map((file) => {
 		const ext = file.name.split('.').pop().trim().toLowerCase();
-		console.log('file name', file.name)
-		console.log('allowedExtensions', allowedExtensions)
-		console.log('folder', folder)
+		
 		if (!allowedExtensions.includes(ext)) {
 			throw new Error(`Unsupported file format: ${ext}`);
 		}
@@ -96,16 +94,27 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 router.route("/").get(async (req, res) => {
 
 	try {
+
 		let view = false
 		let canEdit = false
 		const user = req.user
+		if(!user){
+			return res.json({
+				status: false,
+				message: "You are not authorized to access this page"
+			})
+		}
 
 
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
-		console.log('college', college);
-
+		if(!college){
+			return res.json({
+				status: false,
+				message: "College not found"
+			})
+		}
 
 		const data = req.query;
 		const fields = {
@@ -135,7 +144,7 @@ router.route("/").get(async (req, res) => {
 		}
 		fields["status"] = status;
 		let courses;
-		// ✅ Role 11 specific filtering
+		
 		courses = await Courses.find({
 			...fields,
 			college: college._id
@@ -320,10 +329,8 @@ router
 	.route("/edit/:id")
 	.get(async (req, res) => {
 		try {
-			console.log('edit api');
 			const { id } = req.params;
 			let course = await Courses.findById(id);
-			console.log('course', course)
 			if (!course) throw req.ykError("course not found!");
 			const sectors = await CourseSectors.find({
 				status: true, _id: {
@@ -365,7 +372,6 @@ router
 
 
 
-			console.log('body', body)
 			const bucketName = process.env.AWS_BUCKET_NAME;
 
 			// Find existing course
@@ -531,8 +537,7 @@ router.route('/:courseId/candidate/upload-docs')
 	.post(isCollege, async (req, res) => {
 		try {
 			let { docsName, courseId, docsId } = req.body;
-			console.log("Docs ID:", docsId, typeof docsId);
-			console.log('courseId' , typeof courseId)
+			
 
 			if(typeof courseId === 'string' && mongoose.Types.ObjectId.isValid(courseId)){
 				courseId = new mongoose.Types.ObjectId(courseId);
@@ -542,8 +547,7 @@ router.route('/:courseId/candidate/upload-docs')
 				docsId = new mongoose.Types.ObjectId(docsId);
 			}
 
-			console.log("after conversion Docs ID:", docsId, typeof docsId);
-			console.log('after conversion courseId' , typeof courseId)
+			
 
 			if (!mongoose.Types.ObjectId.isValid(docsId)) {
 				return res.status(400).json({ error: "Invalid document ID format." });
@@ -559,7 +563,6 @@ router.route('/:courseId/candidate/upload-docs')
 				mobile: candidateMobile
 			});
 
-			console.log('candidate' , candidate)	
 
 			const appliedCourse = await AppliedCourses.findOne({
 				_candidate: candidate._id,
@@ -575,7 +578,6 @@ router.route('/:courseId/candidate/upload-docs')
 				return res.status(400).send({ status: false, message: "No files uploaded" });
 			}
 
-			console.log("Files", files)
 
 			const filesArray = Array.isArray(files) ? files : [files];
 			const uploadedFiles = [];
@@ -586,7 +588,6 @@ router.route('/:courseId/candidate/upload-docs')
 				const { name, mimetype } = item;
 				const ext = name?.split('.').pop().toLowerCase();
 
-				console.log(`Processing File: ${name}, Extension: ${ext}`);
 
 				if (!allowedExtensions.includes(ext)) {
 					console.log("File type not supported")
@@ -619,7 +620,6 @@ router.route('/:courseId/candidate/upload-docs')
 			});
 
 			await Promise.all(uploadPromises);
-			console.log(uploadedFiles)
 
 			const fileUrl = uploadedFiles[0].fileURL;
 
@@ -631,7 +631,6 @@ router.route('/:courseId/candidate/upload-docs')
 			});
 
 			await appliedCourse.save();
-			console.log('appliedCourse', appliedCourse)
 
 			const existingCourseDoc = await Candidate.findOne({
 				mobile: candidateMobile,
@@ -710,8 +709,6 @@ router.route('/leadStatus')
 			const { appliedId } = req.body
 
 
-			console.log('user', user)
-			console.log('appliedId', appliedId);
 
 			return res.status(200).json({
 				status: true,

@@ -751,7 +751,6 @@ $(document).on("click", ".remove-btn", function () {
             url: "/admin/post/candidateslist?page=" + candidatePage,
             type: "GET",
             success: function (response) {
-              console.log('candidate data', response)
               if (response && response.length > 0) {
                 newCandidateslist = candidateslist.concat(response); // Add new data
                 console.log("New Candidate List", newCandidateslist)
