@@ -15,6 +15,7 @@ const {AppliedCourses, CandidateProfile, Courses} = require('../../models');
 router.route("/addleaddandcourseapply")
 	.post( async (req, res) => {
 		console.log("req.body");
+        
 		try {
 			console.log("Incoming body:", req.body);
 
