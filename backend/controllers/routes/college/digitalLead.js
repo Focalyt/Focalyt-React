@@ -29,12 +29,13 @@ router.route("/addleaddandcourseapply")
             }
       
             const centerName = Field4?.trim(); // Trim kar diya yahan
-            const selectedCenter = await Center.findOne({name: centerName, college: course.college});
+            const selectedCenterName = await Center.findOne({name: centerName, college: course.college});
             console.log("selectedCenter", selectedCenter);
-            if(!selectedCenter){
+            if(!selectedCenterName){
                 return res.status(400).json({ status: false, msg: "Center not found" });
             }         
 
+            const selectedCenter = selectedCenterName._id;
 
             if (mongoose.Types.ObjectId.isValid(courseId)) courseId = new mongoose.Types.ObjectId(courseId);
             if (mongoose.Types.ObjectId.isValid(selectedCenter)) selectedCenter = new mongoose.Types.ObjectId(selectedCenter);
