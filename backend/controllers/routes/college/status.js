@@ -5,8 +5,6 @@ const cors = require('cors');
 const router = express.Router();
 const { isCollege, auth1, authenti } = require("../../../helpers");
 
-
-
 // Status Model
 const Status = require('../../models/status');
 const AppliedCourses = require('../../models/appliedCourses');

@@ -15,7 +15,7 @@ const {AppliedCourses, CandidateProfile, Courses} = require('../../models');
 router.route("/addleaddandcourseapply")
 	.post( async (req, res) => {
 		console.log("req.body");
-        
+
 		try {
 			console.log("Incoming body:", req.body);
 
@@ -68,7 +68,7 @@ router.route("/addleaddandcourseapply")
 			// ✅ Optional: Update your Google Spreadsheet
 			
 
-			res.send({ status: true, msg: "Candidate added and course applied successfully", data: candidate });
+			res.json({ status: true, msg: "Candidate added and course applied successfully", data: candidate });
 
 		} catch (err) {
 			console.error(err);
