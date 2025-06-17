@@ -32,7 +32,7 @@ const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
 router.use("/leadAssignmentRule", isCollege, leadAssignmentRuleRoutes);
-router.use("/users",  userRoutes);
+router.use("/users", isCollege, userRoutes);
 router.use("/batches", isCollege, batchRoutes);
 router.use("/sms", isCollege, smsRoutes);
 router.use("/roles", isCollege, roleManagementRoutes);
@@ -3678,7 +3678,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 //     }
 // });
 
-;
+
 
 
 
