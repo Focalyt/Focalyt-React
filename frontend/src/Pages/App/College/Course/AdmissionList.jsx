@@ -3008,15 +3008,15 @@ const AdmissionList = () => {
                                             <div className="info-card">
                                               <div className="info-group">
                                                 <div className="info-label">STATE</div>
-                                                <div className="info-value">{profile._course?.state}</div>
+                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
                                                 <div className="info-label">City</div>
-                                                <div className="info-value">{profile._course?.city}</div>
+                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
                                                 <div className="info-label">BRANCH NAME</div>
-                                                <div className="info-value">PSD Chandauli Center</div>
+                                                <div className="info-value">{profile._center?.name || 'N/A'}</div>
                                               </div>
                                               <div className="info-group">
                                                 <div className="info-label">LEAD MODIFICATION DATE</div>
@@ -3079,15 +3079,15 @@ const AdmissionList = () => {
                                                   <div className="info-card">
                                                     <div className="info-group">
                                                       <div className="info-label">STATE</div>
-                                                      <div className="info-value">{profile._course?.state}</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">City</div>
-                                                      <div className="info-value">{profile._course?.city}</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">BRANCH NAME</div>
-                                                      <div className="info-value">PSD Chandauli Center</div>
+                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD MODIFICATION DATE</div>
@@ -3122,7 +3122,13 @@ const AdmissionList = () => {
                                                   <div className="col-xl-3 col-3">
                                                     <div className="info-group">
                                                       <div className="info-label">STATE</div>
-                                                      <div className="info-value">{profile._course?.state}</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl-3 col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">City</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
                                                     </div>
                                                   </div>
                                                   <div className="col-xl- col-3">
@@ -3131,17 +3137,12 @@ const AdmissionList = () => {
                                                       <div className="info-value">{profile._course?.name}</div>
                                                     </div>
                                                   </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">BATCH NAME</div>
-                                                      <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
+                                                 
 
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
                                                       <div className="info-label">BRANCH NAME</div>
-                                                      <div className="info-value">{profile._course?.college || 'N/A'}</div>
+                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
                                                     </div>
                                                   </div>
                                                   <div className="col-xl- col-3">

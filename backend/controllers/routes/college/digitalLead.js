@@ -19,9 +19,12 @@ router.route("/addleaddandcourseapply")
         try {
             console.log("Incoming body:", req.body);
 
-            let { name, MobileNumber, sex, dob, email, courseId, Field4} = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4} = req.body;
             let mobile = MobileNumber;
-            let courseName = Field4?.trim();
+            let name = FirstName;
+            let sex = Gender;
+            let dob = DateOfBirth;
+            let email = Email;
 
             let course = await Courses.findById(courseId);
             if (!course) {

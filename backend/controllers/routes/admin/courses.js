@@ -302,6 +302,8 @@ router
 router.patch('/:courseId/disable-doc/:docId', async (req, res) => {
 	const { courseId, docId } = req.params;
 
+	console.log("courseId", courseId, "docId", docId)
+
 	try {
 		const course = await Courses.findOneAndUpdate(
 			{ _id: courseId, 'docsRequired._id': docId },

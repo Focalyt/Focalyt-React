@@ -114,8 +114,7 @@ module.exports.isCollege = async (req, res, next) => {
     const college = await College.findOne({ '_concernPerson._id': user._id })
     req.user = user
     req.college = college
-
-
+    user.college = college
 
     return next();
   } catch (err) {

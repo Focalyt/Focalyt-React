@@ -325,6 +325,30 @@ router
 		}
 	})
 
+router.patch('/:courseId/disable-doc/:docId', async (req, res) => {
+		const { courseId, docId } = req.params;
+	
+		console.log("courseId", courseId, "docId", docId)
+	
+		try {
+			const course = await Courses.findOneAndUpdate(
+				{ _id: courseId, 'docsRequired._id': docId },
+				{ $set: { 'docsRequired.$.status': false } },
+				{ new: true }
+			);
+	
+			if (!course) {
+				return res.status(404).json({ status: false, message: "Document or Course not found" });
+			}
+	
+			res.status(200).json({ status: true, message: "Document disabled successfully", data: course });
+		} catch (error) {
+			console.error(error);
+			res.status(500).json({ status: false, message: "Server Error" });
+		}
+	});
+	
+
 router
 	.route("/edit/:id")
 	.get(async (req, res) => {
