@@ -341,6 +341,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				}
 			})
 			.populate('_leadStatus')
+			.populate('_center')
 			.populate('registeredBy')
 			.populate({
 				path: '_candidate',
@@ -2259,14 +2260,11 @@ router.get('/list-projects', [isCollege], async (req, res) => {
 		let filter = {};
 		let collegeId = req.user.college._id;
 		let vertical = req.query.vertical;
-
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
 		if (typeof vertical !== 'string') { vertical = new mongoose.Types.ObjectId(vertical); }
-
 		if (vertical) {
 			filter.vertical = vertical;
 		}
-
 		filter.college = collegeId;
 
 		const projects = await Project.find(filter).sort({ createdAt: -1 });
@@ -2840,6 +2838,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 					select: 'name'
 				}
 			})
+			.populate('_center')
 			.populate('_leadStatus')
 			.populate('registeredBy')
 			.populate({
@@ -3475,6 +3474,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 					select: 'name'
 				}
 			})
+			.populate('_center')
 			.populate('_leadStatus')
 			.populate('registeredBy')
 			.populate({
