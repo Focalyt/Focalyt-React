@@ -181,6 +181,12 @@
 .main-menu.menu-light .navigation>li ul .active>a {
   color: #fff;
 }
+@media (max-width: 768px) {
+  .app-content.content {
+    margin-left: 0;
+  }
+}
+
 /* .menu-title {
   margin-left: 10px;
   color: black;
