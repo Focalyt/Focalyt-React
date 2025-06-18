@@ -52,7 +52,7 @@ router.route("/addleaddandcourseapply")
             if(alreadyApplied){
                 return res.json({ status: false, msg: "Candidate already exists and course already applied", data:{existingCandidate, alreadyApplied} });
             }
-            if (existingCandidate) {
+            if (existingCandidate && !alreadyApplied) {
                 let appliedCourseEntry = await AppliedCourses.create({
                     _candidate: existingCandidate._id,
                     _course: courseId,
