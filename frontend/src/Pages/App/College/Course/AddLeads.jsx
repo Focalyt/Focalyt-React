@@ -505,7 +505,7 @@ const AddLeads = () => {
               <div className="breadcrumb-wrapper col-12">
                 <ol className="breadcrumb">
                   <li className="breadcrumb-item">
-                    <a href="/admin">Home</a>
+                    <a href="/institute/dashboard">Home</a>
                   </li>
                   <li className="breadcrumb-item active">Add Leads</li>
                 </ol>

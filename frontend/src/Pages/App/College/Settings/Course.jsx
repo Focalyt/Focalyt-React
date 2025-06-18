@@ -149,7 +149,7 @@ const Course = () => {
               <div className="breadcrumb-wrapper col-12">
                 <ol className="breadcrumb">
                   <li className="breadcrumb-item">
-                    <Link to="/admin">Home</Link>
+                    <Link to="/institute/dashboard">Home</Link>
                   </li>
                   <li className="breadcrumb-item active">Add Course</li>
                 </ol>

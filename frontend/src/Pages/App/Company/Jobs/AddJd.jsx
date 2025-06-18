@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios'
+import Choices from 'choices.js';
+import 'choices.js/public/assets/styles/choices.min.css';
 
 const AddJd = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -78,6 +81,37 @@ const AddJd = () => {
   // Refs for Google Maps
   const workLocationRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const benefitRef = useRef(null);
+  const subQualificationRef = useRef(null);
+  const techSkillsRef = useRef(null);
+  const nonTechSkillsRef = useRef(null);
+
+  useEffect(() => {
+    if (benefitRef.current) {
+      const choices = new Choices(benefitRef.current, {
+        removeItemButton: true,
+        shouldSort: false,
+      });
+    }
+    if (subQualificationRef.current) {
+      new Choices(subQualificationRef.current, {
+        removeItemButton: true,
+        shouldSort: false,
+      });
+    }
+    if (techSkillsRef.current) {
+      new Choices(techSkillsRef.current, {
+        removeItemButton: true,
+        shouldSort: false,
+      });
+    }
+    if (nonTechSkillsRef.current) {
+      new Choices(nonTechSkillsRef.current, {
+        removeItemButton: true,
+        shouldSort: false,
+      });
+    }
+  }, []);
 
   // Company and coins data (would come from props or context in real app)
   const [companyData, setCompanyData] = useState({
@@ -97,38 +131,36 @@ const AddJd = () => {
   const loadDropdownData = async () => {
     try {
       const token = localStorage.getItem('token');
+      // const token = userData.token;
       const headers = { 'x-auth': token };
 
-      // Load all dropdown data
-      const [industryRes, qualificationRes, statesRes, techSkillsRes, nonTechSkillsRes] = await Promise.all([
-        fetch(`${backendUrl}/api/industries`, { headers }),
-        fetch(`${backendUrl}/api/qualifications`, { headers }),
-        fetch(`${backendUrl}/api/states`, { headers }),
-        fetch(`${backendUrl}/api/techskills`, { headers }),
-        fetch(`${backendUrl}/api/nontechskills`, { headers })
-      ]);
-
-      const [industry, qualification, states, techSkills, nonTechSkills] = await Promise.all([
-        industryRes.json(), qualificationRes.json(), statesRes.json(), 
-        techSkillsRes.json(), nonTechSkillsRes.json()
-      ]);
+      const response = await axios.get(`${backendUrl}/company/addjobsdetails`,{headers})
+     const data = response.data;
+      console.log('response',response.data)
 
       setDropdownData({
-        industry: industry.data || [],
-        qualification: qualification.data || [],
-        subQualification: [],
-        states: states.data || [],
-        cities: [],
-        techSkills: techSkills.data || [],
-        nonTechSkills: nonTechSkills.data || []
+        industry: data.industry || [],
+        qualification: data.qualification || [],
+        subQualification: data.subQualification || [],
+        states: data.state || [],
+        cities: [], // initially empty
+        techSkills: data.techskills || [],
+        nonTechSkills: data.nontechskills || []
       });
 
-      // Set company name
-      setFormData(prev => ({
-        ...prev,
-        displayCompanyName: companyData.name || ''
-      }));
+      setCompanyData({
+        name: data.company?.name || '',
+        creditLeft: data.company?.creditLeft || 0
+      });
+      coinsRequired.contactcoins = data.coinsRequired?.contactcoins || 25;
 
+    // Pre-fill company name into form
+    setFormData(prev => ({
+      ...prev,
+      displayCompanyName: data.company?.name || ''
+    }));
+
+ 
     } catch (error) {
       console.error('Error loading dropdown data:', error);
     }
@@ -499,6 +531,7 @@ const AddJd = () => {
                             <div className="col-xl-3 mb-1">
                               <label>Stream <span className="mandatory">*</span></label>
                               <select 
+                                ref={subQualificationRef}
                                 className="form-control"
                                 name="_subQualification"
                                 multiple
@@ -882,6 +915,7 @@ const AddJd = () => {
                             <select 
                               className="form-control" 
                               multiple 
+                              ref={benefitRef}
                               name="benifits"
                               value={formData.benifits}
                               onChange={(e) => {

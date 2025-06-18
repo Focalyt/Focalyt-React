@@ -3,7 +3,7 @@ const axios = require("axios");
 const jwt = require('jsonwebtoken');
 
 const ObjectId = require("mongodb").ObjectID;
-const {verify}=require('jsonwebtoken')
+const { verify } = require('jsonwebtoken')
 const {
   City,
   State,
@@ -19,7 +19,7 @@ const {
   Skill
 } = require("../controllers/models");
 
-const { msgApikey, authKey, msg91SmsUrl,jwtSecret, chat_service_api } = require("../config");
+const { msgApikey, authKey, msg91SmsUrl, jwtSecret, chat_service_api } = require("../config");
 const qualification = require("../controllers/models/qualification");
 const { default: mongoose } = require("mongoose");
 
@@ -101,19 +101,22 @@ module.exports.isCollege = async (req, res, next) => {
     const error = req.ykError("You are not authorized");
     let user = null;
 
-      // ✅ Else check for token in headers (for React SPA project)
-      const token = req.header('x-auth');
-      
-    
-      if (!token) throw error;
-      const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
-      
-      user = await User.findById(decoded.id);
-      const college = await College.findOne({'_concernPerson._id': user._id})
-      user.college = college
+    // ✅ Else check for token in headers (for React SPA project)
+    const token = req.header('x-auth');
 
-      req.user = user;
+
+    if (!token) throw error;
+    const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+
+    user = await User.findById(decoded.id);
     if (!user || user.role !== 2) throw error;
+
+    const college = await College.findOne({ '_concernPerson._id': user._id })
+    req.user = user
+    req.college = college
+
+
+
     return next();
   } catch (err) {
     const userAgent = req.get('User-Agent');
@@ -147,9 +150,13 @@ const checkPermission = (permission) => {
 module.exports.isCompany = async (req, res, next) => {
   try {
     const error = req.ykError("You are not authorized");
-    const { user } = req.session;
+    const token = req.header('x-auth');
+    if (!token) throw error;
+    const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+    const user = await User.findById(decoded.id);
     if (!user || user.role !== 1) throw error;
     req.companyUser = user._id;
+    req.user = user
     return next();
   } catch (err) {
     const userAgent = req.get('User-Agent');
@@ -165,13 +172,13 @@ module.exports.isCandidate = async (req, res, next) => {
     const error = req.ykError("You are not authorized");
     let user = null;
 
-      // ✅ Else check for token in headers (for React SPA project)
-      const token = req.header('x-auth');
-      if (!token) throw error;
-      const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
-      user = await User.findById(decoded.id);     
+    // ✅ Else check for token in headers (for React SPA project)
+    const token = req.header('x-auth');
+    if (!token) throw error;
+    const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+    user = await User.findById(decoded.id);
 
-      req.user = user;
+    req.user = user;
 
     if (!user || user.role !== 3) throw error;
     return next();
@@ -186,35 +193,36 @@ module.exports.isCandidate = async (req, res, next) => {
 
 module.exports.logUserActivity = (action) => {
   return async (req, res, next) => {
-  try {
-    let user = null;
+    try {
+      let user = null;
 
       // ✅ Else check for token in headers (for React SPA project)
       const token = req.header('x-auth');
       if (!token) throw error;
       const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
-      user = await User.findById(decoded.id); 
+      user = await User.findById(decoded.id);
       user = req.user; // `req.user` middleware में पहले से populated होना चाहिए
-    if (!user || !user._id) return next(); // अगर user login नहीं है, तो आगे बढ़ जाएं
+      if (!user || !user._id) return next(); // अगर user login नहीं है, तो आगे बढ़ जाएं
 
-    const ip = req.header('x-forwarded-for') || req.socket.remoteAddress;
-    const userAgent = req.get('User-Agent');
-    const page = req.originalUrl;
+      const ip = req.header('x-forwarded-for') || req.socket.remoteAddress;
+      const userAgent = req.get('User-Agent');
+      const page = req.originalUrl;
 
-    await UserActivityLog.create({
-      user: user._id,
-      action: action || 'visit',  // 👈 yahi pe default use ho raha hai,
-      meta: {
-        ip,
-        userAgent,
-        page
-      }
-    });
-  } catch (err) {
-    console.error("Failed to log user activity:", err.message);
-  }
-  next();
-};}
+      await UserActivityLog.create({
+        user: user._id,
+        action: action || 'visit',  // 👈 yahi pe default use ho raha hai,
+        meta: {
+          ip,
+          userAgent,
+          page
+        }
+      });
+    } catch (err) {
+      console.error("Failed to log user activity:", err.message);
+    }
+    next();
+  };
+}
 
 
 
@@ -246,10 +254,10 @@ module.exports.authentiAdmin = async (req, res, next) => {
   try {
     const token = req.user.token
     if (!token) throw req.ykError("Missing Token");
-    const {_id}=verify(token,jwtSecret)
+    const { _id } = verify(token, jwtSecret)
     const user = await User.findOne({ _id });
     if (!user) throw req.ykError("User not found in authenti");
-    if(user.role==0){
+    if (user.role == 0) {
       req.user = user;
       req.token = token;
       return next();
@@ -258,7 +266,7 @@ module.exports.authentiAdmin = async (req, res, next) => {
     return req.errFunc(err);
   }
 };
-module.exports.toHexString= (str)=> {
+module.exports.toHexString = (str) => {
   let hex = '';
   for (let i = 0; i < str.length; i++) {
     hex += str.charCodeAt(i).toString(16);
@@ -370,14 +378,14 @@ module.exports.authCommon = async (req, res, next) => {
 
 module.exports.authChat = async (req, res, next) => {
   try {
-    const token = req.header("x-auth");    
+    const token = req.header("x-auth");
     if (!token) throw req.ykError("Not Authorized request");
     if (token === chat_service_api) {
       return next();
     } else {
       throw req.ykError("Invalid request");
     }
-    
+
   } catch (err) {
     return req.errFunc(err);
   }
@@ -522,6 +530,6 @@ module.exports.sendSms = async (body) => {
   }
   catch (err) {
     console.log(err)
-    throw err
-  }
+    throw err
+  }
 }
