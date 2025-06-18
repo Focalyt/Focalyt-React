@@ -175,7 +175,7 @@
 .app-content.content {
   scroll-behavior: smooth;
   overflow-y: auto;
-  height: calc(100vh - 4rem); /* Adjust based on your header height */
+  min-height: calc(100vh - 4rem); /* Adjust based on your header height */
   margin-left:230px;
 }
 .main-menu.menu-light .navigation>li ul .active>a {

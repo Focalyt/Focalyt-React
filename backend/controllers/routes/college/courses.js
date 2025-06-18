@@ -379,6 +379,8 @@ router
 			if (!existingCourse) {
 				return res.status(404).json({ status: false, message: "Course not found" });
 			}
+			console.log(body, 'body 1');
+
 
 			if (Object.keys(body).length === 1 && body.status !== undefined) {
 				existingCourse.status = body.status;
@@ -387,6 +389,9 @@ router
 			}
 
 			const courseName = body.name || existingCourse.name || 'unnamed';
+
+			console.log(body, 'body 2');
+
 
 			// Parse JSON fields (if present in body)
 			if (body.docsRequired) {
@@ -409,7 +414,7 @@ router
 					bucketName,
 					allowedExtensions: allowedImageExtensions
 				});
-				body.photos = photoUrls;
+				body.photos = [...existingCourse.photos, ...photoUrls];
 			} else {
 				body.photos = existingCourse.photos;
 			}
@@ -423,7 +428,7 @@ router
 					bucketName,
 					allowedExtensions: allowedVideoExtensions
 				});
-				body.videos = videoUrls;
+				body.videos = [...existingCourse.videos, ...videoUrls];
 			} else {
 				body.videos = existingCourse.videos;
 			}
@@ -437,7 +442,7 @@ router
 					bucketName,
 					allowedExtensions: allowedVideoExtensions
 				});
-				body.testimonialvideos = testimonialVideoUrls;
+				body.testimonialvideos = [...existingCourse.testimonialvideos, ...testimonialVideoUrls];
 			} else {
 				body.testimonialvideos = existingCourse.testimonialvideos;
 			}
@@ -470,6 +475,8 @@ router
 				body.brochure = existingCourse.brochure;
 			}
 
+			console.log(body,'body2');
+
 			// Update the course
 			const updatedCourse = await Courses.findByIdAndUpdate(courseId, body, { new: true });
 
@@ -479,6 +486,41 @@ router
 			res.status(400).json({ status: false, message: err.message || "Something went wrong!" });
 		}
 	});
+router.put('/remove_course_media/:courseId', async (req, res) => {
+	try {
+		const { courseId } = req.params;
+		const {fileType, fileUrl} = req.body;
+		const course = await Courses.findById(courseId);
+		console.log(course, 'course');
+		if(!course){
+			console.log('course not found');
+			return res.status(404).json({ status: false, message: "Course not found" });
+		}
+		if(fileType === 'photo'){
+			course.photos = course.photos.filter(photo => photo !== fileUrl);
+		}
+		if(fileType === 'video'){
+			course.videos = course.videos.filter(video => video !== fileUrl);
+		}
+		if(fileType === 'testimonialvideo'){
+			course.testimonialvideos = course.testimonialvideos.filter(testimonialvideo => testimonialvideo !== fileUrl);
+		}
+		if(fileType === 'brochure'){
+			course.brochure = '';
+		}
+		if(fileType === 'thumbnail'){
+			course.thumbnail = '';
+		}
+		if(fileType === 'testimonial'){
+			course.testimonialvideos = course.testimonialvideos.filter(testimonial => testimonial !== fileUrl);
+		}
+		await course.save();
+		return res.status(200).json({ status: true, message: `${fileType} removed successfully` });
+	} catch (err) {
+		console.error("Error removing media:", err);
+		res.status(500).json({ status: false, message: err.message || "Something went wrong!" });
+	}
+})
 
 router.put('/update_course_status/:courseId', async (req, res) => {
 	try {

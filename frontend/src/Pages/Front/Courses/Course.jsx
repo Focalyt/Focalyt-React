@@ -234,7 +234,14 @@ console.log( "response callback" , response )
     } else {
       console.error("Element with ID 'bootm-box' not found!");
     }}
-  
+    const getFullUrl = (filePath) => {
+      if (!filePath) return "";
+      // Already contains full bucket URL
+      if (filePath.startsWith(bucketUrl)) return filePath;
+      // Is relative path, so prepend bucket URL
+      return `${bucketUrl}/${filePath}`;
+    };
+    
 
   return (
     <>
@@ -421,7 +428,7 @@ console.log( "response callback" , response )
                                 className="pointer img-fluid"
                               >
                                 <img
-                                  src={course.thumbnail ? `${bucketUrl}/${course.thumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
+                                  src={course.thumbnail ? getFullUrl(course.thumbnail) : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
                                   className="digi"
                                   alt={course.name}
                                 />

@@ -419,7 +419,7 @@ const CandidateLogin = () => {
     };
 
     return (
-        <div className="app-content blank-page content">
+        <div className="app-content blank-page content marginLeft">
             <div className="content-wrapper mt-4">
                 <section className="row flexbox-container">
                     <div className="col-xl-5 col-lg-6 col-md-8 col-sm-10 col-12 mx-auto">
@@ -748,6 +748,9 @@ const CandidateLogin = () => {
             </div>
             <style>
                 {`
+                .marginLeft{
+                    margin-left:0px!important;
+                }
                 .swiper-pagination-bullet{
                     width: 5px;
                     height: 5px;
