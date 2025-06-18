@@ -1850,7 +1850,7 @@ const AddCourse = () => {
                     <h4 className="card-title pb-1">Testimonial Videos</h4>
                   </div>
 
-                  <div className="row">
+                  <div className="row" style={{minHeight:'170px'}}>
                     <div className="col-xl-3 m-2">
                       <div className="col-12 mb-1 d-flex justify-content-center h-100 flex-column ps-3">
                         <label htmlFor="testimonialvideos">Add New Testimonial Videos</label>
@@ -2150,7 +2150,7 @@ formData.testimonialvideos.map((video, i) => (
             </button>
             <button
               type="submit"
-              className="btn btn-success px-lg-4 waves-effect waves-light"
+              className="btn btn-success px-lg-4 waves-effect waves-light ms-2"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Saving...' : 'Save'}
