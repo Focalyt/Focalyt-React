@@ -48,6 +48,10 @@ router.route("/addleaddandcourseapply")
             
 
             let existingCandidate = await CandidateProfile.findOne({ mobile });
+            let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
+            if(alreadyApplied){
+                return res.json({ status: false, msg: "Candidate already exists and course already applied", data:{existingCandidate, alreadyApplied} });
+            }
             if (existingCandidate) {
                 let appliedCourseEntry = await AppliedCourses.create({
                     _candidate: existingCandidate._id,
