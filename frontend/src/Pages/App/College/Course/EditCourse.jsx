@@ -34,7 +34,7 @@ const EditCourse = () => {
   const choicesInstance = useRef(null);
 
   // Document requirements
-  const [docsRequired, setDocsRequired] = useState([{ name: '' }]);
+  const [docsRequired, setDocsRequired] = useState([]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -606,7 +606,11 @@ const EditCourse = () => {
   const disableDocument = async (docId) => {
     if (window.confirm('Are you sure you want to remove this document?')) {
       try {
-        const res = await axios.patch(`${backendUrl}/college/courses/${id}/disable-doc/${docId}`);
+        const res = await axios.patch(`${backendUrl}/college/courses/${id}/disable-doc/${docId}`,docId,{
+          headers: {
+            'x-auth': token
+          }
+        });
         alert(res.data.message);
         // Remove from local state
         setDocsRequired(prev => prev.filter(doc => doc._id !== docId));
@@ -1360,7 +1364,7 @@ const handleSubmit = async (e) => {
                         className="btn btn-success text-white add-another-button"
                         onClick={addDocumentField}
                       >
-                        + Add Another
+                        {docsRequired.length > 0 ? 'Add Another' : 'Add Document'}
                       </button>
                     </div>
                   </div>

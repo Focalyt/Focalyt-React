@@ -102,7 +102,7 @@ const AddCourse = () => {
   });
 
   // Document requirements
-  const [docsRequired, setDocsRequired] = useState([{ name: '' }]);
+  const [docsRequired, setDocsRequired] = useState([]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -1186,7 +1186,7 @@ const AddCourse = () => {
                         className="btn btn-success text-white add-another-button"
                         onClick={addDocumentField}
                       >
-                        + Add Another
+                        {docsRequired.length > 0 ? 'Add Another' : 'Add Document'}
                       </button>
                     </div>
                   </div>
