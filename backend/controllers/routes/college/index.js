@@ -1963,9 +1963,16 @@ router.post("/courses/add", [isCollege], async (req, res) => {
 
 router.get('/getVerticals', [isCollege], async (req, res) => {
 
-	try {
-		const collegeId = req.user.college._id;
+	try {		
+		let collegeId = req.user.college._id;
 
+		if (!collegeId || !mongoose.Types.ObjectId.isValid(collegeId)) {
+			return res.json({
+				status: false,
+				message: "College not found or invalid"
+			});
+		}
+		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
 
 		const verticals = await Vertical.find({ college: collegeId }).sort({ createdAt: -1 });
 
@@ -2250,35 +2257,17 @@ router.delete('/delete_project/:id', [isCollege], async (req, res) => {
 router.get('/list-projects', [isCollege], async (req, res) => {
 	try {
 		let filter = {};
-		const vertical = req.query.vertical;
-		const collegeId = req.user.college._id;
+		let collegeId = req.user.college._id;
+		let vertical = req.query.vertical;
+
+		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
+		if (typeof vertical !== 'string') { vertical = new mongoose.Types.ObjectId(vertical); }
 
 		if (vertical) {
-			if (mongoose.Types.ObjectId.isValid(vertical)) {
-				filter.vertical = new mongoose.Types.ObjectId(vertical);
-			} else {
-				// Agar vertical string ObjectId nahi hai, toh error ya empty filter kar sakte hain
-				return res.status(400).json({ success: false, message: 'Invalid vertical id' });
-			}
-		}
-
-		const verticalDetails = await Vertical.findById(vertical);
-
-		if (!verticalDetails) {
-			return res.status(404).json({ success: false, message: 'Vertical not found.' });
-		}
-
-		if (verticalDetails.college.toString() !== collegeId.toString()) {
-
-			return res.status(403).json({
-				status: false,
-				message: "You are not authorized to list projects for this vertical"
-			});
+			filter.vertical = vertical;
 		}
 
 		filter.college = collegeId;
-
-
 
 		const projects = await Project.find(filter).sort({ createdAt: -1 });
 		res.json({ success: true, data: projects });
@@ -2473,13 +2462,21 @@ router.put('/remove_project_from_center/:id', async (req, res) => {
 
 router.get('/list-centers', [isCollege], async (req, res) => {
 	try {
-		const collegeId = req.user.college._id;
-		const projectId = req.query.projectId;
+		let collegeId = req.user.college._id;
+		let projectId = req.query.projectId;
+		console.log('projectId', projectId)
+		console.log('collegeId', collegeId)
+
+		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
+		if (typeof projectId !== 'string') { projectId = new mongoose.Types.ObjectId(projectId); }
+
+
 		if (projectId) {
 			if (!mongoose.Types.ObjectId.isValid(projectId)) {
 				return res.status(400).json({ success: false, message: 'Invalid Project ID' });
 			}
 			const projectDetails = await Project.findById(projectId);
+			console.log('projectDetails', projectDetails)
 			if (!projectDetails) {
 				return res.status(404).json({ success: false, message: 'Project not found.' });
 			}

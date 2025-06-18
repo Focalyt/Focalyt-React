@@ -936,11 +936,9 @@ module.exports.educationBoardList = async (req, res) => {
 };
 module.exports.sectorList = async (req, res) => {
   try {
-    console.log('sector api ')
     const sector = await CourseSectors.find({
       status: true
     });
-    console.log('res', sector)
     res.send(sector);
 
 

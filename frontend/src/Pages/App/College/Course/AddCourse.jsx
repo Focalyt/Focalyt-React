@@ -281,9 +281,18 @@ const AddCourse = () => {
   // Handle input field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-
+  
+    // If vertical is changed, reset project selection
+    if (name === 'vertical') {
+      setFormData({
+        ...formData,
+        [name]: value,
+        project: '' // Reset project when vertical changes
+      });
+      setProjects([]); // Clear projects immediately
+    }
     // If project is selected to the default value, reset it to empty string
-    if (name === 'project' && value === '') {
+    else if (name === 'project' && value === '') {
       setFormData({
         ...formData,
         [name]: ''  // Reset to empty string when the default option is selected
@@ -294,7 +303,7 @@ const AddCourse = () => {
         [name]: value
       });
     }
-
+  
     // Clear error for this field if it exists
     if (formErrors[name]) {
       setFormErrors({
@@ -302,7 +311,7 @@ const AddCourse = () => {
         [name]: null
       });
     }
-
+  
     // Handle specific field changes that affect UI
     if (name === 'courseFeeType') {
       setShowProjectFields(value === 'Free');
