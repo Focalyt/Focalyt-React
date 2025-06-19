@@ -740,7 +740,10 @@ const FollowupCalendar = () => {
     scrollbar-width: thin; /* For Firefox */
     scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
 }
-
+             .react-date-picker__calendar.react-date-picker__calendar--open{
+    inset: 0 !important;
+    width: 300px !important;
+}
           /* Responsive Design */
           @media (max-width: 768px) {
             .preset-buttons-grid {

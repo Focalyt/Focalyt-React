@@ -5405,6 +5405,10 @@ const MyFollowups = () => {
     scrollbar-width: thin; /* For Firefox */
     scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
 }
+             .react-date-picker__calendar.react-date-picker__calendar--open{
+    inset: 0 !important;
+    width: 300px !important;
+}
   @media (min-width: 992px) {
     .site-header--sticky--my--followup:not(.mobile-sticky-enable) {
       position: fixed !important;

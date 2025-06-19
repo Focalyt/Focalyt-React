@@ -4721,7 +4721,10 @@ html body .content .content-wrapper {
     position: relative;
     z-index: 1501;
 }
-
+         .react-date-picker__calendar.react-date-picker__calendar--open{
+    inset: 0 !important;
+    width: 300px !important;
+}
 /* Responsive Design */
 @media (max-width: 1920px) {
     .stickyBreakpoints {

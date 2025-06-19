@@ -190,6 +190,10 @@ const CRMDashboard = () => {
       </div>
       <style>{
         `
+         .react-date-picker__calendar.react-date-picker__calendar--open{
+    inset: 0 !important;
+    width: 300px !important;
+}
                 .site-header--sticky--admissions--posts:not(.mobile-sticky-enable){
           top: 100px;
           z-index: 999;
