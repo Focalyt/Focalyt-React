@@ -196,7 +196,7 @@ const CRMDashboard = () => {
 }
                 .site-header--sticky--admissions--posts:not(.mobile-sticky-enable){
           top: 100px;
-          z-index: 999;
+          z-index: 10;
           }
 @media (min-width: 992px) {
     .site-header--sticky--admissions--posts:not(.mobile-sticky-enable) {
