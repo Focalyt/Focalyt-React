@@ -21,6 +21,7 @@ const CRMDashboard = () => {
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showFollowupPanel, setShowFollowupPanel] = useState(false);
+  const [showRefferPanel, setShowRefferPanel] = useState(false);
   const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
@@ -35,6 +36,8 @@ const CRMDashboard = () => {
   const [pageSize, setPageSize] = useState(10);
   const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedCounselor, setSelectedCounselor] = useState(null);
+  const [counselors, setCounselors] = useState([]);
 
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
@@ -1870,8 +1873,6 @@ const CRMDashboard = () => {
     }
   };
 
-
-
   const closeEditPanel = () => {
     setShowEditPanel(false);
     setShowFollowupPanel(false);
@@ -1879,6 +1880,39 @@ const CRMDashboard = () => {
       setMainContentClass('col-12');
     }
   };
+
+  const openRefferPanel = async (profile = null, panel) => {
+    console.log('panel', panel);
+
+    if (profile) {
+      setSelectedProfile(profile);
+    }
+
+    // Close all panels first
+    setShowRefferPanel(false);
+    setShowFollowupPanel(false);
+    setShowWhatsappPanel(false);
+    setShowEditPanel(false);
+   
+    if (panel === 'Reffer') {
+      setShowRefferPanel(true);
+    }
+  
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+
+  };
+
+  const closeRefferPanel = () => {
+    setShowRefferPanel(false);
+    setShowFollowupPanel(false);
+    if (!isMobile) {
+      setMainContentClass('col-12');
+    }
+  };
+
+
   const openWhatsappPanel = () => {
     setShowWhatsappPanel(true);
     setShowEditPanel(false);
@@ -2133,6 +2167,115 @@ const CRMDashboard = () => {
       </div>
     ) : null;
   };
+
+// Render Reffer Panel (Desktop Sidebar or Mobile Modal)
+
+const renderRefferPanel = () => {
+  const panelContent = (
+    <div className="card border-0 shadow-sm">
+      <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+        <div className="d-flex align-items-center">
+          <div className="me-2">
+            <i className="fas fa-user-edit text-secondary"></i>
+          </div>
+          <h6 className="mb-0 followUp fw-medium">
+            {showEditPanel && 'Edit Status for '}
+            {showFollowupPanel && 'Set Followup for '}
+            {selectedProfile?._candidate?.name || 'Unknown'}
+          </h6>
+        </div>
+        <div>
+          <button className="btn-close" type="button" onClick={closeRefferPanel}>
+            {/* <i className="fa-solid fa-xmark"></i> */}
+          </button>
+        </div>
+      </div>
+
+      <div className="card-body">
+        <form>
+
+        
+            <>
+           
+              {/* NEW COUNSELOR SELECT DROPDOWN */}
+              <div className="mb-1">
+                <label htmlFor="counselor" className="form-label small fw-medium text-dark">
+                  Select Counselor<span className="text-danger">*</span>
+                </label>
+                <div className="d-flex">
+                  <div className="form-floating flex-grow-1">
+                    <select
+                      className="form-select border-0  bgcolor"
+                      id="counselor"
+                      value={selectedCounselor || ''}
+                      style={{
+                        height: '42px',
+                        paddingTop: '8px',
+                        paddingInline: '10px',
+                        width: '100%',
+                        backgroundColor: '#f1f2f6'
+                      }}
+                      // onChange={handleCounselorChange}
+                    >
+                      <option value="">Select Counselor</option>
+                      {counselors.map((counselor, index) => (
+                        <option key={index} value={counselor._id}>{counselor.name}</option>))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </>
+          
+          <div className="d-flex justify-content-end gap-2 mt-4">
+            <button
+              type="button"
+              className="btn"
+              style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+              onClick={closeRefferPanel}
+            >
+              CLOSE
+            </button>
+            <button
+              type="submit"
+              className="btn text-white"
+              // onClick={handleUpdateStatus}
+              style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+            >
+
+              {showRefferPanel && 'UPDATE STATUS'}
+              {showFollowupPanel && 'SET FOLLOWUP '}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div
+        className={`modal ${showRefferPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeRefferPanel();
+        }}
+      >
+        <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-content">
+            {panelContent}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return showRefferPanel || showFollowupPanel ? (
+    <div className="col-12 transition-col" id="refferPanel">
+      {panelContent}
+    </div>    
+  ) : null;
+};
+
 
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
   const renderWhatsAppPanel = () => {
@@ -3196,7 +3339,10 @@ const CRMDashboard = () => {
                                               fontSize: "12px",
                                               fontWeight: "600"
                                             }}
-                                            onClick={() => alert("Reffer")}
+                                            onClick={() => {
+                                              openRefferPanel(profile, 'Reffer');
+                                              console.log('selectedProfile', profile);
+                                            }}
                                           >
                                             Reffer
                                           </button>
@@ -3214,7 +3360,7 @@ const CRMDashboard = () => {
                                             }}
 
                                             onClick={() => {
-                                              openleadHistoryPanel(profile);
+                                              openRefferPanel(profile);
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -3233,7 +3379,7 @@ const CRMDashboard = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
-                                              openEditPanel(profile, 'SetFollowup');
+                                              openRefferPanel(profile, 'SetFollowup');
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -3331,7 +3477,10 @@ const CRMDashboard = () => {
                                               fontSize: "12px",
                                               fontWeight: "600"
                                             }}
-                                            onClick={() => alert("Reffer")}
+                                            onClick={() => {
+                                              openRefferPanel(profile, 'Reffer');
+                                              console.log('selectedProfile', profile);
+                                            }}
                                           >
                                             Reffer
                                           </button>
@@ -3364,7 +3513,7 @@ const CRMDashboard = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
-                                              openEditPanel(profile, 'SetFollowup');
+                                                openRefferPanel(profile, 'SetFollowup');
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -4498,6 +4647,7 @@ const CRMDashboard = () => {
           <div className="col-4">
             <div className="row site-header--sticky--register--panels">
               {renderEditPanel()}
+              {renderRefferPanel()}
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
             </div>
@@ -4506,6 +4656,7 @@ const CRMDashboard = () => {
 
         {/* Mobile Modals */}
         {isMobile && renderEditPanel()}
+        {isMobile && renderRefferPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
       </div>
@@ -4787,7 +4938,7 @@ html body .content .content-wrapper {
     z-index: 10;
 }
     .site-header--sticky--register--panels{
-     top: 200px;
+     top: 258px;
     z-index: 10;
     }
 
