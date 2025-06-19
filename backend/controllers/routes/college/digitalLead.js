@@ -7,7 +7,7 @@ let router = express.Router();
 
 // Status Model
 let Status = require('../../models/status');
-let { AppliedCourses, CandidateProfile, Courses, Center } = require('../../models');
+let { AppliedCourses, CandidateProfile, Courses, Center, User } = require('../../models');
 
 // @route   GET api/statuses
 // @desc    Get All Statuses
@@ -20,6 +20,19 @@ router.route("/addleaddandcourseapply")
             console.log("Incoming body:", req.body);
 
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4} = req.body;
+
+            if (MobileNumber.startsWith('+91')) {
+                MobileNumber = MobileNumber.slice(3);  // Remove +91
+            } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
+                MobileNumber = MobileNumber.slice(2);  // Remove 91
+            }
+            
+            // Validate the 10-digit mobile number
+            if (!/^[0-9]{10}$/.test(MobileNumber)) {
+                return res.status(400).json({ message: 'Invalid mobile number format' });
+            }
+            
+
             let mobile = MobileNumber;
             let name = FirstName;
             let sex = Gender;
@@ -80,10 +93,18 @@ router.route("/addleaddandcourseapply")
                 verified: false
             };
 
+
             console.log("Final Candidate Data:", candidateData);
 
             // ✅ Create CandidateProfile
             let candidate = await CandidateProfile.create(candidateData);
+            let user = await User.create({
+                name: candidate.name,
+                email: candidate.email,
+                mobile: candidate.mobile,
+                role: 3,
+                status: 'active'
+            });
 
             console.log('selectedCenter', typeof selectedCenter)
             // ✅ Insert AppliedCourses Record

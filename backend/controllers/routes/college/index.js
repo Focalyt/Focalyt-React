@@ -3679,10 +3679,58 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 //     }
 // });
 
-
-
-
-
-
+//refer leads
+router.route("/refer-leads")
+    .get(isCollege, async (req, res) => {
+        try {
+            const user = req.user;
+            const college = await College.findOne({
+                '_concernPerson._id': user._id
+            });
+            // ... existing code ...
+        } catch (err) {
+            // ... existing code ...
+        }
+    })
+    .post(isCollege, async (req, res) => {
+        try {
+            let { appliedCourseId, counselorId } = req.body;
+            if (!appliedCourseId || !counselorId) {
+                return res.status(400).json({ success: false, message: 'appliedCourseId and counselorId are required.' });
+            }
+            // Validate IDs
+            if (!mongoose.Types.ObjectId.isValid(appliedCourseId) || !mongoose.Types.ObjectId.isValid(counselorId)) {
+                return res.status(400).json({ success: false, message: 'Invalid appliedCourseId or counselorId.' });
+            }
+			if (typeof appliedCourseId == 'string' ) {
+				appliedCourseId = mongoose.Types.ObjectId(appliedCourseId);
+			}
+			if (typeof counselorId == 'string' ) {
+				counselorId = mongoose.Types.ObjectId(counselorId);
+			}
+            // Find the applied course
+            const appliedCourse = await AppliedCourses.findById(appliedCourseId);
+			const oldCounselor = await User.findById(appliedCourse.assignedCounselor);
+			const newCounselor = await User.findById(counselorId);
+            if (!appliedCourse) {
+                return res.status(404).json({ success: false, message: 'Applied course not found.' });
+            }
+            // Update the assigned counselor
+            appliedCourse.assignedCounselor = counselorId;
+            // Add a log entry
+            appliedCourse.logs = appliedCourse.logs || [];
+            appliedCourse.logs.push({
+                user: req.user._id,
+                timestamp: new Date(),
+                action: 'Lead referred to another counselor',
+                remarks: `Lead referred to counselorId: ${newCounselor.name} from ${oldCounselor.name}`
+            });
+            await appliedCourse.save();
+            return res.json({ success: true, message: 'Lead referred successfully.' });
+        } catch (err) {
+            console.error('Error referring lead:', err);
+            return res.status(500).json({ success: false, message: 'Server error', error: err.message });
+        }
+    });
 
 module.exports = router;
