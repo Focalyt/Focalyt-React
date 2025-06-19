@@ -21,6 +21,8 @@ router.route("/addleaddandcourseapply")
 
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4} = req.body;
 
+            MobileNumber = MobileNumber.toString();
+
             if (MobileNumber.startsWith('+91')) {
                 MobileNumber = MobileNumber.slice(3);  // Remove +91
             } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
@@ -31,6 +33,8 @@ router.route("/addleaddandcourseapply")
             if (!/^[0-9]{10}$/.test(MobileNumber)) {
                 return res.status(400).json({ message: 'Invalid mobile number format' });
             }
+
+            MobileNumber = parseInt(MobileNumber);
             
 
             let mobile = MobileNumber;
