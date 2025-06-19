@@ -21,6 +21,8 @@ const CollegeLogin = () => {
     const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'otp'
     const [otp, setOtp] = useState('');
     const [showOtpField, setShowOtpField] = useState(false);
+    const [showOtpBtn, setShowOtpBtn] = useState(false);
+
     const [isUserInputDisabled, setIsUserInputDisabled] = useState(false);
 
     // Forgot password states
@@ -135,6 +137,8 @@ const CollegeLogin = () => {
 
             if (sendRes.data.status === true) {
                 toast.success(sendRes.data.message);
+
+                setShowOtpBtn(false);
 
 
                 setShowOtpField(true); // Show OTP field after successful OTP send
@@ -330,6 +334,7 @@ const CollegeLogin = () => {
                                             onChange={() => {
                                                 setLoginMethod('otp');
                                                 setShowOtpField(false);
+                                                setShowOtpBtn(true);
                                             }}
                                         />
                                         <span className="radio-label">OTP Login</span>
@@ -399,7 +404,7 @@ const CollegeLogin = () => {
                                                 className="send-otp-btn"
                                                 onClick={sendOtp}
                                             >
-                                                {showOtpField ? "Resend OTP" : "Send OTP"}
+                                                {showOtpField ? "Resend OTP" : ""}
                                             </button>
                                         </div>
                                     </div>
@@ -425,10 +430,10 @@ const CollegeLogin = () => {
 
                                 <button
                                     className="login-btn"
-                                    onClick={handleLogin}
+                                    onClick={showOtpBtn ? sendOtp : handleLogin}
                                     ref={loginBtnRef}
                                 >
-                                    Login
+                                    {showOtpBtn ? "Send OTP" : "Login"}
                                 </button>
 
                                 {errorMessage && (
