@@ -41,6 +41,11 @@ const CollegeRegister = ({ embedded = false }) => {
     const signupBtnRef = useRef(null);
     const otpInputRef = useRef(null);
     const generateOTPRef = useRef(null);
+
+
+    //refer leads
+    
+
     useEffect(() => {
 
 
