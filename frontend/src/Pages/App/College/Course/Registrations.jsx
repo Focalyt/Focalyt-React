@@ -4784,11 +4784,11 @@ html body .content .content-wrapper {
 .site-header--sticky--register:not(.mobile-sticky-enable) {
     /* position: absolute !important; */
     top: 97px;
-    z-index: 999;
+    z-index: 10;
 }
     .site-header--sticky--register--panels{
      top: 200px;
-    z-index: 999;
+    z-index: 10;
     }
 
 @media (min-width: 992px) {

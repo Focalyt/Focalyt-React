@@ -4016,7 +4016,7 @@ const AdmissionList = () => {
 }
           .site-header--sticky--admission--list--post:not(.mobile-sticky-enable){
           top: 170px;
-          z-index: 999;
+          z-index: 10;
           }
            .site-header--sticky--list--panels:not(.mobile-sticky-enable) {
         position: fixed !important;

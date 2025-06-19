@@ -617,22 +617,25 @@ const Dashboard = () => {
       </div>
 
       {/* Enhanced CSS Styles */}
-   <style>
-{
-  `
-  .modern-dashboard {
+      <style jsx>{`
+        .modern-dashboard {
           min-height: 100vh;
           background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
-          .dashboard-header {
+
+        /* Enhanced Header */
+        .dashboard-header {
           position: relative;
           overflow: hidden;
         }
-          .header-background {
+
+        .header-background {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           position: relative;
         }
-  .header-pattern {
+
+        .header-pattern {
           position: absolute;
           top: 0;
           left: 0;
@@ -643,44 +646,49 @@ const Dashboard = () => {
             radial-gradient(circle at 75% 75%, rgba(255,255,255,0.1) 0%, transparent 50%);
           background-size: 100px 100px;
         }
-           .header-content {
+
+        .header-content {
           position: relative;
           z-index: 2;
         }
-           .title-wrapper {
+
+        .title-wrapper {
           display: flex;
           align-items: center;
           gap: 1.5rem;
         }
-          .title-icon {
+
+        .title-icon {
           font-size: 3rem;
           background: rgba(255, 255, 255, 0.2);
           padding: 1rem;
           border-radius: 20px;
           backdrop-filter: blur(10px);
         }
-.dashboard-title {
+
+        .dashboard-title {
           font-size: 2.5rem;
           font-weight: 800;
           color: white;
           margin: 0;
           letter-spacing: -0.5px;
         }
-.dashboard-subtitle {
+
+        .dashboard-subtitle {
           color: rgba(255, 255, 255, 0.9);
           font-size: 1.1rem;
           margin: 0.5rem 0 1rem 0;
           font-weight: 400;
         }
 
-.live-indicator {
+        .live-indicator {
           display: flex;
           align-items: center;
           gap: 0.5rem;
           color: rgba(255, 255, 255, 0.9);
           font-size: 0.9rem;
         }
-          
+
         .pulse-dot {
           width: 8px;
           height: 8px;
@@ -688,29 +696,34 @@ const Dashboard = () => {
           border-radius: 50%;
           animation: pulse 2s infinite;
         }
-@keyframes pulse {
+
+        @keyframes pulse {
           0% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
           70% { box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
           100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
-          .header-controls {
+
+        /* Enhanced Time Range Selector */
+        .header-controls {
           display: flex;
           flex-direction: column;
           gap: 1.5rem;
           align-items: flex-end;
         }
-         .time-range-selector {
+
+        .time-range-selector {
           display: flex;
           flex-direction: column;
           gap: 1rem;
           align-items: flex-end;
         }
-           .range-label {
+
+        .range-label {
           color: rgba(255, 255, 255, 0.9);
           font-size: 0.9rem;
           font-weight: 600;
         }
-      
+
         .range-buttons {
           display: flex;
           gap: 0.5rem;
@@ -719,6 +732,7 @@ const Dashboard = () => {
           border-radius: 15px;
           backdrop-filter: blur(10px);
         }
+
         .range-btn {
           position: relative;
           background: none;
@@ -734,18 +748,21 @@ const Dashboard = () => {
           cursor: pointer;
           overflow: hidden;
         }
-.range-btn:hover {
+
+        .range-btn:hover {
           background: rgba(255, 255, 255, 0.2);
           color: white;
           transform: translateY(-2px);
         }
-           .range-btn.active {
+
+        .range-btn.active {
           background: rgba(255, 255, 255, 0.25);
           color: white;
           transform: scale(1.05);
           box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
         }
- .active-indicator {
+
+        .active-indicator {
           position: absolute;
           bottom: 0;
           left: 50%;
@@ -757,11 +774,12 @@ const Dashboard = () => {
           animation: slideIn 0.3s ease;
         }
 
-      //  @keyframes slideIn {
-      //     from { width: 0; }
-      //     to { width: 30px; }
-      //   }
-      .export-btn {
+        @keyframes slideIn {
+          from { width: 0; }
+          to { width: 30px; }
+        }
+
+        .export-btn {
           position: relative;
           background: linear-gradient(135deg, #00ff88, #00cc6a);
           border: none;
@@ -776,11 +794,13 @@ const Dashboard = () => {
           transition: all 0.3s ease;
           overflow: hidden;
         }
- .export-btn:hover {
+
+        .export-btn:hover {
           transform: translateY(-3px);
           box-shadow: 0 15px 40px rgba(0, 255, 136, 0.4);
         }
-          .btn-shine {
+
+        .btn-shine {
           position: absolute;
           top: 0;
           left: -100%;
@@ -1435,17 +1455,7 @@ const Dashboard = () => {
             align-items: flex-start;
           }
         }
-
-
-       
-
-
-
-
-  `
-}
-
-   </style>
+      `}</style>
     </div>
   );
 };

@@ -4175,11 +4175,11 @@ const KYCManagement = () => {
         }
           .site-header--sticky--admission--post:not(.mobile-sticky-enable){
           top: 195px;
-          z-index: 999;
+          z-index: 10;
           }
           .site-header--sticky--admission--post--panel:not(.mobile-sticky-enable){
           top: 265px;
-          z-index: 999;
+          z-index: 10;
           }
            #editFollowupPanel {
     max-height: calc(100vh - 220px); /* Adjust based on your header height */
