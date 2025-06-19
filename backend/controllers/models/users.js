@@ -97,8 +97,11 @@ const userSchema = new Schema(
 		},
 		userUpdatedby:{
 			type: ObjectId, ref:'User'
+		},
+		source: {
+			type: String,
+			default: 'website'
 		}
-		
 		
 	},
 	{ timestamps: true }

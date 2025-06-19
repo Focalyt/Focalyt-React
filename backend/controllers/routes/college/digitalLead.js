@@ -19,7 +19,10 @@ router.route("/addleaddandcourseapply")
         try {
             console.log("Incoming body:", req.body);
 
-            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4} = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source } = req.body;
+            if(!source){
+                source = 'FB Form';
+            }
 
             if(!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4){
                 return res.status(400).json({ status: false, msg: "All fields are required" });
@@ -118,7 +121,8 @@ router.route("/addleaddandcourseapply")
                         centerId: selectedCenter
                     }
                 ],
-                verified: false
+                verified: false,
+                source
             };
 
 
@@ -131,7 +135,8 @@ router.route("/addleaddandcourseapply")
                 email: candidate.email,
                 mobile: candidate.mobile,
                 role: 3,
-                status: 'active'
+                status: true,
+                source
             });
 
             console.log('selectedCenter', typeof selectedCenter)
