@@ -21,20 +21,31 @@ router.route("/addleaddandcourseapply")
 
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4} = req.body;
 
-            MobileNumber = MobileNumber.toString();
-
-            if (MobileNumber.startsWith('+91')) {
-                MobileNumber = MobileNumber.slice(3);  // Remove +91
-            } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
-                MobileNumber = MobileNumber.slice(2);  // Remove 91
-            }
+            if (MobileNumber) {
+                MobileNumber = MobileNumber.toString();  // Convert to string
             
-            // Validate the 10-digit mobile number
-            if (!/^[0-9]{10}$/.test(MobileNumber)) {
-                return res.status(400).json({ message: 'Invalid mobile number format' });
+                // Check the type after conversion
+                console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber); 
+            
+                // Remove +91 or 91 prefix if present
+                if (MobileNumber.startsWith('+91')) {
+                    MobileNumber = MobileNumber.slice(3);  // Remove +91
+                } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
+                    MobileNumber = MobileNumber.slice(2);  // Remove 91
+                }
+            
+                // Validate the 10-digit mobile number
+                if (!/^[0-9]{10}$/.test(MobileNumber)) {
+                    return res.status(400).json({ message: 'Invalid mobile number format' });
+                }
+            MobileNumber = parseInt(MobileNumber);
+
+            
+                // Continue processing
+            } else {
+                return res.status(400).json({ message: 'Mobile number is required' });
             }
 
-            MobileNumber = parseInt(MobileNumber);
             
 
             let mobile = MobileNumber;
