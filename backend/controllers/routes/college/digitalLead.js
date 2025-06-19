@@ -21,6 +21,10 @@ router.route("/addleaddandcourseapply")
 
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4} = req.body;
 
+            if(!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4){
+                return res.status(400).json({ status: false, msg: "All fields are required" });
+            }
+
             if (MobileNumber) {
                 MobileNumber = MobileNumber.toString();  // Convert to string
             
@@ -53,6 +57,12 @@ router.route("/addleaddandcourseapply")
             let sex = Gender;
             let dob = DateOfBirth;
             let email = Email;
+
+           
+
+            if(typeof courseId === 'string'){
+                courseId = new mongoose.Types.ObjectId(courseId);
+            }
 
             let course = await Courses.findById(courseId);
             if (!course) {
