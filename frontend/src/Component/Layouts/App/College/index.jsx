@@ -440,7 +440,7 @@ function CollegeLayout({ children }) {
             <div className="header-navbar-shadow"></div>
             <CollegeHeader toggleSidebar={handleSidebarToggle} isSidebarOpen={isSidebarOpen} />
             <div className="content-wrapper">
-              <div className="content-body mb-4" style={{marginTop:'50px'}}>
+              <div className="mb-4" >
                 <Outlet />
               </div>
               <CollegeFooter />
