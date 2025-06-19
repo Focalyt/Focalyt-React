@@ -733,6 +733,14 @@ const FollowupCalendar = () => {
             color: #0d6efd;
           }
 
+    #editFollowupPanel {
+    max-height: calc(100vh - 220px); /* Adjust based on your header height */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+}
+
           /* Responsive Design */
           @media (max-width: 768px) {
             .preset-buttons-grid {

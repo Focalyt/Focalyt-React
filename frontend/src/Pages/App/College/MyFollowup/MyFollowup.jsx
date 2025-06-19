@@ -5398,6 +5398,13 @@ const MyFollowups = () => {
   position: fixed !important;
   
 }
+     #editFollowupPanel {
+    max-height: calc(100vh - 220px); /* Adjust based on your header height */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+}
   @media (min-width: 992px) {
     .site-header--sticky--my--followup:not(.mobile-sticky-enable) {
       position: fixed !important;
