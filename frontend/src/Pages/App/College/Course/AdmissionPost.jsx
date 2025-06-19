@@ -141,7 +141,7 @@ const CRMDashboard = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints">
+          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--admissions--posts">
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
                 <div className="col-md-6 d-md-block d-sm-none">
@@ -188,6 +188,25 @@ const CRMDashboard = () => {
           </div>
         </div>
       </div>
+      <style>{
+        `
+                .site-header--sticky--admissions--posts:not(.mobile-sticky-enable){
+          top: 100px;
+          z-index: 999;
+          }
+@media (min-width: 992px) {
+    .site-header--sticky--admissions--posts:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+        left:20%;
+        right:3%;
+        }
+        }
+        `
+        }</style>
     </div>
   );
 };

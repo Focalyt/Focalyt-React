@@ -3233,7 +3233,7 @@ const MyFollowups = () => {
         <div className={isMobile ? 'col-12' : mainContentClass}>
 
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints" >
+          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--my--followup" >
             <div className="container-fluid py-2 " >
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
@@ -3728,7 +3728,7 @@ const MyFollowups = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body">
+          <div className="content-body" style={{marginTop:'150px'}}>
             <section className="list-view">
 
               <div className='row'>
@@ -3778,7 +3778,7 @@ const MyFollowups = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-5">
+                                  <div className="col-md-4">
                                     <div className="d-flex gap-2">
                                       <div className="flex-grow-1">
                                         <input
@@ -3822,7 +3822,7 @@ const MyFollowups = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-1 text-end d-md-none d-sm-block d-block">
+                                  <div className="col-md-2 text-end d-md-none d-sm-block d-block">
                                     <div className="btn-group">
 
                                       <div style={{ position: "relative", display: "inline-block" }}>
@@ -3957,7 +3957,7 @@ const MyFollowups = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-1 text-end d-md-block d-sm-none d-none">
+                                  <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                     <div className="btn-group">
 
                                       <div style={{ position: "relative", display: "inline-block" }}>
@@ -5201,7 +5201,7 @@ const MyFollowups = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row sticky-top stickyBreakpoints">
+            <div className="row site-header--sticky--my--followup--panels">
               {renderEditPanel()}
               {FollowupCalendar()}
               {renderWhatsAppPanel()}
@@ -5387,6 +5387,27 @@ const MyFollowups = () => {
   transition: width 0.3s ease;
   border-radius: 4px;
 }
+
+.site-header--sticky--my--followup:not(.mobile-sticky-enable){
+  top: 100px;
+  z-index: 999;
+}
+
+.site-header--sticky--my--followup--panels:not(.mobile-sticky-enable){
+  top: 258px;
+  position: fixed !important;
+  
+}
+  @media (min-width: 992px) {
+    .site-header--sticky--my--followup:not(.mobile-sticky-enable) {
+      position: fixed !important;
+      transition: 0.4s;
+      background: white;
+      left:20%;
+      right:3%;
+    }
+  }
+
 
 @media(max-width:1920px) {
     .stickyBreakpoints {

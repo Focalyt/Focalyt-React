@@ -5,7 +5,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import './CourseCrm.css';
+import './CourseCrm.css';  
 import './crm.css';
 
 // Add this at the top of the file, after imports
@@ -2585,7 +2585,7 @@ const KYCManagement = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints">
+          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--admission--post">
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
                 <div className="col-md-6 d-md-block d-sm-none">
@@ -2618,7 +2618,7 @@ const KYCManagement = () => {
                               }}
                               title={`Milestone: ${filter.milestone}`}
                             >
-                              🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
+                              🚩 <span style={{ marginLeft: '4px', fontSize: '12px', whiteSpace:'nowrap' }}>{filter.milestone}</span>
                             </span>
                           )}
                         </div>
@@ -2771,7 +2771,7 @@ const KYCManagement = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body">
+          <div className="content-body" style={{ marginTop: '155px' }}>
             <section className="list-view">
               <div className='row'>
                 <div>
@@ -2785,7 +2785,7 @@ const KYCManagement = () => {
                               <div className="card border-0 shadow-sm mb-0 mt-2">
                                 <div className="card-body px-1 py-0 my-2">
                                   <div className="row align-items-center justify-content-between">
-                                    <div className="col-md-6">
+                                    <div className="col-md-7">
                                       <div className="d-flex align-items-center">
                                         <div className="form-check me-3">
                                           <input className="form-check-input" type="checkbox" />
@@ -2821,7 +2821,7 @@ const KYCManagement = () => {
                                       </div>
                                     </div>
 
-                                    <div className="col-md-1 text-end d-md-none d-sm-block d-block">
+                                    <div className="col-md-2 text-end d-md-none d-sm-block d-block">
                                       <div className="btn-group">
                                         <div style={{ position: "relative", display: "inline-block" }}>
                                           <button
@@ -2952,7 +2952,7 @@ const KYCManagement = () => {
                                       </div>
                                     </div>
 
-                                    <div className="col-md-1 text-end d-md-block d-sm-none d-none">
+                                    <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                       <div className="btn-group">
                                         <div style={{ position: "relative", display: "inline-block" }}>
                                           <button
@@ -4136,7 +4136,7 @@ const KYCManagement = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row sticky-top stickyBreakpoints">
+            <div className="row site-header--sticky--admission--post--panel">
               {renderEditPanel()}
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
@@ -4173,7 +4173,40 @@ const KYCManagement = () => {
           top: 20px;
           z-index: 11;
         }
-
+          .site-header--sticky--admission--post:not(.mobile-sticky-enable){
+          top: 195px;
+          z-index: 999;
+          }
+          .site-header--sticky--admission--post--panel:not(.mobile-sticky-enable){
+          top: 265px;
+          z-index: 999;
+          }
+           #editFollowupPanel {
+    max-height: calc(100vh - 220px); /* Adjust based on your header height */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+}
+@media (min-width: 992px) {
+    .site-header--sticky--admission--post:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+        left:20%;
+        right:3%;
+        }
+        .site-header--sticky--admission--post--panel:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+        
+        }
+        }
         .react-date-picker__wrapper {
           border: none;
         }

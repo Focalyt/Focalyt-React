@@ -464,7 +464,7 @@ const CRMDashboard = () => {
         return (
           <div style={{ position: 'relative', overflow: 'hidden', height: '100%' }}>
             <iframe
-              src={fileUrl+ '#navpanes=0&toolbar=0'}
+              src={fileUrl + '#navpanes=0&toolbar=0'}
               className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
                 width: isSmall ? '100%' : '150px',
@@ -512,7 +512,7 @@ const CRMDashboard = () => {
         return (
           <div style={{ position: 'relative' }}>
             <iframe
-              src={fileUrl+ '#navpanes=0&toolbar=0'}
+              src={fileUrl + '#navpanes=0&toolbar=0'}
               className={`document-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
                 width: isSmall ? '100%' : '150px',
@@ -756,7 +756,7 @@ const CRMDashboard = () => {
                     {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
                   </span>
                 </div>
-             
+
                 <button
                   className="action-btn upload-btn"
                   title="Upload Document"
@@ -767,7 +767,7 @@ const CRMDashboard = () => {
                   <i className="fas fa-cloud-upload-alt"></i>
                   Upload
                 </button>
-              
+
               </div>
             </div>
           </div>
@@ -776,8 +776,8 @@ const CRMDashboard = () => {
     );
   };
 
-  
-const UploadModal = () => {
+
+  const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
 
     return (
@@ -2439,7 +2439,7 @@ const UploadModal = () => {
         <div className={isMobile ? 'col-12' : mainContentClass}>
 
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints" >
+          {/* <div className="bg-white shadow-sm border-bottom mb-3 sticky-header-container" >
             <div className="container-fluid py-2 " >
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
@@ -2528,7 +2528,7 @@ const UploadModal = () => {
                             </span>
                           </button>
 
-                          {/* Milestone flag OUTSIDE the button */}
+                        
                           {filter.milestone && (
                             <span
                               className="bg-success d-flex align-items-center"
@@ -2550,7 +2550,128 @@ const UploadModal = () => {
 
               </div>
             </div>
+          </div> */}
+
+
+
+          <div className="position-relative">
+            <div className="site-header--sticky--register">
+              <div className="container-fluid">
+                <div className="row align-items-center">
+                  <div className="col-md-6 d-md-block d-sm-none">
+                    <div className="d-flex align-items-center">
+                      <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                      <nav aria-label="breadcrumb">
+                        <ol className="breadcrumb mb-0 small">
+                          <li className="breadcrumb-item">
+                            <a href="/institute/dashboard" className="text-decoration-none">Home</a>
+                          </li>
+                          <li className="breadcrumb-item active">Admission Cycle</li>
+                        </ol>
+                      </nav>
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="d-flex justify-content-end align-items-center gap-2">
+                      <div className="input-group" style={{ maxWidth: '300px' }}>
+                        <span className="input-group-text bg-white border-end-0 input-height">
+                          <i className="fas fa-search text-muted"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="name"
+                          className="form-control border-start-0 m-0"
+                          placeholder="Quick search..."
+                          value={filterData.name}
+                          onChange={handleFilterChange}
+                        />
+                        {filterData.name && (
+                          <button
+                            className="btn btn-outline-secondary border-start-0"
+                            type="button"
+                            onClick={() => {
+                              setFilterData(prev => ({ ...prev, name: '' }));
+                              setAllProfiles(allProfilesData);
+                            }}
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                        Filters
+                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                          <span className="bg-light text-dark ms-1">
+                            {Object.values(filterData).filter(val => val && val !== 'true').length}
+                          </span>
+                        )}
+                      </button>
+
+                      <div className="btn-group">
+                        <button
+                          onClick={() => setViewMode('grid')}
+                          className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        >
+                          <i className="fas fa-th"></i>
+                        </button>
+                        <button
+                          onClick={() => setViewMode('list')}
+                          className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        >
+                          <i className="fas fa-list"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filter Buttons Row */}
+                  <div className="col-12 mt-2">
+                    <div className="d-flex flex-wrap gap-2 align-items-center">
+                      {crmFilters.map((filter, index) => (
+                        <div key={index} className="d-flex align-items-center gap-1">
+                          <div className='d-flex position-relative'>
+                            <button
+                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
+                              onClick={() => handleCrmFilterClick(filter._id, index)}
+                            >
+                              {filter.name}
+                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                                ({filter.count})
+                              </span>
+                            </button>
+
+                            {filter.milestone && (
+                              <span
+                                className="position-absolute bg-success text-white px-2 py-1 rounded-pill"
+                                style={{
+                                  fontSize: '0.7rem',
+                                  top: '-8px',
+                                  right: '-10px',
+                                  transform: 'scale(0.8)'
+                                }}
+                                title={`Milestone: ${filter.milestone}`}
+                              >
+                                🚩 {filter.milestone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+
+
 
           {/* Advanced Filters */}
           {/* Advanced Filters - Improved Design */}
@@ -2907,7 +3028,7 @@ const UploadModal = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body">
+          <div className="content-body" style={{marginTop:'90px'}}>
             <section className="list-view">
 
               <div className='row'>
@@ -2957,7 +3078,7 @@ const UploadModal = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-5">
+                                  <div className="col-md-4">
                                     <div className="d-flex gap-2">
                                       <div className="flex-grow-1">
                                         <input
@@ -3001,7 +3122,7 @@ const UploadModal = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-1 text-end d-md-none d-sm-block d-block">
+                                  <div className="col-md-2 text-end d-md-none d-sm-block d-block">
                                     <div className="btn-group">
 
                                       <div style={{ position: "relative", display: "inline-block" }}>
@@ -3136,7 +3257,7 @@ const UploadModal = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-1 text-end d-md-block d-sm-none d-none">
+                                  <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                     <div className="btn-group">
 
                                       <div style={{ position: "relative", display: "inline-block" }}>
@@ -3494,7 +3615,7 @@ const UploadModal = () => {
                                                     <div className="info-value">{profile._course?.name}</div>
                                                   </div>
                                                 </div>
-                                               
+
 
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
@@ -4375,7 +4496,7 @@ const UploadModal = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row sticky-top stickyBreakpoints">
+            <div className="row site-header--sticky--register--panels">
               {renderEditPanel()}
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
@@ -4388,7 +4509,553 @@ const UploadModal = () => {
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
       </div>
+
+
       <style>
+        {
+          `
+
+    /* Clean Sticky Header CSS - Replace your entire style section with this */
+
+/* Main wrapper styling */
+html body .content .content-wrapper {
+    padding: calc(0.9rem - 0.1rem) 1.2rem;
+    overflow: visible !important;
+}
+
+/* Sticky Header Container */
+.sticky-header-container {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1020 !important;
+    background-color: white !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+    width: 100% !important;
+    margin-bottom: 1rem !important;
+}
+
+/* Header Content Styling */
+.sticky-header-container .container-fluid {
+    padding: 0.5rem 1.2rem !important;
+}
+
+/* Secondary Sticky Elements (Side Panels) */
+.stickyBreakpoints {
+    position: sticky !important;
+    top: 120px !important;
+    z-index: 11 !important;
+}
+
+/* Date Picker Styles */
+.react-date-picker__wrapper {
+    border: none;
+}
+
+.react-date-picker__inputGroup input {
+    border: none !important;
+}
+
+.react-date-picker__inputGroup {
+    width: 100%;
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+}
+
+.react-date-picker__clear-button {
+    display: none;
+}
+
+/* Upload Modal Styles */
+.upload-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
+    backdrop-filter: blur(2px);
+}
+
+.upload-modal-content {
+    background-color: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    position: relative;
+}
+
+.upload-modal-header {
+    padding: 24px 24px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.upload-modal-body {
+    padding: 24px;
+}
+
+.upload-modal-footer {
+    padding: 16px 24px 24px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.file-drop-zone {
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 48px 24px;
+    text-align: center;
+    background-color: #f9fafb;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-drop-zone:hover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.drop-zone-content .upload-icon {
+    font-size: 48px;
+    color: #3b82f6;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.file-details {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background-color: #f3f4f6;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.file-icon {
+    width: 48px;
+    height: 48px;
+    background-color: #3b82f6;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-name {
+    margin: 0 0 4px;
+    font-weight: 500;
+    color: #1f2937;
+    font-size: 0.875rem;
+}
+
+.file-size {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background-color: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: #3b82f6;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+/* Document Modal Styles */
+.document-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1500;
+    backdrop-filter: blur(2px);
+}
+
+.document-modal-content {
+    background-color: white;
+    border-radius: 12px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    position: relative;
+    z-index: 1501;
+}
+
+/* Responsive Design */
+@media (max-width: 1920px) {
+    .stickyBreakpoints {
+        top: 120px !important;
+    }
+}
+
+@media (max-width: 1400px) {
+    .stickyBreakpoints {
+        top: 110px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .sticky-header-container {
+        position: sticky !important;
+        top: 0 !important;
+    }
+    
+    .stickyBreakpoints {
+        position: relative !important;
+    }
+    
+    .sticky-header-container .container-fluid {
+        padding: 0.5rem 1rem !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .sticky-header-container .container-fluid {
+        padding: 0.25rem 0.5rem !important;
+    }
+}
+
+    /* Final Complete CSS - Replace entire <style> section with this */
+
+html body .content .content-wrapper {
+    padding: calc(0.9rem - 0.1rem) 1.2rem;
+    overflow: visible !important;
+}
+
+
+/* ========== STICKY HEADER STYLES ========== */
+.sticky-header-container {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1020 !important;
+    background-color: white !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+    width: 100% !important;
+    margin-bottom: 1rem !important;
+}
+
+.sticky-header-container .container-fluid {
+    padding: 0.5rem 1.2rem !important;
+}
+.site-header--sticky--register:not(.mobile-sticky-enable) {
+    /* position: absolute !important; */
+    top: 97px;
+    z-index: 999;
+}
+    .site-header--sticky--register--panels{
+     top: 200px;
+    z-index: 999;
+    }
+
+@media (min-width: 992px) {
+    .site-header--sticky--register:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+    }
+    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+    }
+}
+    @media (max-width: 767px) {
+    .site-header--sticky--register:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        background: white;
+        width: 100%;
+        left: 0;
+        right: 0;
+    }
+    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        background: white;
+        width: 100%;
+        left: 0;
+        right: 0;
+    }
+    
+    /* Adjust content margin to avoid overlap */
+    .content-body {
+        margin-top: 120px; /* Adjust based on your header height */
+    }
+}
+
+.stickyBreakpoints {
+    position: sticky !important;
+    top: 120px !important;
+    z-index: 11 !important;
+}
+
+/* ========== DATE PICKER STYLES ========== */
+.react-date-picker__wrapper {
+    border: none;
+}
+
+.react-date-picker__inputGroup input {
+    border: none !important;
+}
+
+.react-date-picker__inputGroup {
+    width: 100%;
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+}
+
+.react-date-picker__clear-button {
+    display: none;
+}
+
+/* ========== UPLOAD MODAL STYLES ========== */
+.upload-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
+    backdrop-filter: blur(2px);
+}
+
+.upload-modal-content {
+    background-color: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    position: relative;
+}
+
+.upload-modal-header {
+    padding: 24px 24px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.upload-modal-body {
+    padding: 24px;
+}
+
+.upload-modal-footer {
+    padding: 16px 24px 24px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.file-drop-zone {
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 48px 24px;
+    text-align: center;
+    background-color: #f9fafb;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-drop-zone:hover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.drop-zone-content .upload-icon {
+    font-size: 48px;
+    color: #3b82f6;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.file-details {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background-color: #f3f4f6;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.file-icon {
+    width: 48px;
+    height: 48px;
+    background-color: #3b82f6;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-name {
+    margin: 0 0 4px;
+    font-weight: 500;
+    color: #1f2937;
+    font-size: 0.875rem;
+}
+
+.file-size {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background-color: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: #3b82f6;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+/* ========== DOCUMENT MODAL STYLES ========== */
+.document-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1500;
+    backdrop-filter: blur(2px);
+}
+
+.document-modal-content {
+    background-color: white;
+    border-radius: 12px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    position: relative;
+    z-index: 1501;
+}
+    #editFollowupPanel {
+    max-height: calc(100vh - 220px); /* Adjust based on your header height */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+@media (max-width: 1920px) {
+    .stickyBreakpoints {
+        top: 120px !important;
+    }
+}
+
+@media (max-width: 1400px) {
+    .stickyBreakpoints {
+        top: 110px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .sticky-header-container {
+        position: sticky !important;
+        top: 0 !important;
+    }
+    
+    .stickyBreakpoints {
+        position: relative !important;
+    }
+    
+    .sticky-header-container .container-fluid {
+        padding: 0.5rem 1rem !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .sticky-header-container .container-fluid {
+        padding: 0.25rem 0.5rem !important;
+    }
+}
+    
+    `
+        }
+      </style>
+
+      {/* <style>
         {
           `
         html body .content .content-wrapper {
@@ -4403,12 +5070,11 @@ const UploadModal = () => {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-.stickyBreakpoints {
-    position: sticky;
-    top: 20px;
-    /* default top */
-    z-index: 11;
-}
+// .stickyBreakpoints {
+//     position: sticky;
+//     top: 20px;
+//     z-index: 11;
+// }
 
 .react-date-picker__wrapper {
     border: none;
@@ -4429,7 +5095,7 @@ const UploadModal = () => {
     display: none;
 }
 
-/* Upload Modal Styles */
+
 .upload-modal-overlay {
   position: fixed;
   top: 0;
@@ -4559,7 +5225,7 @@ const UploadModal = () => {
   transition: width 0.3s ease;
   border-radius: 4px;
 }
-  /* Document Modal Styles */
+ 
 .document-modal-overlay {
   position: fixed;
   top: 0;
@@ -4584,7 +5250,7 @@ const UploadModal = () => {
   z-index: 1501;
 }
 
-/* Upload Modal Styles */
+
 .upload-modal-overlay {
   position: fixed;
   top: 0;
@@ -4598,22 +5264,130 @@ const UploadModal = () => {
   z-index: 2050;
   backdrop-filter: blur(2px);
 }
+  html body .content .content-wrapper {
+    overflow: visible !important; 
 
-@media(max-width:1920px) {
+
+
+
+.sticky-header-container {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1020 !important;
+    background-color: white !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+    width: 100% !important;
+    margin-bottom: 1rem !important;
+}
+
+
+.sticky-header-container .container-fluid {
+    padding: 0.5rem 1.2rem !important;
+    position: relative !important;
+}
+
+
+
+
+
+.stickyBreakpoints {
+    position: sticky !important;
+    top: 120px !important; 
+    z-index: 11 !important;
+}
+
+
+.react-date-picker__wrapper {
+    border: none;
+}
+
+.react-date-picker__inputGroup input {
+    border: none !important;
+}
+
+.react-date-picker__inputGroup {
+    width: 100%;
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+}
+
+.react-date-picker__clear-button {
+    display: none;
+}
+
+
+.upload-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
+    backdrop-filter: blur(2px);
+}
+
+
+.document-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1500;
+    backdrop-filter: blur(2px);
+}
+
+
+@media(max-width: 1920px) {
     .stickyBreakpoints {
-        top: 20%
+        top: 120px !important;
     }
 }
 
-@media(max-width:1400px) {
+@media(max-width: 1400px) {
     .stickyBreakpoints {
-        top: 17%
+        top: 110px !important;
     }
+}
+
+@media(max-width: 768px) {
+    .sticky-header-container {
+        position: sticky !important;
+        top: 0 !important;
+    }
+    
+    .stickyBreakpoints {
+        position: relative !important;
+}
+
+
+.sticky-header-container::before {
+    content: "STICKY ACTIVE";
+    position: absolute;
+    top: -20px;
+    right: 10px;
+    background: red;
+    color: white;
+    padding: 2px 5px;
+    font-size: 10px;
+    z-index: 9999;
+    
 }
 
 
 `}
-      </style>
+      </style> */}
+
+
     </div>
   );
 };

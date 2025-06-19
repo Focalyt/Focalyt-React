@@ -935,7 +935,7 @@ const InterestedCandidates = () => {
           <div className={isMobile ? 'col-12' : mainContentClass}>
 
             {/* Header */}
-            <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints" >
+            <div className="bg-white shadow-sm border-bottom mb-3 sticky-top " >
               <div className="container-fluid py-2 " >
                 <div className="row align-items-center">
                   <div className="col-md-6 d-md-block d-sm-none">
@@ -1555,7 +1555,7 @@ const InterestedCandidates = () => {
           {/* Right Sidebar for Desktop - Panels */}
           {!isMobile && (
             <div className="col-4">
-              <div className="row sticky-top stickyBreakpoints">
+              <div className="row sticky-top ">
                 {renderEditPanel()}
                 {renderLeadHistoryPanel()}
               </div>
@@ -1586,11 +1586,7 @@ const InterestedCandidates = () => {
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
           }
 
-          .stickyBreakpoints {
-            position: sticky;
-            top: 20px;
-            z-index: 11;
-          }
+         
 
           .circular-progress-container {
             position: relative;
@@ -1828,17 +1824,7 @@ const InterestedCandidates = () => {
             transform: translateY(-2px);
           }
 
-          @media(max-width:1920px) {
-            .stickyBreakpoints {
-              top: 20%
-            }
-          }
-
-          @media(max-width:1400px) {
-            .stickyBreakpoints {
-              top: 17%
-            }
-          }
+        
         `}</style>
       </div>
     </>

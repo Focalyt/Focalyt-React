@@ -2508,12 +2508,12 @@ const AdmissionList = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 sticky-top stickyBreakpoints">
+          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--admission--list--post">
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
-                <div className="col-md-9 d-md-block d-sm-none">
+                <div className="col-md-7 d-md-block d-sm-none">
                   <div className="main-tabs-container">
-                    <ul className="nav nav-tabs nav-tabs-main border-0">
+                    <ul className="nav nav-tabs nav-tabs-main border-0 gap-1">
 
                       {/* All Admission Tab */}
                       {getCurrentFilters().map((filter, index) => (
@@ -2533,7 +2533,7 @@ const AdmissionList = () => {
                   </div>
                 </div>
 
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="d-flex justify-content-end align-items-center gap-2">
                     <div className="input-group" style={{ maxWidth: '300px' }}>
                       <span className="input-group-text bg-white border-end-0 input-height">
@@ -2629,7 +2629,7 @@ const AdmissionList = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body">
+          <div className="content-body" style={{ marginTop: '150px' }}>
             <section className="list-view">
               <div className='row'>
                 <div>
@@ -2643,7 +2643,7 @@ const AdmissionList = () => {
                               <div className="card border-0 shadow-sm mb-0 mt-2">
                                 <div className="card-body px-1 py-0 my-2">
                                   <div className="row align-items-center justify-content-between">
-                                    <div className="col-md-6">
+                                    <div className="col-md-7">
                                       <div className="d-flex align-items-center">
                                         <div className="form-check me-3">
                                           <input className="form-check-input" type="checkbox" />
@@ -2679,7 +2679,7 @@ const AdmissionList = () => {
                                       </div>
                                     </div>
 
-                                    <div className="col-md-1 text-end d-md-none d-sm-block d-block">
+                                    <div className="col-md-2 text-end d-md-none d-sm-block d-block">
                                       <div className="btn-group">
                                         <div style={{ position: "relative", display: "inline-block" }}>
                                           <button
@@ -2809,7 +2809,7 @@ const AdmissionList = () => {
                                       </div>
                                     </div>
 
-                                    <div className="col-md-1 text-end d-md-block d-sm-none d-none">
+                                    <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                       <div className="btn-group">
                                         <div style={{ position: "relative", display: "inline-block" }}>
                                           <button
@@ -3988,7 +3988,7 @@ const AdmissionList = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row sticky-top stickyBreakpoints">
+            <div className="row site-header--sticky--list--panels ">
               {renderEditPanel()}
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
@@ -4004,6 +4004,48 @@ const AdmissionList = () => {
 
 
       </div>
+      <style>
+        {
+          `
+            #editFollowupPanel {
+    max-height: calc(100vh - 220px); /* Adjust based on your header height */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+}
+          .site-header--sticky--admission--list--post:not(.mobile-sticky-enable){
+          top: 170px;
+          z-index: 999;
+          }
+           .site-header--sticky--list--panels:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        background: white;
+       top:280px
+        
+    }
+    
+          @media (min-width: 992px) {
+            .site-header--sticky--admission--list--post:not(.mobile-sticky-enable) {
+              position: fixed !important;
+              transition: 0.4s;
+              background: white;
+              left:20%;
+              right:3%;
+            }
+                .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+    }
+          }
+
+          `
+        }
+      </style>
     </div>
   );
 };
