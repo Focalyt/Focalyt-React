@@ -139,6 +139,7 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
     const AppliedCourses = mongoose.model('AppliedCourses');
     const Course = mongoose.model('courses');
     const College = mongoose.model('College');
+    const User = mongoose.model('User');
     
     const courseId = this._course;
     const centerId = this._center;
