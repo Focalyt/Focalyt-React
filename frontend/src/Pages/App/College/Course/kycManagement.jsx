@@ -1145,8 +1145,8 @@ const KYCManagement = () => {
         const { totalCount = 0, pendingKycCount = 0, doneKycCount = 0 } = response.data;
 
         const filter = [
-          { _id: 'pendingEkyc', name: 'Ekyc Pending', count: pendingKycCount, milestone: '' },
-          { _id: 'doneEkyc', name: 'Ekyc Verified', count: doneKycCount, milestone: 'Ekyc Done' },
+          { _id: 'pendingEkyc', name: 'kyc Pending', count: pendingKycCount, milestone: '' },
+          { _id: 'doneEkyc', name: 'kyc Verified', count: doneKycCount, milestone: 'kyc Done' },
           { _id: 'All', name: 'All', count: totalCount, milestone: '' }
         ];
 
@@ -4817,6 +4817,10 @@ const KYCManagement = () => {
 .document-history .history-item:hover {
   background: linear-gradient(145deg, #e9ecef, #f8f9fa);
 }
+    .react-date-picker__calendar react-date-picker__calendar--open{
+    inset: 0 !important;
+    width: 300px !important;
+    }
         `}
       </style>
     </div>
