@@ -3207,7 +3207,9 @@ const renderRefferPanel = () => {
                                       </div>
                                       <div style={{ marginLeft: '15px' }}>
                                         <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                          <i className="fas fa-phone"></i>
+                                          <a href={`tel:${profile._candidate?.mobile}`} target="_blank" rel="noopener noreferrer">
+                                            <i className="fas fa-phone"></i>
+                                          </a>
                                         </button>
                                         {/* <button
                                         className="btn btn-outline-success btn-sm border-0"
