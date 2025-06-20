@@ -2466,13 +2466,14 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 		console.log('collegeId', collegeId)
 
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
-		if (typeof projectId !== 'string') { projectId = new mongoose.Types.ObjectId(projectId); }
 
 
 		if (projectId) {
 			if (!mongoose.Types.ObjectId.isValid(projectId)) {
 				return res.status(400).json({ success: false, message: 'Invalid Project ID' });
 			}
+		if (typeof projectId !== 'string') { projectId = new mongoose.Types.ObjectId(projectId); }
+
 			const projectDetails = await Project.findById(projectId);
 			console.log('projectDetails', projectDetails)
 			if (!projectDetails) {
