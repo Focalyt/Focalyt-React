@@ -459,7 +459,7 @@ const NearByJobs = () => {
       {showProfileModal && (
         <div className="modal fade show" id="popup" tabIndex="-1" role="dialog" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
+            <div className="modal-content p-0">
               <div className="modal-header bg-primary">
                 <h5 className="modal-title text-white text-uppercase">Complete Profile</h5>
                 <button type="button" className="close" onClick={() => setShowProfileModal(false)}>
@@ -474,7 +474,7 @@ const NearByJobs = () => {
               </div>
               <div className="modal-footer">
                 <a href="/candidate/myProfile">
-                  <button type="submit" className="btn btn-primary text-white">Complete Profile</button>
+                  <button type="submit" className="btn btn-primary text-black">Complete Profile</button>
                 </a>
                 <button type="button" className="btn btn-outline-light" onClick={() => setShowProfileModal(false)}>
                 <i class="fas fa-times d-block d-lg-none"></i>

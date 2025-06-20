@@ -525,7 +525,7 @@ const CourseDetails = () => {
                                   <div key={i} className={`carousel-item ${i === 0 ? 'active' : ''}`}>
                                     <img
                                       className="d-block w-100"
-                                      src={`${bucketUrl}/${photo}`}
+                                      src={photo ? `${bucketUrl}/${photo}` : '/Assets/public_assets/images/newjoblisting/course_img.svg'}
                                       alt={`Slide ${i + 1}`}
                                     />
                                   </div>
@@ -537,7 +537,7 @@ const CourseDetails = () => {
                             <div className="carousel-inner">
                               <div className="carousel-item active">
                                 <img
-                                  src="/public_assets/images/newjoblistingbanner2.jpg"
+                                  src="/Assets/public_assets/images/newjoblisting/banner2.jpg"
                                   className="d-block w-100 rounded shadow"
                                   alt="Default course banner"
                                 />
@@ -1189,7 +1189,7 @@ const CourseDetails = () => {
       <div className="modal fade" id="apply" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered" role="document">
           {canApply ? (
-            <div className="modal-content">
+            <div className="modal-content p-0">
               <div className="modal-header">
                 <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">REGISTRATION</h5>
                 <button
@@ -1255,7 +1255,7 @@ const CourseDetails = () => {
           ) : 
           (
 
-            <div className="modal-content">
+            <div className="modal-content p-0">
               <div className="modal-header">
                 <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">COMPLETE PROFILE</h5>
                 <button
@@ -1355,7 +1355,7 @@ const CourseDetails = () => {
       {showCongratulationModal && (
         <div className="modal fade show" style={{ display: 'block' }} id="completeRegistration" tabIndex="-1" role="dialog" aria-labelledby="completeRegistrationTitle" aria-hidden="true">
           <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
+            <div className="modal-content p-0">
               <div className="modal-header">
                 <h5 className="modal-title text-white text-uppercase" id="completeRegistrationTitle">REGISTRATION DONE</h5>
                 <button
@@ -1417,7 +1417,7 @@ const CourseDetails = () => {
 
       <div className="modal fade" id="videoModal" tabIndex="-1" role="dialog" aria-labelledby="videoModalTitle" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
+          <div className="modal-content p-0">
             <button
               type="button"
               className="close"

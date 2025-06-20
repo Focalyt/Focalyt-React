@@ -997,7 +997,7 @@ const CandidateViewJobs = () => {
         <div className="modal fade show" style={{ display: 'block' }} id="apply">
           <div className="modal-dialog modal-dialog-centered">
             {canApply ? (
-              <div className="modal-content">
+              <div className="modal-content p-0">
                 <div className="modal-header">
                   <h5 className="modal-title text-white text-uppercase">Apply Now</h5>
                   <button type="button" className="close" onClick={() => setShowApplyModal(false)}>
@@ -1030,7 +1030,7 @@ const CandidateViewJobs = () => {
                 </div>
               </div>
             ) : (
-              <div className="modal-content">
+              <div className="modal-content p-0">
                 <div className="modal-header">
                   <h5 className="modal-title text-white text-uppercase">Complete Profile</h5>
                   <button type="button" className="close" onClick={() => setShowApplyModal(false)}>
@@ -1119,7 +1119,7 @@ const CandidateViewJobs = () => {
         <div className="modal fade show" style={{ display: 'block' }} id="registerApply">
           <div className="modal-dialog modal-dialog-centered">
             {(canApply && hasCredit) && (
-              <div className="modal-content">
+              <div className="modal-content p-0">
                 <div className="modal-header">
                   <h5 className="modal-title text-white text-uppercase">Register for Interview</h5>
                   <button type="button" className="close" onClick={() => setShowRegisterModal(false)}>
@@ -1158,7 +1158,7 @@ const CandidateViewJobs = () => {
               </div>
             )}
             {(canApply && !hasCredit) && (
-              <div className="modal-content">
+              <div className="modal-content p-0">
                 <div className="modal-header">
                   <h5 className="modal-title text-white text-uppercase">Insufficient Coins</h5>
                   <button type="button" className="close" onClick={() => setShowRegisterModal(false)}>
@@ -1228,7 +1228,7 @@ const CandidateViewJobs = () => {
       {showCoinOfferModal && (
         <div className="modal fade show" style={{ display: 'block' }} id="coin_offer">
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
+            <div className="modal-content p-0">
               <div className="modal-header">
                 <h5 className="modal-title text-white text-uppercase">COIN OFFERS</h5>
                 <button type="button" className="close" onClick={() => setShowCoinOfferModal(false)}>
@@ -1299,7 +1299,7 @@ const CandidateViewJobs = () => {
       {showRedeemModal && (
         <div className="modal fade show" style={{ display: 'block' }} id="redeemCashback">
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content modal-sm">
+            <div className="modal-content modal-sm p-0">
               <div className="modal-header vchr_header">
                 <h5 className="modal-title text-white text-uppercase">Buy Coins / सिक्के खरीदें</h5>
                 <button type="button" className="close color-purple" onClick={() => setShowRedeemModal(false)}>
@@ -1362,7 +1362,7 @@ const CandidateViewJobs = () => {
       {showAfterApplyModal && (
         <div className="modal fade show" style={{ display: 'block' }} id="afterApply">
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
+            <div className="modal-content p-0">
               <div className="modal-header">
                 <h5 className="modal-title text-white text-uppercase">Applied successfully</h5>
                 <button
@@ -1402,7 +1402,7 @@ const CandidateViewJobs = () => {
 {showCongratulationModal && (
 <div className="modal fade show" style={{ display: 'block' }} id="completeRegistration" tabIndex="-1" role="dialog" aria-labelledby="completeRegistrationTitle" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
+          <div className=" p-0">
             <div className="modal-header">
               <h5 className="modal-title text-white text-uppercase" id="completeRegistrationTitle">REGISTRATION DONE</h5>
               <button
@@ -1444,7 +1444,7 @@ const CandidateViewJobs = () => {
       {showFeedbackModal && (
         <div className="modal fade show" style={{ display: 'block' }} id="feedback">
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content review-border">
+            <div className="modal-content review-border p-0">
               <div className="modal-header">
                 <h5 className="modal-title text-white text-uppercase">Feedback</h5>
                 <button
@@ -1509,7 +1509,7 @@ const CandidateViewJobs = () => {
 
       <div className="modal fade" id="videoModal" tabIndex="-1" role="dialog" aria-labelledby="videoModalTitle" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
+          <div className="modal-content p-0">
             <button
               type="button"
               className="close"
