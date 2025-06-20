@@ -66,7 +66,6 @@ const EditCourse = () => {
   const [formData, setFormData] = useState({
     sectors: [],
     courseLevel: '',
-    courseFeeType: '',
     projectName: '',
     typeOfProject: '',
     courseType: '',
@@ -273,7 +272,6 @@ const EditCourse = () => {
         setFormData({
           sectors: course.sectors ? course.sectors.map(c => c._id) : [],
           courseLevel: course.courseLevel || '',
-          courseFeeType: course.courseFeeType || '',
           vertical: course.vertical || '',
           project: course.project || '',
           projectName: course.projectName || '',
@@ -337,7 +335,6 @@ const EditCourse = () => {
         }
 
         // Set UI state based on course data
-        setShowProjectFields(course.courseFeeType === 'Free');
         setShowContactInfo(!!course.counslername || !!course.counslerphonenumber);
         handleTrainingModeChange(course.trainingMode);
         handleAddressChange(course.address);
@@ -409,9 +406,7 @@ const EditCourse = () => {
     }
 
     // Handle specific field changes that affect UI
-    if (name === 'courseFeeType') {
-      setShowProjectFields(value === 'Free');
-    } else if (name === 'trainingMode') {
+    if (name === 'trainingMode') {
       handleTrainingModeChange(value);
     } else if (name === 'address') {
       handleAddressChange(value);
@@ -1300,21 +1295,7 @@ const EditCourse = () => {
                         {formErrors.courseLevel && <div className="invalid-feedback">{formErrors.courseLevel}</div>}
                       </div>
 
-                      {/* Course Fee Type */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
-                        <label htmlFor="courseFeeType">Course Fee Type</label>
-                        <select
-                          className="form-control"
-                          name="courseFeeType"
-                          id="courseFeeType"
-                          value={formData.courseFeeType}
-                          onChange={handleChange}
-                        >
-                          <option value="">Select Course Fee Type</option>
-                          <option value="Paid">Paid</option>
-                          <option value="Free">Free</option>
-                        </select>
-                      </div>
+                    
 
                       {/* Vertical */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
