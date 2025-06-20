@@ -288,8 +288,7 @@ router.get("/list-candidates", isCompany, async (req, res) => {
   const menu = "list-candidates";
   const qualification = await Qualification.find({ status: true }).sort({ basic: -1 })
   const company = await Company.findOne({
-    // _concernPerson: req.session.user._id,
-    _concernPerson: req.user._id,
+    _concernPerson: req.session.user._id,
   });
   let companyLat = Number(company.latitude);
   let companyLong = Number(company.longitude)
