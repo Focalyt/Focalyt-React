@@ -418,10 +418,12 @@ const AdmissionList = () => {
   // 🎯 Tab-Specific Filter Logic
   // ========================================
   const applyFiltersForTab = (mainTabName, filterIndex) => {
-    const currentFilters = mainTabName === admissionFilters;
+    console.log('mainTabName', mainTabName)
+    const currentFilters = mainTabName === 'AllAdmission' ? admissionFilters : [];
     const selectedFilter = currentFilters[filterIndex];
 
     let filteredData = [...allProfilesData];
+    console.log('selectedFilter', selectedFilter)
 
 
     if (selectedFilter._id === 'pendingDocs') {

@@ -91,7 +91,7 @@ const CollegeLogin = () => {
             // Verify OTP here
             try {
                 const body = {
-                    mobile: userInput,
+                    userInput,
                     otp
                 };
 

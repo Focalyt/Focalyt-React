@@ -643,7 +643,23 @@ module.exports.loginAsCandidate = async (req, res) => {
 module.exports.loginAsCollege = async (req, res) => {
   try {
 
-    const { mobile, otp } = req.body;
+    const { userInput, otp } = req.body;
+    const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInput); // email check
+    let mobile;
+    let email;
+    if(isMobile){
+      mobile = userInput;
+    }else if(isEmail){
+      email = userInput;
+      const user = await User.findOne({ email, role: 2 });
+      if(!user){
+        return res.json({ status: false, error: "User not found" });
+      }
+      mobile = user.mobile;
+    }else{
+      return res.json({ status: false, error: "Invalid mobile number or email" });
+    }
 
     const auth = authKey
     const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
@@ -661,7 +677,9 @@ module.exports.loginAsCollege = async (req, res) => {
       }
 
       const userId = new mongoose.Types.ObjectId(user._id);
-      const college = await College.findOne({ _concernPerson: { $in: [{id: userId}] } }, "name");
+      const college = await College.findOne({
+				_concernPerson: { $elemMatch: { _id: userId } }
+			}, "name _concernPerson");
 
       if (!college || college === null) {
         return res.json({ status: false, message: 'Missing College!' });
