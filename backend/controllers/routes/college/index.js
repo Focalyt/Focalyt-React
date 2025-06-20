@@ -2621,13 +2621,20 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		if (actionParts.length === 0) {
 			actionParts.push('No changes made to status or followup');
 		}
-
+		console.log(userId, 'userId')
 		// Add a log entry for the update
-		doc.logs.push({
+		// Add a log entry for the update with proper validation
+		const newLogEntry = {
 			user: userId,
 			action: actionParts.join('; '), // Combine all actions in one log message
-			remarks: remarks || '' // Optional remarks in the log
-		});
+			remarks: remarks || '', // Optional remarks in the log
+			timestamp: new Date() // Add timestamp if your schema supports it
+		};
+
+		// Validate the log entry before pushing
+		console.log('New log entry:', newLogEntry);
+		
+		doc.logs.push(newLogEntry);
 
 		// Save the updated document
 		await doc.save();

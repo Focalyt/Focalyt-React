@@ -80,7 +80,7 @@ const appliedCoursesSchema = new Schema(
         user: {
           type: ObjectId,
           ref: "User",
-          required: true,
+          
         },
         timestamp: {
           type: Date,
@@ -291,20 +291,7 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
 
       this.courseStatus = 1; // Assigned
 
-      // Add log entry with appropriate message
-      const logMessage = applicableRules.length === 0 
-        ? 'Lead assigned to default admin automatically (no assignment rules found)'
-        : 'Lead assigned automatically via assignment rules';
-
-      this.logs.push({
-        user: this.registeredBy,
-        timestamp: new Date(),
-        action: logMessage,
-        remarks: logMessage
-      });
-
-      // DON'T CALL this.save() HERE - let the main save operation handle it
-      console.log(`Lead assigned to counselor: ${counselorName}`);
+     
       return selectedCounselor;
     }
 
