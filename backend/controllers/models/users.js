@@ -31,6 +31,7 @@ const userSchema = new Schema(
 		countryId: String,
 		address: String,
 		reporting_managers: [ObjectId],
+		my_team: [ObjectId],
 		authTokens: [String],
 		permissions: {
 			permission_type: { type: String, default: 'Admin' },

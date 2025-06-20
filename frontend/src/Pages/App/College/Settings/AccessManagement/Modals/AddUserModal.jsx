@@ -230,6 +230,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
 
     try {
       console.log(userForm, 'userForm')
+      console.log(token, 'token')
       const reponse = await axios.post(`${backendUrl}/college/users/add`, userForm, {
         headers: {
           'x-auth': token

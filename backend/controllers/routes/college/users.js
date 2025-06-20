@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const router = express.Router();
 
-const { isCollege, auth1, authenti } = require("../../../helpers");
+const { isCollege, auth1, authenti, logUserActivity } = require("../../../helpers");
 
 
 
@@ -24,6 +24,7 @@ const AppliedCourses = require('../../models/appliedCourses');
 
 // Permission Checker Utility Function
 const hasPermission = (user, permission) => {
+  console.log(user, 'user')
   const permissionType = user.permissions?.permission_type;
   
   if (permissionType === 'Admin') return true;
@@ -379,7 +380,7 @@ router.get('/', isCollege, async (req, res) => {
 		});
 	}
 });
-router.post('/add', [checkPermission('can_add_users'), isCollege], async (req, res) => {
+router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity((req) => `Add user: ${req.body.name}`)], async (req, res) => {
   console.log('api called add user')
   try {
 
@@ -527,6 +528,16 @@ router.post('/add', [checkPermission('can_add_users'), isCollege], async (req, r
 
     // Save user to database
     const savedUser = await newUser.save();
+
+    validReportingManagers.map(async (manager) => {
+      const managerUser = await User.findOne({ _id: manager });
+      if (managerUser) {
+        managerUser.my_team.push(savedUser._id);
+        await managerUser.save();
+      }
+    });
+
+
 
     // Return success response
     const userResponse = {
