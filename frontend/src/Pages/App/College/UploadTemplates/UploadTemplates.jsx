@@ -183,7 +183,7 @@ const UploadTemplates = () => {
                     <div className="image-upload">
                       <label htmlFor="media-group">
                         <img 
-                          src="/images/icons/jd_one.png" 
+                          src="/Assets/images/icons/jd_one.png" 
                           className="pointer img-fluid" 
                           alt="Upload" 
                         />

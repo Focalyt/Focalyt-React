@@ -1194,7 +1194,7 @@ const CandidatesJobs = () => {
         aria-labelledby="exampleModalCenterTitle"
       >
         <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
+          <div className="modal-content p-0">
             <div className="modal-header">
               <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">
                 Complete Profile
@@ -1235,7 +1235,7 @@ const CandidatesJobs = () => {
         onClick={() => setVideoSrc("")}
       >
         <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
+          <div className="modal-content p-0">
             <button
               type="button"
               className="close"

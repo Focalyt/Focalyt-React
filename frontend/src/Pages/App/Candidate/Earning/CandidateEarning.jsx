@@ -395,7 +395,7 @@ const CandidateEarning = ({
       {/* Cashback modal */}
       <div className="modal fade" id="redeemCashback" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle">
         <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
+          <div className="modal-content p-0">
             <div className="modal-header">
               <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">
                 Redeem Cashback
@@ -440,7 +440,7 @@ const CandidateEarning = ({
       {/* KYC modal */}
       <div className="modal fade" id="kyc" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle">
         <div className="modal-dialog modal-dialog-centered" role="document">
-          <div className="modal-content">
+          <div className="modal-content p-0">
             <div className="modal-header">
               <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">
                 Upload KYC Document
