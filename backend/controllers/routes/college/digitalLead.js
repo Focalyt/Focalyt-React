@@ -19,18 +19,40 @@ router.route("/addleaddandcourseapply")
         try {
             console.log("Incoming body:", req.body);
 
-            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4} = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source } = req.body;
+            if(!source){
+                source = 'FB Form';
+            }
 
-            if (MobileNumber.startsWith('+91')) {
-                MobileNumber = MobileNumber.slice(3);  // Remove +91
-            } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
-                MobileNumber = MobileNumber.slice(2);  // Remove 91
+            if(!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4){
+                return res.status(400).json({ status: false, msg: "All fields are required" });
             }
+
+            if (MobileNumber) {
+                MobileNumber = MobileNumber.toString();  // Convert to string
             
-            // Validate the 10-digit mobile number
-            if (!/^[0-9]{10}$/.test(MobileNumber)) {
-                return res.status(400).json({ message: 'Invalid mobile number format' });
+                // Check the type after conversion
+                console.log('MobileNumber:', MobileNumber, 'Type:', typeof MobileNumber); 
+            
+                // Remove +91 or 91 prefix if present
+                if (MobileNumber.startsWith('+91')) {
+                    MobileNumber = MobileNumber.slice(3);  // Remove +91
+                } else if (MobileNumber.startsWith('91') && MobileNumber.length === 12) {
+                    MobileNumber = MobileNumber.slice(2);  // Remove 91
+                }
+            
+                // Validate the 10-digit mobile number
+                if (!/^[0-9]{10}$/.test(MobileNumber)) {
+                    return res.status(400).json({ message: 'Invalid mobile number format' });
+                }
+            MobileNumber = parseInt(MobileNumber);
+
+            
+                // Continue processing
+            } else {
+                return res.status(400).json({ message: 'Mobile number is required' });
             }
+
             
 
             let mobile = MobileNumber;
@@ -38,6 +60,12 @@ router.route("/addleaddandcourseapply")
             let sex = Gender;
             let dob = DateOfBirth;
             let email = Email;
+
+           
+
+            if(typeof courseId === 'string'){
+                courseId = new mongoose.Types.ObjectId(courseId);
+            }
 
             let course = await Courses.findById(courseId);
             if (!course) {
@@ -61,6 +89,9 @@ router.route("/addleaddandcourseapply")
             
 
             let existingCandidate = await CandidateProfile.findOne({ mobile });
+            if(existingCandidate){
+               
+            
             let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
             if(alreadyApplied){
                 return res.json({ status: false, msg: "Candidate already exists and course already applied", data:{existingCandidate, alreadyApplied} });
@@ -74,7 +105,7 @@ router.route("/addleaddandcourseapply")
 
                 return res.json({ status: true, msg: "Candidate already exists and course applied successfully", data:{existingCandidate, appliedCourseEntry} });
 
-            }
+            }}
 
             else{
             // ✅ Build CandidateProfile Data
@@ -90,7 +121,8 @@ router.route("/addleaddandcourseapply")
                         centerId: selectedCenter
                     }
                 ],
-                verified: false
+                verified: false,
+                source
             };
 
 
@@ -103,7 +135,8 @@ router.route("/addleaddandcourseapply")
                 email: candidate.email,
                 mobile: candidate.mobile,
                 role: 3,
-                status: 'active'
+                status: true,
+                source
             });
 
             console.log('selectedCenter', typeof selectedCenter)

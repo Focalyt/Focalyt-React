@@ -139,6 +139,7 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
     const AppliedCourses = mongoose.model('AppliedCourses');
     const Course = mongoose.model('courses');
     const College = mongoose.model('College');
+    const User = mongoose.model('User');
     
     const courseId = this._course;
     const centerId = this._center;
@@ -234,9 +235,7 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
     for (let counselorId of allCounselors) {
       // Find last assignment for this counselor with same course and center (sorted by createdAt)
       const lastAssignment = await AppliedCourses.findOne({
-        _course: courseId,
-        _center: centerId,
-        'leadAssignment.counsellorName': counselorId
+        'leadAssignment._id': counselorId
       }).sort({ createdAt: -1 });
 
       let lastAssignmentDate = null;
@@ -279,9 +278,14 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
 
     // Step 5: Assign the selected counselor (DON'T SAVE HERE)
     if (selectedCounselor) {
+
+      const counselorDetails = await User.findById(selectedCounselor);
+      const counselorName = counselorDetails.name;
+
       // Add new assignment to leadAssignment array
       this.leadAssignment.push({
-        counsellorName: new mongoose.Types.ObjectId(selectedCounselor),
+        _id: new mongoose.Types.ObjectId(selectedCounselor),
+        counsellorName: counselorName,
         assignDate: new Date(),
         assignedBy: this.registeredBy
       });
@@ -301,7 +305,7 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
       });
 
       // DON'T CALL this.save() HERE - let the main save operation handle it
-      console.log(`Lead assigned to counselor: ${selectedCounselor}`);
+      console.log(`Lead assigned to counselor: ${counselorName}`);
       return selectedCounselor;
     }
 
