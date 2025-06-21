@@ -37,7 +37,7 @@ const EditCourse = () => {
   const [selectedTestimonialPreviews, setSelectedTestimonialPreviews] = useState([]);
   const [selectedBrochurePreview, setSelectedBrochurePreview] = useState(null);
   // Document requirements
-  const [docsRequired, setDocsRequired] = useState([]);
+  const [docsRequired, setDocsRequired] = useState([ {name: '', mandatory: false} ]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -65,6 +65,7 @@ const EditCourse = () => {
   // Basic form state
   const [formData, setFormData] = useState({
     sectors: [],
+    courseFeeType: '',
     courseLevel: '',
     projectName: '',
     typeOfProject: '',
@@ -271,6 +272,7 @@ const EditCourse = () => {
         // Initialize form data with course data
         setFormData({
           sectors: course.sectors ? course.sectors.map(c => c._id) : [],
+          courseFeeType: course.courseFeeType || '',
           courseLevel: course.courseLevel || '',
           vertical: course.vertical || '',
           project: course.project || '',
@@ -322,7 +324,8 @@ const EditCourse = () => {
         if (course.docsRequired && course.docsRequired.length > 0) {
           setDocsRequired(course.docsRequired.map(doc => ({
             _id: doc._id,
-            name: doc.Name
+            name: doc.Name,
+            mandatory: doc.mandatory ? true : false
           })));
         }
 
@@ -1033,13 +1036,17 @@ const EditCourse = () => {
 
   // Add a new document field
   const addDocumentField = () => {
-    setDocsRequired([...docsRequired, { name: '' }]);
+    setDocsRequired([...docsRequired, { name: '', mandatory: false }]);
   };
 
   // Update document field value
-  const updateDocumentField = (index, value) => {
+  const updateDocumentField = (index, value, field) => {
     const updatedDocs = [...docsRequired];
-    updatedDocs[index].name = value;
+    if(field === 'name'){
+      updatedDocs[index].name = value;
+    }else if(field === 'mandatory'){
+      updatedDocs[index].mandatory = value === 'true' ? true : false;
+    }
     setDocsRequired(updatedDocs);
   };
 
@@ -1173,7 +1180,8 @@ const EditCourse = () => {
       // Append docs required
       form.append('docsRequired', JSON.stringify(docsRequired.map(doc => ({
         _id: doc._id,
-        Name: doc.name
+        Name: doc.name,
+        mandatory: doc.mandatory
       }))));
 
       // Append question answers
@@ -1295,7 +1303,21 @@ const EditCourse = () => {
                         {formErrors.courseLevel && <div className="invalid-feedback">{formErrors.courseLevel}</div>}
                       </div>
 
-                    
+                      {/* Course Fee Type */}
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
+                        <label htmlFor="courseFeeType">Course Fee Type</label>
+                        <select
+                          className="form-control"
+                          name="courseFeeType"
+                          id="courseFeeType"
+                          value={formData.courseFeeType}
+                          onChange={handleChange}
+                        >
+                          <option value="">Select Course Fee Type</option>
+                          <option value="Paid">Paid</option>
+                          <option value="Free">Free</option>
+                        </select>
+                      </div>
 
                       {/* Vertical */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
@@ -1771,7 +1793,7 @@ const EditCourse = () => {
                                 type="text"
                                 className="form-control docsName"
                                 value={doc.name || ''}
-                                onChange={(e) => updateDocumentField(index, e.target.value)}
+                                onChange={(e) => updateDocumentField(index, e.target.value,'name')}
                               />
                               <div className="input-group-append">
                                 <button
@@ -1783,6 +1805,13 @@ const EditCourse = () => {
                                 </button>
                               </div>
                             </div>
+                          </div>
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1 doc-item">
+                            <label>Mandatory</label>
+                            <select name="mandatory-doc" className="form-control" value={doc.mandatory} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
                           </div>
                         </div>
                       ))}

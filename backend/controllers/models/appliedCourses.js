@@ -63,6 +63,10 @@ const appliedCoursesSchema = new Schema(
 
     ],
     leadAssignment: [{
+      _id: {
+        type: ObjectId,
+        ref: "User",
+      },
       counsellorName: {
         type: String,
       },

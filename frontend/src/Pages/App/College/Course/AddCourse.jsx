@@ -65,6 +65,7 @@ const AddCourse = () => {
     {
       sector: [],
       courseLevel: '',
+      courseFeeType: '',
       projectName: '',
       vertical: '',
       project: '',
@@ -107,7 +108,7 @@ const AddCourse = () => {
     });
 
   // Document requirements
-  const [docsRequired, setDocsRequired] = useState([]);
+  const [docsRequired, setDocsRequired] = useState([{name: '', mandatory: false}]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -410,13 +411,17 @@ const AddCourse = () => {
 
   // Add a new document field
   const addDocumentField = () => {
-    setDocsRequired([...docsRequired, { name: '' }]);
+    setDocsRequired([...docsRequired, { name: '', mandatory: false }]);
   };
 
   // Update document field value
-  const updateDocumentField = (index, value) => {
+  const updateDocumentField = (index, value, field) => {
     const updatedDocs = [...docsRequired];
-    updatedDocs[index].name = value;
+    if(field === 'name'){ 
+      updatedDocs[index].name = value;
+    }else if(field === 'mandatory'){
+      updatedDocs[index].mandatory = value === 'true' ? true : false;
+    }
     setDocsRequired(updatedDocs);
   };
 
@@ -458,6 +463,7 @@ const AddCourse = () => {
       {
       sector: [],
       courseLevel: '',
+      courseFeeType: '',
       projectName: '',
       vertical: '',
       project: '',
@@ -1089,6 +1095,23 @@ const AddCourse = () => {
                         {formErrors.courseLevel && <div className="invalid-feedback">{formErrors.courseLevel}</div>}
                       </div>
 
+
+                      {/* Course Fee Type */}
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
+                        <label htmlFor="courseFeeType">Course Fee Type</label>
+                        <select
+                          className="form-control"
+                          name="courseFeeType"
+                          id="courseFeeType"
+                          value={formData.courseFeeType}
+                          onChange={handleChange}
+                        >
+                          <option value="">Select Course Fee Type</option>
+                          <option value="Paid">Paid</option>
+                          <option value="Free">Free</option>
+                        </select>
+                      </div>
+
                       
 
                       {/* Vertical */}
@@ -1565,8 +1588,16 @@ const AddCourse = () => {
                               type="text"
                               className="form-control docsName"
                               value={doc.name}
-                              onChange={(e) => updateDocumentField(index, e.target.value)}
+                              onChange={(e) => updateDocumentField(index, e.target.value,'name')}
                             />
+                          </div>
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                            <label>Mandatory</label>
+                            <select name="mandatory-doc" className="form-control" value={doc.mandatory} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
+                              <option value="">Select Mandatory</option>
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
                           </div>
                         </div>
                       ))}
