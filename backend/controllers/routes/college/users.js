@@ -601,7 +601,7 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
 
 //update User
 
-router.post('/update/:userId', [isCollege, checkPermission('can_add_users'), logUserActivity((req) => `Add user: ${req.body.name}`)], async (req, res) => {
+router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), logUserActivity((req) => `Update user: ${req.body.name}`)], async (req, res) => {
   console.log('api called add user')
   try {
 
@@ -719,6 +719,26 @@ router.post('/update/:userId', [isCollege, checkPermission('can_add_users'), log
       }
       delete body.access_level;
     }
+
+    if (body.reporting_managers) {
+      body.reporting_managers = await Promise.all(
+        body.reporting_managers.map(async (manager) => {
+          if (typeof manager === 'string') {
+            return new mongoose.Types.ObjectId(manager);
+          }
+          
+          // Update the reporting manager and add userId to their my_team array if it's not already there
+          const updateMyTeam = await User.findOneAndUpdate(
+            { _id: manager },
+            { $addToSet: { my_team: userId } },  // Using $addToSet to avoid duplicates
+            { new: true }
+          );
+    
+          return updateMyTeam._id;
+        })
+      );
+    }
+    
 
 
 
