@@ -26,6 +26,7 @@ import {
 const UserManagement = ({
   users = [],
   handleAddUser,
+  handleEditUser,
   allRoles = {},
   permissionMode = 'unified',
   searchTerm = '',
@@ -543,7 +544,7 @@ const UserManagement = ({
                           </button>
                           <button
                             className="btn btn-sm btn-outline-warning"
-                            onClick={() => onEditUser && onEditUser(user)}
+                            onClick={() => handleEditUser && handleEditUser(user)}
                             title="Edit User"
                           >
                             <Edit size={14} />

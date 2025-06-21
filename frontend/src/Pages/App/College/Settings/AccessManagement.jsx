@@ -20,6 +20,7 @@ import PermissionAnalysis from './AccessManagement/PermissionAnalysis';
 import RoleManagement from './AccessManagement/RoleManagement';
 import Settings from './AccessManagement/Settings';
 import LeadAssignmentRule from './leadAssignmentRule';
+import EditUserModal from './AccessManagement/Modals/EditUserModal';
 import qs from 'query-string';
 
 
@@ -47,6 +48,11 @@ const AccessManagement = () => {
   const [showAddRole, setShowAddRole] = useState(false);
   const [viewDetailsUser, setViewDetailsUser] = useState(null);
   const [addMode, setAddMode] = useState('user');
+
+
+  //EDIT USER MODAL
+  const [showEditUser, setShowEditUser] = useState(false);
+  const [editUser, setEditUser] = useState(null);
 
   // All users data
   const [users, setUsers] = useState([
@@ -125,6 +131,12 @@ const AccessManagement = () => {
   const handleAddUser = () => {
     setAddMode('user');
     setShowAddUser(true);
+  };
+
+  const handleEditUser = (user) => {
+    console.log(user, 'user');
+    setEditUser(user);
+    setShowEditUser(true);
   };
 
   const handleCreateRole = () => {
@@ -316,6 +328,7 @@ const fetchBatches = async () => {
           <UserManagement
             users={users}
             handleAddUser={handleAddUser}
+            handleEditUser={handleEditUser}
             allRoles={allRoles}
             permissionMode={permissionMode}
             searchTerm={searchTerm}
@@ -422,8 +435,23 @@ const fetchBatches = async () => {
           allRoles={allRoles}
           onClose={() => setShowAddUser(false)}
           onAddUser={(newUser) => {
-            setUsers([...users, newUser]);
+            fetchUsers();
             setShowAddUser(false);
+          }}
+          enhancedEntities={enhancedEntities}
+
+        />
+      )}
+
+      {showEditUser && (
+        <EditUserModal
+          users={users}
+          editUser={editUser}
+          allRoles={allRoles}
+          onClose={() => setShowEditUser(false)}
+          onEditUser={(newUser) => {
+            fetchUsers();
+            setShowEditUser(false);
           }}
           enhancedEntities={enhancedEntities}
 

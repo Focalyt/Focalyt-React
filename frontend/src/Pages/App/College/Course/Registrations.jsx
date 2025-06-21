@@ -65,6 +65,20 @@ const CRMDashboard = () => {
   const [concernPersons, setConcernPersons] = useState([]);
   const [selectedConcernPerson, setSelectedConcernPerson] = useState(null);
 
+  //filter stats
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterSubStatus, setFilterSubStatus] = useState('all');
+  const [filterLeadStatus, setFilterLeadStatus] = useState('all');
+  const [filterCourse, setFilterCourse] = useState('all');
+  const [filterCenter, setFilterCenter] = useState('all');
+  const [filterVertical, setFilterVertical] = useState('all');
+  const [filterProject, setFilterProject] = useState('all');
+  const [filterSector, setFilterSector] = useState('all');
+  const [filterCounselor, setFilterCounselor] = useState('all');
+  const [filterConcernPerson, setFilterConcernPerson] = useState('all');
+  const [filterDate, setFilterDate] = useState(new Date());
+
+
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
     setShowUploadModal(true);
@@ -1725,8 +1739,6 @@ const CRMDashboard = () => {
         setAllProfiles(response.data.data);
         setAllProfilesData(response.data.data)
         setTotalPages(response.data.totalPages);
-
-
 
       } else {
         console.error('Failed to fetch profile data', response.data.message);
