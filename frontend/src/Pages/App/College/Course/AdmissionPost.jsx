@@ -2734,7 +2734,7 @@ background: #fd2b5a;
         /* position: absolute !important; */
         /* min-height: 200px; */
         background: white;
-        left:20%;
+        left:15.9%;
         right:3%;
         }
         }

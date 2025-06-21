@@ -2819,7 +2819,7 @@ const renderRefferPanel = () => {
           {/* Advanced Filters */}
           {/* Advanced Filters - Improved Design */}
           {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm">
+            <div className="bg-white border-bottom shadow-sm" style={{marginTop: '130px' , transition:'0.4s ease'}}>
               <div className="container-fluid py-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <div className="d-flex align-items-center">
@@ -2863,7 +2863,7 @@ const renderRefferPanel = () => {
 
                 <div className="row g-4">
 
-                  <div className="col-md-4">
+                  <div className="col-md-2">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-graduation-cap me-1 text-success"></i>
                       Course Type
@@ -2879,11 +2879,10 @@ const renderRefferPanel = () => {
                         <option value="Free">🆓 Free</option>
                         <option value="Paid">💰 Paid</option>
                       </select>
-                      <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
                     </div>
                   </div>
 
-                  <div className="col-md-6">
+                  <div className="col-md-2">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-industry me-1 text-primary"></i>
                       Sector
@@ -2901,7 +2900,77 @@ const renderRefferPanel = () => {
                         <option value="Healthcare">🏥 Healthcare</option>
                         <option value="Finance">💳 Finance</option>
                       </select>
-                      <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Verticals
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Verticals</option>
+                        <option value="Vertical 1">Vertical 1</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Course
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All course</option>
+                        <option value="Course 1">Course 1</option>
+                        <option value="Course 2">Course 2</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Center
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All centers</option>
+                        <option value="center 1">center 1</option>
+                        <option value="center 2">center 2</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Councellor Name
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Sectors</option>
+                        <option value="Councellor 1">Councellor 1</option>
+                        <option value="Councellor 2">Councellor 2</option>
+                      </select>
                     </div>
                   </div>
 
@@ -7737,339 +7806,6 @@ html body .content .content-wrapper {
     `
         }
       </style>
-
-      {/* <style>
-        {
-          `
-        html body .content .content-wrapper {
-    padding: calc(0.9rem - 0.1rem) 1.2rem
-}
-
-.container-fluid.py-2 {
-    position: sticky !important;
-    top: 0;
-    z-index: 1020;
-    background-color: white;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-// .stickyBreakpoints {
-//     position: sticky;
-//     top: 20px;
-//     z-index: 11;
-// }
-
-.react-date-picker__wrapper {
-    border: none;
-}
-
-.react-date-picker__inputGroup input {
-    border: none !important
-}
-
-.react-date-picker__inputGroup {
-    width: 100%;
-    white-space: nowrap;
-    background: transparent;
-    border: none;
-}
-
-.react-date-picker__clear-button {
-    display: none;
-}
-
-
-.upload-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1050;
-  backdrop-filter: blur(2px);
-}
-
-.upload-modal-content {
-  background-color: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow: hidden;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  position: relative;
-}
-
-.upload-modal-header {
-  padding: 24px 24px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.upload-modal-body {
-  padding: 24px;
-}
-
-.upload-modal-footer {
-  padding: 16px 24px 24px;
-  border-top: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.file-drop-zone {
-  border: 2px dashed #d1d5db;
-  border-radius: 8px;
-  padding: 48px 24px;
-  text-align: center;
-  background-color: #f9fafb;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.file-drop-zone:hover {
-  border-color: #3b82f6;
-  background-color: #eff6ff;
-}
-
-.drop-zone-content .upload-icon {
-  font-size: 48px;
-  color: #3b82f6;
-  margin-bottom: 16px;
-  display: block;
-}
-
-.file-details {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background-color: #f3f4f6;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-}
-
-.file-icon {
-  width: 48px;
-  height: 48px;
-  background-color: #3b82f6;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 20px;
-}
-
-.file-info {
-  flex: 1;
-}
-
-.file-name {
-  margin: 0 0 4px;
-  font-weight: 500;
-  color: #1f2937;
-  font-size: 0.875rem;
-}
-
-.file-size {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.75rem;
-}
-
-.preview-image {
-  max-width: 100%;
-  max-height: 200px;
-  object-fit: contain;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-
-.progress-bar-container {
-  width: 100%;
-  height: 8px;
-  background-color: #e5e7eb;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.progress-bar {
-  height: 100%;
-  background-color: #3b82f6;
-  transition: width 0.3s ease;
-  border-radius: 4px;
-}
- 
-.document-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1500;
-  backdrop-filter: blur(2px);
-}
-
-.document-modal-content {
-  background-color: white;
-  border-radius: 12px;
-  max-height: 90vh;
-  overflow: hidden;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  position: relative;
-  z-index: 1501;
-}
-
-
-.upload-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2050;
-  backdrop-filter: blur(2px);
-}
-  html body .content .content-wrapper {
-    overflow: visible !important; 
-
-
-
-
-.sticky-header-container {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 1020 !important;
-    background-color: white !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
-    width: 100% !important;
-    margin-bottom: 1rem !important;
-}
-
-
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-    position: relative !important;
-}
-
-
-
-
-
-.stickyBreakpoints {
-    position: sticky !important;
-    top: 120px !important; 
-    z-index: 11 !important;
-}
-
-
-.react-date-picker__wrapper {
-    border: none;
-}
-
-.react-date-picker__inputGroup input {
-    border: none !important;
-}
-
-.react-date-picker__inputGroup {
-    width: 100%;
-    white-space: nowrap;
-    background: transparent;
-    border: none;
-}
-
-.react-date-picker__clear-button {
-    display: none;
-}
-
-
-.upload-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1050;
-    backdrop-filter: blur(2px);
-}
-
-
-.document-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1500;
-    backdrop-filter: blur(2px);
-}
-
-
-@media(max-width: 1920px) {
-    .stickyBreakpoints {
-        top: 120px !important;
-    }
-}
-
-@media(max-width: 1400px) {
-    .stickyBreakpoints {
-        top: 110px !important;
-    }
-}
-
-@media(max-width: 768px) {
-    .sticky-header-container {
-        position: sticky !important;
-        top: 0 !important;
-    }
-    
-    .stickyBreakpoints {
-        position: relative !important;
-}
-
-
-.sticky-header-container::before {
-    content: "STICKY ACTIVE";
-    position: absolute;
-    top: -20px;
-    right: 10px;
-    background: red;
-    color: white;
-    padding: 2px 5px;
-    font-size: 10px;
-    z-index: 9999;
-    
-}
-
-
-`}
-      </style> */}
-
 
     </div>
   );

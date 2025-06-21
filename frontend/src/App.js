@@ -87,6 +87,7 @@ import ViewJd from './Pages/App/Company/Jobs/ViewJd';
 import IntCandiate from './Pages/App/Company/Candidate/IntrestedCandidates';
 import ListCandidate from './Pages/App/Company/Candidate/ListCandidate';
 import NearByCandidate from './Pages/App/Company/Candidate/NearByCandidate';
+import AttendanceManagement from './Component/Layouts/App/College/ProjectManagement/AttendanceManagement'
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -200,7 +201,7 @@ const Layout = () => {
     
           {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
           <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
-
+          <Route path='attendance' element={<AttendanceManagement/>}/>
         </Route>
 
         {/* company  */}

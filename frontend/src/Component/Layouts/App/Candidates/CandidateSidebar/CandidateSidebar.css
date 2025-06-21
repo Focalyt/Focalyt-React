@@ -93,6 +93,7 @@
   .menu-title {
     margin-left: 10px;
     color: #000;
+    font-size: 13px;
   }
   .menu-title .active {
     margin-left: 10px;

@@ -3376,7 +3376,7 @@ const MyFollowups = () => {
           {/* Advanced Filters */}
           {/* Advanced Filters - Improved Design */}
           {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm">
+            <div className="bg-white border-bottom shadow-sm" style={{marginTop:'140px'}}>
               <div className="container-fluid py-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <div className="d-flex align-items-center">
@@ -3420,7 +3420,7 @@ const MyFollowups = () => {
 
                 <div className="row g-4">
 
-                  <div className="col-md-4">
+                  <div className="col-md-2">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-graduation-cap me-1 text-success"></i>
                       Course Type
@@ -3436,11 +3436,10 @@ const MyFollowups = () => {
                         <option value="Free">🆓 Free</option>
                         <option value="Paid">💰 Paid</option>
                       </select>
-                      <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
                     </div>
                   </div>
 
-                  <div className="col-md-6">
+                  <div className="col-md-2">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-industry me-1 text-primary"></i>
                       Sector
@@ -3458,10 +3457,79 @@ const MyFollowups = () => {
                         <option value="Healthcare">🏥 Healthcare</option>
                         <option value="Finance">💳 Finance</option>
                       </select>
-                      <i className="fas fa-chevron-down position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}></i>
                     </div>
                   </div>
-
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Verticals
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Verticals</option>
+                        <option value="Vertical 1">Vertical 1</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Course
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All course</option>
+                        <option value="Course 1">Course 1</option>
+                        <option value="Course 2">Course 2</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Center
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All centers</option>
+                        <option value="center 1">center 1</option>
+                        <option value="center 2">center 2</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Councellor Name
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Sectors</option>
+                        <option value="Councellor 1">Councellor 1</option>
+                        <option value="Councellor 2">Councellor 2</option>
+                      </select>
+                    </div>
+                  </div>
                   {/* Date Range */}
                   {/* Date Filters Section */}
                   {/* REPLACE your existing Date Filters Section with this */}
@@ -7941,7 +8009,7 @@ background: #fd2b5a;
       position: fixed !important;
       transition: 0.4s;
       background: white;
-      left:20%;
+      left:15.9%;
       right:3%;
     }
   }

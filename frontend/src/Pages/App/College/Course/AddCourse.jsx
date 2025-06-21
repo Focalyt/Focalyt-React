@@ -187,8 +187,8 @@ const AddCourse = () => {
       if (choicesInstance.current) {
         try {
           // Check if the instance has a valid element before destroying
-          if (choicesInstance.current.passedElement && 
-              choicesInstance.current.passedElement.element) {
+          if (choicesInstance.current.passedElement &&
+            choicesInstance.current.passedElement.element) {
             choicesInstance.current.destroy();
           }
         } catch (error) {
@@ -199,10 +199,10 @@ const AddCourse = () => {
     };
 
     // Initialize Choices.js when training center field is visible and centers are available
-    if (showTrainingFields.trainingCenter && 
-        trainingCenterRef.current && 
-        centers.length > 0) {
-      
+    if (showTrainingFields.trainingCenter &&
+      trainingCenterRef.current &&
+      centers.length > 0) {
+
       // Clean up any existing instance first
       cleanupChoices();
 
@@ -275,8 +275,8 @@ const AddCourse = () => {
 
   const fetchVerticals = async () => {
     try {
-      const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, { 
-        headers: { 'x-auth': token } 
+      const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, {
+        headers: { 'x-auth': token }
       });
       // Update the whole enhancedEntities but keep other keys unchanged
       setVerticals(newVertical.data.data);
@@ -289,7 +289,7 @@ const AddCourse = () => {
   // Handle input field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-  
+
     // If vertical is changed, reset project selection
     if (name === 'vertical') {
       setFormData({
@@ -311,7 +311,7 @@ const AddCourse = () => {
         [name]: value
       });
     }
-  
+
     // Clear error for this field if it exists
     if (formErrors[name]) {
       setFormErrors({
@@ -319,7 +319,7 @@ const AddCourse = () => {
         [name]: null
       });
     }
-  
+
     // Handle specific field changes that affect UI
     if (name === 'courseFeeType') {
       setShowProjectFields(value === 'Free');
@@ -672,7 +672,7 @@ const AddCourse = () => {
       console.log(`${validFiles.length} photo(s) uploaded successfully`);
     }
   };
-  
+
   const handleThumbnailUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1841,16 +1841,16 @@ const AddCourse = () => {
 
         {/* Testimonial Videos Section */}
         <section id="testimonial-videos">
-          <div className="row" style={{minHeight:'170px'}}>
+          <div className="row" style={{ minHeight: '170px' }}>
             <div className="col-xl-12 col-lg-12">
-             
+
               <div>
                 <div className="card">
                   <div className="card-header border border-top-0 border-left-0 border-right-0">
                     <h4 className="card-title pb-1">Testimonial Videos</h4>
                   </div>
 
-                  <div className="row" style={{minHeight:'170px'}}>
+                  <div className="row" style={{ minHeight: '170px' }}>
                     <div className="col-xl-3 m-2">
                       <div className="col-12 mb-1 d-flex justify-content-center h-100 flex-column ps-3">
                         <label htmlFor="testimonialvideos">Add New Testimonial Videos</label>
@@ -1860,44 +1860,44 @@ const AddCourse = () => {
                           name="testimonialvideos"
                           accept="video/*"
                           multiple
-                          onChange={handleTestimonialVideoUpload} style={{width:'100%', fontSize:'12px' , textAlign:'center'}}
+                          onChange={handleTestimonialVideoUpload} style={{ width: '100%', fontSize: '12px', textAlign: 'center' }}
                         />
                       </div>
 
                     </div>
                     {formData.testimonialvideos && formData.testimonialvideos.length > 0 && (
 
-formData.testimonialvideos.map((video, i) => (
-                    <div className="col-xl-3 m-2">
-                      <div className="card" style={{height:'138px', width:'100%'}}>
+                      formData.testimonialvideos.map((video, i) => (
+                        <div className="col-xl-3 m-2">
+                          <div className="card" style={{ height: '138px', width: '100%' }}>
                             {/* Existing Testimonial Videos */}
-                           
-                                <div key={`testimonial-${i}`} className="col-12 mb-2">
-                              
-                                      <video key={formData.videos[0] instanceof File ? formData.videos[0].name + Date.now() : formData.videos[0]}
-                                        width="100%"
-                                        height="auto"
-                                        controls className="text-primary">
-                                        <source src={getFileUrl(video)} type="video/mp4" />
-                                        <source src={getFileUrl(video)} type="video/webm" />
-                                        <source src={getFileUrl(video)} type="  video/ogg" />
-                                        Your browser does not support the video tag.
-                                      </video>
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm btn-danger ml-2 position-absolute" style={{right:'1px'}}
-                                        onClick={() => removeFile('testimonial', video)}
-                                      >
-                                        <i className="fa fa-times"></i>
-                                      </button>
-                                    </div>
-                                  
-                             
-                      </div>
-                    </div>
-                    ))
-                  )}
-                </div>
+
+                            <div key={`testimonial-${i}`} className="col-12 mb-2">
+
+                              <video key={formData.videos[0] instanceof File ? formData.videos[0].name + Date.now() : formData.videos[0]}
+                                width="100%"
+                                height="auto"
+                                controls className="text-primary">
+                                <source src={getFileUrl(video)} type="video/mp4" />
+                                <source src={getFileUrl(video)} type="video/webm" />
+                                <source src={getFileUrl(video)} type="  video/ogg" />
+                                Your browser does not support the video tag.
+                              </video>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger ml-2 position-absolute" style={{ right: '1px' }}
+                                onClick={() => removeFile('testimonial', video)}
+                              >
+                                <i className="fa fa-times"></i>
+                              </button>
+                            </div>
+
+
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
 
                 </div>
 

@@ -5,7 +5,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import './CourseCrm.css';  
+import './CourseCrm.css';
 import './crm.css';
 
 // Add this at the top of the file, after imports
@@ -134,15 +134,15 @@ const KYCManagement = () => {
   // ========================================
   const [ekycFilters, setEkycFilters] = useState([
     { _id: 'pendingEkyc', name: 'Ekyc Pending', count: 0, milestone: '' },
-   { _id: 'doneEkyc', name: 'Ekyc Verified', count: 0, milestone: 'Ekyc Done' },
-   { _id: 'All', name: 'All', count: 0, milestone: '' }
-   
+    { _id: 'doneEkyc', name: 'Ekyc Verified', count: 0, milestone: 'Ekyc Done' },
+    { _id: 'All', name: 'All', count: 0, milestone: '' }
+
   ]);
 
   // ========================================
   // 🎯 All Admission Filters Configuration
   // ========================================
- 
+
 
   // open model for upload documents 
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -260,7 +260,7 @@ const KYCManagement = () => {
     return mainTab === 'Ekyc' ? ekycFilters : [];
   };
 
- 
+
 
   // Document functions
   // Fixed openDocumentModal function
@@ -312,10 +312,10 @@ const KYCManagement = () => {
       }
 
       // Add confirmation dialog
-      const confirmMessage = status === 'Verified' 
+      const confirmMessage = status === 'Verified'
         ? 'Are you sure you want to verify this document?'
         : 'Are you sure you want to reject this document?';
-      
+
       if (!window.confirm(confirmMessage)) {
         return;
       }
@@ -341,7 +341,7 @@ const KYCManagement = () => {
         } else {
           alert(`Document ${status.toLowerCase()} successfully!`);
         }
-        
+
         // Refresh the profile data
         await fetchProfileData();
         closeDocumentModal();
@@ -804,7 +804,7 @@ const KYCManagement = () => {
     setSelectedStatus(e.target.value);
   };
 
-  const handleMoveToAdmission = async(profile) => {
+  const handleMoveToAdmission = async (profile) => {
     try {
       if (!profile || !profile._id) {
         alert('No profile selected');
@@ -933,21 +933,21 @@ const KYCManagement = () => {
   };
 
   const handleUpdateStatus = async () => {
-      console.log('Function called');
-  
-      try {
-      if(showEditPanel){
-             // Validation checks
+    console.log('Function called');
+
+    try {
+      if (showEditPanel) {
+        // Validation checks
         if (!selectedProfile || !selectedProfile._id) {
           alert('No profile selected');
           return;
         }
-  
+
         if (!seletectedStatus) {
           alert('Please select a status');
           return;
         }
-  
+
         // Combine date and time into a single Date object (if both are set)
         let followupDateTime = '';
         if (followupDate && followupTime) {
@@ -955,16 +955,16 @@ const KYCManagement = () => {
           const dateStr = followupDate instanceof Date
             ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
             : followupDate;
-  
+
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
-  
+
           // Validate the datetime
           if (isNaN(followupDateTime.getTime())) {
             alert('Invalid date/time combination');
             return;
           }
         }
-  
+
         // Prepare the request body
         const data = {
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
@@ -972,20 +972,20 @@ const KYCManagement = () => {
           followup: followupDateTime ? followupDateTime.toISOString() : null,
           remarks: remarks || ''
         };
-  
-        
-  
+
+
+
         // Check if backend URL and token exist
         if (!backendUrl) {
           alert('Backend URL not configured');
           return;
         }
-  
+
         if (!token) {
           alert('Authentication token missing');
           return;
         }
-  
+
         // Send PUT request to backend API
         const response = await axios.put(
           `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
@@ -997,19 +997,19 @@ const KYCManagement = () => {
             }
           }
         );
-  
+
         console.log('API response:', response.data);
-  
+
         if (response.data.success) {
           alert('Status updated successfully!');
-  
+
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
           setFollowupDate('');
           setFollowupTime('');
           setRemarks('');
-  
+
           // Refresh data and close panel
           await fetchProfileData();
           closeEditPanel();
@@ -1017,11 +1017,11 @@ const KYCManagement = () => {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
         }
-  
+
       }
-      if(showFollowupPanel){
-        
-  
+      if (showFollowupPanel) {
+
+
         // Combine date and time into a single Date object (if both are set)
         let followupDateTime = '';
         if (followupDate && followupTime) {
@@ -1029,35 +1029,35 @@ const KYCManagement = () => {
           const dateStr = followupDate instanceof Date
             ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
             : followupDate;
-  
+
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
-  
+
           // Validate the datetime
           if (isNaN(followupDateTime.getTime())) {
             alert('Invalid date/time combination');
             return;
           }
         }
-  
+
         // Prepare the request body
         const data = {
           followup: followupDateTime ? followupDateTime.toISOString() : null,
           remarks: remarks || ''
         };
-  
-        
-  
+
+
+
         // Check if backend URL and token exist
         if (!backendUrl) {
           alert('Backend URL not configured');
           return;
         }
-  
+
         if (!token) {
           alert('Authentication token missing');
           return;
         }
-  
+
         // Send PUT request to backend API
         const response = await axios.put(
           `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
@@ -1069,19 +1069,19 @@ const KYCManagement = () => {
             }
           }
         );
-  
+
         console.log('API response:', response.data);
-  
+
         if (response.data.success) {
           alert('Status updated successfully!');
-  
+
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
           setFollowupDate('');
           setFollowupTime('');
           setRemarks('');
-  
+
           // Refresh data and close panel
           await fetchProfileData();
           closeEditPanel();
@@ -1089,32 +1089,32 @@ const KYCManagement = () => {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
         }
-  
-      }
-      } 
-      catch (error) {
-        console.error('Error updating status:', error);
-  
-        // More detailed error handling
-        if (error.response) {
-          // Server responded with error status
-          console.error('Error Response:', error.response.data);
-          console.error('Error Status:', error.response.status);
-          alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
-        } else if (error.request) {
-          // Request was made but no response received
-          console.error('No response received:', error.request);
-          alert('Network error: Unable to reach server');
-        } else {
-          // Something else happened
-          console.error('Error:', error.message);
-          alert(`Error: ${error.message}`);
-        }
-      }
-    };
 
-    
- 
+      }
+    }
+    catch (error) {
+      console.error('Error updating status:', error);
+
+      // More detailed error handling
+      if (error.response) {
+        // Server responded with error status
+        console.error('Error Response:', error.response.data);
+        console.error('Error Status:', error.response.status);
+        alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
+      } else if (error.request) {
+        // Request was made but no response received
+        console.error('No response received:', error.request);
+        alert('Network error: Unable to reach server');
+      } else {
+        // Something else happened
+        console.error('Error:', error.message);
+        alert(`Error: ${error.message}`);
+      }
+    }
+  };
+
+
+
 
   useEffect(() => {
     fetchProfileData();
@@ -1156,7 +1156,7 @@ const KYCManagement = () => {
         setAllProfilesData(response.data.data)
         setTotalPages(response.data.totalPages)
 
-        
+
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -1341,14 +1341,14 @@ const KYCManagement = () => {
 
   const today = new Date();
 
-  const DocumentControls = React.memo(({ 
-    onZoomIn, 
-    onZoomOut, 
-    onRotate, 
-    onReset, 
-    onDownload, 
-    zoomLevel, 
-    fileType 
+  const DocumentControls = React.memo(({
+    onZoomIn,
+    onZoomOut,
+    onRotate,
+    onReset,
+    onDownload,
+    zoomLevel,
+    fileType
   }) => {
     return (
       <div className="preview-controls">
@@ -1422,7 +1422,7 @@ const KYCManagement = () => {
 
   // यह function DocumentModal के बाहर, component के अंदर कहीं भी define करें:
 
-// Auto Height Document Thumbnail Function - DocumentModal के बाहर define करें
+  // Auto Height Document Thumbnail Function - DocumentModal के बाहर define करें
 
 
   const DocumentModal = () => {
@@ -1477,166 +1477,166 @@ const KYCManagement = () => {
     if (!showDocumentModal || !selectedDocument) return null;
 
     // Helper function to render document preview thumbnail using iframe/img
-   // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
-   const renderDocumentThumbnail = (upload, isSmall = true) => {
-    const fileUrl = upload?.fileUrl;
-    if (!fileUrl) {
-      return (
-        <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f8f9fa',
-          border: '1px solid #dee2e6',
-          borderRadius: '4px',
-          width: isSmall ? '100%' : '150px',
-          height: isSmall ? 'auto' : '100px',
-          minHeight: '50px',
-          fontSize: isSmall ? '16px' : '24px',
-          color: '#6c757d'
-        }}>
-          📄
-        </div>
-      );
-    }
-  
-    const fileType = getFileType(fileUrl);
-  
-    if (fileType === 'image') {
-      return (
-        <img
-          src={fileUrl}
-          alt="Document Preview"
-          className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-          style={{
-            width: isSmall ? '100%' : '150px',
-            height: 'auto', // Completely auto height
-            maxWidth: '100%',
-            objectFit: 'contain',
-            borderRadius: '4px',
-            border: '1px solid #dee2e6',
-            cursor: 'pointer',
+    // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
+    const renderDocumentThumbnail = (upload, isSmall = true) => {
+      const fileUrl = upload?.fileUrl;
+      if (!fileUrl) {
+        return (
+          <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             backgroundColor: '#f8f9fa',
-            display: 'block'
-          }}
-          onClick={() => {
-            if (isSmall) {
-              setCurrentPreviewUpload(upload);
-            }
-          }}
-        />
-      );
-    } else if (fileType === 'pdf') {
-      return (
-        <div style={{ 
-          position: 'relative', 
-          overflow: 'visible', // Allow content to expand
-          width: isSmall ? '100%' : '150px',
-          height: 'auto' // Auto height for container
-        }}>
-          <iframe
-            src={fileUrl+ '#navpanes=0&toolbar=0'} // Add FitH parameter for better PDF display
-            className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
-            style={{
-              width: '100%',
-              height: isSmall ? 'auto' : '100px', // Use viewport height for history
-              maxHeight: isSmall ? '600px' : '100px',
-              border: '1px solid #dee2e6',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              pointerEvents: isSmall ? 'auto' : 'none',
-              transform: isSmall ? 'scale(1)' : 'scale(0.3)',
-              transformOrigin: 'top left',
-              backgroundColor: '#fff'
-            }}
-            title="PDF Document"
-            onClick={() => {
-              if (isSmall) {
-                setCurrentPreviewUpload(upload);
-              }
-            }}
-            scrolling={isSmall ? 'auto' : 'no'}
-          />
-          {!isSmall && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(220, 53, 69, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#dc3545',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-              onClick={() => {
-                setCurrentPreviewUpload(upload);
-              }}>
-              PDF
-            </div>
-          )}
-        </div>
-      );
-    } else {
-      return (
-        <div style={{ 
-          position: 'relative',
-          width: isSmall ? '100%' : '150px',
-          height: 'auto' // Auto height
-        }}>
-          <iframe
+            border: '1px solid #dee2e6',
+            borderRadius: '4px',
+            width: isSmall ? '100%' : '150px',
+            height: isSmall ? 'auto' : '100px',
+            minHeight: '50px',
+            fontSize: isSmall ? '16px' : '24px',
+            color: '#6c757d'
+          }}>
+            📄
+          </div>
+        );
+      }
+
+      const fileType = getFileType(fileUrl);
+
+      if (fileType === 'image') {
+        return (
+          <img
             src={fileUrl}
+            alt="Document Preview"
             className={`document-thumbnail ${isSmall ? 'small' : ''}`}
             style={{
-              width: '100%',
-              height: isSmall ? 'auto' : '100px',
-              minHeight: isSmall ? '300px' : '100px',
-              border: '1px solid #dee2e6',
+              width: isSmall ? '100%' : '150px',
+              height: 'auto', // Completely auto height
+              maxWidth: '100%',
+              objectFit: 'contain',
               borderRadius: '4px',
+              border: '1px solid #dee2e6',
               cursor: 'pointer',
-              pointerEvents: isSmall ? 'auto' : 'none',
-              backgroundColor: '#f8f9fa'
+              backgroundColor: '#f8f9fa',
+              display: 'block'
             }}
-            title="Document"
             onClick={() => {
               if (isSmall) {
                 setCurrentPreviewUpload(upload);
               }
             }}
-            scrolling={isSmall ? 'auto' : 'no'}
           />
-          {!isSmall && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 123, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#007bff',
-              fontSize: '24px',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+        );
+      } else if (fileType === 'pdf') {
+        return (
+          <div style={{
+            position: 'relative',
+            overflow: 'visible', // Allow content to expand
+            width: isSmall ? '100%' : '150px',
+            height: 'auto' // Auto height for container
+          }}>
+            <iframe
+              src={fileUrl + '#navpanes=0&toolbar=0'} // Add FitH parameter for better PDF display
+              className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+              style={{
+                width: '100%',
+                height: isSmall ? 'auto' : '100px', // Use viewport height for history
+                maxHeight: isSmall ? '600px' : '100px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                pointerEvents: isSmall ? 'auto' : 'none',
+                transform: isSmall ? 'scale(1)' : 'scale(0.3)',
+                transformOrigin: 'top left',
+                backgroundColor: '#fff'
+              }}
+              title="PDF Document"
               onClick={() => {
-                setCurrentPreviewUpload(upload);
-              }}>
-              {fileType === 'document' ? '📄' :
-                fileType === 'spreadsheet' ? '📊' : '📁'}
-            </div>
-          )}
-        </div>
-      );
-    }
-  };
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}
+              scrolling={isSmall ? 'auto' : 'no'}
+            />
+            {!isSmall && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#dc3545',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+                onClick={() => {
+                  setCurrentPreviewUpload(upload);
+                }}>
+                PDF
+              </div>
+            )}
+          </div>
+        );
+      } else {
+        return (
+          <div style={{
+            position: 'relative',
+            width: isSmall ? '100%' : '150px',
+            height: 'auto' // Auto height
+          }}>
+            <iframe
+              src={fileUrl}
+              className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+              style={{
+                width: '100%',
+                height: isSmall ? 'auto' : '100px',
+                minHeight: isSmall ? '300px' : '100px',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                pointerEvents: isSmall ? 'auto' : 'none',
+                backgroundColor: '#f8f9fa'
+              }}
+              title="Document"
+              onClick={() => {
+                if (isSmall) {
+                  setCurrentPreviewUpload(upload);
+                }
+              }}
+              scrolling={isSmall ? 'auto' : 'no'}
+            />
+            {!isSmall && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#007bff',
+                fontSize: '24px',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+                onClick={() => {
+                  setCurrentPreviewUpload(upload);
+                }}>
+                {fileType === 'document' ? '📄' :
+                  fileType === 'spreadsheet' ? '📊' : '📁'}
+              </div>
+            )}
+          </div>
+        );
+      }
+    };
 
 
 
@@ -1650,7 +1650,7 @@ const KYCManagement = () => {
 
           <div className="modal-body">
             <div className="document-preview-section">
-              <div className="document-preview-container" style={{height: 'auto'}}>
+              <div className="document-preview-container" style={{ height: 'auto' }}>
                 {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
                   (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                   <>
@@ -1687,7 +1687,7 @@ const KYCManagement = () => {
                             return (
                               <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
                                 <iframe
-                                  src={fileUrl+ '#navpanes=0&toolbar=0'}
+                                  src={fileUrl + '#navpanes=0&toolbar=0'}
                                   width="100%"
                                   height="100%"
                                   style={{
@@ -1773,7 +1773,7 @@ const KYCManagement = () => {
 
               {/* document preview container  */}
 
-               {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
                 <div className="info-card mt-4">
                   <h4>Document History</h4>
                   <div className="document-history">
@@ -1874,50 +1874,50 @@ const KYCManagement = () => {
 
               {/* Document Actions */}
               {(latestUpload?.status || selectedDocument?.status) === 'Pending' && (
-              <div className="document-actions mt-4">
-                {!showRejectionForm ? (
-                  <div className="action-buttons">
-                    <button
-                      className="btn btn-success me-2"
-                      onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
-                    >
-                      <i className="fas fa-check"></i> Approve Document
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      onClick={handleRejectClick}
-                    >
-                      <i className="fas fa-times"></i> Reject Document
-                    </button>
-                  </div>
-                ) : (
-                  <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
-                    <textarea
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      placeholder="Please provide a detailed reason for rejection..."
-                      rows="8"
-                      className="form-control mb-3"
-                    />
-                    <div className="d-flex gap-2">
+                <div className="document-actions mt-4">
+                  {!showRejectionForm ? (
+                    <div className="action-buttons">
+                      <button
+                        className="btn btn-success me-2"
+                        onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
+                      >
+                        <i className="fas fa-check"></i> Approve Document
+                      </button>
                       <button
                         className="btn btn-danger"
-                        onClick={handleConfirmRejection}
+                        onClick={handleRejectClick}
                       >
-                        Confirm Rejection
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={handleCancelRejection}
-                      >
-                        Cancel
+                        <i className="fas fa-times"></i> Reject Document
                       </button>
                     </div>
-                  </div>
-                )}
-              </div>)}
+                  ) : (
+                    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+                      <textarea
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        placeholder="Please provide a detailed reason for rejection..."
+                        rows="8"
+                        className="form-control mb-3"
+                      />
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-danger"
+                          onClick={handleConfirmRejection}
+                        >
+                          Confirm Rejection
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={handleCancelRejection}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>)}
 
-             
+
             </div>
           </div>
         </div>
@@ -2527,7 +2527,7 @@ const KYCManagement = () => {
     setRejectionReason(e.target.value);
   };
 
-  const handleMarkDropout = async(profile) => {
+  const handleMarkDropout = async (profile) => {
     try {
       if (!profile || !profile._id) {
         alert('No profile selected');
@@ -2595,7 +2595,7 @@ const KYCManagement = () => {
                         <div key={filter._id} className="position-relative d-inline-block me-2">
                           <button
                             className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                            onClick={() => handleCrmFilterClick( index)}
+                            onClick={() => handleCrmFilterClick(index)}
                           >
                             <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
                             {filter.name}
@@ -2618,7 +2618,7 @@ const KYCManagement = () => {
                               }}
                               title={`Milestone: ${filter.milestone}`}
                             >
-                              🚩 <span style={{ marginLeft: '4px', fontSize: '12px', whiteSpace:'nowrap' }}>{filter.milestone}</span>
+                              🚩 <span style={{ marginLeft: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>{filter.milestone}</span>
                             </span>
                           )}
                         </div>
@@ -2740,7 +2740,7 @@ const KYCManagement = () => {
 
           {/* Advanced Filters */}
           {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm">
+            <div className="bg-white border-bottom shadow-sm" style={{ marginTop: '140px', transition: '0.4s ease' }}>
               <div className="container-fluid py-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <div className="d-flex align-items-center">
@@ -2763,6 +2763,380 @@ const KYCManagement = () => {
                       onClick={() => setIsFilterCollapsed(true)}
                     >
                       <i className="fas fa-chevron-up"></i>
+                    </button>
+                  </div>
+                </div>
+                <div className="row g-4">
+
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-graduation-cap me-1 text-success"></i>
+                      Course Type
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="courseType"
+                        value={filterData.courseType}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Types</option>
+                        <option value="Free">🆓 Free</option>
+                        <option value="Paid">💰 Paid</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Sector
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Sectors</option>
+                        <option value="Tourism and Hospitality">🏨 Tourism & Hospitality</option>
+                        <option value="Information Technology">💻 Information Technology</option>
+                        <option value="Healthcare">🏥 Healthcare</option>
+                        <option value="Finance">💳 Finance</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Verticals
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Verticals</option>
+                        <option value="Vertical 1">Vertical 1</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Course
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All course</option>
+                        <option value="Course 1">Course 1</option>
+                        <option value="Course 2">Course 2</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Center
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All centers</option>
+                        <option value="center 1">center 1</option>
+                        <option value="center 2">center 2</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Councellor Name
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Sectors</option>
+                        <option value="Councellor 1">Councellor 1</option>
+                        <option value="Councellor 2">Councellor 2</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Date Range */}
+                  {/* Date Filters Section */}
+                  {/* REPLACE your existing Date Filters Section with this */}
+                  {/* Date Filters Section - Facebook Style */}
+                  <div className="col-12">
+                    <div className="row g-4">
+                      {/* Created Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-plus me-1 text-success"></i>
+                          Lead Creation Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
+                                value={filterData.createdFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                maxDate={filterData.createdToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
+                                value={filterData.createdToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                minDate={filterData.createdFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.createdFromDate || filterData.createdToDate) && (
+                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
+                              <small className="text-success">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
+                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('created')}
+                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Created Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Modified Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
+                          Lead Modification Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
+                                value={filterData.modifiedFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                maxDate={filterData.modifiedToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
+                                value={filterData.modifiedToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                minDate={filterData.modifiedFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
+                              <small className="text-warning">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
+                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
+                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('modified')}
+                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Modified Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Next Action Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-check me-1 text-info"></i>
+                          Next Action Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
+                                value={filterData.nextActionFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                maxDate={filterData.nextActionToDate}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
+                                value={filterData.nextActionToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                minDate={filterData.nextActionFromDate}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
+                              <small className="text-info">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
+                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('nextAction')}
+                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Next Action Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Update the Clear All button in your existing filters section */}
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={clearAllFilters}
+                  >
+                    <i className="fas fa-times-circle me-1"></i>
+                    Clear All Filters
+                  </button>
+
+                  {/* Update the results summary section */}
+                  <div className="text-muted small">
+                    <i className="fas fa-info-circle me-1"></i>
+                    Showing {allProfiles.length} of {allProfilesData.length} results
+
+                    {/* Active filter indicators */}
+                    {(filterData.createdFromDate || filterData.createdToDate) && (
+                      <div className="mt-1">
+                        <span className="bg-success me-2">
+                          <i className="fas fa-calendar-plus me-1"></i>
+                          Created:
+                          {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                          {filterData.createdFromDate && filterData.createdToDate && ' to '}
+                          {filterData.createdToDate && formatDate(filterData.createdToDate)}
+                        </span>
+                      </div>
+                    )}
+
+                    {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                      <div className="mt-1">
+                        <span className="bg-warning me-2">
+                          <i className="fas fa-calendar-edit me-1"></i>
+                          Modified:
+                          {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
+                          {filterData.modifiedFromDate && filterData.modifiedToDate && ' to '}
+                          {filterData.modifiedToDate && formatDate(filterData.modifiedToDate)}
+                        </span>
+                      </div>
+                    )}
+
+                    {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                      <div className="mt-1">
+                        <span className="bg-info me-2">
+                          <i className="fas fa-calendar-check me-1"></i>
+                          Next Action:
+                          {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                          {filterData.nextActionFromDate && filterData.nextActionToDate && ' to '}
+                          {filterData.nextActionToDate && formatDate(filterData.nextActionToDate)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={() => setIsFilterCollapsed(true)}
+                    >
+                      <i className="fas fa-eye-slash me-1"></i>
+                      Hide Filters
+                    </button>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => applyFilters()}
+                    >
+                      <i className="fas fa-search me-1"></i>
+                      Apply Filters
                     </button>
                   </div>
                 </div>
@@ -2866,22 +3240,22 @@ const KYCManagement = () => {
                                             }}
                                           >
                                             {Boolean(profile.kyc) && (
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleMoveToAdmission(profile)}
-                                            >
-                                              Move to Admission
-                                            </button>)}
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleMoveToAdmission(profile)}
+                                              >
+                                                Move to Admission
+                                              </button>)}
                                             <button
                                               className="dropdown-item"
                                               style={{
@@ -2996,23 +3370,23 @@ const KYCManagement = () => {
                                               display: showPopup === profileIndex ? "block" : "none"
                                             }}
                                           >
-                                            {Boolean(profile.kyc) &&(
+                                            {Boolean(profile.kyc) && (
                                               <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleMoveToAdmission(profile)}
-                                            >
-                                              Move to Admission
-                                            </button>)}
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleMoveToAdmission(profile)}
+                                              >
+                                                Move to Admission
+                                              </button>)}
                                             <button
                                               className="dropdown-item"
                                               style={{
@@ -3281,7 +3655,7 @@ const KYCManagement = () => {
                                                       <div className="info-value">{profile._course?.name}</div>
                                                     </div>
                                                   </div>
-                                                 
+
 
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
@@ -3293,7 +3667,7 @@ const KYCManagement = () => {
                                                     <div className="info-group">
                                                       <div className="info-label">NEXT ACTION DATE</div>
                                                       <div className="info-value">
-                                                        {profile.followups.length>0
+                                                        {profile.followups.length > 0
                                                           ? (() => {
                                                             const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
                                                             const datePart = dateObj.toLocaleDateString('en-GB', {
@@ -3884,7 +4258,7 @@ const KYCManagement = () => {
                                                   }
 
                                                   return filteredDocs.map((doc, index) => {
-                                                    
+
                                                     // Check if this is a document with upload data or just uploaded file info
                                                     const latestUpload = doc.uploads && doc.uploads.length > 0
                                                       ? doc.uploads[doc.uploads.length - 1]
@@ -3893,7 +4267,7 @@ const KYCManagement = () => {
                                                     return (
                                                       <div key={doc._id || index} className="document-card-enhanced">
                                                         <div className="document-image-container">
-                                                        <h5 className='badge position-absolute'>{latestUpload?.status? latestUpload.status : ''}</h5>
+                                                          <h5 className='badge position-absolute'>{latestUpload?.status ? latestUpload.status : ''}</h5>
                                                           {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
                                                             <>
                                                               {(() => {
@@ -3902,7 +4276,7 @@ const KYCManagement = () => {
 
                                                                 if (fileType === 'image') {
                                                                   return (
-                                                                                                                                      
+
                                                                     <img
                                                                       src={fileUrl}
                                                                       alt="Document Preview"
@@ -3975,13 +4349,13 @@ const KYCManagement = () => {
                                                             )}
                                                           </div>
                                                         </div>
-                                                        
+
                                                         <div className="document-info-section">
-                                                          
+
                                                           <div className="document-header">
                                                             <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
                                                             <div className="document-actions">
-                                                              {((!latestUpload) || (latestUpload?.status || doc.status) === 'Rejected')? (
+                                                              {((!latestUpload) || (latestUpload?.status || doc.status) === 'Rejected') ? (
                                                                 <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
                                                                   setSelectedProfile(profile); // Set the current profile
                                                                   openUploadModal(doc);        // Open the upload modal
@@ -6722,7 +7096,7 @@ background: #fd2b5a;
         /* position: absolute !important; */
         /* min-height: 200px; */
         background: white;
-        left:20%;
+        left:15.9%;
         right:3%;
         }
         .site-header--sticky--admission--post--panel:not(.mobile-sticky-enable) {
