@@ -87,6 +87,8 @@ import ViewJd from './Pages/App/Company/Jobs/ViewJd';
 import IntCandiate from './Pages/App/Company/Candidate/IntrestedCandidates';
 import ListCandidate from './Pages/App/Company/Candidate/ListCandidate';
 import NearByCandidate from './Pages/App/Company/Candidate/NearByCandidate';
+import Batch from './Component/Layouts/App/College/ProjectManagement/Student'
+import ResumeTest from './Pages/Front/Resume/Resume';
 import AttendanceManagement from './Component/Layouts/App/College/ProjectManagement/AttendanceManagement'
 const Layout = () => {
   const location = useLocation();
@@ -136,6 +138,7 @@ const Layout = () => {
         <Route path="/stulabs" element={<StuLabs />} />
         <Route path="/events" element={<Event />} />
         <Route path="/studentRegistration" element={<Registration />} />
+        <Route path="/Resumetest" element={<ResumeTest/>}/>
 
         {/* Candidate Parent Route */}
         <Route path="/candidate/login" element={<CandidateLogin />} />
@@ -201,6 +204,7 @@ const Layout = () => {
     
           {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
           <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
+          <Route path='batch' element={<Batch/>}/>
           <Route path='attendance' element={<AttendanceManagement/>}/>
         </Route>
 

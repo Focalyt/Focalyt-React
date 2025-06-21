@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo ,useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import moment from 'moment';
 
@@ -9,16 +9,6 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-  const [showAttendanceManagement, setShowAttendanceManagement] = useState(false);
-  const handleAttendanceManagement = () => {
-    setShowAttendanceManagement(true);
-  };
-
-  const handleBackFromAttendance = () => {
-    setShowAttendanceManagement(false);
-  };
-
-  
   // State management
   const [activeTab, setActiveTab] = useState('zeroPeriod');
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,6 +51,40 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
     timeIn: '',
     documents: null
   });
+  const [attendanceView, setAttendanceView] = useState('daily');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [attendanceComments, setAttendanceComments] = useState({});
+
+  const [showAttendanceManagement, setShowAttendanceManagement] = useState(false);
+  const [attendanceManagementView, setAttendanceManagementView] = useState('daily');
+  const [attendanceSelectedDate, setAttendanceSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceSelectedMonth, setAttendanceSelectedMonth] = useState(new Date().getMonth());
+  const [attendanceSelectedYear, setAttendanceSelectedYear] = useState(new Date().getFullYear());
+
+  // open model for upload documents 
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedDocumentForUpload, setSelectedDocumentForUpload] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadPreview, setUploadPreview] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [documentZoom, setDocumentZoom] = useState(1);
+  const [documentRotation, setDocumentRotation] = useState(0);
+  const [showRejectionForm, setShowRejectionForm] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [uploadingDoc, setUploadingDoc] = useState(null);
+  const fileInputRef = useRef(null);
+  const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [allProfiles, setAllProfiles] = useState([]);
+  const [allProfilesData, setAllProfilesData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
 
   // Filter state
   const [filterData, setFilterData] = useState({
@@ -122,29 +146,1392 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
     return 'unknown';
   };
 
-  // open model for upload documents 
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedDocumentForUpload, setSelectedDocumentForUpload] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadPreview, setUploadPreview] = useState(null);
-  const [selectedDocument, setSelectedDocument] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [documentZoom, setDocumentZoom] = useState(1);
-  const [documentRotation, setDocumentRotation] = useState(0);
-  const [showRejectionForm, setShowRejectionForm] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [uploadingDoc, setUploadingDoc] = useState(null);
-  const fileInputRef = useRef(null);
-  const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
-  const [selectedProfile, setSelectedProfile] = useState(null);
-  const [allProfiles, setAllProfiles] = useState([]);
-  const [allProfilesData, setAllProfilesData] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-   
+
+  const handleAttendanceManagement = () => {
+    console.log('Attendance Dashboard clicked!');
+    setShowAttendanceManagement(true);
+  };
+
+  const handleBackFromAttendance = () => {
+    setShowAttendanceManagement(false);
+  };
+
+  const exportAttendanceData = (format) => {
+    const data = getFilteredStudents().map(student => ({
+      name: student.name,
+      enrollmentNumber: student.enrollmentNumber,
+      email: student.email,
+      mobile: student.mobile,
+      attendanceStats: student.attendanceStats,
+      filteredStats: getFilteredAttendanceData(student)
+    }));
+
+    // Here you can implement actual export logic
+    if (format === 'excel') {
+      // Implement Excel export
+    } else if (format === 'pdf') {
+      // Implement PDF export
+    }
+  };
+
+  const AttendanceManagementModal = () => {
+    if (!showAttendanceManagement) return null;
+
+    // Get all students data for attendance management
+    const allStudentsAttendanceData = getFilteredStudents().map(student => {
+      const filteredStats = getFilteredAttendanceData(student);
+      const monthlyData = getMonthlyAttendanceBreakdown(student);
+      const yearlyData = getYearlyAttendanceBreakdown(student);
+
+      return {
+        ...student,
+        filteredStats,
+        monthlyData,
+        yearlyData
+      };
+    });
+
+    const renderDailyAttendanceView = () => {
+      return (
+        <div className="daily-attendance-management">
+          <div className="table-responsive">
+            <table className="table table-striped table-hover">
+              <thead className="table-dark">
+                <tr>
+                  <th style={{ minWidth: '200px' }}>Student Details</th>
+                  <th>Enrollment No.</th>
+                  <th>Total Days</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Late</th>
+                  <th>Leave</th>
+                  <th>Attendance %</th>
+                  <th>Punctuality %</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allStudentsAttendanceData.map((student, index) => (
+                  <tr key={student.id}>
+                    <td>
+                      <div className="d-flex align-items-center">
+                        <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3"
+                          style={{ width: '40px', height: '40px' }}>
+                          <i className="bi bi-person-fill text-primary"></i>
+                        </div>
+                        <div>
+                          <h6 className="mb-0 fw-bold">{student.name}</h6>
+                          <small className="text-muted">{student.email}</small>
+                          <div className="mt-1">
+                            {getAdmissionStatusBadge(student)}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="fw-medium">{student.enrollmentNumber}</span>
+                    </td>
+                    <td>
+                      <span className="badge bg-primary">{student.filteredStats.totalWorkingDays}</span>
+                    </td>
+                    <td>
+                      <span className="badge bg-success">{student.filteredStats.presentDays}</span>
+                    </td>
+                    <td>
+                      <span className="badge bg-danger">{student.filteredStats.absentDays}</span>
+                    </td>
+                    <td>
+                      <span className="badge bg-warning text-dark">{student.filteredStats.lateDays}</span>
+                    </td>
+                    <td>
+                      <span className="badge bg-info">{student.filteredStats.leaveDays}</span>
+                    </td>
+                    <td>
+                      <div className="d-flex align-items-center">
+                        <div className="progress flex-grow-1 me-2" style={{ height: '20px', width: '60px' }}>
+                          <div
+                            className={`progress-bar bg-${getProgressColor(student.filteredStats.attendancePercentage)}`}
+                            style={{ width: `${student.filteredStats.attendancePercentage}%` }}
+                          >
+                          </div>
+                        </div>
+                        <small className="fw-medium">{student.filteredStats.attendancePercentage}%</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="d-flex align-items-center">
+                        <div className="progress flex-grow-1 me-2" style={{ height: '18px', width: '50px' }}>
+                          <div
+                            className={`progress-bar bg-${getProgressColor(student.filteredStats.punctualityScore)}`}
+                            style={{ width: `${student.filteredStats.punctualityScore}%` }}
+                          >
+                          </div>
+                        </div>
+                        <small className="fw-medium">{student.filteredStats.punctualityScore}%</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="btn-group btn-group-sm">
+                        <button
+                          className="btn btn-outline-primary"
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setShowDetailsModal(true);
+                          }}
+                          title="View Details"
+                        >
+                          <i className="fas fa-eye"></i>
+                        </button>
+                        <button
+                          className="btn btn-outline-success"
+                          onClick={() => {
+                            // Close modal and focus on student
+                            setShowAttendanceManagement(false);
+                            setTimeout(() => {
+                              const studentIndex = getFilteredStudents().findIndex(s => s.id === student.id);
+                              if (studentIndex !== -1) {
+                                toggleStudentDetails(studentIndex);
+                              }
+                            }, 300);
+                          }}
+                          title="Mark Attendance"
+                        >
+                          <i className="fas fa-check"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    };
+
+    const renderMonthlyAttendanceView = () => {
+      return (
+        <div className="monthly-attendance-management">
+          <div className="row mb-4">
+            <div className="col-md-6">
+              <label className="form-label fw-bold">Select Month</label>
+              <select
+                className="form-select"
+                value={attendanceSelectedMonth}
+                onChange={(e) => setAttendanceSelectedMonth(parseInt(e.target.value))}
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i} value={i}>
+                    {new Date(2024, i, 1).toLocaleDateString('en-US', { month: 'long' })}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-6">
+              <label className="form-label fw-bold">Select Year</label>
+              <select
+                className="form-select"
+                value={attendanceSelectedYear}
+                onChange={(e) => setAttendanceSelectedYear(parseInt(e.target.value))}
+              >
+                {Array.from({ length: 5 }, (_, i) => {
+                  const year = new Date().getFullYear() - 2 + i;
+                  return (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+
+          <div className="table-responsive">
+            <table className="table table-striped table-hover">
+              <thead className="table-dark">
+                <tr>
+                  <th>Student Name</th>
+                  <th>Enrollment No.</th>
+                  <th>Total Days</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Late</th>
+                  <th>Leave</th>
+                  <th>Half Days</th>
+                  <th>Attendance %</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allStudentsAttendanceData.map((student, index) => {
+                  const monthKey = `${attendanceSelectedYear}-${String(attendanceSelectedMonth + 1).padStart(2, '0')}`;
+                  const monthData = student.monthlyData[monthKey] || {
+                    total: 0, present: 0, absent: 0, late: 0, leave: 0, halfDay: 0, shortLeave: 0, attendancePercentage: 0
+                  };
+
+                  return (
+                    <tr key={student.id}>
+                      <td>
+                        <div className="d-flex align-items-center">
+                          <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-2"
+                            style={{ width: '35px', height: '35px' }}>
+                            <i className="bi bi-person-fill text-primary fs-6"></i>
+                          </div>
+                          <div>
+                            <h6 className="mb-0">{student.name}</h6>
+                            <small className="text-muted">{student.mobile}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="fw-medium">{student.enrollmentNumber}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-primary">{monthData.total}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-success">{monthData.present || 0}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-danger">{monthData.absent || 0}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-warning text-dark">{monthData.late || 0}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-info">{monthData.leave || 0}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-secondary">{(monthData.halfDay || 0) + (monthData.shortLeave || 0)}</span>
+                      </td>
+                      <td>
+                        <div className="d-flex align-items-center">
+                          <div className="progress flex-grow-1 me-2" style={{ height: '18px', width: '60px' }}>
+                            <div
+                              className={`progress-bar bg-${getProgressColor(monthData.attendancePercentage)}`}
+                              style={{ width: `${monthData.attendancePercentage}%` }}
+                            >
+                            </div>
+                          </div>
+                          <small className="fw-medium">{monthData.attendancePercentage}%</small>
+                        </div>
+                      </td>
+                      <td>
+                        {monthData.attendancePercentage >= 85 ? (
+                          <span className="badge bg-success">
+                            <i className="fas fa-check-circle me-1"></i>
+                            Excellent
+                          </span>
+                        ) : monthData.attendancePercentage >= 75 ? (
+                          <span className="badge bg-info">
+                            <i className="fas fa-thumbs-up me-1"></i>
+                            Good
+                          </span>
+                        ) : monthData.attendancePercentage >= 65 ? (
+                          <span className="badge bg-warning text-dark">
+                            <i className="fas fa-exclamation-triangle me-1"></i>
+                            Average
+                          </span>
+                        ) : (
+                          <span className="badge bg-danger">
+                            <i className="fas fa-times-circle me-1"></i>
+                            Poor
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    };
+
+    const renderYearlyAttendanceView = () => {
+      return (
+        <div className="yearly-attendance-management">
+          <div className="row mb-4">
+            <div className="col-md-6">
+              <label className="form-label fw-bold">Select Year</label>
+              <select
+                className="form-select"
+                value={attendanceSelectedYear}
+                onChange={(e) => setAttendanceSelectedYear(parseInt(e.target.value))}
+              >
+                {Array.from({ length: 5 }, (_, i) => {
+                  const year = new Date().getFullYear() - 2 + i;
+                  return (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+
+          <div className="table-responsive">
+            <table className="table table-striped table-hover">
+              <thead className="table-dark">
+                <tr>
+                  <th>Student Name</th>
+                  <th>Enrollment No.</th>
+                  <th>Total Days</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Late</th>
+                  <th>Leave</th>
+                  <th>Attendance %</th>
+                  <th>Performance</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allStudentsAttendanceData.map((student, index) => {
+                  const yearData = student.yearlyData[attendanceSelectedYear] || {
+                    total: 0, present: 0, absent: 0, late: 0, leave: 0, halfDay: 0, shortLeave: 0, attendancePercentage: 0
+                  };
+
+                  return (
+                    <tr key={student.id}>
+                      <td>
+                        <div className="d-flex align-items-center">
+                          <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-2"
+                            style={{ width: '35px', height: '35px' }}>
+                            <i className="bi bi-person-fill text-primary fs-6"></i>
+                          </div>
+                          <div>
+                            <h6 className="mb-0">{student.name}</h6>
+                            <small className="text-muted">{student.email}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="fw-medium">{student.enrollmentNumber}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-primary fs-6">{yearData.total}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-success fs-6">{yearData.present || 0}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-danger fs-6">{yearData.absent || 0}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-warning text-dark fs-6">{yearData.late || 0}</span>
+                      </td>
+                      <td>
+                        <span className="badge bg-info fs-6">{yearData.leave || 0}</span>
+                      </td>
+                      <td>
+                        <div className="d-flex align-items-center">
+                          <div className="progress flex-grow-1 me-2" style={{ height: '20px', width: '80px' }}>
+                            <div
+                              className={`progress-bar bg-${getProgressColor(yearData.attendancePercentage)}`}
+                              style={{ width: `${yearData.attendancePercentage}%` }}
+                            >
+                              {yearData.attendancePercentage}%
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="performance-metrics">
+                          {yearData.attendancePercentage >= 90 ? (
+                            <div>
+                              <span className="badge bg-success mb-1">
+                                <i className="fas fa-star me-1"></i>
+                                Outstanding
+                              </span>
+                              <br />
+                              <small className="text-success">
+                                <i className="fas fa-trophy me-1"></i>
+                                Top Performer
+                              </small>
+                            </div>
+                          ) : yearData.attendancePercentage >= 85 ? (
+                            <div>
+                              <span className="badge bg-info mb-1">
+                                <i className="fas fa-check-circle me-1"></i>
+                                Excellent
+                              </span>
+                              <br />
+                              <small className="text-info">
+                                <i className="fas fa-thumbs-up me-1"></i>
+                                Good Student
+                              </small>
+                            </div>
+                          ) : yearData.attendancePercentage >= 75 ? (
+                            <div>
+                              <span className="badge bg-warning text-dark mb-1">
+                                <i className="fas fa-exclamation-triangle me-1"></i>
+                                Average
+                              </span>
+                              <br />
+                              <small className="text-warning">
+                                <i className="fas fa-clock me-1"></i>
+                                Needs Improvement
+                              </small>
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="badge bg-danger mb-1">
+                                <i className="fas fa-times-circle me-1"></i>
+                                Poor
+                              </span>
+                              <br />
+                              <small className="text-danger">
+                                <i className="fas fa-exclamation-circle me-1"></i>
+                                Requires Attention
+                              </small>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="btn-group-vertical btn-group-sm">
+                          <button
+                            className="btn btn-outline-primary btn-sm mb-1"
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setShowDetailsModal(true);
+                            }}
+                            title="View Full Report"
+                          >
+                            <i className="fas fa-chart-line me-1"></i>
+                            Report
+                          </button>
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            onClick={() => {
+                              // Generate individual student report
+                              exportAttendanceData('pdf');
+                            }}
+                            title="Generate Report"
+                          >
+                            <i className="fas fa-download me-1"></i>
+                            Export
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    };
+
+    // return (
+    //   <div className="attendance-management-overlay">
+    //     <div className="attendance-management-modal">
+    //       <div className="modal-header-enhanced">
+    //         <div className="d-flex justify-content-between align-items-center w-100">
+    //           <div>
+    //             <h3 className="mb-0">
+    //               <i className="fas fa-chart-line me-2 text-primary"></i>
+    //               Attendance Management Dashboard
+    //             </h3>
+    //             <p className="text-muted mb-0">Comprehensive attendance tracking for all students</p>
+    //           </div>
+    //           <button 
+    //             className="btn btn-outline-secondary"
+    //             onClick={handleBackFromAttendance}
+    //           >
+    //             <i className="fas fa-times"></i>
+    //           </button>
+    //         </div>
+    //       </div>
+
+    //       <div className="modal-body-enhanced">
+    //         {/* Enhanced Control Panel */}
+    //         <div className="control-panel-enhanced mb-4">
+    //           <div className="row align-items-center">
+    //             <div className="col-md-6">
+    //               <div className="view-selector">
+    //                 <label className="form-label fw-bold mb-2">
+    //                   <i className="fas fa-eye me-2"></i>
+    //                   View Type
+    //                 </label>
+    //                 <div className="btn-group w-100" role="group">
+    //                   <button
+    //                     type="button"
+    //                     className={`btn ${attendanceManagementView === 'daily' ? 'btn-primary' : 'btn-outline-primary'}`}
+    //                     onClick={() => setAttendanceManagementView('daily')}
+    //                   >
+    //                     <i className="fas fa-calendar-day me-1"></i>
+    //                     Daily View
+    //                   </button>
+    //                   <button
+    //                     type="button"
+    //                     className={`btn ${attendanceManagementView === 'monthly' ? 'btn-primary' : 'btn-outline-primary'}`}
+    //                     onClick={() => setAttendanceManagementView('monthly')}
+    //                   >
+    //                     <i className="fas fa-calendar-alt me-1"></i>
+    //                     Monthly View
+    //                   </button>
+    //                   <button
+    //                     type="button"
+    //                     className={`btn ${attendanceManagementView === 'yearly' ? 'btn-primary' : 'btn-outline-primary'}`}
+    //                     onClick={() => setAttendanceManagementView('yearly')}
+    //                   >
+    //                     <i className="fas fa-calendar me-1"></i>
+    //                     Yearly View
+    //                   </button>
+    //                 </div>
+    //               </div>
+    //             </div>
+    //             <div className="col-md-6">
+    //               <div className="action-buttons">
+    //                 <label className="form-label fw-bold mb-2">
+    //                   <i className="fas fa-tools me-2"></i>
+    //                   Actions
+    //                 </label>
+    //                 <div className="d-flex gap-2">
+    //                   <button 
+    //                     className="btn btn-success"
+    //                     onClick={() => exportAttendanceData('excel')}
+    //                   >
+    //                     <i className="fas fa-file-excel me-1"></i>
+    //                     Export Excel
+    //                   </button>
+    //                   <button 
+    //                     className="btn btn-info"
+    //                     onClick={() => exportAttendanceData('pdf')}
+    //                   >
+    //                     <i className="fas fa-file-pdf me-1"></i>
+    //                     Export PDF
+    //                   </button>
+    //                   <button 
+    //                     className="btn btn-warning"
+    //                     onClick={() => {
+    //                       alert('Printing attendance report...');
+    //                       window.print();
+    //                     }}
+    //                   >
+    //                     <i className="fas fa-print me-1"></i>
+    //                     Print
+    //                   </button>
+    //                 </div>
+    //               </div>
+    //             </div>
+    //           </div>
+    //         </div>
+
+    //         {/* Statistics Summary */}
+    //         <div className="statistics-summary mb-4">
+    //           <div className="row text-center">
+    //             <div className="col-md-2">
+    //               <div className="stat-card bg-primary text-white">
+    //                 <div className="stat-number">{allStudentsAttendanceData.length}</div>
+    //                 <div className="stat-label">Total Students</div>
+    //               </div>
+    //             </div>
+    //             <div className="col-md-2">
+    //               <div className="stat-card bg-success text-white">
+    //                 <div className="stat-number">
+    //                   {allStudentsAttendanceData.filter(s => s.filteredStats.attendancePercentage >= 85).length}
+    //                 </div>
+    //                 <div className="stat-label">High Attendance (85%+)</div>
+    //               </div>
+    //             </div>
+    //             <div className="col-md-2">
+    //               <div className="stat-card bg-warning text-white">
+    //                 <div className="stat-number">
+    //                   {allStudentsAttendanceData.filter(s => 
+    //                     s.filteredStats.attendancePercentage >= 75 && 
+    //                     s.filteredStats.attendancePercentage < 85
+    //                   ).length}
+    //                 </div>
+    //                 <div className="stat-label">Average (75-84%)</div>
+    //               </div>
+    //             </div>
+    //             <div className="col-md-2">
+    //               <div className="stat-card bg-danger text-white">
+    //                 <div className="stat-number">
+    //                   {allStudentsAttendanceData.filter(s => s.filteredStats.attendancePercentage < 75).length}
+    //                 </div>
+    //                 <div className="stat-label">Low Attendance (<75%)</div>
+    //               </div>
+    //             </div>
+    //             <div className="col-md-2">
+    //               <div className="stat-card bg-info text-white">
+    //                 <div className="stat-number">
+    //                   {allStudentsAttendanceData.length > 0 ? 
+    //                     (allStudentsAttendanceData.reduce((sum, s) => sum + s.filteredStats.attendancePercentage, 0) / 
+    //                       allStudentsAttendanceData.length).toFixed(1) : '0'}%
+    //                 </div>
+    //                 <div className="stat-label">Average Attendance</div>
+    //               </div>
+    //             </div>
+    //             <div className="col-md-2">
+    //               <div className="stat-card bg-secondary text-white">
+    //                 <div className="stat-number">
+    //                   {allStudentsAttendanceData.length > 0 ? 
+    //                     (allStudentsAttendanceData.reduce((sum, s) => sum + s.filteredStats.punctualityScore, 0) / 
+    //                       allStudentsAttendanceData.length).toFixed(1) : '0'}%
+    //                 </div>
+    //                 <div className="stat-label">Average Punctuality</div>
+    //               </div>
+    //             </div>
+    //           </div>
+    //         </div>
+
+    //         {/* Dynamic Content Based on View */}
+    //         <div className="attendance-content">
+    //           {attendanceManagementView === 'daily' && renderDailyAttendanceView()}
+    //           {attendanceManagementView === 'monthly' && renderMonthlyAttendanceView()}
+    //           {attendanceManagementView === 'yearly' && renderYearlyAttendanceView()}
+    //         </div>
+    //       </div>
+    //     </div>
+    //   </div>
+    // );
+  }
+
+
+  const getMonthlyAttendanceBreakdown = (student) => {
+    const monthlyData = {};
+
+    student.dailyAttendance.forEach(record => {
+      const date = new Date(record.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthName = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          monthName,
+          present: 0,
+          absent: 0,
+          late: 0,
+          leave: 0,
+          halfDay: 0,
+          shortLeave: 0,
+          total: 0,
+          records: []
+        };
+      }
+
+      monthlyData[monthKey][record.status] = (monthlyData[monthKey][record.status] || 0) + 1;
+      monthlyData[monthKey].total++;
+      monthlyData[monthKey].records.push(record);
+    });
+
+    // Calculate percentages for each month
+    Object.keys(monthlyData).forEach(monthKey => {
+      const month = monthlyData[monthKey];
+      month.attendancePercentage = month.total > 0
+        ? ((month.present + month.late + month.halfDay * 0.5 + month.shortLeave * 0.5) / month.total * 100).toFixed(1)
+        : 0;
+    });
+
+    return monthlyData;
+  };
+  // Yearly attendance breakdown function
+  const getYearlyAttendanceBreakdown = (student) => {
+    const yearlyData = {};
+
+    student.dailyAttendance.forEach(record => {
+      const date = new Date(record.date);
+      const year = date.getFullYear();
+
+      if (!yearlyData[year]) {
+        yearlyData[year] = {
+          present: 0,
+          absent: 0,
+          late: 0,
+          leave: 0,
+          halfDay: 0,
+          shortLeave: 0,
+          total: 0,
+          months: {},
+          records: []
+        };
+      }
+
+      const month = date.getMonth();
+      const monthName = date.toLocaleDateString('en-US', { month: 'long' });
+
+      if (!yearlyData[year].months[month]) {
+        yearlyData[year].months[month] = {
+          monthName,
+          present: 0,
+          absent: 0,
+          late: 0,
+          leave: 0,
+          halfDay: 0,
+          shortLeave: 0,
+          total: 0,
+          records: []
+        };
+      }
+
+      yearlyData[year][record.status] = (yearlyData[year][record.status] || 0) + 1;
+      yearlyData[year].total++;
+      yearlyData[year].records.push(record);
+
+      yearlyData[year].months[month][record.status] = (yearlyData[year].months[month][record.status] || 0) + 1;
+      yearlyData[year].months[month].total++;
+      yearlyData[year].months[month].records.push(record);
+    });
+
+    // Calculate percentages
+    Object.keys(yearlyData).forEach(year => {
+      const yearData = yearlyData[year];
+      yearData.attendancePercentage = yearData.total > 0
+        ? ((yearData.present + yearData.late + yearData.halfDay * 0.5 + yearData.shortLeave * 0.5) / yearData.total * 100).toFixed(1)
+        : 0;
+
+      Object.keys(yearData.months).forEach(month => {
+        const monthData = yearData.months[month];
+        monthData.attendancePercentage = monthData.total > 0
+          ? ((monthData.present + monthData.late + monthData.halfDay * 0.5 + monthData.shortLeave * 0.5) / monthData.total * 100).toFixed(1)
+          : 0;
+      });
+    });
+
+    return yearlyData;
+  };
+
+  const EnhancedDateRangeFilter = () => {
+    return (
+      <div className="d-flex align-items-center gap-3 flex-wrap">
+        {/* Time Filter */}
+        <div className="d-flex align-items-center">
+          <label className="form-label me-2 mb-0 small fw-bold">Period:</label>
+          <select
+            className="form-select form-select-sm"
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value)}
+            style={{ width: '120px' }}
+          >
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+            <option value="custom">Custom Range</option>
+          </select>
+        </div>
+
+        {/* Date Picker for Today/Custom */}
+        {timeFilter === 'today' && (
+          <div className="d-flex align-items-center">
+            <label className="form-label me-2 mb-0 small fw-bold">Date:</label>
+            <input
+              type="date"
+              className="form-control form-control-sm"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={{ width: '140px' }}
+            />
+          </div>
+        )}
+
+        {/* Custom Date Range */}
+        {timeFilter === 'custom' && (
+          <>
+            <div className="d-flex align-items-center">
+              <label className="form-label me-2 mb-0 small fw-bold">From:</label>
+              <input
+                type="date"
+                className="form-control form-control-sm"
+                value={dateRange.fromDate}
+                onChange={(e) => setDateRange(prev => ({ ...prev, fromDate: e.target.value }))}
+                style={{ width: '140px' }}
+              />
+            </div>
+            <div className="d-flex align-items-center">
+              <label className="form-label me-2 mb-0 small fw-bold">To:</label>
+              <input
+                type="date"
+                className="form-control form-control-sm"
+                value={dateRange.toDate}
+                onChange={(e) => setDateRange(prev => ({ ...prev, toDate: e.target.value }))}
+                style={{ width: '140px' }}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Quick Month/Year Selectors */}
+        {(timeFilter === 'month' || timeFilter === 'year') && (
+          <div className="d-flex align-items-center gap-2">
+            <select
+              className="form-select form-select-sm"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              style={{ width: '120px' }}
+              disabled={timeFilter === 'year'}
+            >
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i} value={i}>
+                  {new Date(2024, i, 1).toLocaleDateString('en-US', { month: 'long' })}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="form-select form-select-sm"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              style={{ width: '100px' }}
+            >
+              {Array.from({ length: 5 }, (_, i) => {
+                const year = new Date().getFullYear() - 2 + i;
+                return (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const MonthlyAttendanceSummary = ({ student }) => {
+    const monthlyData = getMonthlyAttendanceBreakdown(student);
+
+    return (
+      <div className="monthly-attendance-summary mt-4">
+        <h6 className="mb-3">
+          <i className="fas fa-calendar-alt me-2"></i>
+          Monthly Attendance Summary
+        </h6>
+        <div className="table-responsive">
+          <table className="table table-sm table-striped">
+            <thead className="table-dark">
+              <tr>
+                <th>Month</th>
+                <th>Total Days</th>
+                <th>Present</th>
+                <th>Absent</th>
+                <th>Late</th>
+                <th>Leave</th>
+                <th>Half Day</th>
+                <th>Attendance %</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(monthlyData)
+                .sort(([a], [b]) => b.localeCompare(a))
+                .map(([monthKey, data]) => (
+                  <tr key={monthKey}>
+                    <td className="fw-medium">{data.monthName}</td>
+                    <td>{data.total}</td>
+                    <td><span className="badge bg-success">{data.present || 0}</span></td>
+                    <td><span className="badge bg-danger">{data.absent || 0}</span></td>
+                    <td><span className="badge bg-warning text-dark">{data.late || 0}</span></td>
+                    <td><span className="badge bg-info">{data.leave || 0}</span></td>
+                    <td><span className="badge bg-secondary">{(data.halfDay || 0) + (data.shortLeave || 0)}</span></td>
+                    <td>
+                      <div className="d-flex align-items-center">
+                        <div className="progress flex-grow-1 me-2" style={{ height: '20px', width: '60px' }}>
+                          <div
+                            className={`progress-bar bg-${getProgressColor(data.attendancePercentage)}`}
+                            style={{ width: `${data.attendancePercentage}%` }}
+                          >
+                          </div>
+                        </div>
+                        <small className="fw-medium">{data.attendancePercentage}%</small>
+                      </div>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => {
+                          setAttendanceView('daily');
+                          setSelectedDate(data.records[0]?.date || selectedDate);
+                        }}
+                        title="View Details"
+                      >
+                        <i className="fas fa-eye"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  // Yearly Attendance Summary Component
+  const YearlyAttendanceSummary = ({ student }) => {
+    const yearlyData = getYearlyAttendanceBreakdown(student);
+
+    return (
+      <div className="yearly-attendance-summary mt-4">
+        <h6 className="mb-3">
+          <i className="fas fa-calendar me-2"></i>
+          Yearly Attendance Summary
+        </h6>
+        {Object.entries(yearlyData)
+          .sort(([a], [b]) => b - a)
+          .map(([year, data]) => (
+            <div key={year} className="card mb-3">
+              <div className="card-header">
+                <div className="d-flex justify-content-between align-items-center">
+                  <h6 className="mb-0">Year {year}</h6>
+                  <div className="d-flex gap-2">
+                    <span className="badge bg-primary">{data.total} Total Days</span>
+                    <span className="badge bg-success">{data.attendancePercentage}% Attendance</span>
+                  </div>
+                </div>
+              </div>
+              <div className="card-body">
+                {/* Year Overview */}
+                <div className="row mb-3 text-center">
+                  <div className="col-2">
+                    <div className="card bg-success text-white">
+                      <div className="card-body p-2">
+                        <div className="h6 mb-0">{data.present || 0}</div>
+                        <div className="small">Present</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-2">
+                    <div className="card bg-danger text-white">
+                      <div className="card-body p-2">
+                        <div className="h6 mb-0">{data.absent || 0}</div>
+                        <div className="small">Absent</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-2">
+                    <div className="card bg-warning text-dark">
+                      <div className="card-body p-2">
+                        <div className="h6 mb-0">{data.late || 0}</div>
+                        <div className="small">Late</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-2">
+                    <div className="card bg-info text-white">
+                      <div className="card-body p-2">
+                        <div className="h6 mb-0">{data.leave || 0}</div>
+                        <div className="small">Leave</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-2">
+                    <div className="card bg-secondary text-white">
+                      <div className="card-body p-2">
+                        <div className="h6 mb-0">{(data.halfDay || 0) + (data.shortLeave || 0)}</div>
+                        <div className="small">Half Days</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-2">
+                    <div className="card bg-primary text-white">
+                      <div className="card-body p-2">
+                        <div className="h6 mb-0">{data.total}</div>
+                        <div className="small">Total</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monthly breakdown within the year */}
+                <h6 className="mt-3 mb-2">Monthly Breakdown for {year}</h6>
+                <div className="table-responsive">
+                  <table className="table table-sm">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Month</th>
+                        <th>Present</th>
+                        <th>Absent</th>
+                        <th>Late</th>
+                        <th>Leave</th>
+                        <th>Attendance %</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(data.months)
+                        .sort(([a], [b]) => a - b)
+                        .map(([monthIndex, monthData]) => (
+                          <tr key={monthIndex}>
+                            <td className="fw-medium">{monthData.monthName}</td>
+                            <td><span className="badge bg-success">{monthData.present || 0}</span></td>
+                            <td><span className="badge bg-danger">{monthData.absent || 0}</span></td>
+                            <td><span className="badge bg-warning text-dark">{monthData.late || 0}</span></td>
+                            <td><span className="badge bg-info">{monthData.leave || 0}</span></td>
+                            <td>
+                              <div className="d-flex align-items-center">
+                                <div className="progress flex-grow-1 me-2" style={{ height: '18px', width: '50px' }}>
+                                  <div
+                                    className={`progress-bar bg-${getProgressColor(monthData.attendancePercentage)}`}
+                                    style={{ width: `${monthData.attendancePercentage}%` }}
+                                  >
+                                  </div>
+                                </div>
+                                <small className="fw-medium">{monthData.attendancePercentage}%</small>
+                              </div>
+                            </td>
+                            <td>
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => {
+                                  setAttendanceView('monthly');
+                                  setSelectedMonth(parseInt(monthIndex));
+                                  setSelectedYear(parseInt(year));
+                                }}
+                                title="View Month Details"
+                              >
+                                <i className="fas fa-eye"></i>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ))}
+      </div>
+    );
+  };
+
+  const EnhancedAttendanceTab = ({ student, studentIndex }) => {
+    const filteredStats = getFilteredAttendanceData(student);
+
+    return (
+      <div className="card">
+        <div className="card-header">
+          <div className="d-flex justify-content-between align-items-center">
+            <h6 className="mb-0">Attendance Records</h6>
+            <div className="d-flex gap-2 align-items-center">
+              {/* View Selector */}
+              <div className="btn-group btn-group-sm" role="group">
+                <button
+                  type="button"
+                  className={`btn ${attendanceView === 'daily' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setAttendanceView('daily')}
+                >
+                  <i className="fas fa-calendar-day me-1"></i>Daily
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${attendanceView === 'monthly' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setAttendanceView('monthly')}
+                >
+                  <i className="fas fa-calendar-alt me-1"></i>Monthly
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${attendanceView === 'yearly' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setAttendanceView('yearly')}
+                >
+                  <i className="fas fa-calendar me-1"></i>Yearly
+                </button>
+              </div>
+
+              {/* Stats Badges */}
+              <div className="d-flex gap-1">
+                <span className="badge bg-primary">{filteredStats.totalWorkingDays} Total</span>
+                <span className="badge bg-success">{filteredStats.presentDays} Present</span>
+                <span className="badge bg-danger">{filteredStats.absentDays} Absent</span>
+                <span className="badge bg-warning text-dark">{filteredStats.lateDays} Late</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card-body">
+          {/* Enhanced Time Filter */}
+          {attendanceView === 'daily' && (
+            <div className="mb-4">
+              <EnhancedDateRangeFilter />
+            </div>
+          )}
+
+          {/* Filtered Attendance Summary Stats */}
+          <div className="row mb-4 text-center">
+            <div className="col-md-2">
+              <div className="card bg-primary text-white">
+                <div className="card-body p-2">
+                  <div className="h5 mb-0">{filteredStats.totalWorkingDays}</div>
+                  <div className="small">
+                    {timeFilter === 'today' ? 'Selected Day' :
+                      timeFilter === 'week' ? 'This Week' :
+                        timeFilter === 'month' ? 'This Month' :
+                          timeFilter === 'year' ? 'This Year' : 'Selected Period'}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-2">
+              <div className="card bg-success text-white">
+                <div className="card-body p-2">
+                  <div className="h5 mb-0">{filteredStats.presentDays}</div>
+                  <div className="small">Present Days</div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-2">
+              <div className="card bg-danger text-white">
+                <div className="card-body p-2">
+                  <div className="h5 mb-0">{filteredStats.absentDays}</div>
+                  <div className="small">Absent Days</div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-2">
+              <div className="card bg-warning text-dark">
+                <div className="card-body p-2">
+                  <div className="h5 mb-0">{filteredStats.lateDays}</div>
+                  <div className="small">Late Days</div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-2">
+              <div className="card bg-info text-white">
+                <div className="card-body p-2">
+                  <div className="h5 mb-0">{filteredStats.leaveDays}</div>
+                  <div className="small">Leave Days</div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-2">
+              <div className="card bg-secondary text-white">
+                <div className="card-body p-2">
+                  <div className="h5 mb-0">{filteredStats.halfDays + filteredStats.shortLeaveDays}</div>
+                  <div className="small">Half/Short Days</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Enhanced Attendance Percentage */}
+          <div className="row mb-4">
+            <div className="col-md-6">
+              <div className="d-flex justify-content-between small text-muted mb-1">
+                <span>
+                  {timeFilter === 'today' ? 'Daily Status' :
+                    timeFilter === 'week' ? 'Weekly Attendance' :
+                      timeFilter === 'month' ? 'Monthly Attendance' :
+                        timeFilter === 'year' ? 'Yearly Attendance' : 'Period Attendance'}
+                </span>
+                <span>{filteredStats.attendancePercentage}%</span>
+              </div>
+              <div className="progress mb-2" style={{ height: '20px' }}>
+                <div
+                  className={`progress-bar bg-${getProgressColor(filteredStats.attendancePercentage)}`}
+                  style={{ width: `${filteredStats.attendancePercentage}%` }}
+                >
+                  {filteredStats.attendancePercentage}%
+                </div>
+              </div>
+              <small className="text-muted">
+                Target: 85% • Current: {filteredStats.attendancePercentage}%
+              </small>
+            </div>
+            <div className="col-md-6">
+              <div className="d-flex justify-content-between small text-muted mb-1">
+                <span>Punctuality Score</span>
+                <span>{filteredStats.punctualityScore}%</span>
+              </div>
+              <div className="progress mb-2" style={{ height: '20px' }}>
+                <div
+                  className={`progress-bar bg-${getProgressColor(filteredStats.punctualityScore)}`}
+                  style={{ width: `${filteredStats.punctualityScore}%` }}
+                >
+                  {filteredStats.punctualityScore}%
+                </div>
+              </div>
+              <small className="text-muted">
+                On-time arrivals out of total present days
+              </small>
+            </div>
+          </div>
+
+          {/* Different Views Based on Selection */}
+          {attendanceView === 'daily' && (
+            <>
+              <h6 className="mb-3">
+                Daily Attendance Records
+                {timeFilter !== 'today' && (
+                  <small className="text-muted ms-2">
+                    ({filteredStats.filteredRecords?.length || 0} records found)
+                  </small>
+                )}
+              </h6>
+              <div className="table-responsive">
+                <table className="table table-striped table-hover">
+                  <thead className="table-dark">
+                    <tr>
+                      <th>Date</th>
+                      <th>Day</th>
+                      <th>Status</th>
+                      <th>Time In</th>
+                      <th>Time Out</th>
+                      <th>Late Minutes</th>
+                      <th>Notes/Reason</th>
+                      <th>Comments</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(filteredStats.filteredRecords || student.dailyAttendance).length > 0 ? (
+                      (filteredStats.filteredRecords || student.dailyAttendance)
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .map((record, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <strong>{new Date(record.date).toLocaleDateString('en-GB')}</strong>
+                            </td>
+                            <td>
+                              <small className="text-muted">
+                                {new Date(record.date).toLocaleDateString('en-US', { weekday: 'short' })}
+                              </small>
+                            </td>
+                            <td>
+                              <span className={`badge bg-${getStatusColor(record.status)} px-3 py-2`}>
+                                <i className={`fas ${record.status === 'present' ? 'fa-check' :
+                                  record.status === 'late' ? 'fa-clock' :
+                                    record.status === 'halfDay' ? 'fa-clock-o' :
+                                      record.status === 'shortLeave' ? 'fa-sign-out-alt' :
+                                        record.status === 'leave' ? 'fa-calendar' : 'fa-times'} me-1`}></i>
+                                {record.status?.toUpperCase() || 'NOT MARKED'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="fw-medium">{record.timeIn || '-'}</span>
+                            </td>
+                            <td>
+                              <span className="fw-medium">{record.timeOut || '-'}</span>
+                            </td>
+                            <td>
+                              {record.lateMinutes > 0 ? (
+                                <span className="badge bg-warning text-dark">{record.lateMinutes} min</span>
+                              ) : (
+                                <span className="text-muted">0 min</span>
+                              )}
+                            </td>
+                            <td>
+                              <span className="text-muted small">{record.notes || record.reason || '-'}</span>
+                            </td>
+                            <td>
+                              <div className="d-flex align-items-center gap-2">
+                                <input
+                                  type="text"
+                                  className="form-control form-control-sm"
+                                  placeholder="Add comment..."
+                                  value={attendanceComments[`${student.id}-${record.date}`] || ''}
+                                  onChange={(e) => setAttendanceComments(prev => ({
+                                    ...prev,
+                                    [`${student.id}-${record.date}`]: e.target.value
+                                  }))}
+                                  style={{ minWidth: '150px' }}
+                                />
+                                <button
+                                  className="btn btn-sm btn-outline-primary"
+                                  onClick={() => {
+                                    // Save comment logic here
+                                    const comment = attendanceComments[`${student.id}-${record.date}`];
+                                    if (comment) {
+                                      alert(`Comment saved: ${comment}`);
+                                    }
+                                  }}
+                                  title="Save Comment"
+                                >
+                                  <i className="fas fa-save"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                    ) : (
+                      <tr>
+                        <td colSpan="8" className="text-center py-4">
+                          <i className="fas fa-calendar-times fs-2 text-muted mb-2"></i>
+                          <p className="text-muted mb-0">
+                            No attendance records found for the selected period
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {attendanceView === 'monthly' && (
+            <MonthlyAttendanceSummary student={student} />
+          )}
+
+          {attendanceView === 'yearly' && (
+            <YearlyAttendanceSummary student={student} />
+          )}
+
+          {/* Leave Records Table (shown in all views) */}
+          {student.leaves && student.leaves.length > 0 && (
+            <>
+              <h6 className="mb-3 mt-4">Leave Applications</h6>
+              <div className="table-responsive">
+                <table className="table table-sm table-bordered">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Applied Date</th>
+                      <th>Leave Date</th>
+                      <th>Type</th>
+                      <th>Duration</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                      <th>Approved By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {student.leaves
+                      .sort((a, b) => new Date(b.appliedDate || b.date) - new Date(a.appliedDate || a.date))
+                      .map((leave, idx) => (
+                        <tr key={idx}>
+                          <td>{new Date(leave.appliedDate || leave.date).toLocaleDateString('en-GB')}</td>
+                          <td>{new Date(leave.date).toLocaleDateString('en-GB')}</td>
+                          <td>
+                            <span className="badge bg-secondary">{leave.type}</span>
+                          </td>
+                          <td>
+                            <span className={`badge ${leave.leaveType === 'full' ? 'bg-danger' :
+                              leave.leaveType === 'half' ? 'bg-warning text-dark' : 'bg-info'}`}>
+                              {leave.leaveType === 'full' ? '1 Day' :
+                                leave.leaveType === 'half' ? '0.5 Day' :
+                                  `${leave.duration || 0} Hours`}
+                            </span>
+                          </td>
+                          <td className="small">{leave.reason}</td>
+                          <td>
+                            <span className={`badge bg-${leave.status === 'approved' ? 'success' :
+                              leave.status === 'pending' ? 'warning text-dark' : 'danger'}`}>
+                              <i className={`fas ${leave.status === 'approved' ? 'fa-check' :
+                                leave.status === 'pending' ? 'fa-clock' : 'fa-times'} me-1`}></i>
+                              {leave.status?.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="small">{leave.approvedBy || '-'}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+      </div>
+    );
+  };
 
   const filterDocuments = (documents = []) => {
     // Ensure documents is always an array
@@ -1190,13 +2577,13 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
       dateOfBirth: '2000-05-15',
       bloodGroup: 'O+',
       emergencyContact: '+91 9876543212',
-      
+
       // Course Information
       courseStartDate: '2024-02-01',
       courseEndDate: '2024-08-01',
       totalCourseDays: 180,
       courseDuration: '6 months',
-      
+
       // Job History
       jobHistory: [
         {
@@ -1220,7 +2607,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           status: 'completed'
         }
       ],
-      
+
       // Course History
       courseHistory: [
         {
@@ -1244,7 +2631,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           percentage: 92
         }
       ],
-      
+
       // Enhanced attendance tracking
       attendanceStats: {
         presentDays: 152,
@@ -1257,7 +2644,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
         attendancePercentage: 92.2,
         punctualityScore: 89.5
       },
-      
+
       // Leave records
       leaves: [
         {
@@ -1272,7 +2659,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           duration: 1
         }
       ],
-      
+
       // Daily attendance records
       dailyAttendance: [
         { date: '2024-06-20', status: 'present', timeIn: '09:00', timeOut: '17:00', notes: '', lateMinutes: 0 },
@@ -1306,12 +2693,12 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
       dateOfBirth: '2001-08-22',
       bloodGroup: 'A+',
       emergencyContact: '+91 9876543222',
-      
+
       courseStartDate: '2024-02-01',
       courseEndDate: '2024-08-01',
       totalCourseDays: 180,
       courseDuration: '6 months',
-      
+
       // Job History
       jobHistory: [
         {
@@ -1325,7 +2712,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           status: 'completed'
         }
       ],
-      
+
       // Course History
       courseHistory: [
         {
@@ -1339,7 +2726,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           percentage: 78
         }
       ],
-      
+
       attendanceStats: {
         presentDays: 140,
         absentDays: 15,
@@ -1351,7 +2738,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
         attendancePercentage: 85.8,
         punctualityScore: 82.3
       },
-      
+
       leaves: [
         {
           id: 2,
@@ -1365,7 +2752,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           duration: 0.5
         }
       ],
-      
+
       dailyAttendance: [
         { date: '2024-06-20', status: 'present', timeIn: '09:02', timeOut: '17:00', notes: '', lateMinutes: 2 },
         { date: '2024-06-19', status: 'absent', reason: 'Sick leave', notes: 'Fever' },
@@ -1399,7 +2786,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
       dateOfBirth: '2000-11-08',
       bloodGroup: 'AB+',
       emergencyContact: '+91 9876543242',
-      
+
       courseStartDate: '2024-03-01',
       courseEndDate: '2024-03-31',
       totalCourseDays: 30,
@@ -1408,10 +2795,10 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
       trialStartDate: '2024-03-01',
       trialEndDate: '2024-03-31',
       totalTrialDays: 30,
-      
+
       // Job History
       jobHistory: [],
-      
+
       // Course History
       courseHistory: [
         {
@@ -1425,7 +2812,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           percentage: 60
         }
       ],
-      
+
       attendanceStats: {
         presentDays: 18,
         absentDays: 4,
@@ -1437,7 +2824,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
         attendancePercentage: 75.0,
         punctualityScore: 85.2
       },
-      
+
       leaves: [
         {
           id: 3,
@@ -1453,7 +2840,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           duration: 1.5
         }
       ],
-      
+
       dailyAttendance: [
         { date: '2024-06-20', status: 'present', timeIn: '09:00', timeOut: '13:00', notes: '', lateMinutes: 0 },
         { date: '2024-06-19', status: 'late', timeIn: '09:15', timeOut: '13:00', notes: 'Traffic', lateMinutes: 15 },
@@ -1470,7 +2857,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
   ]);
 
   // ===== ATTENDANCE FUNCTIONS =====
-  
+
   // Initialize today's attendance
   useEffect(() => {
     const initialAttendance = {};
@@ -1502,7 +2889,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
     const today = new Date();
     let startDate, endDate;
     let filteredRecords = [];
-  
+
     switch (timeFilter) {
       case 'today':
         startDate = endDate = selectedDate;
@@ -1511,53 +2898,53 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           return recordDate === selectedDate;
         });
         break;
-        
+
       case 'week':
         const weekStart = new Date(today);
         weekStart.setDate(today.getDate() - today.getDay());
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
-        
+
         startDate = weekStart.toISOString().split('T')[0];
         endDate = weekEnd.toISOString().split('T')[0];
-        
+
         filteredRecords = student.dailyAttendance.filter(record => {
           const recordDate = new Date(record.date);
           return recordDate >= weekStart && recordDate <= weekEnd;
         });
         break;
-        
+
       case 'month':
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
         const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        
+
         startDate = monthStart.toISOString().split('T')[0];
         endDate = monthEnd.toISOString().split('T')[0];
-        
+
         filteredRecords = student.dailyAttendance.filter(record => {
           const recordDate = new Date(record.date);
           return recordDate >= monthStart && recordDate <= monthEnd;
         });
         break;
-        
+
       case 'year':
         const yearStart = new Date(today.getFullYear(), 0, 1);
         const yearEnd = new Date(today.getFullYear(), 11, 31);
-        
+
         startDate = yearStart.toISOString().split('T')[0];
         endDate = yearEnd.toISOString().split('T')[0];
-        
+
         filteredRecords = student.dailyAttendance.filter(record => {
           const recordDate = new Date(record.date);
           return recordDate >= yearStart && recordDate <= yearEnd;
         });
         break;
-        
+
       case 'custom':
         if (dateRange.fromDate && dateRange.toDate) {
           const customStart = new Date(dateRange.fromDate);
           const customEnd = new Date(dateRange.toDate);
-          
+
           filteredRecords = student.dailyAttendance.filter(record => {
             const recordDate = new Date(record.date);
             return recordDate >= customStart && recordDate <= customEnd;
@@ -1566,7 +2953,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           filteredRecords = student.dailyAttendance;
         }
         break;
-        
+
       default:
         filteredRecords = student.dailyAttendance;
     }
@@ -1577,15 +2964,15 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
     const halfDays = filteredRecords.filter(r => r.status === 'halfDay').length;
     const shortLeaveDays = filteredRecords.filter(r => r.status === 'shortLeave').length;
     const totalWorkingDays = filteredRecords.length;
-    
-    const attendancePercentage = totalWorkingDays > 0 
+
+    const attendancePercentage = totalWorkingDays > 0
       ? ((presentDays + lateDays + halfDays * 0.5 + shortLeaveDays * 0.5) / totalWorkingDays * 100).toFixed(1)
       : 0;
-      
-    const punctualityScore = (presentDays + lateDays) > 0 
+
+    const punctualityScore = (presentDays + lateDays) > 0
       ? (presentDays / (presentDays + lateDays) * 100).toFixed(1)
       : 0;
-  
+
     return {
       presentDays,
       absentDays,
@@ -1598,7 +2985,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
       punctualityScore: parseFloat(punctualityScore),
       filteredRecords
     };
-  
+
   }
 
   // Calculate tab counts
@@ -1651,7 +3038,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
     }
 
     if (searchQuery) {
-      filtered = filtered.filter(student => 
+      filtered = filtered.filter(student =>
         student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         student.enrollmentNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1664,10 +3051,10 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
 
   // Mark individual attendance
   const markIndividualAttendance = (studentId, status) => {
-    const currentTime = new Date().toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    const currentTime = new Date().toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit'
     });
 
     let lateMinutes = 0;
@@ -1682,7 +3069,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
       [studentId]: {
         ...prev[studentId],
         status: status,
-        timeIn: status !== 'absent' && status !== 'leave' ? 
+        timeIn: status !== 'absent' && status !== 'leave' ?
           (prev[studentId]?.timeIn || currentTime) : '',
         timeOut: prev[studentId]?.timeOut || '',
         isMarked: true,
@@ -1703,11 +3090,11 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
   };
 
   const selectAllStudents = () => {
-    const eligibleStudents = filteredStudents.filter(s => 
+    const eligibleStudents = filteredStudents.filter(s =>
       (activeTab === 'zeroPeriod' && s.admissionStatus === 'zeroPeriod') ||
       (activeTab === 'all')
     );
-    
+
     if (selectedStudents.size === eligibleStudents.length) {
       setSelectedStudents(new Set());
     } else {
@@ -1717,11 +3104,11 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
 
   const applyBulkAttendance = () => {
     if (!bulkAttendanceStatus || selectedStudents.size === 0) return;
-    
+
     selectedStudents.forEach(studentId => {
       markIndividualAttendance(studentId, bulkAttendanceStatus);
     });
-    
+
     setSelectedStudents(new Set());
     setBulkAttendanceStatus('');
     setShowBulkControls(false);
@@ -1753,7 +3140,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
   };
 
   const getStatusColor = (status) => {
-    switch(status) {
+    switch (status) {
       case 'active': return 'success';
       case 'inactive': return 'danger';
       case 'frozen': return 'warning';
@@ -1768,7 +3155,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
   };
 
   const getAdmissionStatusBadge = (student) => {
-    switch(student.admissionStatus) {
+    switch (student.admissionStatus) {
       case 'admitted':
         return <span className="badge bg-success">Admitted</span>;
       case 'zeroPeriod':
@@ -1793,11 +3180,11 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
     const start = new Date(student.courseStartDate);
     const end = new Date(student.courseEndDate);
     const today = new Date();
-    
+
     const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     const elapsedDays = Math.ceil((today - start) / (1000 * 60 * 60 * 24));
     const remainingDays = Math.max(0, totalDays - elapsedDays);
-    
+
     return {
       total: totalDays,
       elapsed: Math.max(0, elapsedDays),
@@ -1808,7 +3195,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
 
   // Check if current tab shows attendance controls
   const showAttendanceControls = activeTab === 'zeroPeriod' || activeTab === 'all';
-  const attendanceEligibleStudents = filteredStudents.filter(s => 
+  const attendanceEligibleStudents = filteredStudents.filter(s =>
     s.admissionStatus === 'zeroPeriod' || s.admissionStatus === 'admitted'
   );
 
@@ -1828,7 +3215,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                         <ol className="breadcrumb mb-0 small">
                           {onBackToCenters && selectedCenter && (
                             <li className="breadcrumb-item">
-                              <button 
+                              <button
                                 className="btn btn-link p-0 text-decoration-none"
                                 onClick={onBackToCenters}
                               >
@@ -1838,7 +3225,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                           )}
                           {onBackToCourses && selectedCourse && (
                             <li className="breadcrumb-item">
-                              <button 
+                              <button
                                 className="btn btn-link p-0 text-decoration-none"
                                 onClick={onBackToCourses}
                               >
@@ -1848,7 +3235,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                           )}
                           {onBackToBatches && selectedBatch && (
                             <li className="breadcrumb-item">
-                              <button 
+                              <button
                                 className="btn btn-link p-0 text-decoration-none"
                                 onClick={onBackToBatches}
                               >
@@ -2006,6 +3393,13 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                         <button className="btn btn-sm btn-outline-primary me-2" onClick={() => setShowBulkUpload(true)}>
                           <i className="fas fa-upload"></i> Bulk Upload
                         </button>
+                        <button
+                          onClick={handleAttendanceManagement}
+                          className="btn btn-sm btn-primary me-2"
+                        >
+                          <i className="fas fa-chart-line me-1"></i>
+                          Attendance Dashboard
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2077,7 +3471,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
 
           {/* Advanced Filters */}
           {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm" style={{marginTop:'150px'}}>
+            <div className="bg-white border-bottom shadow-sm" style={{ marginTop: '150px' }}>
               <div className="container-fluid py-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <div className="d-flex align-items-center">
@@ -2098,7 +3492,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                     <select
                       className="form-select"
                       value={filterData.status}
-                      onChange={(e) => setFilterData({...filterData, status: e.target.value})}
+                      onChange={(e) => setFilterData({ ...filterData, status: e.target.value })}
                     >
                       <option value="">All Status</option>
                       <option value="active">Active</option>
@@ -2112,7 +3506,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                       type="date"
                       className="form-select"
                       value={filterData.fromDate}
-                      onChange={(e) => setFilterData({...filterData, fromDate: e.target.value})}
+                      onChange={(e) => setFilterData({ ...filterData, fromDate: e.target.value })}
                     />
                   </div>
                   <div className="col-md-3">
@@ -2121,7 +3515,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                       type="date"
                       className="form-select"
                       value={filterData.toDate}
-                      onChange={(e) => setFilterData({...filterData, toDate: e.target.value})}
+                      onChange={(e) => setFilterData({ ...filterData, toDate: e.target.value })}
                     />
                   </div>
                   <div className="col-md-3 d-flex align-items-end">
@@ -2146,7 +3540,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           )}
 
           {/* Main Content - Enhanced Students Cards */}
-          <div className="content-body" style={{marginTop: showBulkControls && showAttendanceMode ? '320px' : showAttendanceMode ? '150px' : '140px'}}>
+          <div className="content-body" style={{ marginTop: showBulkControls && showAttendanceMode ? '320px' : showAttendanceMode ? '150px' : '140px' }}>
             <section className="list-view">
               <div className='row'>
                 <div className="col-12 rounded equal-height-2 coloumn-2">
@@ -2156,7 +3550,7 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                         const courseInfo = formatDuration(student);
                         const filteredStats = getFilteredAttendanceData(student);
                         const isEligibleForAttendance = student.admissionStatus === 'zeroPeriod' || student.admissionStatus === 'admitted';
-                        
+
                         return (
                           <div className={`card-content transition-col mb-2`} key={studentIndex}>
                             {/* Enhanced Student Header Card */}
@@ -2177,13 +3571,13 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                                           />
                                         </div>
                                       )}
-                                      
+
                                       <div className="form-check me-3">
                                         <input className="form-check-input" type="checkbox" />
                                       </div>
                                       <div className="me-3">
-                                        <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" 
-                                             style={{ width: '50px', height: '50px' }}>
+                                        <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                                          style={{ width: '50px', height: '50px' }}>
                                           <i className="bi bi-person-fill fs-4 text-primary"></i>
                                         </div>
                                       </div>
@@ -2195,11 +3589,11 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                                           {/* Show today's attendance status if marked */}
                                           {todayAttendance[student.id]?.isMarked && (
                                             <span className={`badge bg-${getStatusColor(todayAttendance[student.id]?.status)} ms-1`}>
-                                              <i className={`fas ${todayAttendance[student.id]?.status === 'present' ? 'fa-check' : 
-                                                todayAttendance[student.id]?.status === 'late' ? 'fa-clock' : 
-                                                todayAttendance[student.id]?.status === 'halfDay' ? 'fa-clock-o' :
-                                                todayAttendance[student.id]?.status === 'shortLeave' ? 'fa-sign-out-alt' :
-                                                todayAttendance[student.id]?.status === 'leave' ? 'fa-calendar' : 'fa-times'} me-1`}></i>
+                                              <i className={`fas ${todayAttendance[student.id]?.status === 'present' ? 'fa-check' :
+                                                todayAttendance[student.id]?.status === 'late' ? 'fa-clock' :
+                                                  todayAttendance[student.id]?.status === 'halfDay' ? 'fa-clock-o' :
+                                                    todayAttendance[student.id]?.status === 'shortLeave' ? 'fa-sign-out-alt' :
+                                                      todayAttendance[student.id]?.status === 'leave' ? 'fa-calendar' : 'fa-times'} me-1`}></i>
                                               {todayAttendance[student.id]?.status?.toUpperCase()}
                                             </span>
                                           )}
@@ -2275,36 +3669,36 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                                         </div>
 
                                         {/* Time Fields */}
-                                        {todayAttendance[student.id]?.status && 
-                                         todayAttendance[student.id]?.status !== 'absent' && 
-                                         todayAttendance[student.id]?.status !== 'leave' && (
-                                          <div className="row">
-                                            <div className="col-6">
-                                              <label className="form-label small mb-1">Time In</label>
-                                              <input
-                                                type="time"
-                                                className="form-control form-control-sm"
-                                                value={todayAttendance[student.id]?.timeIn || ''}
-                                                onChange={(e) => setTodayAttendance(prev => ({
-                                                  ...prev,
-                                                  [student.id]: { ...prev[student.id], timeIn: e.target.value }
-                                                }))}
-                                              />
+                                        {todayAttendance[student.id]?.status &&
+                                          todayAttendance[student.id]?.status !== 'absent' &&
+                                          todayAttendance[student.id]?.status !== 'leave' && (
+                                            <div className="row">
+                                              <div className="col-6">
+                                                <label className="form-label small mb-1">Time In</label>
+                                                <input
+                                                  type="time"
+                                                  className="form-control form-control-sm"
+                                                  value={todayAttendance[student.id]?.timeIn || ''}
+                                                  onChange={(e) => setTodayAttendance(prev => ({
+                                                    ...prev,
+                                                    [student.id]: { ...prev[student.id], timeIn: e.target.value }
+                                                  }))}
+                                                />
+                                              </div>
+                                              <div className="col-6">
+                                                <label className="form-label small mb-1">Time Out</label>
+                                                <input
+                                                  type="time"
+                                                  className="form-control form-control-sm"
+                                                  value={todayAttendance[student.id]?.timeOut || ''}
+                                                  onChange={(e) => setTodayAttendance(prev => ({
+                                                    ...prev,
+                                                    [student.id]: { ...prev[student.id], timeOut: e.target.value }
+                                                  }))}
+                                                />
+                                              </div>
                                             </div>
-                                            <div className="col-6">
-                                              <label className="form-label small mb-1">Time Out</label>
-                                              <input
-                                                type="time"
-                                                className="form-control form-control-sm"
-                                                value={todayAttendance[student.id]?.timeOut || ''}
-                                                onChange={(e) => setTodayAttendance(prev => ({
-                                                  ...prev,
-                                                  [student.id]: { ...prev[student.id], timeOut: e.target.value }
-                                                }))}
-                                              />
-                                            </div>
-                                          </div>
-                                        )}
+                                          )}
 
                                         {/* Late Minutes Display */}
                                         {todayAttendance[student.id]?.status === 'late' && todayAttendance[student.id]?.lateMinutes > 0 && (
@@ -2474,19 +3868,18 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                                             className={`nav-link ${(studentTabsActive[studentIndex] || 0) === tabIndex ? 'active' : ''}`}
                                             onClick={() => handleTabClick(studentIndex, tabIndex)}
                                           >
-                                            <i className={`fas ${
-                                              tabIndex === 0 ? 'fa-user' :
+                                            <i className={`fas ${tabIndex === 0 ? 'fa-user' :
                                               tabIndex === 1 ? 'fa-briefcase' :
-                                              tabIndex === 2 ? 'fa-graduation-cap' :
-                                              tabIndex === 3 ? 'fa-file-alt' : 'fa-calendar-check'
-                                            } me-1`}></i>
+                                                tabIndex === 2 ? 'fa-graduation-cap' :
+                                                  tabIndex === 3 ? 'fa-file-alt' : 'fa-calendar-check'
+                                              } me-1`}></i>
                                             {tab}
                                           </button>
                                         </li>
                                       ))}
                                     </ul>
-                                    
-                                    
+
+
                                   </div>
                                 </div>
 
@@ -2494,915 +3887,916 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
                                   {/* Profile Tab */}
                                   {(studentTabsActive[studentIndex] || 0) === 0 && (
                                     <div className="tab-pane active" id="profile">
-                                    <div className="resume-preview-body">
-                                      <div id="resume-download" className="resume-document">
+                                      <div className="resume-preview-body">
+                                        <div id="resume-download" className="resume-document">
 
-                                        <div className="resume-document-header">
-                                          <div className="resume-profile-section">
-                                            {user?.image ? (
-                                              <img
-                                                src={`${bucketUrl}/${user.image}`}
-                                                alt="Profile"
-                                                className="resume-profile-image"
-                                              />
-                                            ) : (
-                                              <div className="resume-profile-placeholder">
-                                                <i className="bi bi-person-circle"></i>
-                                              </div>
-                                            )}
-
-                                            <div className="resume-header-content">
-                                              <h1 className="resume-name">
-                                                {profile._candidate?.name || 'Your Name'}
-                                              </h1>
-                                              <p className="resume-title">
-                                                {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                              </p>
-                                              <p className="resume-title">
-                                                {profile._candidate?.sex || 'Sex'}
-                                              </p>
-
-                                              <div className="resume-contact-details">
-
-                                                <div className="resume-contact-item">
-                                                  <i className="bi bi-telephone-fill"></i>
-                                                  <span>{profile._candidate?.mobile}</span>
+                                          <div className="resume-document-header">
+                                            <div className="resume-profile-section">
+                                              {user?.image ? (
+                                                <img
+                                                  src={`${bucketUrl}/${user.image}`}
+                                                  alt="Profile"
+                                                  className="resume-profile-image"
+                                                />
+                                              ) : (
+                                                <div className="resume-profile-placeholder">
+                                                  <i className="bi bi-person-circle"></i>
                                                 </div>
+                                              )}
+
+                                              <div className="resume-header-content">
+                                                <h1 className="resume-name">
+                                                  {profile._candidate?.name || 'Your Name'}
+                                                </h1>
+                                                <p className="resume-title">
+                                                  {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                </p>
+                                                <p className="resume-title">
+                                                  {profile._candidate?.sex || 'Sex'}
+                                                </p>
+
+                                                <div className="resume-contact-details">
+
+                                                  <div className="resume-contact-item">
+                                                    <i className="bi bi-telephone-fill"></i>
+                                                    <span>{profile._candidate?.mobile}</span>
+                                                  </div>
 
 
-                                                <div className="resume-contact-item">
-                                                  <i className="bi bi-envelope-fill"></i>
-                                                  <span>{profile._candidate?.email}</span>
+                                                  <div className="resume-contact-item">
+                                                    <i className="bi bi-envelope-fill"></i>
+                                                    <span>{profile._candidate?.email}</span>
+                                                  </div>
+
+                                                  {profile._candidate?.dob && (
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-calendar-heart-fill"></i>
+                                                      {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
+                                                        day: '2-digit',
+                                                        month: 'long',
+                                                        year: 'numeric'
+                                                      })}
+                                                    </div>
+                                                  )}
+                                                  {profile._candidate?.personalInfo?.currentAddress?.city && (
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-geo-alt-fill"></i>
+                                                      <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                    </div>
+                                                  )}
+                                                  {profile._candidate?.personalInfo?.permanentAddress?.city && (
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-house-fill"></i>
+                                                      <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                    </div>
+                                                  )}
                                                 </div>
-
-                                                {profile._candidate?.dob && (
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-calendar-heart-fill"></i>
-                                                    {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
-                                                      day: '2-digit',
-                                                      month: 'long',
-                                                      year: 'numeric'
-                                                    })}
-                                                  </div>
-                                                )}
-                                                {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-geo-alt-fill"></i>
-                                                    <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
-                                                  </div>
-                                                )}
-                                                {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-house-fill"></i>
-                                                    <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
-                                                  </div>
-                                                )}
                                               </div>
+                                            </div>
+
+                                            <div className="resume-summary">
+                                              <h2 className="resume-section-title">Professional Summary</h2>
+                                              <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
                                             </div>
                                           </div>
 
-                                          <div className="resume-summary">
-                                            <h2 className="resume-section-title">Professional Summary</h2>
-                                            <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                          </div>
-                                        </div>
 
+                                          <div className="resume-document-body">
 
-                                        <div className="resume-document-body">
+                                            <div className="resume-column resume-left-column">
 
-                                          <div className="resume-column resume-left-column">
-
-                                            {profile._candidate?.isExperienced === false ? (
-                                              <div className="resume-section">
-                                                <h2 className="resume-section-title">Work Experience</h2>
-                                                <div className="resume-experience-item">
-                                                  <div className="resume-item-header">
-                                                    <h3 className="resume-item-title">Fresher</h3>
-                                                  </div>
-                                                  <div className="resume-item-content">
-                                                    <p>Looking for opportunities to start my career</p>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              profile._candidate?.experiences?.length > 0 && (
+                                              {profile._candidate?.isExperienced === false ? (
                                                 <div className="resume-section">
                                                   <h2 className="resume-section-title">Work Experience</h2>
-                                                  {profile._candidate.experiences.map((exp, index) => (
-                                                    <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                      <div className="resume-item-header">
-                                                        {exp.jobTitle && (
-                                                          <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                        )}
-                                                        {exp.companyName && (
-                                                          <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                        )}
-                                                        {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                          <p className="resume-item-period">
-                                                            {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                              year: 'numeric',
-                                                              month: 'short',
-                                                            }) : 'Start Date'}
-                                                            {" - "}
-                                                            {exp.currentlyWorking ? 'Present' :
-                                                              exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                year: 'numeric',
-                                                                month: 'short',
-                                                              }) : 'End Date'}
-                                                          </p>
-                                                        )}
-                                                      </div>
-                                                      {exp.jobDescription && (
-                                                        <div className="resume-item-content">
-                                                          <p>{exp.jobDescription}</p>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              )
-                                            )}
-
-                                            {profile._candidate?.qualifications?.length > 0 && (
-                                              <div className="resume-section">
-                                                <h2 className="resume-section-title">Education</h2>
-                                                {profile._candidate.qualifications.map((edu, index) => (
-                                                  <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                  <div className="resume-experience-item">
                                                     <div className="resume-item-header">
-                                                      {edu.education && (
-                                                        <h3 className="resume-item-title">{edu.education}</h3>
-                                                      )}
-                                                      {edu.course && (
-                                                        <h3 className="resume-item-title">{edu.course}</h3>
-                                                      )}
-                                                      {edu.universityName && (
-                                                        <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                      )}
-                                                      {edu.schoolName && (
-                                                        <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                      )}
-                                                      {edu.collegeName && (
-                                                        <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                      )}
-                                                      {edu.passingYear && (
-                                                        <p className="resume-item-period">{edu.passingYear}</p>
-                                                      )}
+                                                      <h3 className="resume-item-title">Fresher</h3>
                                                     </div>
                                                     <div className="resume-item-content">
-                                                      {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                      {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                      <p>Looking for opportunities to start my career</p>
                                                     </div>
                                                   </div>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-
-
-                                          <div className="resume-column resume-right-column">
-
-                                            {profile._candidate?.personalInfo?.skills?.length > 0 && (
-                                              <div className="resume-section">
-                                                <h2 className="resume-section-title">Skills</h2>
-                                                <div className="resume-skills-list">
-                                                  {profile._candidate.personalInfo.skills.map((skill, index) => (
-                                                    <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                      <div className="resume-skill-name">{skill.skillName || skill}</div>
-                                                      {skill.skillPercent && (
-                                                        <div className="resume-skill-bar-container">
-                                                          <div
-                                                            className="resume-skill-bar"
-                                                            style={{ width: `${skill.skillPercent}%` }}
-                                                          ></div>
-                                                          <span className="resume-skill-percent">{skill.skillPercent}%</span>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  ))}
                                                 </div>
-                                              </div>
-                                            )}
-
-
-
-                                            {profile._candidate?.personalInfo?.languages?.length > 0 && (
-                                              <div className="resume-section">
-                                                <h2 className="resume-section-title">Languages</h2>
-                                                <div className="resume-languages-list">
-                                                  {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                    <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                      <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
-                                                      {lang.level && (
-                                                        <div className="resume-language-level">
-                                                          {[1, 2, 3, 4, 5].map(dot => (
-                                                            <span
-                                                              key={`resume-lang-dot-${index}-${dot}`}
-                                                              className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                            ></span>
-                                                          ))}
+                                              ) : (
+                                                profile._candidate?.experiences?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Work Experience</h2>
+                                                    {profile._candidate.experiences.map((exp, index) => (
+                                                      <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          {exp.jobTitle && (
+                                                            <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                          )}
+                                                          {exp.companyName && (
+                                                            <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                          )}
+                                                          {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                            <p className="resume-item-period">
+                                                              {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                year: 'numeric',
+                                                                month: 'short',
+                                                              }) : 'Start Date'}
+                                                              {" - "}
+                                                              {exp.currentlyWorking ? 'Present' :
+                                                                exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                  year: 'numeric',
+                                                                  month: 'short',
+                                                                }) : 'End Date'}
+                                                            </p>
+                                                          )}
                                                         </div>
-                                                      )}
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            )}
-
-
-                                            {profile._candidate?.personalInfo?.certifications?.length > 0 && (
-                                              <div className="resume-section">
-                                                <h2 className="resume-section-title">Certifications</h2>
-                                                <ul className="resume-certifications-list">
-                                                  {profile._candidate.personalInfo.certifications.map((cert, index) => (
-                                                    <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                      <strong>{cert.certificateName || cert.name}</strong>
-                                                      {cert.orgName && (
-                                                        <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                      )}
-                                                      {(cert.month || cert.year) && (
-                                                        <span className="resume-cert-date">
-                                                          {cert.month && cert.year ?
-                                                            ` (${cert.month}/${cert.year})` :
-                                                            cert.month ?
-                                                              ` (${cert.month})` :
-                                                              cert.year ?
-                                                                ` (${cert.year})` :
-                                                                ''}
-                                                        </span>
-                                                      )}
-                                                    </li>
-                                                  ))}
-                                                </ul>
-                                              </div>
-                                            )}
-
-
-                                            {profile._candidate?.personalInfo?.projects?.length > 0 && (
-                                              <div className="resume-section">
-                                                <h2 className="resume-section-title">Projects</h2>
-                                                {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                  <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                    <div className="resume-item-header">
-                                                      <h3 className="resume-project-title">
-                                                        {proj.projectName || 'Project'}
-                                                        {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                      </h3>
-                                                    </div>
-                                                    {proj.description && (
-                                                      <div className="resume-item-content">
-                                                        <p>{proj.description}</p>
+                                                        {exp.jobDescription && (
+                                                          <div className="resume-item-content">
+                                                            <p>{exp.jobDescription}</p>
+                                                          </div>
+                                                        )}
                                                       </div>
-                                                    )}
+                                                    ))}
                                                   </div>
-                                                ))}
-                                              </div>
-                                            )}
+                                                )
+                                              )}
 
-
-                                            {profile._candidate?.personalInfo?.interest?.length > 0 && (
-                                              <div className="resume-section">
-                                                <h2 className="resume-section-title">Interests</h2>
-                                                <div className="resume-interests-tags">
-                                                  {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                    <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                      {interest}
-                                                    </span>
+                                              {profile._candidate?.qualifications?.length > 0 && (
+                                                <div className="resume-section">
+                                                  <h2 className="resume-section-title">Education</h2>
+                                                  {profile._candidate.qualifications.map((edu, index) => (
+                                                    <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                      <div className="resume-item-header">
+                                                        {edu.education && (
+                                                          <h3 className="resume-item-title">{edu.education}</h3>
+                                                        )}
+                                                        {edu.course && (
+                                                          <h3 className="resume-item-title">{edu.course}</h3>
+                                                        )}
+                                                        {edu.universityName && (
+                                                          <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                        )}
+                                                        {edu.schoolName && (
+                                                          <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                        )}
+                                                        {edu.collegeName && (
+                                                          <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                        )}
+                                                        {edu.passingYear && (
+                                                          <p className="resume-item-period">{edu.passingYear}</p>
+                                                        )}
+                                                      </div>
+                                                      <div className="resume-item-content">
+                                                        {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                        {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                      </div>
+                                                    </div>
                                                   ))}
                                                 </div>
-                                              </div>
-                                            )}
+                                              )}
+                                            </div>
 
+
+                                            <div className="resume-column resume-right-column">
+
+                                              {profile._candidate?.personalInfo?.skills?.length > 0 && (
+                                                <div className="resume-section">
+                                                  <h2 className="resume-section-title">Skills</h2>
+                                                  <div className="resume-skills-list">
+                                                    {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                      <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                        <div className="resume-skill-name">{skill.skillName || skill}</div>
+                                                        {skill.skillPercent && (
+                                                          <div className="resume-skill-bar-container">
+                                                            <div
+                                                              className="resume-skill-bar"
+                                                              style={{ width: `${skill.skillPercent}%` }}
+                                                            ></div>
+                                                            <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+
+
+                                              {profile._candidate?.personalInfo?.languages?.length > 0 && (
+                                                <div className="resume-section">
+                                                  <h2 className="resume-section-title">Languages</h2>
+                                                  <div className="resume-languages-list">
+                                                    {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                      <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                        <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                        {lang.level && (
+                                                          <div className="resume-language-level">
+                                                            {[1, 2, 3, 4, 5].map(dot => (
+                                                              <span
+                                                                key={`resume-lang-dot-${index}-${dot}`}
+                                                                className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                              ></span>
+                                                            ))}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+
+                                              {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                                <div className="resume-section">
+                                                  <h2 className="resume-section-title">Certifications</h2>
+                                                  <ul className="resume-certifications-list">
+                                                    {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                      <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                        <strong>{cert.certificateName || cert.name}</strong>
+                                                        {cert.orgName && (
+                                                          <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                        )}
+                                                        {(cert.month || cert.year) && (
+                                                          <span className="resume-cert-date">
+                                                            {cert.month && cert.year ?
+                                                              ` (${cert.month}/${cert.year})` :
+                                                              cert.month ?
+                                                                ` (${cert.month})` :
+                                                                cert.year ?
+                                                                  ` (${cert.year})` :
+                                                                  ''}
+                                                          </span>
+                                                        )}
+                                                      </li>
+                                                    ))}
+                                                  </ul>
+                                                </div>
+                                              )}
+
+
+                                              {profile._candidate?.personalInfo?.projects?.length > 0 && (
+                                                <div className="resume-section">
+                                                  <h2 className="resume-section-title">Projects</h2>
+                                                  {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                      <div className="resume-item-header">
+                                                        <h3 className="resume-project-title">
+                                                          {proj.projectName || 'Project'}
+                                                          {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                        </h3>
+                                                      </div>
+                                                      {proj.description && (
+                                                        <div className="resume-item-content">
+                                                          <p>{proj.description}</p>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+
+
+                                              {profile._candidate?.personalInfo?.interest?.length > 0 && (
+                                                <div className="resume-section">
+                                                  <h2 className="resume-section-title">Interests</h2>
+                                                  <div className="resume-interests-tags">
+                                                    {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                      <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                        {interest}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                            </div>
                                           </div>
+
+
+                                          {profile._candidate?.personalInfo?.declaration?.text && (
+                                            <div className="resume-declaration">
+                                              <h2 className="resume-section-title">Declaration</h2>
+                                              <p>{profile._candidate.personalInfo.declaration.text}</p>
+
+                                            </div>
+                                          )}
                                         </div>
-
-
-                                        {profile._candidate?.personalInfo?.declaration?.text && (
-                                          <div className="resume-declaration">
-                                            <h2 className="resume-section-title">Declaration</h2>
-                                            <p>{profile._candidate.personalInfo.declaration.text}</p>
-
-                                          </div>
-                                        )}
                                       </div>
                                     </div>
-                                  </div>
                                   )}
 
                                   {/* Job History Tab */}
                                   {(studentTabsActive[studentIndex] || 0) === 1 && (
                                     <div className="tab-pane active" id="job-history">
-                                    <div className="section-card">
-                                      <div className="table-responsive">
-                                        <table className="table table-hover table-bordered job-history-table">
-                                          <thead className="table-light">
-                                            <tr>
-                                              <th>S.No</th>
-                                              <th>Company Name</th>
-                                              <th>Position</th>
-                                              <th>Duration</th>
-                                              <th>Location</th>
-                                              <th>Status</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            {experiences.map((job, index) => (
-                                              <tr key={index}>
-                                                <td>{index + 1}</td>
-                                                <td>{job.companyName}</td>
-                                                <td>{job.jobTitle}</td>
-                                                <td>
-                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                </td>
-                                                <td>Remote</td>
-                                                <td><span className="text-success">Completed</span></td>
+                                      <div className="section-card">
+                                        <div className="table-responsive">
+                                          <table className="table table-hover table-bordered job-history-table">
+                                            <thead className="table-light">
+                                              <tr>
+                                                <th>S.No</th>
+                                                <th>Company Name</th>
+                                                <th>Position</th>
+                                                <th>Duration</th>
+                                                <th>Location</th>
+                                                <th>Status</th>
                                               </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
+                                            </thead>
+                                            <tbody>
+                                              {experiences.map((job, index) => (
+                                                <tr key={index}>
+                                                  <td>{index + 1}</td>
+                                                  <td>{job.companyName}</td>
+                                                  <td>{job.jobTitle}</td>
+                                                  <td>
+                                                    {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                    {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                  </td>
+                                                  <td>Remote</td>
+                                                  <td><span className="text-success">Completed</span></td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
                                   )}
 
                                   {/* Course History Tab */}
                                   {(studentTabsActive[studentIndex] || 0) === 2 && (
-                                   <div className="tab-pane active" id="course-history">
-                                   <div className="section-card">
-                                     <div className="table-responsive">
-                                       <table className="table table-hover table-bordered course-history-table">
-                                         <thead className="table-light">
-                                           <tr>
-                                             <th>S.No</th>
-                                             <th>Applied Date</th>
-                                             <th>Course Name</th>
-                                             <th>Lead Added By</th>
-                                             <th>Counsellor</th>
-                                             <th>Status</th>
-                                           </tr>
-                                         </thead>
-                                         <tbody>
-                                           {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                             profile._candidate._appliedCourses.map((course, index) => (
-                                               <tr key={index}>
-                                                 <td>{index + 1}</td>
-                                                 <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-                                                 <td>{course._course?.name || 'N/A'}</td>
-                                                 <td>{course.registeredBy?.name || 'Self Registered'}</td>
-                                                 <td>{course.month || ''} {course.year || ''}</td>
-                                                 <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
-                                               </tr>
-                                             ))
-                                           ) : (
-                                             <tr>
-                                               <td colSpan={6} className="text-center">No course history available</td>
-                                             </tr>
-                                           )}
-
-                                         </tbody>
-                                       </table>
-                                     </div>
-                                   </div>
-                                 </div>
-                                  )}
-
-                                  {/* Documents Tab */}
-                                  {(studentTabsActive[studentIndex] || 0) === 3 && (
-                                     <div className="tab-pane active" id='studentsDocuments'>
-                                     {(() => {
-                                       const documentsToDisplay = profile.uploadedDocs || [];
-                                       const totalRequired = profile?.docCounts?.totalRequired || 0;
-
-                                       // If no documents are required, show a message
-                                       if (totalRequired === 0) {
-                                         return (
-                                           <div className="col-12 text-center py-5">
-                                             <div className="text-muted">
-                                               <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                               <h5 className="text-success">No Documents Required</h5>
-                                               <p>This course does not require any document verification.</p>
-                                             </div>
-                                           </div>
-
-                                         );
-                                       }
-
-                                       // If documents are required, show the full interface
-                                       return (
-                                         <div className="enhanced-documents-panel">
-                                           {/* Enhanced Stats Grid */}
-                                           <div className="stats-grid">
-                                             {(() => {
-                                               // Use backend counts only, remove static document fallback
-                                               const backendCounts = profile?.docCounts || {};
-                                               return (
-                                                 <>
-                                                   <div className="stat-card total-docs">
-                                                     <div className="stat-icon">
-                                                       <i className="fas fa-file-alt"></i>
-                                                     </div>
-                                                     <div className="stat-info">
-                                                       <h4>{backendCounts.totalRequired || 0}</h4>
-                                                       <p>Total Required</p>
-                                                     </div>
-                                                     <div className="stat-trend">
-                                                       <i className="fas fa-list"></i>
-                                                     </div>
-                                                   </div>
-
-                                                   <div className="stat-card uploaded-docs">
-                                                     <div className="stat-icon">
-                                                       <i className="fas fa-cloud-upload-alt"></i>
-                                                     </div>
-                                                     <div className="stat-info">
-                                                       <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                       <p>Uploaded</p>
-                                                     </div>
-                                                     <div className="stat-trend">
-                                                       <i className="fas fa-arrow-up"></i>
-                                                     </div>
-                                                   </div>
-
-                                                   <div className="stat-card pending-docs">
-                                                     <div className="stat-icon">
-                                                       <i className="fas fa-clock"></i>
-                                                     </div>
-                                                     <div className="stat-info">
-                                                       <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                       <p>Pending Review</p>
-                                                     </div>
-                                                     <div className="stat-trend">
-                                                       <i className="fas fa-exclamation-triangle"></i>
-                                                     </div>
-                                                   </div>
-
-                                                   <div className="stat-card verified-docs">
-                                                     <div className="stat-icon">
-                                                       <i className="fas fa-check-circle"></i>
-                                                     </div>
-                                                     <div className="stat-info">
-                                                       <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                       <p>Approved</p>
-                                                     </div>
-                                                     <div className="stat-trend">
-                                                       <i className="fas fa-thumbs-up"></i>
-                                                     </div>
-                                                   </div>
-
-                                                   <div className="stat-card rejected-docs">
-                                                     <div className="stat-icon">
-                                                       <i className="fas fa-times-circle"></i>
-                                                     </div>
-                                                     <div className="stat-info">
-                                                       <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                       <p>Rejected</p>
-                                                     </div>
-                                                     <div className="stat-trend">
-                                                       <i className="fas fa-arrow-down"></i>
-                                                     </div>
-                                                   </div>
-                                                 </>
-                                               );
-                                             })()}
-                                           </div>
-
-                                           {/* Enhanced Filter Section */}
-                                           <div className="filter-section-enhanced">
-                                             <div className="filter-tabs-container">
-                                               <h5 className="filter-title">
-                                                 <i className="fas fa-filter me-2"></i>
-                                                 Filter Documents
-                                               </h5>
-                                               <div className="filter-tabs">
-                                                 {(() => {
-                                                   const backendCounts = profile?.docCounts || {};
-                                                   return (
-                                                     <>
-                                                       <button
-                                                         className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                         onClick={() => setStatusFilter('all')}
-                                                       >
-                                                         <i className="fas fa-list-ul"></i>
-                                                         All Documents
-                                                         <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                       </button>
-                                                       <button
-                                                         className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                         onClick={() => setStatusFilter('pending')}
-                                                       >
-                                                         <i className="fas fa-clock"></i>
-                                                         Pending
-                                                         <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                       </button>
-                                                       <button
-                                                         className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                         onClick={() => setStatusFilter('verified')}
-                                                       >
-                                                         <i className="fas fa-check-circle"></i>
-                                                         Verified
-                                                         <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                       </button>
-                                                       <button
-                                                         className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                         onClick={() => setStatusFilter('rejected')}
-                                                       >
-                                                         <i className="fas fa-times-circle"></i>
-                                                         Rejected
-                                                         <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                       </button>
-                                                     </>
-                                                   );
-                                                 })()}
-                                               </div>
-                                             </div>
-                                           </div>
-
-                                           {/* Enhanced Documents Grid */}
-                                           <div className="documents-grid-enhanced">
-                                             {(() => {
-                                               // Filter documents based on status filter
-                                               const filteredDocs = filterDocuments(documentsToDisplay);
-
-                                               if (filteredDocs.length === 0) {
-                                                 return (
-                                                   <div className="col-12 text-center py-5">
-                                                     <div className="text-muted">
-                                                       <i className="fas fa-filter fa-3x mb-3"></i>
-                                                       <h5>No Documents Found</h5>
-                                                       <p>No documents match the current filter criteria.</p>
-                                                     </div>
-                                                   </div>
-                                                 );
-                                               }
-
-                                               return filteredDocs.map((doc, index) => {
-                                                 // Check if this is a document with upload data or just uploaded file info
-                                                 const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                   ? doc.uploads[doc.uploads.length - 1]
-                                                   : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                 return (
-                                                   <div key={doc._id || index} className="document-card-enhanced">
-                                                     <div className="document-image-container">
-                                                       {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                         <>
-                                                           {(() => {
-                                                             const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                             const fileType = getFileType(fileUrl);
-
-                                                             if (fileType === 'image') {
-                                                               return (
-                                                                 <img
-                                                                   src={fileUrl}
-                                                                   alt="Document Preview"
-                                                                   className="document-image"
-                                                                 />
-                                                               );
-                                                             } else if (fileType === 'pdf') {
-                                                               return (
-                                                                 <div className="document-preview-icon">
-                                                                   <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
-                                                                   <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                 </div>
-                                                               );
-                                                             } else {
-                                                               return (
-                                                                 <div className="document-preview-icon">
-                                                                   <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
-                                                                     fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                     }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                   <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                     {fileType === 'document' ? 'Document' :
-                                                                       fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                   </p>
-                                                                 </div>
-                                                               );
-                                                             }
-                                                           })()}
-                                                           <div className="image-overlay">
-                                                             <button
-                                                               className="preview-btn"
-                                                               onClick={() => openDocumentModal(doc)}
-                                                             >
-                                                               <i className="fas fa-search-plus"></i>
-                                                               Preview
-                                                             </button>
-                                                           </div>
-                                                         </>
-                                                       ) : (
-                                                         <div className="no-document-placeholder">
-                                                           <i className="fas fa-file-upload"></i>
-                                                           <p>No Document</p>
-                                                         </div>
-                                                       )}
-
-                                                       {/* Status Badge Overlay */}
-                                                       <div className="status-badge-overlay">
-                                                         {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                           <span className="status-badge-new pending">
-                                                             <i className="fas fa-clock"></i>
-                                                             Pending
-                                                           </span>
-                                                         )}
-                                                         {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                           <span className="status-badge-new verified">
-                                                             <i className="fas fa-check-circle"></i>
-                                                             Verified
-                                                           </span>
-                                                         )}
-                                                         {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                           <span className="status-badge-new rejected">
-                                                             <i className="fas fa-times-circle"></i>
-                                                             Rejected
-                                                           </span>
-                                                         )}
-                                                         {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                           <span className="status-badge-new not-uploaded">
-                                                             <i className="fas fa-upload"></i>
-                                                             Required
-                                                           </span>
-                                                         )}
-                                                       </div>
-                                                     </div>
-
-                                                     <div className="document-info-section">
-                                                       <div className="document-header">
-                                                         <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
-                                                         <div className="document-actions">
-                                                           {(!latestUpload) ? (
-                                                             <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
-                                                               setSelectedProfile(profile); // Set the current profile
-                                                               openUploadModal(doc);        // Open the upload modal
-                                                             }}>
-                                                               <i className="fas fa-cloud-upload-alt"></i>
-                                                               Upload
-                                                             </button>
-                                                           ) : (
-                                                             <button
-                                                               className="action-btn verify-btn"
-                                                               onClick={() => openDocumentModal(doc)}
-                                                               title="Verify Document"
-                                                             >
-                                                               <i className="fas fa-search"></i>
-                                                               PREVIEW
-                                                             </button>
-                                                           )}
-                                                         </div>
-                                                       </div>
-
-                                                       <div className="document-meta">
-                                                         <div className="meta-item">
-                                                           <i className="fas fa-calendar-alt text-muted"></i>
-                                                           <span className="meta-text">
-                                                             {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                               new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                 day: '2-digit',
-                                                                 month: 'short',
-                                                                 year: 'numeric'
-                                                               }) :
-                                                               'Not uploaded'
-                                                             }
-                                                           </span>
-                                                         </div>
-
-                                                         {latestUpload && (
-                                                           <div className="meta-item">
-                                                             <i className="fas fa-clock text-muted"></i>
-                                                             <span className="meta-text">
-                                                               {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                 hour: '2-digit',
-                                                                 minute: '2-digit'
-                                                               })}
-                                                             </span>
-                                                           </div>
-                                                         )}
-                                                       </div>
-                                                     </div>
-                                                   </div>
-                                                 );
-                                               });
-                                             })()}
-                                           </div>
-
-                                           <DocumentModal />
-                                           <UploadModal />
-                                         </div>
-                                       );
-                                     })()}
-                                   </div>
-                                  )}
-
-                                  {/* Attendance Tab - Table Format Only */}
-                                  {(studentTabsActive[studentIndex] || 0) === 4 && (
-                                    <div className="card">
-                                      <div className="card-header">
-                                        <div className="d-flex justify-content-between align-items-center">
-                                          <h6 className="mb-0">Attendance Records</h6>
-                                          <div className="d-flex gap-2">
-                                            <span className="badge bg-primary">{student.attendanceStats.totalWorkingDays} Total Days</span>
-                                            <span className="badge bg-success">{student.attendanceStats.presentDays} Present</span>
-                                            <span className="badge bg-danger">{student.attendanceStats.absentDays} Absent</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div className="card-body">
-                                        {/* Attendance Summary Stats */}
-                                        <div className="row mb-4 text-center">
-                                          <div className="col-md-2">
-                                            <div className="card bg-primary text-white">
-                                              <div className="card-body p-2">
-                                                <div className="h5 mb-0">{student.attendanceStats.totalWorkingDays}</div>
-                                                <div className="small">Total Working Days</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="col-md-2">
-                                            <div className="card bg-success text-white">
-                                              <div className="card-body p-2">
-                                                <div className="h5 mb-0">{student.attendanceStats.presentDays}</div>
-                                                <div className="small">Present Days</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="col-md-2">
-                                            <div className="card bg-danger text-white">
-                                              <div className="card-body p-2">
-                                                <div className="h5 mb-0">{student.attendanceStats.absentDays}</div>
-                                                <div className="small">Absent Days</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="col-md-2">
-                                            <div className="card bg-warning text-white">
-                                              <div className="card-body p-2">
-                                                <div className="h5 mb-0">{student.attendanceStats.lateDays}</div>
-                                                <div className="small">Late Days</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="col-md-2">
-                                            <div className="card bg-info text-white">
-                                              <div className="card-body p-2">
-                                                <div className="h5 mb-0">{student.attendanceStats.leaveDays}</div>
-                                                <div className="small">Leave Days</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="col-md-2">
-                                            <div className="card bg-secondary text-white">
-                                              <div className="card-body p-2">
-                                                <div className="h5 mb-0">{student.attendanceStats.halfDays + student.attendanceStats.shortLeaveDays}</div>
-                                                <div className="small">Half/Short Days</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* Attendance Percentage */}
-                                        <div className="row mb-4">
-                                          <div className="col-md-6">
-                                            <div className="d-flex justify-content-between small text-muted mb-1">
-                                              <span>Overall Attendance</span>
-                                              <span>{student.attendanceStats.attendancePercentage}%</span>
-                                            </div>
-                                            <div className="progress mb-2" style={{ height: '20px' }}>
-                                              <div 
-                                                className={`progress-bar bg-${getProgressColor(student.attendanceStats.attendancePercentage)}`}
-                                                style={{ width: `${student.attendanceStats.attendancePercentage}%` }}
-                                              >
-                                                {student.attendanceStats.attendancePercentage}%
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="col-md-6">
-                                            <div className="d-flex justify-content-between small text-muted mb-1">
-                                              <span>Punctuality Score</span>
-                                              <span>{student.attendanceStats.punctualityScore}%</span>
-                                            </div>
-                                            <div className="progress mb-2" style={{ height: '20px' }}>
-                                              <div 
-                                                className={`progress-bar bg-${getProgressColor(student.attendanceStats.punctualityScore)}`}
-                                                style={{ width: `${student.attendanceStats.punctualityScore}%` }}
-                                              >
-                                                {student.attendanceStats.punctualityScore}%
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* Attendance Records Table */}
-                                        <h6 className="mb-3">Daily Attendance Records</h6>
+                                    <div className="tab-pane active" id="course-history">
+                                      <div className="section-card">
                                         <div className="table-responsive">
-                                          <table className="table table-striped table-hover">
-                                            <thead className="table-dark">
+                                          <table className="table table-hover table-bordered course-history-table">
+                                            <thead className="table-light">
                                               <tr>
-                                                <th>Date</th>
-                                                <th>Day</th>
+                                                <th>S.No</th>
+                                                <th>Applied Date</th>
+                                                <th>Course Name</th>
+                                                <th>Lead Added By</th>
+                                                <th>Counsellor</th>
                                                 <th>Status</th>
-                                                <th>Time In</th>
-                                                <th>Time Out</th>
-                                                <th>Late Minutes</th>
-                                                <th>Notes/Reason</th>
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              {student.dailyAttendance && student.dailyAttendance.length > 0 ? (
-                                                student.dailyAttendance.map((record, idx) => (
-                                                  <tr key={idx}>
-                                                    <td>
-                                                      <strong>{new Date(record.date).toLocaleDateString()}</strong>
-                                                    </td>
-                                                    <td>
-                                                      <small className="text-muted">{new Date(record.date).toLocaleDateString('en-US', { weekday: 'short' })}</small>
-                                                    </td>
-                                                    <td>
-                                                      <span className={`badge bg-${getStatusColor(record.status)} px-3 py-2`}>
-                                                        <i className={`fas ${record.status === 'present' ? 'fa-check' : 
-                                                          record.status === 'late' ? 'fa-clock' : 
-                                                          record.status === 'halfDay' ? 'fa-clock-o' :
-                                                          record.status === 'shortLeave' ? 'fa-sign-out-alt' :
-                                                          record.status === 'leave' ? 'fa-calendar' : 'fa-times'} me-1`}></i>
-                                                        {record.status?.toUpperCase() || 'NOT MARKED'}
-                                                      </span>
-                                                    </td>
-                                                    <td>
-                                                      <span className="fw-medium">{record.timeIn || '-'}</span>
-                                                    </td>
-                                                    <td>
-                                                      <span className="fw-medium">{record.timeOut || '-'}</span>
-                                                    </td>
-                                                    <td>
-                                                      {record.lateMinutes > 0 ? (
-                                                        <span className="badge bg-warning">{record.lateMinutes} min</span>
-                                                      ) : (
-                                                        <span className="text-muted">0 min</span>
-                                                      )}
-                                                    </td>
-                                                    <td>
-                                                      <span className="text-muted small">{record.notes || record.reason || '-'}</span>
-                                                    </td>
+                                              {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
+                                                profile._candidate._appliedCourses.map((course, index) => (
+                                                  <tr key={index}>
+                                                    <td>{index + 1}</td>
+                                                    <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                    <td>{course._course?.name || 'N/A'}</td>
+                                                    <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                    <td>{course.month || ''} {course.year || ''}</td>
+                                                    <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
                                                   </tr>
                                                 ))
                                               ) : (
                                                 <tr>
-                                                  <td colSpan="7" className="text-center py-4">
-                                                    <i className="fas fa-calendar-times fs-2 text-muted mb-2"></i>
-                                                    <p className="text-muted mb-0">No attendance records found</p>
-                                                  </td>
+                                                  <td colSpan={6} className="text-center">No course history available</td>
                                                 </tr>
                                               )}
+
                                             </tbody>
                                           </table>
                                         </div>
-
-                                        {/* Leave Records Table */}
-                                        {student.leaves && student.leaves.length > 0 && (
-                                          <>
-                                            <h6 className="mb-3 mt-4">Leave Applications</h6>
-                                            <div className="table-responsive">
-                                              <table className="table table-sm">
-                                                <thead className="table-light">
-                                                  <tr>
-                                                    <th>Date</th>
-                                                    <th>Type</th>
-                                                    <th>Duration</th>
-                                                    <th>Reason</th>
-                                                    <th>Status</th>
-                                                    <th>Approved By</th>
-                                                  </tr>
-                                                </thead>
-                                                <tbody>
-                                                  {student.leaves.map((leave, idx) => (
-                                                    <tr key={idx}>
-                                                      <td>{new Date(leave.date).toLocaleDateString()}</td>
-                                                      <td>
-                                                        <span className="badge bg-secondary">{leave.type}</span>
-                                                      </td>
-                                                      <td>
-                                                        <span className={`badge ${leave.leaveType === 'full' ? 'bg-danger' : 
-                                                          leave.leaveType === 'half' ? 'bg-warning' : 'bg-info'}`}>
-                                                          {leave.leaveType === 'full' ? '1 Day' : 
-                                                           leave.leaveType === 'half' ? '0.5 Day' : 
-                                                           `${leave.duration || 0} Hours`}
-                                                        </span>
-                                                      </td>
-                                                      <td>{leave.reason}</td>
-                                                      <td>
-                                                        <span className={`badge bg-${leave.status === 'approved' ? 'success' : 
-                                                          leave.status === 'pending' ? 'warning' : 'danger'}`}>
-                                                          {leave.status}
-                                                        </span>
-                                                      </td>
-                                                      <td>{leave.approvedBy || '-'}</td>
-                                                    </tr>
-                                                  ))}
-                                                </tbody>
-                                              </table>
-                                            </div>
-                                          </>
-                                        )}
                                       </div>
                                     </div>
+                                  )}
+
+                                  {/* Documents Tab */}
+                                  {(studentTabsActive[studentIndex] || 0) === 3 && (
+                                    <div className="tab-pane active" id='studentsDocuments'>
+                                      {(() => {
+                                        const documentsToDisplay = profile.uploadedDocs || [];
+                                        const totalRequired = profile?.docCounts?.totalRequired || 0;
+
+                                        // If no documents are required, show a message
+                                        if (totalRequired === 0) {
+                                          return (
+                                            <div className="col-12 text-center py-5">
+                                              <div className="text-muted">
+                                                <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                <h5 className="text-success">No Documents Required</h5>
+                                                <p>This course does not require any document verification.</p>
+                                              </div>
+                                            </div>
+
+                                          );
+                                        }
+
+                                        // If documents are required, show the full interface
+                                        return (
+                                          <div className="enhanced-documents-panel">
+                                            {/* Enhanced Stats Grid */}
+                                            <div className="stats-grid">
+                                              {(() => {
+                                                // Use backend counts only, remove static document fallback
+                                                const backendCounts = profile?.docCounts || {};
+                                                return (
+                                                  <>
+                                                    <div className="stat-card total-docs">
+                                                      <div className="stat-icon">
+                                                        <i className="fas fa-file-alt"></i>
+                                                      </div>
+                                                      <div className="stat-info">
+                                                        <h4>{backendCounts.totalRequired || 0}</h4>
+                                                        <p>Total Required</p>
+                                                      </div>
+                                                      <div className="stat-trend">
+                                                        <i className="fas fa-list"></i>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="stat-card uploaded-docs">
+                                                      <div className="stat-icon">
+                                                        <i className="fas fa-cloud-upload-alt"></i>
+                                                      </div>
+                                                      <div className="stat-info">
+                                                        <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                        <p>Uploaded</p>
+                                                      </div>
+                                                      <div className="stat-trend">
+                                                        <i className="fas fa-arrow-up"></i>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="stat-card pending-docs">
+                                                      <div className="stat-icon">
+                                                        <i className="fas fa-clock"></i>
+                                                      </div>
+                                                      <div className="stat-info">
+                                                        <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                        <p>Pending Review</p>
+                                                      </div>
+                                                      <div className="stat-trend">
+                                                        <i className="fas fa-exclamation-triangle"></i>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="stat-card verified-docs">
+                                                      <div className="stat-icon">
+                                                        <i className="fas fa-check-circle"></i>
+                                                      </div>
+                                                      <div className="stat-info">
+                                                        <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                        <p>Approved</p>
+                                                      </div>
+                                                      <div className="stat-trend">
+                                                        <i className="fas fa-thumbs-up"></i>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="stat-card rejected-docs">
+                                                      <div className="stat-icon">
+                                                        <i className="fas fa-times-circle"></i>
+                                                      </div>
+                                                      <div className="stat-info">
+                                                        <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                        <p>Rejected</p>
+                                                      </div>
+                                                      <div className="stat-trend">
+                                                        <i className="fas fa-arrow-down"></i>
+                                                      </div>
+                                                    </div>
+                                                  </>
+                                                );
+                                              })()}
+                                            </div>
+
+                                            {/* Enhanced Filter Section */}
+                                            <div className="filter-section-enhanced">
+                                              <div className="filter-tabs-container">
+                                                <h5 className="filter-title">
+                                                  <i className="fas fa-filter me-2"></i>
+                                                  Filter Documents
+                                                </h5>
+                                                <div className="filter-tabs">
+                                                  {(() => {
+                                                    const backendCounts = profile?.docCounts || {};
+                                                    return (
+                                                      <>
+                                                        <button
+                                                          className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                          onClick={() => setStatusFilter('all')}
+                                                        >
+                                                          <i className="fas fa-list-ul"></i>
+                                                          All Documents
+                                                          <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                        </button>
+                                                        <button
+                                                          className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                          onClick={() => setStatusFilter('pending')}
+                                                        >
+                                                          <i className="fas fa-clock"></i>
+                                                          Pending
+                                                          <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                        </button>
+                                                        <button
+                                                          className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                          onClick={() => setStatusFilter('verified')}
+                                                        >
+                                                          <i className="fas fa-check-circle"></i>
+                                                          Verified
+                                                          <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                        </button>
+                                                        <button
+                                                          className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                          onClick={() => setStatusFilter('rejected')}
+                                                        >
+                                                          <i className="fas fa-times-circle"></i>
+                                                          Rejected
+                                                          <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                        </button>
+                                                      </>
+                                                    );
+                                                  })()}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Enhanced Documents Grid */}
+                                            <div className="documents-grid-enhanced">
+                                              {(() => {
+                                                // Filter documents based on status filter
+                                                const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                if (filteredDocs.length === 0) {
+                                                  return (
+                                                    <div className="col-12 text-center py-5">
+                                                      <div className="text-muted">
+                                                        <i className="fas fa-filter fa-3x mb-3"></i>
+                                                        <h5>No Documents Found</h5>
+                                                        <p>No documents match the current filter criteria.</p>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                }
+
+                                                return filteredDocs.map((doc, index) => {
+                                                  // Check if this is a document with upload data or just uploaded file info
+                                                  const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                    ? doc.uploads[doc.uploads.length - 1]
+                                                    : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                  return (
+                                                    <div key={doc._id || index} className="document-card-enhanced">
+                                                      <div className="document-image-container">
+                                                        {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                          <>
+                                                            {(() => {
+                                                              const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                              const fileType = getFileType(fileUrl);
+
+                                                              if (fileType === 'image') {
+                                                                return (
+                                                                  <img
+                                                                    src={fileUrl}
+                                                                    alt="Document Preview"
+                                                                    className="document-image"
+                                                                  />
+                                                                );
+                                                              } else if (fileType === 'pdf') {
+                                                                return (
+                                                                  <div className="document-preview-icon">
+                                                                    <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
+                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                  </div>
+                                                                );
+                                                              } else {
+                                                                return (
+                                                                  <div className="document-preview-icon">
+                                                                    <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
+                                                                      fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                      }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                      {fileType === 'document' ? 'Document' :
+                                                                        fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                    </p>
+                                                                  </div>
+                                                                );
+                                                              }
+                                                            })()}
+                                                            <div className="image-overlay">
+                                                              <button
+                                                                className="preview-btn"
+                                                                onClick={() => openDocumentModal(doc)}
+                                                              >
+                                                                <i className="fas fa-search-plus"></i>
+                                                                Preview
+                                                              </button>
+                                                            </div>
+                                                          </>
+                                                        ) : (
+                                                          <div className="no-document-placeholder">
+                                                            <i className="fas fa-file-upload"></i>
+                                                            <p>No Document</p>
+                                                          </div>
+                                                        )}
+
+                                                        {/* Status Badge Overlay */}
+                                                        <div className="status-badge-overlay">
+                                                          {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                            <span className="status-badge-new pending">
+                                                              <i className="fas fa-clock"></i>
+                                                              Pending
+                                                            </span>
+                                                          )}
+                                                          {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                            <span className="status-badge-new verified">
+                                                              <i className="fas fa-check-circle"></i>
+                                                              Verified
+                                                            </span>
+                                                          )}
+                                                          {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                            <span className="status-badge-new rejected">
+                                                              <i className="fas fa-times-circle"></i>
+                                                              Rejected
+                                                            </span>
+                                                          )}
+                                                          {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                            <span className="status-badge-new not-uploaded">
+                                                              <i className="fas fa-upload"></i>
+                                                              Required
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="document-info-section">
+                                                        <div className="document-header">
+                                                          <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
+                                                          <div className="document-actions">
+                                                            {(!latestUpload) ? (
+                                                              <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                                setSelectedProfile(profile); // Set the current profile
+                                                                openUploadModal(doc);        // Open the upload modal
+                                                              }}>
+                                                                <i className="fas fa-cloud-upload-alt"></i>
+                                                                Upload
+                                                              </button>
+                                                            ) : (
+                                                              <button
+                                                                className="action-btn verify-btn"
+                                                                onClick={() => openDocumentModal(doc)}
+                                                                title="Verify Document"
+                                                              >
+                                                                <i className="fas fa-search"></i>
+                                                                PREVIEW
+                                                              </button>
+                                                            )}
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="document-meta">
+                                                          <div className="meta-item">
+                                                            <i className="fas fa-calendar-alt text-muted"></i>
+                                                            <span className="meta-text">
+                                                              {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                  day: '2-digit',
+                                                                  month: 'short',
+                                                                  year: 'numeric'
+                                                                }) :
+                                                                'Not uploaded'
+                                                              }
+                                                            </span>
+                                                          </div>
+
+                                                          {latestUpload && (
+                                                            <div className="meta-item">
+                                                              <i className="fas fa-clock text-muted"></i>
+                                                              <span className="meta-text">
+                                                                {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                  hour: '2-digit',
+                                                                  minute: '2-digit'
+                                                                })}
+                                                              </span>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                });
+                                              })()}
+                                            </div>
+
+                                            <DocumentModal />
+                                            <UploadModal />
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  )}
+
+                                  {/* Attendance Tab - Table Format Only */}
+                                  {(studentTabsActive[studentIndex] || 0) === 4 && (
+                                    <EnhancedAttendanceTab student={student} studentIndex={studentIndex} />
+                                    // <div className="card">
+                                    //   <div className="card-header">
+                                    //     <div className="d-flex justify-content-between align-items-center">
+                                    //       <h6 className="mb-0">Attendance Records</h6>
+                                    //       <div className="d-flex gap-2">
+                                    //         <span className="badge bg-primary">{student.attendanceStats.totalWorkingDays} Total Days</span>
+                                    //         <span className="badge bg-success">{student.attendanceStats.presentDays} Present</span>
+                                    //         <span className="badge bg-danger">{student.attendanceStats.absentDays} Absent</span>
+                                    //       </div>
+                                    //     </div>
+                                    //   </div>
+                                    //   <div className="card-body">
+                                    //     {/* Attendance Summary Stats */}
+                                    //     <div className="row mb-4 text-center">
+                                    //       <div className="col-md-2">
+                                    //         <div className="card bg-primary text-white">
+                                    //           <div className="card-body p-2">
+                                    //             <div className="h5 mb-0">{student.attendanceStats.totalWorkingDays}</div>
+                                    //             <div className="small">Total Working Days</div>
+                                    //           </div>
+                                    //         </div>
+                                    //       </div>
+                                    //       <div className="col-md-2">
+                                    //         <div className="card bg-success text-white">
+                                    //           <div className="card-body p-2">
+                                    //             <div className="h5 mb-0">{student.attendanceStats.presentDays}</div>
+                                    //             <div className="small">Present Days</div>
+                                    //           </div>
+                                    //         </div>
+                                    //       </div>
+                                    //       <div className="col-md-2">
+                                    //         <div className="card bg-danger text-white">
+                                    //           <div className="card-body p-2">
+                                    //             <div className="h5 mb-0">{student.attendanceStats.absentDays}</div>
+                                    //             <div className="small">Absent Days</div>
+                                    //           </div>
+                                    //         </div>
+                                    //       </div>
+                                    //       <div className="col-md-2">
+                                    //         <div className="card bg-warning text-white">
+                                    //           <div className="card-body p-2">
+                                    //             <div className="h5 mb-0">{student.attendanceStats.lateDays}</div>
+                                    //             <div className="small">Late Days</div>
+                                    //           </div>
+                                    //         </div>
+                                    //       </div>
+                                    //       <div className="col-md-2">
+                                    //         <div className="card bg-info text-white">
+                                    //           <div className="card-body p-2">
+                                    //             <div className="h5 mb-0">{student.attendanceStats.leaveDays}</div>
+                                    //             <div className="small">Leave Days</div>
+                                    //           </div>
+                                    //         </div>
+                                    //       </div>
+                                    //       <div className="col-md-2">
+                                    //         <div className="card bg-secondary text-white">
+                                    //           <div className="card-body p-2">
+                                    //             <div className="h5 mb-0">{student.attendanceStats.halfDays + student.attendanceStats.shortLeaveDays}</div>
+                                    //             <div className="small">Half/Short Days</div>
+                                    //           </div>
+                                    //         </div>
+                                    //       </div>
+                                    //     </div>
+
+                                    //     {/* Attendance Percentage */}
+                                    //     <div className="row mb-4">
+                                    //       <div className="col-md-6">
+                                    //         <div className="d-flex justify-content-between small text-muted mb-1">
+                                    //           <span>Overall Attendance</span>
+                                    //           <span>{student.attendanceStats.attendancePercentage}%</span>
+                                    //         </div>
+                                    //         <div className="progress mb-2" style={{ height: '20px' }}>
+                                    //           <div
+                                    //             className={`progress-bar bg-${getProgressColor(student.attendanceStats.attendancePercentage)}`}
+                                    //             style={{ width: `${student.attendanceStats.attendancePercentage}%` }}
+                                    //           >
+                                    //             {student.attendanceStats.attendancePercentage}%
+                                    //           </div>
+                                    //         </div>
+                                    //       </div>
+                                    //       <div className="col-md-6">
+                                    //         <div className="d-flex justify-content-between small text-muted mb-1">
+                                    //           <span>Punctuality Score</span>
+                                    //           <span>{student.attendanceStats.punctualityScore}%</span>
+                                    //         </div>
+                                    //         <div className="progress mb-2" style={{ height: '20px' }}>
+                                    //           <div
+                                    //             className={`progress-bar bg-${getProgressColor(student.attendanceStats.punctualityScore)}`}
+                                    //             style={{ width: `${student.attendanceStats.punctualityScore}%` }}
+                                    //           >
+                                    //             {student.attendanceStats.punctualityScore}%
+                                    //           </div>
+                                    //         </div>
+                                    //       </div>
+                                    //     </div>
+
+                                    //     {/* Attendance Records Table */}
+                                    //     <h6 className="mb-3">Daily Attendance Records</h6>
+                                    //     <div className="table-responsive">
+                                    //       <table className="table table-striped table-hover">
+                                    //         <thead className="table-dark">
+                                    //           <tr>
+                                    //             <th>Date</th>
+                                    //             <th>Day</th>
+                                    //             <th>Status</th>
+                                    //             <th>Time In</th>
+                                    //             <th>Time Out</th>
+                                    //             <th>Late Minutes</th>
+                                    //             <th>Notes/Reason</th>
+                                    //           </tr>
+                                    //         </thead>
+                                    //         <tbody>
+                                    //           {student.dailyAttendance && student.dailyAttendance.length > 0 ? (
+                                    //             student.dailyAttendance.map((record, idx) => (
+                                    //               <tr key={idx}>
+                                    //                 <td>
+                                    //                   <strong>{new Date(record.date).toLocaleDateString()}</strong>
+                                    //                 </td>
+                                    //                 <td>
+                                    //                   <small className="text-muted">{new Date(record.date).toLocaleDateString('en-US', { weekday: 'short' })}</small>
+                                    //                 </td>
+                                    //                 <td>
+                                    //                   <span className={`badge bg-${getStatusColor(record.status)} px-3 py-2`}>
+                                    //                     <i className={`fas ${record.status === 'present' ? 'fa-check' :
+                                    //                       record.status === 'late' ? 'fa-clock' :
+                                    //                         record.status === 'halfDay' ? 'fa-clock-o' :
+                                    //                           record.status === 'shortLeave' ? 'fa-sign-out-alt' :
+                                    //                             record.status === 'leave' ? 'fa-calendar' : 'fa-times'} me-1`}></i>
+                                    //                     {record.status?.toUpperCase() || 'NOT MARKED'}
+                                    //                   </span>
+                                    //                 </td>
+                                    //                 <td>
+                                    //                   <span className="fw-medium">{record.timeIn || '-'}</span>
+                                    //                 </td>
+                                    //                 <td>
+                                    //                   <span className="fw-medium">{record.timeOut || '-'}</span>
+                                    //                 </td>
+                                    //                 <td>
+                                    //                   {record.lateMinutes > 0 ? (
+                                    //                     <span className="badge bg-warning">{record.lateMinutes} min</span>
+                                    //                   ) : (
+                                    //                     <span className="text-muted">0 min</span>
+                                    //                   )}
+                                    //                 </td>
+                                    //                 <td>
+                                    //                   <span className="text-muted small">{record.notes || record.reason || '-'}</span>
+                                    //                 </td>
+                                    //               </tr>
+                                    //             ))
+                                    //           ) : (
+                                    //             <tr>
+                                    //               <td colSpan="7" className="text-center py-4">
+                                    //                 <i className="fas fa-calendar-times fs-2 text-muted mb-2"></i>
+                                    //                 <p className="text-muted mb-0">No attendance records found</p>
+                                    //               </td>
+                                    //             </tr>
+                                    //           )}
+                                    //         </tbody>
+                                    //       </table>
+                                    //     </div>
+
+                                    //     {/* Leave Records Table */}
+                                    //     {student.leaves && student.leaves.length > 0 && (
+                                    //       <>
+                                    //         <h6 className="mb-3 mt-4">Leave Applications</h6>
+                                    //         <div className="table-responsive">
+                                    //           <table className="table table-sm">
+                                    //             <thead className="table-light">
+                                    //               <tr>
+                                    //                 <th>Date</th>
+                                    //                 <th>Type</th>
+                                    //                 <th>Duration</th>
+                                    //                 <th>Reason</th>
+                                    //                 <th>Status</th>
+                                    //                 <th>Approved By</th>
+                                    //               </tr>
+                                    //             </thead>
+                                    //             <tbody>
+                                    //               {student.leaves.map((leave, idx) => (
+                                    //                 <tr key={idx}>
+                                    //                   <td>{new Date(leave.date).toLocaleDateString()}</td>
+                                    //                   <td>
+                                    //                     <span className="badge bg-secondary">{leave.type}</span>
+                                    //                   </td>
+                                    //                   <td>
+                                    //                     <span className={`badge ${leave.leaveType === 'full' ? 'bg-danger' :
+                                    //                       leave.leaveType === 'half' ? 'bg-warning' : 'bg-info'}`}>
+                                    //                       {leave.leaveType === 'full' ? '1 Day' :
+                                    //                         leave.leaveType === 'half' ? '0.5 Day' :
+                                    //                           `${leave.duration || 0} Hours`}
+                                    //                     </span>
+                                    //                   </td>
+                                    //                   <td>{leave.reason}</td>
+                                    //                   <td>
+                                    //                     <span className={`badge bg-${leave.status === 'approved' ? 'success' :
+                                    //                       leave.status === 'pending' ? 'warning' : 'danger'}`}>
+                                    //                       {leave.status}
+                                    //                     </span>
+                                    //                   </td>
+                                    //                   <td>{leave.approvedBy || '-'}</td>
+                                    //                 </tr>
+                                    //               ))}
+                                    //             </tbody>
+                                    //           </table>
+                                    //         </div>
+                                    //       </>
+                                    //     )}
+                                    //   </div>
+                                    // </div>
                                   )}
                                 </div>
                               </div>
@@ -3416,14 +4810,14 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
               </div>
             </section>
           </div>
-
+          <AttendanceManagementModal />
           {/* Empty State */}
           {filteredStudents.length === 0 && (
             <div className="text-center py-5">
               <i className="bi bi-person fs-1 text-muted"></i>
               <h5 className="text-muted mt-3">No students found</h5>
               <p className="text-muted">
-                {activeTab === 'all' 
+                {activeTab === 'all'
                   ? 'Try adjusting your search or filter criteria'
                   : `No students in the ${mainTabs.find(t => t.key === activeTab)?.label || ''}`
                 }
@@ -3432,7 +4826,8 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
           )}
         </div>
       </div>
-
+      <AttendanceManagementModal  />
+      
       {/* Enhanced CSS for styling */}
       <style jsx>{`
         .site-header--sticky--register {
@@ -3863,11 +5258,332 @@ const Student = ({ selectedBatch = null, onBackToBatches = null, selectedCourse 
             color: #a0aec0 !important;
           }
         }
-      `}
-    </style>
-    </div>
+
+ .monthly-attendance-summary .table th,
+  .yearly-attendance-summary .table th {
+    background: linear-gradient(135deg, #343a40 0%, #495057 100%);
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    border: none;
+    padding: 0.75rem;
+  }
+  
+  .monthly-attendance-summary .table td,
+  .yearly-attendance-summary .table td {
+    border: none;
+    padding: 0.75rem;
+    border-bottom: 1px solid #f1f3f4;
+    vertical-align: middle;
+  }
+  
+  .monthly-attendance-summary .table tbody tr:hover,
+  .yearly-attendance-summary .table tbody tr:hover {
+    background-color: #f8f9ff;
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+  }
+  
+  /* Enhanced Progress Bars */
+  .progress {
+    border-radius: 10px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+    background-color: #e9ecef;
+  }
+  
+  .progress-bar {
+    border-radius: 10px;
+    transition: width 0.6s ease;
+    font-weight: 600;
+    font-size: 0.75rem;
+  }
+  
+  .progress-bar.bg-success {
+    background: linear-gradient(45deg, #198754, #20c997) !important;
+  }
+  
+  .progress-bar.bg-warning {
+    background: linear-gradient(45deg, #ffc107, #ffca2c) !important;
+  }
+  
+  .progress-bar.bg-danger {
+    background: linear-gradient(45deg, #dc3545, #e85d75) !important;
+  }
+  
+  .progress-bar.bg-info {
+    background: linear-gradient(45deg, #0dcaf0, #31d2f2) !important;
+  }
+  
+  /* Enhanced View Buttons */
+  .btn-group .btn {
+    border-radius: 0;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-group .btn:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+  }
+  
+  .btn-group .btn:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+  }
+
+  
+  /* Enhanced Cards */
+  .yearly-attendance-summary .card {
+    border: none;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+  }
+  
+  .yearly-attendance-summary .card:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+  }
+  
+  .yearly-attendance-summary .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 12px 12px 0 0;
+    padding: 1rem 1.25rem;
+  }
+  
+  .yearly-attendance-summary .card-body {
+    padding: 1.25rem;
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .monthly-attendance-summary .table,
+    .yearly-attendance-summary .table {
+      font-size: 0.8rem;
+    }
     
+    .monthly-attendance-summary .table th,
+    .yearly-attendance-summary .table th,
+    .monthly-attendance-summary .table td,
+    .yearly-attendance-summary .table td {
+      padding: 0.5rem;
+    }
+    
+    .form-control-sm {
+      min-width: 120px !important;
+    }
+  }
+  
+  /* Enhanced animations */
+
+  
+  .monthly-attendance-summary,
+  .yearly-attendance-summary {
+    animation: fadeInUp 0.5s ease-out;
+  }
+
+
+  .attendance-management-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.attendance-management-modal {
+  background: white;
+  border-radius: 20px;
+  width: 95%;
+  max-width: 1400px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+  animation: slideInUp 0.4s ease-out;
+}
+
+.modal-header-enhanced {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 2px solid #dee2e6;
+  padding: 1.5rem 2rem;
+  border-radius: 20px 20px 0 0;
+}
+
+.modal-body-enhanced {
+  padding: 2rem;
+  overflow-y: auto;
+  max-height: calc(90vh - 120px);
+}
+
+.control-panel-enhanced {
+  background: linear-gradient(135deg, #f8f9ff 0%, #f0f7ff 100%);
+  border: 1px solid #e3f2fd;
+  border-radius: 15px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.view-selector .btn-group .btn {
+  border-radius: 0;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.view-selector .btn-group .btn:first-child {
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.view-selector .btn-group .btn:last-child {
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.statistics-summary .stat-card {
+  background: linear-gradient(135deg, var(--bs-primary) 0%, var(--bs-primary-dark, #0056b3) 100%);
+  border-radius: 15px;
+  padding: 1.5rem 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.statistics-summary .stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.attendance-content .table {
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.attendance-content .table thead th {
+  background: linear-gradient(135deg, #343a40 0%, #495057 100%);
+  color: white;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  border: none;
+  padding: 1rem;
+}
+
+.attendance-content .table tbody tr {
+  transition: all 0.3s ease;
+}
+
+.attendance-content .table tbody tr:hover {
+  background-color: #f8f9ff;
+  transform: scale(1.01);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.performance-metrics {
+  text-align: center;
+}
+
+.performance-metrics .badge {
+  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+}
+
+.performance-metrics small {
+  font-weight: 500;
+}
+
+.action-buttons .btn {
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.action-buttons .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+
+
+@media (max-width: 768px) {
+  .attendance-management-modal {
+    width: 98%;
+    margin: 10px;
+  }
+  
+  .modal-body-enhanced {
+    padding: 1rem;
+  }
+  
+  .control-panel-enhanced {
+    padding: 1rem;
+  }
+  
+  .stat-number {
+    font-size: 1.8rem;
+  }
+  
+  .statistics-summary .col-md-2 {
+    margin-bottom: 1rem;
+  }
+  
+  .attendance-content .table {
+    font-size: 0.8rem;
+  }
+  
+  .view-selector .btn-group {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .view-selector .btn-group .btn {
+    border-radius: 8px !important;
+    margin-bottom: 0.5rem;
+  }
+  
+  .action-buttons {
+    margin-top: 1rem;
+  }
+  
+  .action-buttons .d-flex {
+    flex-direction: column;
+  }
+  
+  .action-buttons .btn {
+    margin-bottom: 0.5rem;
+  }
+}
+      `}
+
+      </style>
+    </div>
+
   );
 };
-  
+
 export default Student;
