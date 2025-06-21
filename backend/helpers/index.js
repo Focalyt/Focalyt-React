@@ -532,3 +532,31 @@ module.exports.sendSms = async (body) => {
     throw err
   }
 }
+
+module.exports.getAllTeamMembers = async (userId, allUserIds = []) => {
+  try {
+    // Find the user by userId and populate their 'my_team' field to get their team members
+    const user = await User.findById(userId).populate('my_team');
+    
+    if (!user) {
+      console.log(`⚠️ User with ID ${userId} not found.`);
+      return allUserIds;
+    }
+
+    // Add the current user's userId to the array
+    allUserIds.push(user._id);
+
+    console.log(`Added user ${user.name} (ID: ${user._id})`);
+
+    // Recursively add all team members to the array
+    for (const teamMember of user.my_team) {
+      await module.exports.getAllTeamMembers(teamMember._id, allUserIds); // Recurse for each team member
+    }
+
+    return allUserIds;
+  } catch (error) {
+    console.error("❌ Error in fetching team members:", error);
+    return allUserIds;
+  }
+}
+

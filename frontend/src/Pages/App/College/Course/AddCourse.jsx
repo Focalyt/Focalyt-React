@@ -61,56 +61,54 @@ const AddCourse = () => {
   const [projects, setProjects] = useState([]);
 
   // Basic form state
-  const [formData, setFormData] = useState({
-    sectors: [],
-    courseLevel: '',
-    courseFeeType: '',
-    projectName: '',
-    typeOfProject: '',
-    courseType: '',
-    name: '',
-    duration: '',
-    certifyingAgency: '',
-    certifyingAgencyWebsite: '',
-    qualification: '',
-    age: '',
-    experience: '',
-    trainingMode: '',
-    onlineTrainingTiming: '',
-    offlineTrainingTiming: '',
-    center: [],
-    address: '',
-    city: '',
-    state: '',
-    appLink: '',
-    addressInput: '',
-    ojt: '',
-    registrationCharges: '',
-    courseFee: '',
-    cutPrice: '',
-    examFee: '',
-    otherFee: '',
-    emiOptionAvailable: '',
-    maxEMITenure: '',
-    stipendDuringTraining: '',
-    lastDateForApply: '',
-    youtubeURL: '',
-    courseFeatures: '',
-    importantTerms: '',
-    isContact: false,
-    counslername: '',
-    counslerphonenumber: '',
-    counslerwhatsappnumber: '',
-    counsleremail: '',
-    brochure: '',
-    thumbnail: '',
-    photos: [],
-    videos: [],
-    testimonialvideos: [],
-  });
+  const [formData, setFormData] = useState(
+    {
+      sector: [],
+      courseLevel: '',
+      courseFeeType: '',
+      projectName: '',
+      vertical: '',
+      project: '',
+      typeOfProject: '',
+      courseType: '',
+      name: '',
+      duration: '',
+      certifyingAgency: '',
+      certifyingAgencyWebsite: '',
+      qualification: '',
+      age: '',
+      experience: '',
+      trainingMode: '',
+      onlineTrainingTiming: '',
+      offlineTrainingTiming: '',
+      trainingCenter: [],
+      address: '',
+      city: '',
+      state: '',
+      appLink: '',
+      addressInput: '',
+      ojt: '',
+      registrationCharges: '',
+      courseFee: '',
+      cutPrice: '',
+      examFee: '',
+      otherFee: '',
+      emiOptionAvailable: '',
+      maxEMITenure: '',
+      stipendDuringTraining: '',
+      lastDateForApply: '',
+      youtubeURL: '',
+      courseFeatures: '',
+      importantTerms: '',
+      isContact: false,
+      counslername: '',
+      counslerphonenumber: '',
+      counslerwhatsappnumber: '',
+      counsleremail: '',
+    });
 
   // Document requirements
-  const [docsRequired, setDocsRequired] = useState([]);
+  const [docsRequired, setDocsRequired] = useState([{name: '', mandatory: false}]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -321,9 +319,7 @@ const AddCourse = () => {
     }
 
     // Handle specific field changes that affect UI
-    if (name === 'courseFeeType') {
-      setShowProjectFields(value === 'Free');
-    } else if (name === 'trainingMode') {
+   if (name === 'trainingMode') {
       handleTrainingModeChange(value);
     } else if (name === 'address') {
       handleAddressChange(value);
@@ -415,13 +411,17 @@ const AddCourse = () => {
 
   // Add a new document field
   const addDocumentField = () => {
-    setDocsRequired([...docsRequired, { name: '' }]);
+    setDocsRequired([...docsRequired, { name: '', mandatory: false }]);
   };
 
   // Update document field value
-  const updateDocumentField = (index, value) => {
+  const updateDocumentField = (index, value, field) => {
     const updatedDocs = [...docsRequired];
-    updatedDocs[index].name = value;
+    if(field === 'name'){ 
+      updatedDocs[index].name = value;
+    }else if(field === 'mandatory'){
+      updatedDocs[index].mandatory = value === 'true' ? true : false;
+    }
     setDocsRequired(updatedDocs);
   };
 
@@ -442,7 +442,7 @@ const AddCourse = () => {
     const errors = {};
     const requiredFields = [
       'sectors', 'courseLevel', 'name', 'duration', 'qualification',
-      'trainingMode', 'address', 'ojt', 'emiOptionAvailable'
+      'trainingMode', 'address', 'ojt', 'emiOptionAvailable','vertical','project'
     ];
 
     requiredFields.forEach(field => {
@@ -459,7 +459,8 @@ const AddCourse = () => {
   // Reset form to initial state
   const resetForm = () => {
     // Reset all form fields
-    setFormData({
+    setFormData(
+      {
       sector: [],
       courseLevel: '',
       courseFeeType: '',
@@ -1094,6 +1095,7 @@ const AddCourse = () => {
                         {formErrors.courseLevel && <div className="invalid-feedback">{formErrors.courseLevel}</div>}
                       </div>
 
+
                       {/* Course Fee Type */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
                         <label htmlFor="courseFeeType">Course Fee Type</label>
@@ -1110,11 +1112,13 @@ const AddCourse = () => {
                         </select>
                       </div>
 
+                      
+
                       {/* Vertical */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
                         <label htmlFor="vertical">Vertical</label>
                         <select
-                          className="form-control"
+                          className={`form-control ${formErrors.vertical ? 'is-invalid' : ''}`}
                           name="vertical"
                           id="vertical"
                           value={formData.vertical}
@@ -1125,13 +1129,14 @@ const AddCourse = () => {
                             <option key={vertical._id || index} value={vertical._id}>{vertical.name}</option>
                           ))}
                         </select>
+                        {formErrors.vertical && <div className="invalid-feedback">{formErrors.vertical}</div>}
                       </div>
 
                       {/* Project */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
                         <label htmlFor="project">Project</label>
                         <select
-                          className="form-control"
+                          className={`form-control ${formErrors.project ? 'is-invalid' : ''}`}
                           name="project"
                           id="project"
                           value={formData.project}
@@ -1142,6 +1147,7 @@ const AddCourse = () => {
                             <option key={project._id || index} value={project._id}>{project.name}</option>
                           ))}
                         </select>
+                        {formErrors.project && <div className="invalid-feedback">{formErrors.project}</div>}
                       </div>
 
                       {/* Course Type */}
@@ -1582,8 +1588,16 @@ const AddCourse = () => {
                               type="text"
                               className="form-control docsName"
                               value={doc.name}
-                              onChange={(e) => updateDocumentField(index, e.target.value)}
+                              onChange={(e) => updateDocumentField(index, e.target.value,'name')}
                             />
+                          </div>
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                            <label>Mandatory</label>
+                            <select name="mandatory-doc" className="form-control" value={doc.mandatory} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
+                              <option value="">Select Mandatory</option>
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
                           </div>
                         </div>
                       ))}

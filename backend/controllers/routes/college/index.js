@@ -2,7 +2,7 @@ const express = require("express");
 const uuid = require('uuid/v1');
 const cron = require('node-cron');
 
-const { isCollege, auth1, authenti } = require("../../../helpers");
+const { isCollege, auth1, authenti, getAllTeamMembers } = require("../../../helpers");
 const { extraEdgeAuthToken, extraEdgeUrl, env, baseUrl } = require("../../../config");
 const axios = require("axios");
 const mongoose = require('mongoose');
@@ -34,7 +34,7 @@ const coursesRoutes = require("./courses");
 const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
-router.use("/digitalLead",  digitalLeadRoutes);
+router.use("/digitalLead", digitalLeadRoutes);
 router.use("/leadAssignmentRule", isCollege, leadAssignmentRuleRoutes);
 router.use("/users", userRoutes);
 router.use("/batches", isCollege, batchRoutes);
@@ -318,6 +318,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 	try {
 		const user = req.user;
+		const teamMembers = await getAllTeamMembers(user._id);
+		console.log('====================>!teamMembers ', teamMembers)
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
@@ -326,39 +328,63 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;
 
+		let appliedCourses = [];
 
-		const appliedCourses = await AppliedCourses.find({
-			kycStage: { $nin: [true] },
-			kyc: { $nin: [true] },
-			admissionDone: { $nin: [true] }
-		})
-			.populate({
-				path: '_course',
-				select: 'name description docsRequired college', // Select the necessary fields
-				populate: {
-					path: 'sectors',
-					select: 'name'
-				}
-			})
-			.populate('_leadStatus')
-			.populate('_center')
-			.populate('registeredBy')
-			.populate({
-				path: '_candidate',
-				populate: [
-					{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+		for (const member of teamMembers) {
+			const response = await AppliedCourses.find({
+				kycStage: { $nin: [true] },
+				kyc: { $nin: [true] },
+				admissionDone: { $nin: [true] },
+				$or: [
+					// registeredBy field से match (single member के लिए)
+					{ registeredBy: member }, // $in हटाया गया क्योंकि member single value है
+
+					// leadAssignment के last element की _id से match
+					{
+						$expr: {
+							$eq: [
+								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								member
+							]
+						}
+					}
 				]
 			})
-			.populate({
-				path: 'logs',
-				populate: {
-					path: 'user',
-					select: 'name'
-				}
-			})
-			.sort({ createdAt: -1 })
-			.skip(skip)
-			.limit(limit);
+				.populate({
+					path: '_course',
+					select: 'name description docsRequired college',
+					populate: {
+						path: 'sectors',
+						select: 'name'
+					}
+				})
+				.populate('_leadStatus')
+				.populate('_center')
+				.populate('registeredBy')
+				.populate({
+					path: '_candidate',
+					populate: [
+						{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+					]
+				})
+				.populate({
+					path: 'logs',
+					populate: {
+						path: 'user',
+						select: 'name'
+					}
+				})
+				.sort({ createdAt: -1 })
+				.skip(skip)
+				.limit(limit);
+
+			appliedCourses.push(...response);
+		}
+
+		console.log('====================>!appliedCourses ', appliedCourses)
+
+
+
 
 
 		const filteredAppliedCourses = appliedCourses.filter(doc => {
@@ -399,6 +425,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					return {
 						...uploadedDoc,
 						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						mandatory: reqDoc.mandatory,
 						_id: reqDoc._id
 					};
 				} else {
@@ -406,6 +433,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					return {
 						docsId: reqDoc._id,
 						Name: reqDoc.Name,
+						mandatory: reqDoc.mandatory,
 						status: "Not Uploaded",
 						fileUrl: null,
 						reason: null,
@@ -432,6 +460,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					return {
 						_id: docObj._id,
 						Name: docObj.Name || 'Document',
+						mandatory: docObj.mandatory,
 						description: docObj.description || '',
 						uploads: matchingUploads || []
 					};
@@ -1964,7 +1993,7 @@ router.post("/courses/add", [isCollege], async (req, res) => {
 
 router.get('/getVerticals', [isCollege], async (req, res) => {
 
-	try {		
+	try {
 		let collegeId = req.user.college._id;
 
 		if (!collegeId || !mongoose.Types.ObjectId.isValid(collegeId)) {
@@ -2466,13 +2495,14 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 		console.log('collegeId', collegeId)
 
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
-		if (typeof projectId !== 'string') { projectId = new mongoose.Types.ObjectId(projectId); }
 
 
 		if (projectId) {
 			if (!mongoose.Types.ObjectId.isValid(projectId)) {
 				return res.status(400).json({ success: false, message: 'Invalid Project ID' });
 			}
+			if (typeof projectId !== 'string') { projectId = new mongoose.Types.ObjectId(projectId); }
+
 			const projectDetails = await Project.findById(projectId);
 			console.log('projectDetails', projectDetails)
 			if (!projectDetails) {
@@ -2620,13 +2650,20 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		if (actionParts.length === 0) {
 			actionParts.push('No changes made to status or followup');
 		}
-
+		console.log(userId, 'userId')
 		// Add a log entry for the update
-		doc.logs.push({
+		// Add a log entry for the update with proper validation
+		const newLogEntry = {
 			user: userId,
 			action: actionParts.join('; '), // Combine all actions in one log message
-			remarks: remarks || '' // Optional remarks in the log
-		});
+			remarks: remarks || '', // Optional remarks in the log
+			timestamp: new Date() // Add timestamp if your schema supports it
+		};
+
+		// Validate the log entry before pushing
+		console.log('New log entry:', newLogEntry);
+
+		doc.logs.push(newLogEntry);
 
 		// Save the updated document
 		await doc.save();
@@ -3402,15 +3439,102 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 			return res.status(404).json({ success: false, message: "Profile not found" });
 		}
 
-		const requiredCount = profile._course?.docsRequired?.length || 0;
-		let verifiedCount = 0;
+		const docId = profile.uploadedDocs.find(doc => doc._id.toString() === validUploadId.toString()).docsId;
+
+		console.log(docId,'docId');
+
+		//merge docsRequired and uploadedDocs
+
+		const requiredDocs = profile._course?.docsRequired || [];
+		const uploadedDocs = profile.uploadedDocs || [];
+
+		// Map uploaded docs by docsId for quick lookup
+		const uploadedDocsMap = {};
+		uploadedDocs.forEach(d => {
+			if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+		});
+
+		// Prepare combined docs array
+		const allDocs = requiredDocs.map(reqDoc => {
+			const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+			if (uploadedDoc) {
+				// Agar uploaded hai to uploadedDoc details bhejo
+				return {
+					...uploadedDoc,
+					Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+					mandatory: reqDoc.mandatory,
+					_id: reqDoc._id
+				};
+			} else {
+				// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+				return {
+					docsId: reqDoc._id,
+					Name: reqDoc.Name,
+					mandatory: reqDoc.mandatory,
+					status: "Not Uploaded",
+					fileUrl: null,
+					reason: null,
+					verifiedBy: null,
+					verifiedDate: null,
+					uploadedAt: null
+				};
+			}
+		});
+
+		if (requiredDocs) {
+			docsRequired = requiredDocs
+
+			// Create a merged array with both required docs and uploaded docs info
+			combinedDocs = docsRequired.map(reqDoc => {
+				// Convert Mongoose document to plain object
+				const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+				// Find matching uploaded docs for this required doc
+				const matchingUploads = uploadedDocs.filter(
+					uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+				);
+
+				return {
+					_id: docObj._id,
+					Name: docObj.Name || 'Document',
+					mandatory: docObj.mandatory,
+					description: docObj.description || '',
+					uploads: matchingUploads || []
+				};
+			});
+
+
+		} else {
+			console.log("Course not found or no docs required");
+		};
+
+		console.log(uploadId, 'uploadId');
+
+		console.log(combinedDocs, 'combinedDocs');
+
+
+
+		const isCurrentDoccumentMandatory = !!combinedDocs?.find(doc => doc._id.toString() === docId.toString() && doc.mandatory === true);
+
+		console.log(isCurrentDoccumentMandatory, 'isCurrentDoccumentMandatory');
+
+		const requiredCount = combinedDocs?.filter(doc => doc.mandatory === true).length || 0;
+		let verifiedCount = isCurrentDoccumentMandatory ? 1 : 0;
+
+		console.log(verifiedCount, 'verifiedCount before');
+
+
 
 		// Count already verified docs (excluding the current one)
-		for (const doc of profile.uploadedDocs || []) {
-			if (doc._id.toString() !== validUploadId.toString() && doc.status === 'Verified') {
+		for (const doc of combinedDocs || []) {
+
+			console.log(doc, 'doc');
+			if (doc._id.toString() !== docId.toString() && doc.uploads?.[doc.uploads.length - 1]?.status === 'Verified' && doc.mandatory === true) {
 				verifiedCount++;
 			}
 		}
+
+		console.log(verifiedCount, 'verifiedCount', requiredCount, 'requiredCount');
 
 		// Find and update the current doc
 		for (const doc of profile.uploadedDocs || []) {
@@ -3427,7 +3551,7 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 		}
 
 		// If this is the last required doc being verified, set KYC true
-		if (status === 'Verified' && verifiedCount === requiredCount - 1) {
+		if (status === 'Verified' && verifiedCount === requiredCount) {
 			profile.kyc = true;
 		}
 
@@ -3681,56 +3805,56 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 
 //refer leads
 router.route("/refer-leads")
-    .get(isCollege, async (req, res) => {
-        try {
-            const user = req.user;
-            const college = await College.findOne({
-                '_concernPerson._id': user._id
-            });
-            // ... existing code ...
-        } catch (err) {
-            // ... existing code ...
-        }
-    })
-    .post(isCollege, async (req, res) => {
-        try {
-            let { appliedCourseId, counselorId } = req.body;
-            if (!appliedCourseId || !counselorId) {
-                return res.status(400).json({ success: false, message: 'appliedCourseId and counselorId are required.' });
-            }
-            // Validate IDs
-            if (!mongoose.Types.ObjectId.isValid(appliedCourseId) || !mongoose.Types.ObjectId.isValid(counselorId)) {
-                return res.status(400).json({ success: false, message: 'Invalid appliedCourseId or counselorId.' });
-            }
-			if (typeof appliedCourseId == 'string' ) {
+	.get(isCollege, async (req, res) => {
+		try {
+			const user = req.user;
+			const college = await College.findOne({
+				'_concernPerson._id': user._id
+			});
+			// ... existing code ...
+		} catch (err) {
+			// ... existing code ...
+		}
+	})
+	.post(isCollege, async (req, res) => {
+		try {
+			let { appliedCourseId, counselorId } = req.body;
+			if (!appliedCourseId || !counselorId) {
+				return res.status(400).json({ success: false, message: 'appliedCourseId and counselorId are required.' });
+			}
+			// Validate IDs
+			if (!mongoose.Types.ObjectId.isValid(appliedCourseId) || !mongoose.Types.ObjectId.isValid(counselorId)) {
+				return res.status(400).json({ success: false, message: 'Invalid appliedCourseId or counselorId.' });
+			}
+			if (typeof appliedCourseId == 'string') {
 				appliedCourseId = mongoose.Types.ObjectId(appliedCourseId);
 			}
-			if (typeof counselorId == 'string' ) {
+			if (typeof counselorId == 'string') {
 				counselorId = mongoose.Types.ObjectId(counselorId);
 			}
-            // Find the applied course
-            const appliedCourse = await AppliedCourses.findById(appliedCourseId);
+			// Find the applied course
+			const appliedCourse = await AppliedCourses.findById(appliedCourseId);
 			const oldCounselor = await User.findById(appliedCourse.assignedCounselor);
 			const newCounselor = await User.findById(counselorId);
-            if (!appliedCourse) {
-                return res.status(404).json({ success: false, message: 'Applied course not found.' });
-            }
-            // Update the assigned counselor
-            appliedCourse.assignedCounselor = counselorId;
-            // Add a log entry
-            appliedCourse.logs = appliedCourse.logs || [];
-            appliedCourse.logs.push({
-                user: req.user._id,
-                timestamp: new Date(),
-                action: 'Lead referred to another counselor',
-                remarks: `Lead referred to counselorId: ${newCounselor.name} from ${oldCounselor.name}`
-            });
-            await appliedCourse.save();
-            return res.json({ success: true, message: 'Lead referred successfully.' });
-        } catch (err) {
-            console.error('Error referring lead:', err);
-            return res.status(500).json({ success: false, message: 'Server error', error: err.message });
-        }
-    });
+			if (!appliedCourse) {
+				return res.status(404).json({ success: false, message: 'Applied course not found.' });
+			}
+			// Update the assigned counselor
+			appliedCourse.assignedCounselor = counselorId;
+			// Add a log entry
+			appliedCourse.logs = appliedCourse.logs || [];
+			appliedCourse.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: 'Lead referred to another counselor',
+				remarks: `Lead referred to counselorId: ${newCounselor.name} from ${oldCounselor.name}`
+			});
+			await appliedCourse.save();
+			return res.json({ success: true, message: 'Lead referred successfully.' });
+		} catch (err) {
+			console.error('Error referring lead:', err);
+			return res.status(500).json({ success: false, message: 'Server error', error: err.message });
+		}
+	});
 
 module.exports = router;

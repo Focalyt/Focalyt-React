@@ -13,8 +13,10 @@ const apiKey = process.env.MIPIE_RAZORPAY_KEY;
 const razorSecretKey = process.env.MIPIE_RAZORPAY_SECRET;
 
 const {
-	coinsOffers, PaymentDetails, Vacancy, Courses, Candidate, Company, AppliedJobs, AppliedCourses, User, CandidateCashBack, FAQ
+	coinsOffers, PaymentDetails, Vacancy, Courses, Company, AppliedJobs, AppliedCourses, User, CandidateCashBack, FAQ
 } = require("../models");
+
+const Candidate = require('../models/candidateProfile');
 
 const { sendNotification } = require('./services/notification');
 const { CandidateValidators } = require('../../helpers/validators')

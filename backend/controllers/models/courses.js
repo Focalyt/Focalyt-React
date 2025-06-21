@@ -66,6 +66,7 @@ const courseSchema = new Schema({
   docsRequired: [
     {
       Name: { type: String },
+      mandatory: { type: Boolean, default: false },
       status: { type: Boolean, default: true }
     }
   ],

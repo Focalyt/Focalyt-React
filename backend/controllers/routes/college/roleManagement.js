@@ -144,69 +144,69 @@ router.delete('/delete-role/:id', logUserActivity((req) => `Deleted role id: ${r
 	}
 });
 
-router.post("/users/add-concern-person", logUserActivity((req) => `Add user: ${req.body.name}`),
-	async (req, res) => {
-		try {
-			const {	name,email,	mobile,designation,permissions } = req.body;
-			const user = req.user
+// router.post("/users/add-concern-person", logUserActivity((req) => `Add user: ${req.body.name}`),
+// 	async (req, res) => {
+// 		try {
+// 			const {	name,email,	mobile,designation,permissions } = req.body;
+// 			const user = req.user
 
-			const college =  await College.findOne({'_concernPerson._id':user._id})
+// 			const college =  await College.findOne({'_concernPerson._id':user._id})
 
 
-			const collegeId = college._id
+// 			const collegeId = college._id
 
-			console.log('college',college)
-			console.log('collegeId',collegeId)
+// 			console.log('college',college)
+// 			console.log('collegeId',collegeId)
 
-			// 1. Validation
-			if (!collegeId || !email || !mobile || !name || !designation || !permissions) {
-				return res.status(400).json({ status: false, error: "All fields are required" });
-			}
-			// 2. Check existing user
-			const existingUser = await User.findOne({
-				$or: [{ email }, { mobile }],
-				isDeleted: false,
-				role: 2
-			});
+// 			// 1. Validation
+// 			if (!collegeId || !email || !mobile || !name || !designation || !permissions) {
+// 				return res.status(400).json({ status: false, error: "All fields are required" });
+// 			}
+// 			// 2. Check existing user
+// 			const existingUser = await User.findOne({
+// 				$or: [{ email }, { mobile }],
+// 				isDeleted: false,
+// 				role: 2
+// 			});
 
-			if (existingUser) {
-				return res.status(400).json({ status: false, error: "Email or mobile already exists" });
-			}
+// 			if (existingUser) {
+// 				return res.status(400).json({ status: false, error: "Email or mobile already exists" });
+// 			}
 
-			// 3. Create new user
-			const newUser = await User.create({
-				name,
-				collegeId,
-				email,
-				mobile,
-				role: 2,
-				password: 'Focalyt@123',
-				designation,
-				permissions,
-				userAddedby:user._id
-			});
+// 			// 3. Create new user
+// 			const newUser = await User.create({
+// 				name,
+// 				collegeId,
+// 				email,
+// 				mobile,
+// 				role: 2,
+// 				password: 'Focalyt@123',
+// 				designation,
+// 				permissions,
+// 				userAddedby:user._id
+// 			});
 
-			if (!newUser) {
-				return res.status(500).json({ status: false, error: "User creation failed" });
-			}
+// 			if (!newUser) {
+// 				return res.status(500).json({ status: false, error: "User creation failed" });
+// 			}
 
-			// 4. Add to _concernPerson array
-			const updatedCollege = await College.findByIdAndUpdate(
-				collegeId,
-				{ $addToSet: { _concernPerson: { _id: newUser._id } } },
-				{ new: true }
-			);
+// 			// 4. Add to _concernPerson array
+// 			const updatedCollege = await College.findByIdAndUpdate(
+// 				collegeId,
+// 				{ $addToSet: { _concernPerson: { _id: newUser._id } } },
+// 				{ new: true }
+// 			);
 
-			if (!updatedCollege) {
-				return res.status(500).json({ status: false, error: "Failed to update college" });
-			}
+// 			if (!updatedCollege) {
+// 				return res.status(500).json({ status: false, error: "Failed to update college" });
+// 			}
 
-			return res.status(200).json({ status: true, message: "Concerned person added successfully", userId: newUser._id });
-		} catch (err) {
-			console.error("Add concern person error:", err.message);
-			return res.status(500).json({ status: false, error: err.message });
-		}
-	});
+// 			return res.status(200).json({ status: true, message: "Concerned person added successfully", userId: newUser._id });
+// 		} catch (err) {
+// 			console.error("Add concern person error:", err.message);
+// 			return res.status(500).json({ status: false, error: err.message });
+// 		}
+// 	});
 
 router.put("/users/:id", logUserActivity((req) => `Edit user: ${req.body.name}`), async (req, res) => {
 	try {
