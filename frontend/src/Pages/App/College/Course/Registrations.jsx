@@ -1852,6 +1852,10 @@ const CRMDashboard = () => {
 
     // Close all panels first
     setShowEditPanel(false);
+    setShowRefferPanel(false);
+    setShowPopup(null);
+    setSelectedConcernPerson(null);
+
     setShowFollowupPanel(false);
     setShowWhatsappPanel(false);
 
@@ -1881,6 +1885,10 @@ const CRMDashboard = () => {
   const closeEditPanel = () => {
     setShowEditPanel(false);
     setShowFollowupPanel(false);
+    setShowRefferPanel(false);
+    setShowWhatsappPanel(false);
+    setShowPopup(null);
+    setSelectedConcernPerson(null);
     if (!isMobile) {
       setMainContentClass('col-12');
     }
@@ -1902,11 +1910,11 @@ const CRMDashboard = () => {
     setShowFollowupPanel(false);
     setShowWhatsappPanel(false);
     setShowEditPanel(false);
-   
+
     if (panel === 'Reffer') {
       setShowRefferPanel(true);
     }
-  
+
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -1918,44 +1926,59 @@ const CRMDashboard = () => {
           'x-auth': token,
         },
       });
-      console.log('Backend concern persons data:', response.data);
-      setConcernPersons(response.data.concernPerson);
+      console.log(userData, 'userData');
+      let concernPersons = [];
+      await response.data.concernPerson.map(person => {
+        if (person._id._id.toString() !== userData._id.toString()) {
+          concernPersons.push(person);
+        }
+      });
+      setConcernPersons(concernPersons);
     }
     fetchConcernPersons();
   };
 
   const handleConcernPersonChange = (e) => {
-    console.log(e.target.value,'e.target.value');
+    console.log(e.target.value, 'e.target.value');
     setSelectedConcernPerson(e.target.value);
   }
 
   const handleReferLead = async () => {
-    console.log(selectedConcernPerson,'selectedConcernPerson');
-try{
-    const response = await axios.post(`${backendUrl}/college/refer-leads`, {
-      counselorId: selectedConcernPerson,
-      appliedCourseId: selectedProfile._id
-    }, {
-      headers: {
-        'x-auth': token,
-      },
-    });
+    console.log(selectedConcernPerson, 'selectedConcernPerson');
+    try {
+      const response = await axios.post(`${backendUrl}/college/refer-leads`, {
+        counselorId: selectedConcernPerson,
+        appliedCourseId: selectedProfile._id
+      }, {
+        headers: {
+          'x-auth': token,
+        },
+      });
 
-    if (response.data.status) {
-      alert('Lead referred successfully!');
-      closeRefferPanel();
-    } else {
-      alert(response.data.message || 'Failed to refer lead');
+      if (response.data.status) {
+        const message = alert('Lead referred successfully!');
+        if (message) {
+          
+          
+        }
+      } else {
+        alert(response.data.message || 'Failed to refer lead');
+      }
+      await fetchProfileData();
+          closeRefferPanel();
+          closeEditPanel();
+          closeWhatsappPanel();
+          closeleadHistoryPanel();
+    } catch (error) {
+      console.error('Error referring lead:', error);
+      alert('Failed to refer lead');
     }
-  } catch (error) {
-    console.error('Error referring lead:', error);
-    alert('Failed to refer lead');
-  }
   }
 
   const closeRefferPanel = () => {
     setShowRefferPanel(false);
     setShowFollowupPanel(false);
+    setSelectedConcernPerson(null);
     if (!isMobile) {
       setMainContentClass('col-12');
     }
@@ -2217,36 +2240,35 @@ try{
     ) : null;
   };
 
-// Render Reffer Panel (Desktop Sidebar or Mobile Modal)
+  // Render Reffer Panel (Desktop Sidebar or Mobile Modal)
 
-const renderRefferPanel = () => {
-  const panelContent = (
-    <div className="card border-0 shadow-sm">
-      <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-        <div className="d-flex align-items-center">
-          <div className="me-2">
-            <i className="fas fa-user-edit text-secondary"></i>
+  const renderRefferPanel = () => {
+    const panelContent = (
+      <div className="card border-0 shadow-sm">
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-user-edit text-secondary"></i>
+            </div>
+            <h6 className="mb-0 followUp fw-medium">
+
+              {showRefferPanel && 'Refer Lead '}
+              {selectedProfile?._candidate?.name || 'Unknown'} to Counselor
+            </h6>
           </div>
-          <h6 className="mb-0 followUp fw-medium">
-            {showEditPanel && 'Edit Status for '}
-            {showFollowupPanel && 'Set Followup for '}
-            {showRefferPanel && 'Refer Lead '}
-            {selectedProfile?._candidate?.name || 'Unknown'}
-          </h6>
+          <div>
+            <button className="btn-close" type="button" onClick={closeRefferPanel}>
+              {/* <i className="fa-solid fa-xmark"></i> */}
+            </button>
+          </div>
         </div>
-        <div>
-          <button className="btn-close" type="button" onClick={closeRefferPanel}>
-            {/* <i className="fa-solid fa-xmark"></i> */}
-          </button>
-        </div>
-      </div>
 
-      <div className="card-body">
-        <form>
+        <div className="card-body">
+          <form>
 
-        
+
             <>
-           
+
               {/* NEW COUNSELOR SELECT DROPDOWN */}
               <div className="mb-1">
                 <label htmlFor="counselor" className="form-label small fw-medium text-dark">
@@ -2274,55 +2296,55 @@ const renderRefferPanel = () => {
                 </div>
               </div>
             </>
-          
-          <div className="d-flex justify-content-end gap-2 mt-4">
-            <button
-              type="button"
-              className="btn"
-              style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-              onClick={closeRefferPanel}
-            >
-              CLOSE
-            </button>
-            <button
-              type="submit"
-              className="btn text-white"
-              onClick={handleReferLead}
-              style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
-            >
 
-REFER LEAD
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn"
+                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                onClick={closeRefferPanel}
+              >
+                CLOSE
+              </button>
+              <button
+                type="submit"
+                className="btn text-white"
+                onClick={handleReferLead}
+                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+              >
 
-  if (isMobile) {
-    return (
-      <div
-        className={`modal ${showRefferPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
-        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) closeRefferPanel();
-        }}
-      >
-        <div className="modal-dialog modal-dialog-centered modal-lg">
-          <div className="modal-content">
-            {panelContent}
-          </div>
+                REFER LEAD
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     );
-  }
 
-  return showRefferPanel || showFollowupPanel ? (
-    <div className="col-12 transition-col" id="refferPanel">
-      {panelContent}
-    </div>    
-  ) : null;
-};
+    if (isMobile) {
+      return (
+        <div
+          className={`modal ${showRefferPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeRefferPanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return showRefferPanel ? (
+      <div className="col-12 transition-col" id="refferPanel">
+        {panelContent}
+      </div>
+    ) : null;
+  };
 
 
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
@@ -2867,7 +2889,7 @@ REFER LEAD
           {/* Advanced Filters */}
           {/* Advanced Filters - Improved Design */}
           {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm" style={{marginTop: '130px' , transition:'0.4s ease'}}>
+            <div className="bg-white border-bottom shadow-sm" style={{ marginTop: '130px', transition: '0.4s ease' }}>
               <div className="container-fluid py-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <div className="d-flex align-items-center">
@@ -3288,7 +3310,7 @@ REFER LEAD
           )}
 
           {/* Main Content */}
-          <div className="content-body" style={{marginTop:'150px'}}>
+          <div className="content-body" style={{ marginTop: '150px' }}>
             <section className="list-view">
 
               <div className='row'>
@@ -3461,7 +3483,7 @@ REFER LEAD
                                             onClick={() => {
 
                                               openRefferPanel(profile, 'Reffer');
-                                              
+
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -3623,24 +3645,24 @@ REFER LEAD
                                             History List
                                           </button>
                                           <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => {
-                                                openEditPanel(profile, 'SetFollowup');
-                                                console.log('selectedProfile', profile);
-                                              }}
-                                            >
-                                              Set Followup
-                                            </button>
+                                            className="dropdown-item"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              openEditPanel(profile, 'SetFollowup');
+                                              console.log('selectedProfile', profile);
+                                            }}
+                                          >
+                                            Set Followup
+                                          </button>
 
 
                                         </div>
@@ -3831,7 +3853,7 @@ REFER LEAD
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length-1]?.counsellorName || 'N/A'}</div>
+                                                    <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
                                                   </div>
                                                 </div>
                                               </div>
@@ -3968,7 +3990,7 @@ REFER LEAD
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length-1]?.counsellorName || 'N/A'}</div>
+                                                    <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
