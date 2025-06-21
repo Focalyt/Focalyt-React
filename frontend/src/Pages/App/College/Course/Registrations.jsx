@@ -60,6 +60,11 @@ const CRMDashboard = () => {
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
+
+  //refer lead stats
+  const [concernPersons, setConcernPersons] = useState([]);
+  const [selectedConcernPerson, setSelectedConcernPerson] = useState(null);
+
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
     setShowUploadModal(true);
@@ -1881,6 +1886,8 @@ const CRMDashboard = () => {
     }
   };
 
+
+
   const openRefferPanel = async (profile = null, panel) => {
     console.log('panel', panel);
 
@@ -1890,6 +1897,8 @@ const CRMDashboard = () => {
 
     // Close all panels first
     setShowRefferPanel(false);
+    setShowPopup(null)
+
     setShowFollowupPanel(false);
     setShowWhatsappPanel(false);
     setShowEditPanel(false);
@@ -1902,7 +1911,47 @@ const CRMDashboard = () => {
       setMainContentClass('col-8');
     }
 
+
+    const fetchConcernPersons = async () => {
+      const response = await axios.get(`${backendUrl}/college/refer-leads`, {
+        headers: {
+          'x-auth': token,
+        },
+      });
+      console.log('Backend concern persons data:', response.data);
+      setConcernPersons(response.data.concernPerson);
+    }
+    fetchConcernPersons();
   };
+
+  const handleConcernPersonChange = (e) => {
+    console.log(e.target.value,'e.target.value');
+    setSelectedConcernPerson(e.target.value);
+  }
+
+  const handleReferLead = async () => {
+    console.log(selectedConcernPerson,'selectedConcernPerson');
+try{
+    const response = await axios.post(`${backendUrl}/college/refer-leads`, {
+      counselorId: selectedConcernPerson,
+      appliedCourseId: selectedProfile._id
+    }, {
+      headers: {
+        'x-auth': token,
+      },
+    });
+
+    if (response.data.status) {
+      alert('Lead referred successfully!');
+      closeRefferPanel();
+    } else {
+      alert(response.data.message || 'Failed to refer lead');
+    }
+  } catch (error) {
+    console.error('Error referring lead:', error);
+    alert('Failed to refer lead');
+  }
+  }
 
   const closeRefferPanel = () => {
     setShowRefferPanel(false);
@@ -2181,6 +2230,7 @@ const renderRefferPanel = () => {
           <h6 className="mb-0 followUp fw-medium">
             {showEditPanel && 'Edit Status for '}
             {showFollowupPanel && 'Set Followup for '}
+            {showRefferPanel && 'Refer Lead '}
             {selectedProfile?._candidate?.name || 'Unknown'}
           </h6>
         </div>
@@ -2207,7 +2257,6 @@ const renderRefferPanel = () => {
                     <select
                       className="form-select border-0  bgcolor"
                       id="counselor"
-                      value={selectedCounselor || ''}
                       style={{
                         height: '42px',
                         paddingTop: '8px',
@@ -2215,11 +2264,11 @@ const renderRefferPanel = () => {
                         width: '100%',
                         backgroundColor: '#f1f2f6'
                       }}
-                      // onChange={handleCounselorChange}
+                      onChange={handleConcernPersonChange}
                     >
                       <option value="">Select Counselor</option>
-                      {counselors.map((counselor, index) => (
-                        <option key={index} value={counselor._id}>{counselor.name}</option>))}
+                      {concernPersons.map((counselor, index) => (
+                        <option key={index} value={counselor._id._id}>{counselor._id.name}</option>))}
                     </select>
                   </div>
                 </div>
@@ -2238,12 +2287,11 @@ const renderRefferPanel = () => {
             <button
               type="submit"
               className="btn text-white"
-              // onClick={handleUpdateStatus}
+              onClick={handleReferLead}
               style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
             >
 
-              {showRefferPanel && 'UPDATE STATUS'}
-              {showFollowupPanel && 'SET FOLLOWUP '}
+REFER LEAD
             </button>
           </div>
         </form>
@@ -2910,8 +2958,8 @@ const renderRefferPanel = () => {
                     <div className="position-relative">
                       <select
                         className="form-select"
-                        name="sector"
-                        value={filterData.sector}
+                        name="vertical"
+                        value={filterData.vertical}
                         onChange={handleFilterChange}
                       >
                         <option value="">All Verticals</option>
@@ -3411,7 +3459,9 @@ const renderRefferPanel = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
+
                                               openRefferPanel(profile, 'Reffer');
+                                              
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -3549,6 +3599,7 @@ const renderRefferPanel = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
+                                              setShowPopup(null)
                                               openRefferPanel(profile, 'Reffer');
                                               console.log('selectedProfile', profile);
                                             }}
@@ -3572,24 +3623,24 @@ const renderRefferPanel = () => {
                                             History List
                                           </button>
                                           <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                                openRefferPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Set Followup
-                                          </button>
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => {
+                                                openEditPanel(profile, 'SetFollowup');
+                                                console.log('selectedProfile', profile);
+                                              }}
+                                            >
+                                              Set Followup
+                                            </button>
 
 
                                         </div>

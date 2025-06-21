@@ -539,14 +539,12 @@ module.exports.getAllTeamMembers = async (userId, allUserIds = []) => {
     const user = await User.findById(userId).populate('my_team');
     
     if (!user) {
-      console.log(`⚠️ User with ID ${userId} not found.`);
       return allUserIds;
     }
 
     // Add the current user's userId to the array
     allUserIds.push(user._id);
 
-    console.log(`Added user ${user.name} (ID: ${user._id})`);
 
     // Recursively add all team members to the array
     for (const teamMember of user.my_team) {
