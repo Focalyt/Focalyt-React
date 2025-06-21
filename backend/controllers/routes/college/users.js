@@ -26,21 +26,21 @@ const AppliedCourses = require('../../models/appliedCourses');
 const hasPermission = (user, permission) => {
   console.log(user, 'user')
   const permissionType = user.permissions?.permission_type;
-  
+
   if (permissionType === 'Admin') return true;
-  
+
   if (permissionType === 'View Only') {
     const viewPermissions = [
-      'can_view_leads', 'can_view_kyc', 'can_view_training', 
+      'can_view_leads', 'can_view_kyc', 'can_view_training',
       'can_view_users', 'can_bulk_export'
     ];
     return viewPermissions.includes(permission);
   }
-  
+
   if (permissionType === 'Custom' && user.permissions?.custom_permissions) {
     return user.permissions.custom_permissions[permission] || false;
   }
-  
+
   return false;
 };
 
@@ -74,313 +74,313 @@ const checkPermission = (permission) => {
  */
 
 router.get('/', isCollege, async (req, res) => {
-	try {
-		const page = parseInt(req.query.page) || 1;
-		const limit = parseInt(req.query.limit) || 10;
-		const user = req.user;
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const user = req.user;
 
-		const query = { '_concernPerson._id': user._id };
-		const totalCount = await College.countDocuments(query);
+    const query = { '_concernPerson._id': user._id };
+    const totalCount = await College.countDocuments(query);
 
-		const colleges = await College.find(query)
-			.populate({
-				path: '_concernPerson._id',
-				select: 'name email mobile designation permissions reporting_managers createdAt status'
-			})
-			.skip((page - 1) * limit)
-			.limit(limit)
-			.sort({ createdAt: -1 });
+    const colleges = await College.find(query)
+      .populate({
+        path: '_concernPerson._id',
+        select: 'name email mobile designation permissions reporting_managers createdAt status'
+      })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .sort({ createdAt: -1 });
 
-		// Helper to resolve verify permissions parent entities - Add this near other helper functions
-		const resolveParentEntities = async (parentEntities) => {
-			const resolved = [];
-			for (const parentEntity of parentEntities) {
-				try {
-					const entities = await getEntityNames([parentEntity.entity_id], parentEntity.entity_type);
-					if (entities.length > 0) {
-						resolved.push({
-							id: parentEntity.entity_id,
-							name: entities[0].name,
-							type: parentEntity.entity_type,
-							originalName: parentEntity.entity_name
-						});
-					}
-				} catch (error) {
-					console.error('Error resolving parent entity:', parentEntity, error);
-				}
-			}
-			return resolved;
-		};
+    // Helper to resolve verify permissions parent entities - Add this near other helper functions
+    const resolveParentEntities = async (parentEntities) => {
+      const resolved = [];
+      for (const parentEntity of parentEntities) {
+        try {
+          const entities = await getEntityNames([parentEntity.entity_id], parentEntity.entity_type);
+          if (entities.length > 0) {
+            resolved.push({
+              id: parentEntity.entity_id,
+              name: entities[0].name,
+              type: parentEntity.entity_type,
+              originalName: parentEntity.entity_name
+            });
+          }
+        } catch (error) {
+          console.error('Error resolving parent entity:', parentEntity, error);
+        }
+      }
+      return resolved;
+    };
 
-		// Helper function to get entity names with correct model names
-		const getEntityNames = async (entityIds, entityType) => {
-			try {
-				let Model;
-				switch (entityType) {
-					case 'VERTICAL':
-						Model = Vertical;
-						break;
-					case 'PROJECT':
-						Model = Project;
-						break;
-					case 'CENTER':
-						Model = Center;
-						break;
-					case 'COURSE':
-						Model = Courses; // ← आपका correct model name
-						break;
-					case 'BATCH':
-						Model = Batch;
-						break;
-					default:
-						console.log(`Unknown entity type: ${entityType}`);
-						return [];
-				}
+    // Helper function to get entity names with correct model names
+    const getEntityNames = async (entityIds, entityType) => {
+      try {
+        let Model;
+        switch (entityType) {
+          case 'VERTICAL':
+            Model = Vertical;
+            break;
+          case 'PROJECT':
+            Model = Project;
+            break;
+          case 'CENTER':
+            Model = Center;
+            break;
+          case 'COURSE':
+            Model = Courses; // ← आपका correct model name
+            break;
+          case 'BATCH':
+            Model = Batch;
+            break;
+          default:
+            console.log(`Unknown entity type: ${entityType}`);
+            return [];
+        }
 
-				const entities = await Model.find({
-					_id: { $in: entityIds }
-				}).select('name').lean();
+        const entities = await Model.find({
+          _id: { $in: entityIds }
+        }).select('name').lean();
 
-				return entities.map(entity => ({
-					id: entity._id.toString(),
-					name: entity.name
-				}));
-			} catch (error) {
-				console.error(`Error fetching ${entityType}:`, error);
-				return [];
-			}
-		};
+        return entities.map(entity => ({
+          id: entity._id.toString(),
+          name: entity.name
+        }));
+      } catch (error) {
+        console.error(`Error fetching ${entityType}:`, error);
+        return [];
+      }
+    };
 
-		// Helper to resolve entity_names format (like "CENTER_id")
-		const resolveEntityNames = async (entityKeys) => {
-			console.log('entityKeys', entityKeys); // Debug log
-			const resolved = [];
+    // Helper to resolve entity_names format (like "CENTER_id")
+    const resolveEntityNames = async (entityKeys) => {
+      console.log('entityKeys', entityKeys); // Debug log
+      const resolved = [];
 
-			for (const key of entityKeys) {
-				try {
-					const [type, id] = key.split('_');
-					console.log(`Resolving: ${type} with ID: ${id}`); // Debug log
+      for (const key of entityKeys) {
+        try {
+          const [type, id] = key.split('_');
+          console.log(`Resolving: ${type} with ID: ${id}`); // Debug log
 
-					const entities = await getEntityNames([id], type);
-					if (entities.length > 0) {
-						resolved.push({
-							id: id,
-							name: entities[0].name,
-							type: type
-						});
-						console.log(`Resolved: ${entities[0].name} (${type})`); // Debug log
-					} else {
-						console.log(`No entity found for ${type}_${id}`); // Debug log
-					}
-				} catch (error) {
-					console.error('Error resolving entity:', key, error);
-				}
-			}
-			return resolved;
-		};
+          const entities = await getEntityNames([id], type);
+          if (entities.length > 0) {
+            resolved.push({
+              id: id,
+              name: entities[0].name,
+              type: type
+            });
+            console.log(`Resolved: ${entities[0].name} (${type})`); // Debug log
+          } else {
+            console.log(`No entity found for ${type}_${id}`); // Debug log
+          }
+        } catch (error) {
+          console.error('Error resolving entity:', key, error);
+        }
+      }
+      return resolved;
+    };
 
-		// Process users (rest of the code remains same)
-		const usersWithSimplifiedAccess = await Promise.all(
-			colleges.flatMap(college =>
-				college._concernPerson.map(async (concernPerson) => {
-					const userData = concernPerson._id;
-					const permissions = userData.permissions || {};
+    // Process users (rest of the code remains same)
+    const usersWithSimplifiedAccess = await Promise.all(
+      colleges.flatMap(college =>
+        college._concernPerson.map(async (concernPerson) => {
+          const userData = concernPerson._id;
+          const permissions = userData.permissions || {};
 
-					// 1. VIEW PERMISSIONS
-					let viewPermissions = {
-						type: permissions.view_permissions?.global ? 'Global' : 'Specific',
-						global: permissions.view_permissions?.global || false,
-						entities: {
-							verticals: [],
-							projects: [],
-							centers: [],
-							courses: [],
-							batches: []
-						},
-						summary: { verticals: 0, projects: 0, centers: 0, courses: 0, batches: 0 }
-					};
+          // 1. VIEW PERMISSIONS
+          let viewPermissions = {
+            type: permissions.view_permissions?.global ? 'Global' : 'Specific',
+            global: permissions.view_permissions?.global || false,
+            entities: {
+              verticals: [],
+              projects: [],
+              centers: [],
+              courses: [],
+              batches: []
+            },
+            summary: { verticals: 0, projects: 0, centers: 0, courses: 0, batches: 0 }
+          };
 
-					if (!permissions.view_permissions?.global && permissions.view_permissions?.hierarchical_selection) {
-						const hs = permissions.view_permissions.hierarchical_selection;
+          if (!permissions.view_permissions?.global && permissions.view_permissions?.hierarchical_selection) {
+            const hs = permissions.view_permissions.hierarchical_selection;
 
-						if (hs.selected_verticals?.length > 0) {
-							viewPermissions.entities.verticals = await getEntityNames(hs.selected_verticals, 'VERTICAL');
-							viewPermissions.summary.verticals = viewPermissions.entities.verticals.length;
-						}
-						if (hs.selected_projects?.length > 0) {
-							viewPermissions.entities.projects = await getEntityNames(hs.selected_projects, 'PROJECT');
-							viewPermissions.summary.projects = viewPermissions.entities.projects.length;
-						}
-						if (hs.selected_centers?.length > 0) {
-							viewPermissions.entities.centers = await getEntityNames(hs.selected_centers, 'CENTER');
-							viewPermissions.summary.centers = viewPermissions.entities.centers.length;
-						}
-						if (hs.selected_courses?.length > 0) {
-							viewPermissions.entities.courses = await getEntityNames(hs.selected_courses, 'COURSE');
-							viewPermissions.summary.courses = viewPermissions.entities.courses.length;
-						}
-						if (hs.selected_batches?.length > 0) {
-							viewPermissions.entities.batches = await getEntityNames(hs.selected_batches, 'BATCH');
-							viewPermissions.summary.batches = viewPermissions.entities.batches.length;
-						}
-					}
+            if (hs.selected_verticals?.length > 0) {
+              viewPermissions.entities.verticals = await getEntityNames(hs.selected_verticals, 'VERTICAL');
+              viewPermissions.summary.verticals = viewPermissions.entities.verticals.length;
+            }
+            if (hs.selected_projects?.length > 0) {
+              viewPermissions.entities.projects = await getEntityNames(hs.selected_projects, 'PROJECT');
+              viewPermissions.summary.projects = viewPermissions.entities.projects.length;
+            }
+            if (hs.selected_centers?.length > 0) {
+              viewPermissions.entities.centers = await getEntityNames(hs.selected_centers, 'CENTER');
+              viewPermissions.summary.centers = viewPermissions.entities.centers.length;
+            }
+            if (hs.selected_courses?.length > 0) {
+              viewPermissions.entities.courses = await getEntityNames(hs.selected_courses, 'COURSE');
+              viewPermissions.summary.courses = viewPermissions.entities.courses.length;
+            }
+            if (hs.selected_batches?.length > 0) {
+              viewPermissions.entities.batches = await getEntityNames(hs.selected_batches, 'BATCH');
+              viewPermissions.summary.batches = viewPermissions.entities.batches.length;
+            }
+          }
 
-					// 2. ADD PERMISSIONS
-					let addPermissions = {
-						type: permissions.add_permissions?.global ? 'Global' : 'Specific',
-						global: permissions.add_permissions?.global || false,
-						permissions: [],
-						count: 0
-					};
+          // 2. ADD PERMISSIONS
+          let addPermissions = {
+            type: permissions.add_permissions?.global ? 'Global' : 'Specific',
+            global: permissions.add_permissions?.global || false,
+            permissions: [],
+            count: 0
+          };
 
-					if (!permissions.add_permissions?.global && permissions.add_permissions?.specific_permissions) {
-						for (const perm of permissions.add_permissions.specific_permissions) {
-							let entities = [];
-							if (perm.selected_entities?.length > 0) {
-								entities = await getEntityNames(perm.selected_entities, perm.permission_level);
-							}
+          if (!permissions.add_permissions?.global && permissions.add_permissions?.specific_permissions) {
+            for (const perm of permissions.add_permissions.specific_permissions) {
+              let entities = [];
+              if (perm.selected_entities?.length > 0) {
+                entities = await getEntityNames(perm.selected_entities, perm.permission_level);
+              }
 
-							addPermissions.permissions.push({
-								level: perm.permission_level,
-								entities: entities,
-								canAddTypes: perm.can_add_types || [],
-								summary: `Can add ${(perm.can_add_types || []).join(', ')} in ${entities.length} ${perm.permission_level?.toLowerCase()}(s)`
-							});
-						}
-						addPermissions.count = addPermissions.permissions.length;
-					}
+              addPermissions.permissions.push({
+                level: perm.permission_level,
+                entities: entities,
+                canAddTypes: perm.can_add_types || [],
+                summary: `Can add ${(perm.can_add_types || []).join(', ')} in ${entities.length} ${perm.permission_level?.toLowerCase()}(s)`
+              });
+            }
+            addPermissions.count = addPermissions.permissions.length;
+          }
 
-					// 3. EDIT PERMISSIONS
-					let editPermissions = {
-						type: permissions.edit_permissions?.global ? 'Global' : 'Specific',
-						global: permissions.edit_permissions?.global || false,
-						permissions: [],
-						count: 0
-					};
+          // 3. EDIT PERMISSIONS
+          let editPermissions = {
+            type: permissions.edit_permissions?.global ? 'Global' : 'Specific',
+            global: permissions.edit_permissions?.global || false,
+            permissions: [],
+            count: 0
+          };
 
-					if (!permissions.edit_permissions?.global && permissions.edit_permissions?.specific_permissions) {
-						for (const perm of permissions.edit_permissions.specific_permissions) {
-							let entities = [];
-							let summary = '';
+          if (!permissions.edit_permissions?.global && permissions.edit_permissions?.specific_permissions) {
+            for (const perm of permissions.edit_permissions.specific_permissions) {
+              let entities = [];
+              let summary = '';
 
-							if (perm.edit_type === 'specific_entity_level') {
-								summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels`;
-							} else if (perm.edit_type === 'specific_entity_with_children') {
-								summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels + children`;
-							} else if (perm.entity_names?.length > 0) {
-								entities = await resolveEntityNames(perm.entity_names);
-								summary = `Can edit specific entities: ${entities.map(e => e.name).join(', ')}`;
-							}
+              if (perm.edit_type === 'specific_entity_level') {
+                summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels`;
+              } else if (perm.edit_type === 'specific_entity_with_children') {
+                summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels + children`;
+              } else if (perm.entity_names?.length > 0) {
+                entities = await resolveEntityNames(perm.entity_names);
+                summary = `Can edit specific entities: ${entities.map(e => e.name).join(', ')}`;
+              }
 
-							editPermissions.permissions.push({
-								editType: perm.edit_type,
-								levels: perm.permission_levels || [],
-								entities: entities,
-								withChildren: perm.with_child_levels || false,
-								summary: summary
-							});
-						}
-						editPermissions.count = editPermissions.permissions.length;
-					}
+              editPermissions.permissions.push({
+                editType: perm.edit_type,
+                levels: perm.permission_levels || [],
+                entities: entities,
+                withChildren: perm.with_child_levels || false,
+                summary: summary
+              });
+            }
+            editPermissions.count = editPermissions.permissions.length;
+          }
 
-					// 4. VERIFY PERMISSIONS - Add this after editPermissions
-					let verifyPermissions = {
-						type: permissions.verify_permissions?.type || 'Not set',
-						global: permissions.verify_permissions?.global || false,
-						permissions: [],
-						count: 0,
-						summary: 'No verify permissions set'
-					};
+          // 4. VERIFY PERMISSIONS - Add this after editPermissions
+          let verifyPermissions = {
+            type: permissions.verify_permissions?.type || 'Not set',
+            global: permissions.verify_permissions?.global || false,
+            permissions: [],
+            count: 0,
+            summary: 'No verify permissions set'
+          };
 
-					if (permissions.verify_permissions?.type) {
-						if (permissions.verify_permissions.type === 'global') {
-							verifyPermissions.summary = 'Can verify any content anywhere in the system';
-							verifyPermissions.count = 1;
-						}
-						else if (permissions.verify_permissions.type === 'entity_children') {
-							// Specific Entity's Children
-							if (permissions.verify_permissions.parent_entities?.length > 0) {
-								const parentEntities = await resolveParentEntities(permissions.verify_permissions.parent_entities);
-								verifyPermissions.permissions = [{
-									type: 'entity_children',
-									parentEntities: parentEntities,
-									summary: `Can verify all children of: ${parentEntities.map(e => `${e.name} (${e.type})`).join(', ')}`
-								}];
-								verifyPermissions.count = parentEntities.length;
-								verifyPermissions.summary = `Can verify children of ${parentEntities.length} parent entities`;
-							}
-						}
-						else if (permissions.verify_permissions.type === 'specific_levels_children') {
-							// Specific Entity Levels' Children
-							if (permissions.verify_permissions.selected_levels?.length > 0) {
-								const selectedLevels = permissions.verify_permissions.selected_levels;
-								verifyPermissions.permissions = [{
-									type: 'levels_children',
-									selectedLevels: selectedLevels,
-									summary: `Can verify children of entities at: ${selectedLevels.join(', ')} levels`
-								}];
-								verifyPermissions.count = selectedLevels.length;
-								verifyPermissions.summary = `Can verify children at ${selectedLevels.length} entity levels`;
-							}
-						}
-					}
+          if (permissions.verify_permissions?.type) {
+            if (permissions.verify_permissions.type === 'global') {
+              verifyPermissions.summary = 'Can verify any content anywhere in the system';
+              verifyPermissions.count = 1;
+            }
+            else if (permissions.verify_permissions.type === 'entity_children') {
+              // Specific Entity's Children
+              if (permissions.verify_permissions.parent_entities?.length > 0) {
+                const parentEntities = await resolveParentEntities(permissions.verify_permissions.parent_entities);
+                verifyPermissions.permissions = [{
+                  type: 'entity_children',
+                  parentEntities: parentEntities,
+                  summary: `Can verify all children of: ${parentEntities.map(e => `${e.name} (${e.type})`).join(', ')}`
+                }];
+                verifyPermissions.count = parentEntities.length;
+                verifyPermissions.summary = `Can verify children of ${parentEntities.length} parent entities`;
+              }
+            }
+            else if (permissions.verify_permissions.type === 'specific_levels_children') {
+              // Specific Entity Levels' Children
+              if (permissions.verify_permissions.selected_levels?.length > 0) {
+                const selectedLevels = permissions.verify_permissions.selected_levels;
+                verifyPermissions.permissions = [{
+                  type: 'levels_children',
+                  selectedLevels: selectedLevels,
+                  summary: `Can verify children of entities at: ${selectedLevels.join(', ')} levels`
+                }];
+                verifyPermissions.count = selectedLevels.length;
+                verifyPermissions.summary = `Can verify children at ${selectedLevels.length} entity levels`;
+              }
+            }
+          }
 
-					// 4. LEAD PERMISSIONS
-					const leadPermissions = {
-						enabled: Object.values(permissions.lead_permissions || {}).filter(Boolean).length,
-						details: permissions.lead_permissions || {}
-					};
+          // 4. LEAD PERMISSIONS
+          const leadPermissions = {
+            enabled: Object.values(permissions.lead_permissions || {}).filter(Boolean).length,
+            details: permissions.lead_permissions || {}
+          };
 
-					return {
-						_id: userData._id,
-						name: userData.name,
-						email: userData.email,
-						mobile: userData.mobile,
-						designation: userData.designation,
-						status: userData.status,
-						createdAt: userData.createdAt,
-						defaultAdmin: concernPerson.defaultAdmin,
-						college: {
-							_id: college._id,
-							name: college.name,
-							type: college.type
-						},
-						accessSummary: {
-							permissionType: permissions.permission_type || 'Not set',
-							viewPermissions,
-							addPermissions,
-							editPermissions,
-							leadPermissions,
-							verifyPermissions,
-							reportingManagers: userData.reporting_managers?.length || 0
-						}
-					};
-				})
-			)
-		);
+          return {
+            _id: userData._id,
+            name: userData.name,
+            email: userData.email,
+            mobile: userData.mobile,
+            designation: userData.designation,
+            status: userData.status,
+            createdAt: userData.createdAt,
+            defaultAdmin: concernPerson.defaultAdmin,
+            college: {
+              _id: college._id,
+              name: college.name,
+              type: college.type
+            },
+            accessSummary: {
+              permissionType: permissions.permission_type || 'Not set',
+              viewPermissions,
+              addPermissions,
+              editPermissions,
+              leadPermissions,
+              verifyPermissions,
+              reportingManagers: userData.reporting_managers?.length || 0
+            }
+          };
+        })
+      )
+    );
 
-		res.json({
-			success: true,
-			data: {
-				users: usersWithSimplifiedAccess,
-				pagination: {
-					currentPage: page,
-					totalPages: Math.ceil(totalCount / limit),
-					totalUsers: totalCount,
-					limit
-				}
-			}
-		});
+    res.json({
+      success: true,
+      data: {
+        users: usersWithSimplifiedAccess,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalCount / limit),
+          totalUsers: totalCount,
+          limit
+        }
+      }
+    });
 
-	} catch (err) {
-		console.error('Error in GET /users:', err);
-		res.status(500).json({
-			success: false,
-			message: "Server Error"
-		});
-	}
+  } catch (err) {
+    console.error('Error in GET /users:', err);
+    res.status(500).json({
+      success: false,
+      message: "Server Error"
+    });
+  }
 });
-router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity((req) => `Add user: ${req.body.name}`)], async (req, res) => {
+router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivity((req) => `Add user: ${req.body.name}`)], async (req, res) => {
   console.log('api called add user')
   try {
 
@@ -398,7 +398,7 @@ router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity
     const user = req.user
     const college = user.college
 
-    if(!college){
+    if (!college) {
       return res.status(400).json({
         status: false,
         message: 'College not found'
@@ -431,12 +431,12 @@ router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity
     }
 
     // Check if email already exists
-    const existingUser = await User.findOne({ 
+    const existingUser = await User.findOne({
       email: email.toLowerCase(),
       role: 2,
-      isDeleted: false 
+      isDeleted: false
     });
-    
+
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -445,12 +445,12 @@ router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity
     }
 
     // Check if mobile already exists
-    const existingMobile = await User.findOne({ 
+    const existingMobile = await User.findOne({
       mobile: parseInt(mobile),
       role: 2,
-      isDeleted: false 
+      isDeleted: false
     });
-    
+
     if (existingMobile) {
       return res.status(400).json({
         success: false,
@@ -467,17 +467,17 @@ router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity
         permissionType = 'Admin';
         customPermissions = {};
         break;
-        
+
       case 'view_only':
         permissionType = 'View Only';
         customPermissions = {};
         break;
-        
+
       case 'custom':
         permissionType = 'Custom';
         customPermissions = permissions || {};
         break;
-        
+
       default:
         return res.status(400).json({
           success: false,
@@ -493,9 +493,9 @@ router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity
         isDeleted: false,
         status: true
       });
-      
+
       validReportingManagers = managers.map(manager => manager._id);
-      
+
       if (validReportingManagers.length !== reporting_managers.length) {
         return res.status(400).json({
           success: false,
@@ -573,7 +573,7 @@ router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity
 
   } catch (error) {
     console.error('Add User Error:', error);
-    
+
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -599,106 +599,181 @@ router.post('/add', [ isCollege,checkPermission('can_add_users'),logUserActivity
   }
 });
 
-/**
- * @route   GET /api/users
- * @desc    Get all users with filtering and pagination
- * @access  Private (requires can_view_users permission)
- */
-// router.get('/', checkPermission('can_view_users'), async (req, res) => {
-//   try {
-//     const { status, role, search, page = 1, limit = 10 } = req.query;
-    
-//     // Build filter object
-//     let filter = { isDeleted: false };
-    
-//     if (status) {
-//       filter.status = status === 'active';
-//     }
-    
-//     if (role) {
-//       filter.role = parseInt(role);
-//     }
-    
-//     if (search) {
-//       filter.$or = [
-//         { name: { $regex: search, $options: 'i' } },
-//         { email: { $regex: search, $options: 'i' } },
-//         { designation: { $regex: search, $options: 'i' } }
-//       ];
-//     }
+//update User
 
-//     // Calculate pagination
-//     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-//     // Get users with pagination
-//     const users = await User.find(filter)
-//       .select('-password -authTokens')
-//       .populate('reporting_managers', 'name email designation')
-//       .populate('userAddedby', 'name email')
-//       .sort({ createdAt: -1 })
-//       .skip(skip)
-//       .limit(parseInt(limit));
+router.post('/update/:userId', [isCollege, checkPermission('can_add_users'), logUserActivity((req) => `Add user: ${req.body.name}`)], async (req, res) => {
+  console.log('api called add user')
+  try {
 
-//     // Get total count
-//     const totalUsers = await User.countDocuments(filter);
-//     const totalPages = Math.ceil(totalUsers / parseInt(limit));
+    let body = req.body;
+    let user = req.user
+    let { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+    if (typeof userId === 'string') {
+      userId = new mongoose.Types.ObjectId(userId);
+    }
 
-//     // Format users for frontend
-//     const formattedUsers = users.map(user => ({
-//       id: user._id,
-//       user_id: user._id,
-//       name: user.name,
-//       email: user.email,
-//       mobile: user.mobile,
-//       designation: user.designation,
-//       description: user.description,
-//       role: user.role,
-//       access_level: user.permissions?.permission_type === 'Admin' ? 'admin' : 
-//                    user.permissions?.permission_type === 'View Only' ? 'view_only' : 'custom',
-//       permission_type: user.permissions?.permission_type || 'Custom',
-//       permissions: user.permissions?.custom_permissions || {},
-//       reporting_managers: user.reporting_managers || [],
-//       status: user.status ? 'active' : 'inactive',
-//       created_at: user.createdAt,
-//       userAddedby: user.userAddedby?.email || 'system'
-//     }));
+    let editUser = await User.findById(userId);
+    if (!editUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
 
-//     res.status(200).json({
-//       success: true,
-//       data: {
-//         users: formattedUsers,
-//         pagination: {
-//           current_page: parseInt(page),
-//           total_pages: totalPages,
-//           total_users: totalUsers,
-//           per_page: parseInt(limit)
-//         }
-//       }
-//     });
 
-//   } catch (error) {
-//     console.error('Get Users Error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Error fetching users',
-//       error: process.env.NODE_ENV === 'development' ? error.message : undefined
-//     });
-//   }
-// });
+    if (body.email) {
 
-/**
- * @route   GET /api/users/reporting-managers
- * @desc    Get active users for reporting manager selection
- * @access  Private (requires can_view_users permission)
- */
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid email address'
+        });
+      }
+    }
+
+    if (body.mobile) {
+      // Mobile validation (10 digits)
+      if (!/^[0-9]{10}$/.test(body.mobile.toString())) {
+      return res.status(400).json({
+        success: false,
+          message: 'Mobile number must be exactly 10 digits'
+        });
+      }
+    }
+
+    // Check if email already exists
+
+    if(body.email){
+    const existingUser = await User.findOne({
+      email: body.email.toLowerCase(),
+      role: 2,
+      isDeleted: false,
+      _id: { $ne: userId }
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+    }
+  }
+
+
+  if(body.mobile){
+    // Check if mobile already exists
+    const existingMobile = await User.findOne({
+      mobile: parseInt(body.mobile),
+      role: 2,
+      isDeleted: false,
+      _id: { $ne: userId }
+    });
+
+    if (existingMobile) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this mobile number already exists'
+      });
+    }
+
+
+  }
+
+    // Map access level to permissions (role will always be 2 for college users)
+
+
+    if (body.access_level) {
+
+      switch (body.access_level) {
+        case 'admin':
+          body.permission = {}
+          body.permission.permissionType = 'Admin';
+          body.permission.customPermissions = {};
+          break;
+
+        case 'view_only': 
+          body.permission = {}
+          body.permission.permissionType = 'View Only';
+          body.permission.customPermissions = {};
+          break;
+
+        case 'custom':
+          body.permission = {}
+          body.permission.permissionType = 'Custom';
+          body.permission.customPermissions = body.permissions || {};
+          break;
+
+        default:
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid access level. Must be admin, view_only, or custom'
+          });
+      }
+      delete body.access_level;
+    }
+
+
+
+    // Generate temporary password
+    const currentUserId = req.user ? req.user.id : null;
+
+    if(currentUserId){
+      body.userUpdatedby = currentUserId;
+    }
+
+    // Save user to database
+    const updatedUser = await User.findByIdAndUpdate(userId, body, { new: true });
+    res.status(200).json({
+      status: true,
+      message: `User "${body.name}" updated successfully with ${body.permission.permissionType} access`,
+      data: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Update User Error:', error);
+
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        status: false,
+        message: 'Validation failed',
+        errors: validationErrors
+      });
+    }
+
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        message: `User with this ${field} already exists`
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while updating user',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+
 router.get('/reporting-managers', checkPermission('can_view_users'), async (req, res) => {
   try {
     const users = await User.find({
       status: true,
       isDeleted: false
     })
-    .select('name email designation mobile')
-    .sort({ name: 1 });
+      .select('name email designation mobile')
+      .sort({ name: 1 });
 
     const formattedUsers = users.map(user => ({
       user_id: user._id,
@@ -722,70 +797,8 @@ router.get('/reporting-managers', checkPermission('can_view_users'), async (req,
   }
 });
 
-/**
- * @route   GET /api/users/:userId
- * @desc    Get single user details
- * @access  Private (requires can_view_users permission)
- */
-router.get('/:userId', checkPermission('can_view_users'), async (req, res) => {
-  try {
-    const { userId } = req.params;
 
-    const user = await User.findOne({
-      _id: userId,
-      isDeleted: false
-    })
-    .select('-password -authTokens')
-    .populate('reporting_managers', 'name email designation')
-    .populate('userAddedby', 'name email')
-    .populate('userUpdatedby', 'name email');
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    const userDetails = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      mobile: user.mobile,
-      designation: user.designation,
-      description: user.description,
-      role: user.role,
-      access_level: user.permissions?.permission_type === 'Admin' ? 'admin' : 
-                   user.permissions?.permission_type === 'View Only' ? 'view_only' : 'custom',
-      permission_type: user.permissions?.permission_type || 'Custom',
-      permissions: user.permissions?.custom_permissions || {},
-      reporting_managers: user.reporting_managers || [],
-      status: user.status ? 'active' : 'inactive',
-      created_at: user.createdAt,
-      updated_at: user.updatedAt,
-      userAddedby: user.userAddedby?.email || 'system',
-      userUpdatedby: user.userUpdatedby?.email || null
-    };
-
-    res.status(200).json({
-      success: true,
-      data: userDetails
-    });
-
-  } catch (error) {
-    console.error('Get User Details Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching user details'
-    });
-  }
-});
-
-/**
- * @route   PUT /api/users/:userId/status
- * @desc    Update user status (activate/deactivate)
- * @access  Private (requires can_edit_users permission)
- */
 router.put('/:userId/status', checkPermission('can_edit_users'), async (req, res) => {
   try {
     const { userId } = req.params;
@@ -800,7 +813,7 @@ router.put('/:userId/status', checkPermission('can_edit_users'), async (req, res
 
     const user = await User.findOneAndUpdate(
       { _id: userId, isDeleted: false },
-      { 
+      {
         status: status === 'active',
         userUpdatedby: req.user ? req.user.id : null
       },
@@ -844,7 +857,7 @@ router.delete('/:userId', checkPermission('can_delete_users'), async (req, res) 
 
     const user = await User.findOneAndUpdate(
       { _id: userId, isDeleted: false },
-      { 
+      {
         isDeleted: true,
         status: false,
         userUpdatedby: req.user.id
@@ -889,13 +902,13 @@ router.get('/permissions/matrix', checkPermission('can_view_users'), async (req,
       isDeleted: false,
       status: true
     })
-    .select('name email designation role permissions')
-    .sort({ name: 1 });
+      .select('name email designation role permissions')
+      .sort({ name: 1 });
 
     const permissionsList = [
       'can_view_leads', 'can_add_leads', 'can_edit_leads', 'can_assign_leads', 'can_delete_leads',
       'can_view_kyc', 'can_verify_reject_kyc', 'can_request_kyc',
-      'can_view_training', 'can_add_vertical', 'can_add_project', 'can_add_center', 
+      'can_view_training', 'can_add_vertical', 'can_add_project', 'can_add_center',
       'can_add_course', 'can_add_batch', 'can_assign_batch',
       'can_view_users', 'can_add_users', 'can_edit_users', 'can_delete_users', 'can_manage_roles',
       'can_bulk_import', 'can_bulk_export', 'can_bulk_update', 'can_bulk_delete', 'can_bulk_communication'
@@ -903,7 +916,7 @@ router.get('/permissions/matrix', checkPermission('can_view_users'), async (req,
 
     const matrix = users.map(user => {
       const userPermissions = {};
-      
+
       permissionsList.forEach(permission => {
         userPermissions[permission] = hasPermission(user, permission);
       });
@@ -914,8 +927,8 @@ router.get('/permissions/matrix', checkPermission('can_view_users'), async (req,
         email: user.email,
         designation: user.designation,
         role: user.role,
-        access_level: user.permissions?.permission_type === 'Admin' ? 'admin' : 
-                     user.permissions?.permission_type === 'View Only' ? 'view_only' : 'custom',
+        access_level: user.permissions?.permission_type === 'Admin' ? 'admin' :
+          user.permissions?.permission_type === 'View Only' ? 'view_only' : 'custom',
         permissions: userPermissions
       };
     });
@@ -938,37 +951,65 @@ router.get('/permissions/matrix', checkPermission('can_view_users'), async (req,
 });
 
 router.post('/reset-password', async (req, res) => {
-	try {
-		const { module, userInput, password } = req.body;
+  try {
+    const { module, userInput, password } = req.body;
 
-		console.log('userInput', userInput, 'module', module)
-		let user = null;
-		const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
+    console.log('userInput', userInput, 'module', module)
+    let user = null;
+    const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
 
-		if (isMobile) {
-			user = await User.findOne({ mobile: parseInt(userInput), role: 2 });
-		} else {
-			user = await User.findOne({ email: userInput.toLowerCase(), role: 2 });
-		}
+    if (isMobile) {
+      user = await User.findOne({ mobile: parseInt(userInput), role: 2 });
+    } else {
+      user = await User.findOne({ email: userInput.toLowerCase(), role: 2 });
+    }
 
-		if (!user) {
-			return res.status(404).json({ success: false, message: 'User not found' });
-		}
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
-		user.password = password;
-		await user.save();
-		res.json({
-			status: true,
-			message: 'Password reset successfully',
-			data: user
-		});
-	} catch (err) {
-		console.error('Error in POST /add-user:', err);
-		res.status(500).json({
-			status: false,
-			message: "Server Error"
-		});
-	}
+    user.password = password;
+    await user.save();
+    res.json({
+      status: true,
+      message: 'Password reset successfully',
+      data: user
+    });
+  } catch (err) {
+    console.error('Error in POST /add-user:', err);
+    res.status(500).json({
+      status: false,
+      message: "Server Error"
+    });
+  }
 });
+
+router.get('/users-details/:userId', [isCollege, checkPermission('can_view_users')], async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findOne({
+      _id: userId,
+      isDeleted: false
+    })
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    res.status(200).json({
+      status: true,
+      data: user
+    });
+  } catch (error) {
+    console.error('Get User Details Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user details'
+    });
+  }
+});
+
 
 module.exports = router;

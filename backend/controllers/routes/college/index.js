@@ -319,7 +319,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		const teamMembers = await getAllTeamMembers(user._id);
-		console.log('====================>!teamMembers ', teamMembers)
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
@@ -336,10 +335,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				kyc: { $nin: [true] },
 				admissionDone: { $nin: [true] },
 				$or: [
-					// registeredBy field से match (single member के लिए)
-					{ registeredBy: member }, // $in हटाया गया क्योंकि member single value है
-
-					// leadAssignment के last element की _id से match
+					// registeredBy field se match (single member ke liye)
+					{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
+			
+					// leadAssignment ke last element ki _id se match
 					{
 						$expr: {
 							$eq: [
@@ -352,11 +351,20 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			})
 				.populate({
 					path: '_course',
-					select: 'name description docsRequired college',
-					populate: {
-						path: 'sectors',
-						select: 'name'
-					}
+					populate: [
+						{
+							path: 'sectors',
+							select: 'name'
+						},
+						{
+							path: 'vertical',
+							select: 'name'  // Add the fields you want to populate from the `vertical` path
+						},
+						{
+							path: 'project',
+							select: 'name'  // Add the fields you want to populate from the `project` path
+						}
+					]
 				})
 				.populate('_leadStatus')
 				.populate('_center')
@@ -377,11 +385,11 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				.sort({ createdAt: -1 })
 				.skip(skip)
 				.limit(limit);
+			
 
 			appliedCourses.push(...response);
 		}
 
-		console.log('====================>!appliedCourses ', appliedCourses)
 
 
 
@@ -3810,14 +3818,34 @@ router.route("/refer-leads")
 			const user = req.user;
 			const college = await College.findOne({
 				'_concernPerson._id': user._id
+			}).populate({
+				path: '_concernPerson',
+				populate: {
+					path: '_id',
+					select: 'name'
+				}
+			});
+			const concernPerson = college._concernPerson;
+
+			console.log(concernPerson,'concernPerson');
+
+			res.status(200).json({
+				status: true,
+				concernPerson: concernPerson
 			});
 			// ... existing code ...
 		} catch (err) {
+			console.error(err);
+			res.status(500).json({
+				status: false,
+				message: "Server Error"
+			});
 			// ... existing code ...
 		}
 	})
 	.post(isCollege, async (req, res) => {
 		try {
+			console.log(req.body,'req.body');
 			let { appliedCourseId, counselorId } = req.body;
 			if (!appliedCourseId || !counselorId) {
 				return res.status(400).json({ success: false, message: 'appliedCourseId and counselorId are required.' });
@@ -3827,20 +3855,27 @@ router.route("/refer-leads")
 				return res.status(400).json({ success: false, message: 'Invalid appliedCourseId or counselorId.' });
 			}
 			if (typeof appliedCourseId == 'string') {
-				appliedCourseId = mongoose.Types.ObjectId(appliedCourseId);
+				appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
 			}
 			if (typeof counselorId == 'string') {
-				counselorId = mongoose.Types.ObjectId(counselorId);
+				counselorId = new mongoose.Types.ObjectId(counselorId);
 			}
 			// Find the applied course
 			const appliedCourse = await AppliedCourses.findById(appliedCourseId);
-			const oldCounselor = await User.findById(appliedCourse.assignedCounselor);
+			console.log(appliedCourse,'appliedCourse');
+			const oldCounselor = await User.findById(appliedCourse.leadAssignment[appliedCourse.leadAssignment.length - 1]._id);
+			console.log(oldCounselor,'oldCounselor');
 			const newCounselor = await User.findById(counselorId);
+			console.log(newCounselor,'newCounselor');
 			if (!appliedCourse) {
 				return res.status(404).json({ success: false, message: 'Applied course not found.' });
 			}
 			// Update the assigned counselor
-			appliedCourse.assignedCounselor = counselorId;
+			appliedCourse.leadAssignment.push({
+				_id: counselorId,
+				counsellorName: newCounselor.name,
+				assignDate: new Date()
+			});
 			// Add a log entry
 			appliedCourse.logs = appliedCourse.logs || [];
 			appliedCourse.logs.push({

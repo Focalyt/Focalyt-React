@@ -136,6 +136,8 @@ const CRMDashboard = () => {
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showFollowupPanel, setShowFollowupPanel] = useState(false);
   const [showRefferPanel, setShowRefferPanel] = useState(false);
+  const [showRefferBulkLead, setShowRefferBulkLead] = useState(false);
+  const [showBulkStatusLead, setShowBulkStatusLead] = useState(false);
   const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
@@ -173,6 +175,25 @@ const CRMDashboard = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
+
+
+  //refer lead stats
+  const [concernPersons, setConcernPersons] = useState([]);
+  const [selectedConcernPerson, setSelectedConcernPerson] = useState(null);
+
+  //filter stats
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterSubStatus, setFilterSubStatus] = useState('all');
+  const [filterLeadStatus, setFilterLeadStatus] = useState('all');
+  const [filterCourse, setFilterCourse] = useState('all');
+  const [filterCenter, setFilterCenter] = useState('all');
+  const [filterVertical, setFilterVertical] = useState('all');
+  const [filterProject, setFilterProject] = useState('all');
+  const [filterSector, setFilterSector] = useState('all');
+  const [filterCounselor, setFilterCounselor] = useState('all');
+  const [filterConcernPerson, setFilterConcernPerson] = useState('all');
+  const [filterDate, setFilterDate] = useState(new Date());
+
 
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
@@ -1958,8 +1979,6 @@ const CRMDashboard = () => {
         setAllProfilesData(response.data.data)
         setTotalPages(response.data.totalPages);
 
-
-
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -2084,6 +2103,10 @@ const CRMDashboard = () => {
 
     // Close all panels first
     setShowEditPanel(false);
+    setShowRefferPanel(false);
+    setShowPopup(null);
+    setSelectedConcernPerson(null);
+
     setShowFollowupPanel(false);
     setShowWhatsappPanel(false);
 
@@ -2104,6 +2127,11 @@ const CRMDashboard = () => {
       setShowPopup(null)
       setShowFollowupPanel(true);
     }
+    else if (panel === 'bulkstatuschange') {
+      setShowPopup(null)
+      setShowBulkStatusLead(true)
+
+    }
 
     if (!isMobile) {
       setMainContentClass('col-8');
@@ -2112,26 +2140,41 @@ const CRMDashboard = () => {
 
   const closeEditPanel = () => {
     setShowEditPanel(false);
+    setShowBulkStatusLead(false)
     setShowFollowupPanel(false);
+    setShowRefferBulkLead(false)
+    setShowRefferPanel(false);
+    setShowWhatsappPanel(false);
+    setShowPopup(null);
+    setSelectedConcernPerson(null);
     if (!isMobile) {
       setMainContentClass('col-12');
     }
   };
+
+
 
   const openRefferPanel = async (profile = null, panel) => {
     console.log('panel', panel);
 
     if (profile) {
       setSelectedProfile(profile);
+
+
     }
 
-    // Close all panels first
     setShowRefferPanel(false);
+    setShowPopup(null)
+
     setShowFollowupPanel(false);
     setShowWhatsappPanel(false);
     setShowEditPanel(false);
 
-    if (panel === 'Reffer') {
+    if (panel === 'RefferAllLeads') {
+
+      setShowRefferBulkLead(true)
+
+    } else if (panel === 'Reffer') {
       setShowRefferPanel(true);
     }
 
@@ -2139,15 +2182,73 @@ const CRMDashboard = () => {
       setMainContentClass('col-8');
     }
 
+
+    const fetchConcernPersons = async () => {
+      const response = await axios.get(`${backendUrl}/college/refer-leads`, {
+        headers: {
+          'x-auth': token,
+        },
+      });
+      console.log(userData, 'userData');
+      let concernPersons = [];
+      await response.data.concernPerson.map(person => {
+        if (person._id._id.toString() !== userData._id.toString()) {
+          concernPersons.push(person);
+        }
+      });
+      setConcernPersons(concernPersons);
+    }
+    fetchConcernPersons();
   };
+
+
+  const handleConcernPersonChange = (e) => {
+    console.log(e.target.value, 'e.target.value');
+    setSelectedConcernPerson(e.target.value);
+  }
+
+  const handleReferLead = async () => {
+    console.log(selectedConcernPerson, 'selectedConcernPerson');
+    try {
+      const response = await axios.post(`${backendUrl}/college/refer-leads`, {
+        counselorId: selectedConcernPerson,
+        appliedCourseId: selectedProfile._id
+      }, {
+        headers: {
+          'x-auth': token,
+        },
+      });
+
+      if (response.data.status) {
+        const message = alert('Lead referred successfully!');
+        if (message) {
+
+
+        }
+      } else {
+        alert(response.data.message || 'Failed to refer lead');
+      }
+      await fetchProfileData();
+      closeRefferPanel();
+      closeEditPanel();
+      closeWhatsappPanel();
+      closeleadHistoryPanel();
+    } catch (error) {
+      console.error('Error referring lead:', error);
+      alert('Failed to refer lead');
+    }
+  }
 
   const closeRefferPanel = () => {
     setShowRefferPanel(false);
+    setShowRefferBulkLead(false)
     setShowFollowupPanel(false);
+    setSelectedConcernPerson(null);
     if (!isMobile) {
       setMainContentClass('col-12');
     }
   };
+
 
 
   const openWhatsappPanel = () => {
@@ -2383,7 +2484,7 @@ const CRMDashboard = () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${showEditPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
+          className={`modal ${showEditPanel || showFollowupPanel || showBulkStatusLead ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
             if (e.target === e.currentTarget) closeEditPanel();
@@ -2398,7 +2499,7 @@ const CRMDashboard = () => {
       );
     }
 
-    return showEditPanel || showFollowupPanel ? (
+    return showEditPanel || showFollowupPanel || showBulkStatusLead ? (
       <div className="col-12 transition-col" id="editFollowupPanel">
         {panelContent}
       </div>
@@ -2416,9 +2517,9 @@ const CRMDashboard = () => {
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
             <h6 className="mb-0 followUp fw-medium">
-              {showEditPanel && 'Edit Status for '}
-              {showFollowupPanel && 'Set Followup for '}
-              {selectedProfile?._candidate?.name || 'Unknown'}
+
+              {showRefferPanel && 'Refer Lead '}
+              {selectedProfile?._candidate?.name || 'Unknown'} to Counselor
             </h6>
           </div>
           <div>
@@ -2444,7 +2545,6 @@ const CRMDashboard = () => {
                     <select
                       className="form-select border-0  bgcolor"
                       id="counselor"
-                      value={selectedCounselor || ''}
                       style={{
                         height: '42px',
                         paddingTop: '8px',
@@ -2452,11 +2552,11 @@ const CRMDashboard = () => {
                         width: '100%',
                         backgroundColor: '#f1f2f6'
                       }}
-                    // onChange={handleCounselorChange}
+                      onChange={handleConcernPersonChange}
                     >
                       <option value="">Select Counselor</option>
-                      {counselors.map((counselor, index) => (
-                        <option key={index} value={counselor._id}>{counselor.name}</option>))}
+                      {concernPersons.map((counselor, index) => (
+                        <option key={index} value={counselor._id._id}>{counselor._id.name}</option>))}
                     </select>
                   </div>
                 </div>
@@ -2475,12 +2575,11 @@ const CRMDashboard = () => {
               <button
                 type="submit"
                 className="btn text-white"
-                // onClick={handleUpdateStatus}
+                onClick={handleReferLead}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
-                {showRefferPanel && 'UPDATE STATUS'}
-                {showFollowupPanel && 'SET FOLLOWUP '}
+                {showRefferPanel ? 'REFER LEAD' : 'REFER BULK LEAD'}
               </button>
             </div>
           </form>
@@ -2506,7 +2605,7 @@ const CRMDashboard = () => {
       );
     }
 
-    return showRefferPanel || showFollowupPanel ? (
+    return showRefferPanel || showRefferBulkLead ? (
       <div className="col-12 transition-col" id="refferPanel">
         {panelContent}
       </div>
@@ -3157,8 +3256,8 @@ const CRMDashboard = () => {
                     <div className="position-relative">
                       <select
                         className="form-select"
-                        name="sector"
-                        value={filterData.sector}
+                        name="vertical"
+                        value={filterData.vertical}
                         onChange={handleFilterChange}
                       >
                         <option value="">All Verticals</option>
@@ -3525,40 +3624,45 @@ const CRMDashboard = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: '150px' }}>
+          <div className="content-body" style={{ marginTop: '185px' }}>
             <section className="list-view">
-            <div className="row">
-  <div className="d-flex justify-content-end gap-2">
-    <button
-      className="btn btn-sm btn-outline-primary"
-      style={{
-        padding: "6px 12px",
-        fontSize: "11px",
-        fontWeight: "600",
-        display: "flex",
-        alignItems: "center",
-        gap: "4px"
-      }}
-    >
-      <i className="fas fa-share-alt" style={{fontSize: "10px"}}></i>
-      Reffer All Leads
-    </button>
-    <button
-      className="btn btn-sm btn-outline-secondary"
-      style={{
-        padding: "6px 12px",
-        fontSize: "11px",
-        fontWeight: "600",
-        display: "flex",
-        alignItems: "center",
-        gap: "4px"
-      }}
-    >
-      <i className="fas fa-tasks" style={{fontSize: "10px"}}></i>
-      Bulk Action
-    </button>
-  </div>
-</div>
+              <div className="row">
+                <div className="d-flex justify-content-end gap-2">
+                  <button
+                    className="btn btn-sm btn-outline-primary"
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    onClick={() => {
+                      openRefferPanel(null, 'RefferAllLeads');
+                      console.log('selectedProfile', null);
+                    }}
+                  >
+                    <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
+                    Refer All Leads
+                  </button>
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
+                  >
+                    <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
+                    Bulk Action
+                  </button>
+                </div>
+              </div>
               <div className='row'>
                 <div>
                   <div className="col-12 rounded equal-height-2 coloumn-2">
@@ -3604,6 +3708,14 @@ const CRMDashboard = () => {
                                       >
                                         <i className="fab fa-whatsapp"></i>
                                       </button> */}
+                                        <button
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          onClick={openWhatsappPanel}
+                                          style={{ fontSize: '20px' }}
+                                          title="WhatsApp"
+                                        >
+                                          <i className="fab fa-whatsapp"></i>
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -3727,7 +3839,9 @@ const CRMDashboard = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
+
                                               openRefferPanel(profile, 'Reffer');
+
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -3865,6 +3979,7 @@ const CRMDashboard = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
+                                              setShowPopup(null)
                                               openRefferPanel(profile, 'Reffer');
                                               console.log('selectedProfile', profile);
                                             }}
@@ -3900,7 +4015,7 @@ const CRMDashboard = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
-                                              openRefferPanel(profile, 'SetFollowup');
+                                              openEditPanel(profile, 'SetFollowup');
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -5032,7 +5147,7 @@ const CRMDashboard = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row site-header--sticky--register--panels">
+            <div className="row site-header--sticky--register--panels w-25">
               {renderEditPanel()}
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
