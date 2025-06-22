@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -8,6 +8,120 @@ import axios from 'axios'
 import './CourseCrm.css';
 import './crm.css';
 
+const MultiSelectCheckbox = ({
+  title,
+  options,
+  selectedValues,
+  onChange,
+  icon = "fas fa-list",
+  isOpen,
+  onToggle
+}) => {
+  const handleCheckboxChange = (value) => {
+    const newValues = selectedValues.includes(value)
+      ? selectedValues.filter(v => v !== value)
+      : [...selectedValues, value];
+    onChange(newValues);
+  };
+
+  // Get display text for selected items
+  const getDisplayText = () => {
+    if (selectedValues.length === 0) {
+      return `Select ${title}`;
+    } else if (selectedValues.length === 1) {
+      const selectedOption = options.find(opt => opt.value === selectedValues[0]);
+      return selectedOption ? selectedOption.label : selectedValues[0];
+    } else if (selectedValues.length <= 2) {
+      const selectedLabels = selectedValues.map(val => {
+        const option = options.find(opt => opt.value === val);
+        return option ? option.label : val;
+      });
+      return selectedLabels.join(', ');
+    } else {
+      return `${selectedValues.length} items selected`;
+    }
+  };
+
+  return (
+    <div className="multi-select-container-new">
+      <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
+        <i className={`${icon} me-1 text-primary`}></i>
+        {title}
+        {selectedValues.length > 0 && (
+          <span className="badge bg-primary ms-2">{selectedValues.length}</span>
+        )}
+      </label>
+
+      <div className="multi-select-dropdown-new">
+        <button
+          type="button"
+          className={`form-select multi-select-trigger ${isOpen ? 'open' : ''}`}
+          onClick={onToggle}
+          style={{ cursor: 'pointer', textAlign: 'left' }}
+        >
+          <span className="select-display-text">
+            {getDisplayText()}
+          </span>
+          <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`}></i>
+        </button>
+
+        {isOpen && (
+          <div className="multi-select-options-new">
+            {/* Search functionality (optional) */}
+            <div className="options-search">
+              <div className="input-group input-group-sm">
+                <span className="input-group-text" style={{ height: '40px' }}>
+                  <i className="fas fa-search"></i>
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder={`Search ${title.toLowerCase()}...`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+
+            {/* Options List */}
+            <div className="options-list-new">
+              {options.map((option) => (
+                <label key={option.value} className="option-item-new">
+                  <input
+                    type="checkbox"
+                    className="form-check-input me-2"
+                    checked={selectedValues.includes(option.value)}
+                    onChange={() => handleCheckboxChange(option.value)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span className="option-label-new">{option.label}</span>
+                  {selectedValues.includes(option.value) && (
+                    <i className="fas fa-check text-primary ms-auto"></i>
+                  )}
+                </label>
+              ))}
+
+              {options.length === 0 && (
+                <div className="no-options">
+                  <i className="fas fa-info-circle me-2"></i>
+                  No {title.toLowerCase()} available
+                </div>
+              )}
+            </div>
+
+            {/* Footer with count */}
+            {selectedValues.length > 0 && (
+              <div className="options-footer">
+                <small className="text-muted">
+                  {selectedValues.length} of {options.length} selected
+                </small>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 const CRMDashboard = () => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -22,6 +136,8 @@ const CRMDashboard = () => {
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showFollowupPanel, setShowFollowupPanel] = useState(false);
   const [showRefferPanel, setShowRefferPanel] = useState(false);
+  const [showRefferBulkLead, setShowRefferBulkLead] = useState(false);
+  const [showBulkStatusLead, setShowBulkStatusLead] = useState(false);
   const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
@@ -383,6 +499,129 @@ const CRMDashboard = () => {
     );
   });
 
+
+  // vertical checkboxes option 
+
+  const sectorOptions = [
+    { label: "Tourism and Hospitality", value: "Tourism and Hospitality" },
+    { label: "Information Technology", value: "Information Technology" },
+    { label: "Healthcare", value: "Healthcare" },
+    { label: "Finance", value: "Finance" }
+  ];
+  const verticalOptions = [
+    { label: "Vertical 1", value: "Vertical 1" },
+    { label: "Vertical 2", value: "Vertical 2" },
+    { label: "Vertical 3", value: "Vertical 3" },
+    { label: "Vertical 4", value: "Vertical 4" }
+  ];
+
+  const courseOptions = [
+    { label: "Course 1", value: "Course 1" },
+    { label: "Course 2", value: "Course 2" },
+    { label: "Course 3", value: "Course 3" },
+    { label: "Course 4", value: "Course 4" }
+  ];
+
+  const centerOptions = [
+    { label: "Center 1", value: "Center 1" },
+    { label: "Center 2", value: "Center 2" },
+    { label: "Center 3", value: "Center 3" },
+    { label: "Center 4", value: "Center 4" }
+  ];
+
+  const counselorOptions = [
+    { label: "Counselor 1", value: "Counselor 1" },
+    { label: "Counselor 2", value: "Counselor 2" },
+    { label: "Counselor 3", value: "Counselor 3" },
+    { label: "Counselor 4", value: "Counselor 4" }
+  ];
+  // Form data state
+  const [formData, setFormData] = useState({
+    sectors: {
+      type: "includes",
+      values: []
+    },
+    verticals: {
+      type: "includes",
+      values: []
+    },
+    course: {
+      type: "includes",
+      values: []
+    },
+    center: {
+      type: "includes",
+      values: []
+    },
+    counselor: {
+      type: "includes",
+      values: []
+    },
+    sector: {
+      type: "includes",
+      values: []
+    }
+  });
+
+  // Dropdown open state
+  const [dropdownStates, setDropdownStates] = useState({
+    sectors: false,
+    verticals: false,
+    course: false,
+    center: false,
+    counselor: false,
+    sector: false
+  });
+
+  const handleCriteriaChange = (criteria, values) => {
+    setFormData((prevState) => ({
+      ...prevState,
+      [criteria]: {
+        type: "includes",
+        values: values
+      }
+    }));
+  };
+
+  const toggleDropdown = (filterName) => {
+    setDropdownStates(prev => {
+      // Close all other dropdowns and toggle the current one
+      const newState = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = key === filterName ? !prev[key] : false;
+        return acc;
+      }, {});
+      return newState;
+    });
+  };
+
+  // Add this useEffect to handle clicking outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside any multi-select dropdown
+      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
+
+      if (!isMultiSelectClick) {
+        // Close all dropdowns
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Calculate total selected filters
+  const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
 
   // Document Modal Component
   const DocumentModal = () => {
@@ -1890,6 +2129,11 @@ const CRMDashboard = () => {
       setShowPopup(null)
       setShowFollowupPanel(true);
     }
+    else if (panel === 'bulkstatuschange') {
+      setShowPopup(null)
+      setShowBulkStatusLead(true)
+
+    }
 
     if (!isMobile) {
       setMainContentClass('col-8');
@@ -1898,7 +2142,9 @@ const CRMDashboard = () => {
 
   const closeEditPanel = () => {
     setShowEditPanel(false);
+    setShowBulkStatusLead(false)
     setShowFollowupPanel(false);
+    setShowRefferBulkLead(false)
     setShowRefferPanel(false);
     setShowWhatsappPanel(false);
     setShowPopup(null);
@@ -1915,9 +2161,10 @@ const CRMDashboard = () => {
 
     if (profile) {
       setSelectedProfile(profile);
+
+
     }
 
-    // Close all panels first
     setShowRefferPanel(false);
     setShowPopup(null)
 
@@ -1925,7 +2172,11 @@ const CRMDashboard = () => {
     setShowWhatsappPanel(false);
     setShowEditPanel(false);
 
-    if (panel === 'Reffer') {
+    if (panel === 'RefferAllLeads') {
+
+      setShowRefferBulkLead(true)
+
+    } else if (panel === 'Reffer') {
       setShowRefferPanel(true);
     }
 
@@ -1952,6 +2203,7 @@ const CRMDashboard = () => {
     fetchConcernPersons();
   };
 
+
   const handleConcernPersonChange = (e) => {
     console.log(e.target.value, 'e.target.value');
     setSelectedConcernPerson(e.target.value);
@@ -1972,17 +2224,17 @@ const CRMDashboard = () => {
       if (response.data.status) {
         const message = alert('Lead referred successfully!');
         if (message) {
-          
-          
+
+
         }
       } else {
         alert(response.data.message || 'Failed to refer lead');
       }
       await fetchProfileData();
-          closeRefferPanel();
-          closeEditPanel();
-          closeWhatsappPanel();
-          closeleadHistoryPanel();
+      closeRefferPanel();
+      closeEditPanel();
+      closeWhatsappPanel();
+      closeleadHistoryPanel();
     } catch (error) {
       console.error('Error referring lead:', error);
       alert('Failed to refer lead');
@@ -1991,12 +2243,14 @@ const CRMDashboard = () => {
 
   const closeRefferPanel = () => {
     setShowRefferPanel(false);
+    setShowRefferBulkLead(false)
     setShowFollowupPanel(false);
     setSelectedConcernPerson(null);
     if (!isMobile) {
       setMainContentClass('col-12');
     }
   };
+
 
 
   const openWhatsappPanel = () => {
@@ -2232,7 +2486,7 @@ const CRMDashboard = () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${showEditPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
+          className={`modal ${showEditPanel || showFollowupPanel || showBulkStatusLead ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
             if (e.target === e.currentTarget) closeEditPanel();
@@ -2247,7 +2501,7 @@ const CRMDashboard = () => {
       );
     }
 
-    return showEditPanel || showFollowupPanel ? (
+    return showEditPanel || showFollowupPanel || showBulkStatusLead ? (
       <div className="col-12 transition-col" id="editFollowupPanel">
         {panelContent}
       </div>
@@ -2327,7 +2581,7 @@ const CRMDashboard = () => {
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
-                REFER LEAD
+                {showRefferPanel ? 'REFER LEAD' : 'REFER BULK LEAD'}
               </button>
             </div>
           </form>
@@ -2353,7 +2607,7 @@ const CRMDashboard = () => {
       );
     }
 
-    return showRefferPanel ? (
+    return showRefferPanel || showRefferBulkLead ? (
       <div className="col-12 transition-col" id="refferPanel">
         {panelContent}
       </div>
@@ -2965,7 +3219,7 @@ const CRMDashboard = () => {
                   </div>
 
                   <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
+                    {/* <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-industry me-1 text-primary"></i>
                       Sector
                     </label>
@@ -2982,10 +3236,20 @@ const CRMDashboard = () => {
                         <option value="Healthcare">🏥 Healthcare</option>
                         <option value="Finance">💳 Finance</option>
                       </select>
-                    </div>
+                    </div> */}
+                    <MultiSelectCheckbox
+                      title="Sectors"
+                      options={sectorOptions}
+                      selectedValues={formData.sectors.values}
+                      onChange={(values) => handleCriteriaChange('sectors', values)}
+                      icon="fas fa-sitemap"
+                      isOpen={dropdownStates.sectors}
+                      onToggle={() => toggleDropdown('sectors')}
+                    />
+
                   </div>
                   <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
+                    {/* <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-industry me-1 text-primary"></i>
                       Verticals
                     </label>
@@ -2999,10 +3263,21 @@ const CRMDashboard = () => {
                         <option value="">All Verticals</option>
                         <option value="Vertical 1">Vertical 1</option>
                       </select>
-                    </div>
+                  </div> */}
+                    <MultiSelectCheckbox
+                      title="Verticals"
+                      options={verticalOptions}
+                      selectedValues={formData.verticals.values}
+                      onChange={(values) => handleCriteriaChange('verticals', values)}
+                      icon="fas fa-sitemap"
+                      isOpen={dropdownStates.verticals}
+                      onToggle={() => toggleDropdown('verticals')}
+                    />
+
+
                   </div>
                   <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
+                    {/* <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-industry me-1 text-primary"></i>
                       Course
                     </label>
@@ -3017,10 +3292,19 @@ const CRMDashboard = () => {
                         <option value="Course 1">Course 1</option>
                         <option value="Course 2">Course 2</option>
                       </select>
-                    </div>
+                    </div> */}
+                    <MultiSelectCheckbox
+                      title="Course"
+                      options={courseOptions}
+                      selectedValues={formData.course.values}
+                      onChange={(values) => handleCriteriaChange('course', values)}
+                      icon="fas fa-graduation-cap"
+                      isOpen={dropdownStates.course}
+                      onToggle={() => toggleDropdown('course')}
+                    />
                   </div>
                   <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
+                    {/* <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-industry me-1 text-primary"></i>
                       Center
                     </label>
@@ -3035,10 +3319,19 @@ const CRMDashboard = () => {
                         <option value="center 1">center 1</option>
                         <option value="center 2">center 2</option>
                       </select>
-                    </div>
+                    </div> */}
+                    <MultiSelectCheckbox
+                      title="Center"
+                      options={centerOptions}
+                      selectedValues={formData.center.values}
+                      onChange={(values) => handleCriteriaChange('center', values)}
+                      icon="fas fa-building"
+                      isOpen={dropdownStates.center}
+                      onToggle={() => toggleDropdown('center')}
+                    />
                   </div>
                   <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
+                    {/* <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-industry me-1 text-primary"></i>
                       Councellor Name
                     </label>
@@ -3053,7 +3346,16 @@ const CRMDashboard = () => {
                         <option value="Councellor 1">Councellor 1</option>
                         <option value="Councellor 2">Councellor 2</option>
                       </select>
-                    </div>
+                    </div> */}
+                    <MultiSelectCheckbox
+                      title="Counselor"
+                      options={counselorOptions}
+                      selectedValues={formData.counselor.values}
+                      onChange={(values) => handleCriteriaChange('counselor', values)}
+                      icon="fas fa-user-tie"
+                      isOpen={dropdownStates.counselor}
+                      onToggle={() => toggleDropdown('counselor')}
+                    />
                   </div>
 
                   {/* Date Range */}
@@ -3076,7 +3378,7 @@ const CRMDashboard = () => {
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
                                 value={filterData.createdFromDate}
                                 format="dd/MM/yyyy"
-                                className="form-control"
+                                className="form-control p-0"
                                 clearIcon={null}
                                 calendarIcon={<i className="fas fa-calendar text-success"></i>}
                                 maxDate={filterData.createdToDate || new Date()}
@@ -3088,7 +3390,7 @@ const CRMDashboard = () => {
                                 onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
                                 value={filterData.createdToDate}
                                 format="dd/MM/yyyy"
-                                className="form-control"
+                                className="form-control p-0"
                                 clearIcon={null}
                                 calendarIcon={<i className="fas fa-calendar text-success"></i>}
                                 minDate={filterData.createdFromDate}
@@ -3138,7 +3440,7 @@ const CRMDashboard = () => {
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
                                 value={filterData.modifiedFromDate}
                                 format="dd/MM/yyyy"
-                                className="form-control"
+                                className="form-control p-0"
                                 clearIcon={null}
                                 calendarIcon={<i className="fas fa-calendar text-warning"></i>}
                                 maxDate={filterData.modifiedToDate || new Date()}
@@ -3150,7 +3452,7 @@ const CRMDashboard = () => {
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
                                 value={filterData.modifiedToDate}
                                 format="dd/MM/yyyy"
-                                className="form-control"
+                                className="form-control p-0"
                                 clearIcon={null}
                                 calendarIcon={<i className="fas fa-calendar text-warning"></i>}
                                 minDate={filterData.modifiedFromDate}
@@ -3200,7 +3502,7 @@ const CRMDashboard = () => {
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
                                 value={filterData.nextActionFromDate}
                                 format="dd/MM/yyyy"
-                                className="form-control"
+                                className="form-control p-0"
                                 clearIcon={null}
                                 calendarIcon={<i className="fas fa-calendar text-info"></i>}
                                 maxDate={filterData.nextActionToDate}
@@ -3212,7 +3514,7 @@ const CRMDashboard = () => {
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
                                 value={filterData.nextActionToDate}
                                 format="dd/MM/yyyy"
-                                className="form-control"
+                                className="form-control p-0"
                                 clearIcon={null}
                                 calendarIcon={<i className="fas fa-calendar text-info"></i>}
                                 minDate={filterData.nextActionFromDate}
@@ -3322,9 +3624,45 @@ const CRMDashboard = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: '150px' }}>
+          <div className="content-body" style={{ marginTop: '185px' }}>
             <section className="list-view">
-
+              <div className="row">
+                <div className="d-flex justify-content-end gap-2">
+                  <button
+                    className="btn btn-sm btn-outline-primary"
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    onClick={() => {
+                      openRefferPanel(null, 'RefferAllLeads');
+                      console.log('selectedProfile', null);
+                    }}
+                  >
+                    <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
+                    Refer All Leads
+                  </button>
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}
+                    onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
+                  >
+                    <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
+                    Bulk Action
+                  </button>
+                </div>
+              </div>
               <div className='row'>
                 <div>
                   <div className="col-12 rounded equal-height-2 coloumn-2">
@@ -3370,6 +3708,14 @@ const CRMDashboard = () => {
                                       >
                                         <i className="fab fa-whatsapp"></i>
                                       </button> */}
+                                        <button
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          onClick={openWhatsappPanel}
+                                          style={{ fontSize: '20px' }}
+                                          title="WhatsApp"
+                                        >
+                                          <i className="fab fa-whatsapp"></i>
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -4801,7 +5147,7 @@ const CRMDashboard = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row site-header--sticky--register--panels">
+            <div className="row site-header--sticky--register--panels w-25">
               {renderEditPanel()}
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
@@ -7891,7 +8237,306 @@ html body .content .content-wrapper {
     `
         }
       </style>
+      <style>
+        {
+          `
+    /* Enhanced Multi-Select Dropdown Styles */
+.multi-select-container-new {
+  position: relative;
+  width: 100%;
+}
 
+.multi-select-dropdown-new {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-trigger {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  background: white !important;
+  border: 1px solid #ced4da !important;
+  border-radius: 0.375rem !important;
+  padding: 0.375rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  min-height: 38px !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  width: 100% !important;
+}
+
+.multi-select-trigger:hover {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+}
+
+.multi-select-trigger.open {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+.select-display-text {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #495057;
+  font-weight: normal;
+}
+
+.dropdown-arrow {
+  color: #6c757d;
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+.multi-select-trigger.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.multi-select-options-new {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #ced4da;
+  border-top: none;
+  border-radius: 0 0 0.375rem 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  max-height: 320px;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.options-header {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.select-all-btn,
+.clear-all-btn {
+  font-size: 0.75rem !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 0.25rem !important;
+  border: 1px solid !important;
+}
+
+.select-all-btn {
+  border-color: #0d6efd !important;
+  color: #0d6efd !important;
+}
+
+.clear-all-btn {
+  border-color: #6c757d !important;
+  color: #6c757d !important;
+}
+
+.select-all-btn:hover {
+  background-color: #0d6efd !important;
+  color: white !important;
+}
+
+.clear-all-btn:hover {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+.options-search {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.options-list-new {
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.options-list-new::-webkit-scrollbar {
+  width: 6px;
+}
+
+.options-list-new::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.options-list-new::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.options-list-new::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.option-item-new {
+  display: flex !important;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.option-item-new:last-child {
+  border-bottom: none;
+}
+
+.option-item-new:hover {
+  background-color: #f8f9fa;
+}
+
+.option-item-new input[type="checkbox"] {
+  margin: 0 0.5rem 0 0 !important;
+  cursor: pointer;
+  accent-color: #0d6efd;
+}
+
+.option-label-new {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #495057;
+  cursor: pointer;
+}
+
+.options-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.no-options {
+  padding: 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Close dropdown when clicking outside */
+.multi-select-container-new.dropdown-open::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .multi-select-options-new {
+    max-height: 250px;
+  }
+  
+  .options-header {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .select-all-btn,
+  .clear-all-btn {
+    width: 100%;
+  }
+  
+  .options-list-new {
+    max-height: 150px;
+  }
+}
+
+/* Focus states for accessibility */
+.multi-select-trigger:focus {
+  outline: none;
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.option-item-new input[type="checkbox"]:focus {
+  outline: 2px solid #86b7fe;
+  outline-offset: 2px;
+}
+
+/* Selected state styling */
+.option-item-new input[type="checkbox"]:checked + .option-label-new {
+  font-weight: 500;
+  color: #0d6efd;
+}
+
+/* Badge styling for multi-select */
+.badge.bg-primary {
+  background-color: #0d6efd !important;
+  font-size: 0.75rem;
+  padding: 0.25em 0.4em;
+}
+
+/* Animation for dropdown open/close */
+.multi-select-options-new {
+  transform-origin: top;
+  animation: dropdownOpen 0.15s ease-out;
+}
+
+@keyframes dropdownOpen {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* Prevent text selection on dropdown trigger */
+.multi-select-trigger {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Enhanced visual feedback */
+.multi-select-trigger:active {
+  transform: translateY(1px);
+}
+
+/* Loading state (if needed) */
+.multi-select-loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.multi-select-loading .dropdown-arrow {
+  animation: spin 1s linear infinite;
+}
+
+
+    `
+        }
+      </style>
     </div>
   );
 };
