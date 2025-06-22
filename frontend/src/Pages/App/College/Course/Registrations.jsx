@@ -1586,6 +1586,7 @@ const CRMDashboard = () => {
       }
 
       console.log('Filter results:', filtered.length, 'out of', allProfilesData.length);
+      updateCrmFiltersCounts(filtered);
       setAllProfiles(filtered);
 
     } catch (error) {
@@ -1982,6 +1983,7 @@ const CRMDashboard = () => {
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
+      updateCrmFiltersCounts(response.data.data);
     } catch (error) {
       console.error('Error fetching profile data:', error);
     }
@@ -2895,22 +2897,20 @@ const CRMDashboard = () => {
     ) : null;
   };
 
-  const updateCrmFiltersCounts = () => {
+  const updateCrmFiltersCounts = (data = allProfilesData) => {
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
         if (filter._id === 'all') {
-          return { ...filter, count: allProfilesData.length };
+          return { ...filter, count: data.length };
         }
         // Count profiles matching this filter's _id (leadStatus)
-        const count = allProfilesData.filter(profile => profile._leadStatus && profile._leadStatus._id === filter._id).length;
+        const count = data.filter(profile => profile._leadStatus && profile._leadStatus._id === filter._id).length;
         return { ...filter, count };
       });
     });
   };
 
-  useEffect(() => {
-    updateCrmFiltersCounts();
-  }, [allProfilesData]);
+ 
 
   return (
     <div className="container-fluid">

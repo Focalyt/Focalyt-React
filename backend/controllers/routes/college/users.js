@@ -721,6 +721,23 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
     }
 
     if (body.reporting_managers) {
+      const oldReportingManagers = editUser.reporting_managers.map(manager => manager.toString());
+      const newReportingManagers = body.reporting_managers.map(manager => manager.toString());
+
+      const removedManagers = oldReportingManagers.filter(manager => 
+        !newReportingManagers.includes(manager)  // Ensure you're comparing the correct format (e.g., ObjectId as string)
+      );
+      
+      console.log('Removed Managers:', removedManagers);
+
+      for (let removedManager of removedManagers) {
+        removedManager = new mongoose.Types.ObjectId(removedManager);
+        await User.updateOne(
+          { _id: removedManager },  // Find the manager by ID
+          { $pull: { my_team: userId } }  // Remove the userId from the 'my_team' array
+        );
+      }
+
       body.reporting_managers = await Promise.all(
         body.reporting_managers.map(async (manager) => {
           if (typeof manager === 'string') {
