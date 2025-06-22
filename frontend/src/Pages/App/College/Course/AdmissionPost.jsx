@@ -144,7 +144,7 @@ const CRMDashboard = () => {
           <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--admissions--posts">
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
-                <div className="col-md-6 d-md-block d-sm-none">
+                <div className="col-md-12 d-md-block d-sm-none">
                   <div className="main-tabs-container">
                     <ul className="nav nav-tabs nav-tabs-main border-0">
                       {/* kyc Management Tab */}
@@ -2734,8 +2734,8 @@ background: #fd2b5a;
         /* position: absolute !important; */
         /* min-height: 200px; */
         background: white;
-        left:15.9%;
-        right:3%;
+        {/* left:15.9%; */}
+        {/* right:3%; */}
         }
         }
         `

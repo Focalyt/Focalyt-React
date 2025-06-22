@@ -410,7 +410,7 @@ const KYCManagement = () => {
   ];
   // Form data state
   const [formData, setFormData] = useState({
-    sectors: {
+    projects: {
       type: "includes",
       values: []
     },
@@ -438,7 +438,7 @@ const KYCManagement = () => {
 
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
-    sectors: false,
+    projects: false,
     verticals: false,
     course: false,
     center: false,
@@ -3021,32 +3021,15 @@ const KYCManagement = () => {
                   </div>
 
                   <div className="col-md-2">
-                    {/* <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Sector
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Sectors</option>
-                        <option value="Tourism and Hospitality">🏨 Tourism & Hospitality</option>
-                        <option value="Information Technology">💻 Information Technology</option>
-                        <option value="Healthcare">🏥 Healthcare</option>
-                        <option value="Finance">💳 Finance</option>
-                      </select>
-                    </div> */}
+                    
                      <MultiSelectCheckbox
-                      title="Sectors"
+                      title="Projects"
                       options={sectorOptions}
-                      selectedValues={formData.sectors.values}
-                      onChange={(values) => handleCriteriaChange('sectors', values)}
+                      selectedValues={formData.projects.values}
+                      onChange={(values) => handleCriteriaChange('projects', values)}
                       icon="fas fa-sitemap"
-                      isOpen={dropdownStates.sectors}
-                      onToggle={() => toggleDropdown('sectors')}
+                      isOpen={dropdownStates.projects}
+                      onToggle={() => toggleDropdown('projects')}
                     />
                   </div>
                   <div className="col-md-2">
@@ -7311,8 +7294,8 @@ background: #fd2b5a;
         /* position: absolute !important; */
         /* min-height: 200px; */
         background: white;
-        left:15.9%;
-        right:3%;
+        {/* left:15.9%;
+        right:3%; */}
         }
         .site-header--sticky--admission--post--panel:not(.mobile-sticky-enable) {
         position: fixed !important;

@@ -8009,8 +8009,8 @@ background: #fd2b5a;
       position: fixed !important;
       transition: 0.4s;
       background: white;
-      left:15.9%;
-      right:3%;
+      {/* left:15.9%;
+      right:3%; */}
     }
   }
 
