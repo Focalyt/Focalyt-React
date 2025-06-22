@@ -383,24 +383,21 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					}
 				})
 				.sort({ createdAt: -1 })
-				.skip(skip)
-				.limit(limit);
 			
 
-			appliedCourses.push(...response);
+				response.forEach(doc => {
+					if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
+					  appliedCourses.push(doc);
+					}
+				  });
 		}
-
-
-
-
-
 
 		const filteredAppliedCourses = appliedCourses.filter(doc => {
 			// _course must be populated!
 			return doc._course && String(doc._course.college) === String(college._id);
 		});
 
-		const result = filteredAppliedCourses.map(doc => {
+		const results = filteredAppliedCourses.map(doc => {
 			let selectedSubstatus = null;
 
 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
@@ -515,7 +512,11 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 
 
-		const totalCount = result.length
+		const totalCount = results.length
+
+		const result = results.slice(skip, skip + limit);
+
+
 
 
 		res.status(200).json({
@@ -526,6 +527,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			totalCount,
 			totalPages: Math.ceil(totalCount / limit),
 			data: result,
+			allData:results
 		});
 
 	} catch (err) {
@@ -2682,6 +2684,106 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		return res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });
+
+router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
+	try {
+		console.log('api working')
+		const { selectedProfiles, _leadStatus, _leadSubStatus, remarks } = req.body;
+		console.log(req.body,'body')
+		if (!selectedProfiles || !_leadStatus || !_leadSubStatus) {
+			let missingFields = [];
+		  
+			if (!selectedProfiles) missingFields.push('selectedProfiles');
+			if (!_leadStatus) missingFields.push('_leadStatus');
+			if (!_leadSubStatus) missingFields.push('_leadSubStatus');
+		  
+			return res.status(500).json({
+			  success: false,
+			  message: `Missing required fields: ${missingFields.join(', ')}`
+			});
+		  }
+		const userId = req.user._id;
+
+		// Fetch the new status document (including sub-statuses) only once
+		const newStatusDoc = await Status.findById(_leadStatus).lean();
+		const newStatusTitle = newStatusDoc ? newStatusDoc.title : 'Unknown';
+		const newSubStatusTitle = newStatusDoc?.substatuses?.find(s => s._id.toString() === _leadSubStatus)?.title || 'Unknown';
+
+		// Process profiles in parallel using Promise.all
+		const updatePromises = selectedProfiles.map(async (id) => {
+			// Find the AppliedCourse document by ID
+			const doc = await AppliedCourses.findById(id);
+			console.log('doc',doc)
+			if (!doc) {
+				throw new Error(`AppliedCourse with ID ${id} not found`);
+			}
+
+			let actionParts = [];
+			
+			// Fetch the old status document (including sub-statuses)
+			const oldStatusDoc = await Status.findById(doc._leadStatus).lean();
+			const oldStatusTitle = oldStatusDoc ? oldStatusDoc.title : 'Unknown';
+			const oldSubStatusTitle = oldStatusDoc?.substatuses?.find(s => s._id.toString() === doc._leadSubStatus?.toString())?.title || 'Unknown';
+
+			// Logging changes
+			if (_leadStatus && doc._leadStatus.toString() !== _leadStatus) {
+				actionParts.push(`Lead status changed from "${oldStatusTitle}" to "${newStatusTitle}"`);
+				doc._leadStatus = _leadStatus;
+			}
+
+			if (_leadSubStatus && doc._leadSubStatus.toString() !== _leadSubStatus) {
+				actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
+				doc._leadSubStatus = _leadSubStatus;
+			}
+
+			if (doc.followups?.length > 0) {
+				const lastFollowup = doc.followups[doc.followups.length - 1];
+				if (lastFollowup?.status === 'Planned') {
+					lastFollowup.status = 'Done';
+				}
+			}
+
+			// Update remarks if provided
+			if (remarks && doc.remarks !== remarks) {
+				actionParts.push(`Remarks updated`);
+				doc.remarks = remarks;
+			}
+
+			// If no changes were made
+			if (actionParts.length === 0) {
+				actionParts.push('No changes made to status or followup');
+			}
+
+			// Add a log entry for the update
+			const newLogEntry = {
+				user: userId,
+				action: actionParts.join('; '),
+				remarks: remarks || '',
+				timestamp: new Date()
+			};
+
+			// Validate the log entry before pushing
+			console.log('New log entry:', newLogEntry);
+
+			// Add log entry to the document
+			doc.logs.push(newLogEntry);
+
+			// Save the updated document
+			const newDocDetails = await doc.save();
+			console.log('newDocDetails',newDocDetails)
+		});
+
+		// Wait for all updates to complete
+		await Promise.all(updatePromises);
+
+		return res.json({ success: true, message: 'Status updated successfully' });
+
+	} catch (error) {
+		console.error('Error updating status and followup:', error);
+		return res.status(500).json({ success: false, message: 'Internal Server Error' });
+	}
+});
+
 
 
 ///courses

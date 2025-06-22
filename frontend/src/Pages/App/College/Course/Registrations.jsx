@@ -133,14 +133,8 @@ const CRMDashboard = () => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
-  const [showEditPanel, setShowEditPanel] = useState(false);
-  const [showFollowupPanel, setShowFollowupPanel] = useState(false);
-  const [showRefferPanel, setShowRefferPanel] = useState(false);
-  const [showRefferBulkLead, setShowRefferBulkLead] = useState(false);
-  const [showBulkStatusLead, setShowBulkStatusLead] = useState(false);
-  const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
+
   const [mainContentClass, setMainContentClass] = useState('col-12');
-  const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
@@ -149,7 +143,7 @@ const CRMDashboard = () => {
   const [allProfiles, setAllProfiles] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(0);
   const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [selectedCounselor, setSelectedCounselor] = useState(null);
@@ -193,6 +187,25 @@ const CRMDashboard = () => {
   const [filterCounselor, setFilterCounselor] = useState('all');
   const [filterConcernPerson, setFilterConcernPerson] = useState('all');
   const [filterDate, setFilterDate] = useState(new Date());
+  const [selectedProfiles, setSelectedProfiles] = useState([]);
+
+
+  //side pannel stats
+  const [showPanel, setShowPanel] = useState('')
+
+
+
+  useEffect(() => {
+    console.log('selectedProfiles', selectedProfiles)
+  }, [selectedProfiles])
+
+  const handleCheckboxChange = (profile, checked) => {
+    if (checked) {
+      setSelectedProfiles(prev => [...prev, profile._id]);
+    } else {
+      setSelectedProfiles(prev => prev.filter(id => id !== profile._id));
+    }
+  };
 
 
   const openUploadModal = (document) => {
@@ -1268,8 +1281,9 @@ const CRMDashboard = () => {
   }, []);
 
   useEffect(() => {
-    fetchSubStatus()
-
+    if (seletectedStatus) {
+      fetchSubStatus()
+    }
   }, [seletectedStatus]);
 
   useEffect(() => {
@@ -1434,6 +1448,9 @@ const CRMDashboard = () => {
     });
 
     setAllProfiles(searchFiltered);
+    setAllProfilesData(searchFiltered)
+    updateCrmFiltersCounts(searchFiltered)
+
   };
 
   const applyFilters = (filters = filterData) => {
@@ -1764,7 +1781,74 @@ const CRMDashboard = () => {
     console.log('Function called');
 
     try {
-      if (showEditPanel) {
+      if (showPanel === 'bulkstatuschange') {
+        // Validation checks
+        if (!selectedProfiles) {
+          alert('No profile selected');
+          return;
+        }
+
+        if (!seletectedStatus) {
+          alert('Please select a status');
+          return;
+        }
+
+
+        // Prepare the request body
+        const data = {
+          selectedProfiles,
+          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
+          _leadSubStatus: seletectedSubStatus?._id || null,
+          remarks: remarks || ''
+        };
+
+
+
+        // Check if backend URL and token exist
+        if (!backendUrl) {
+          alert('Backend URL not configured');
+          return;
+        }
+
+        if (!token) {
+          alert('Authentication token missing');
+          return;
+        }
+
+        // Send PUT request to backend API
+        const response = await axios.put(
+          `${backendUrl}/college/lead/bulk_status_change`,
+          data,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        console.log('API response:', response.data);
+
+        if (response.data.success) {
+          alert('Status updated successfully!');
+
+          // Reset form
+          setSelectedStatus('');
+          setSelectedSubStatus(null);
+          setFollowupDate('');
+          setFollowupTime('');
+          setRemarks('');
+
+          // Refresh data and close panel
+          await fetchProfileData();
+          closePanel();
+        } else {
+          console.error('API returned error:', response.data);
+          alert(response.data.message || 'Failed to update status');
+        }
+
+      }
+      if (showPanel === 'editPanel') {
         // Validation checks
         if (!selectedProfile || !selectedProfile._id) {
           alert('No profile selected');
@@ -1840,14 +1924,14 @@ const CRMDashboard = () => {
 
           // Refresh data and close panel
           await fetchProfileData();
-          closeEditPanel();
+          closePanel();
         } else {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
         }
 
       }
-      if (showFollowupPanel) {
+      if (showPanel === 'followUp') {
 
 
         // Combine date and time into a single Date object (if both are set)
@@ -1912,7 +1996,7 @@ const CRMDashboard = () => {
 
           // Refresh data and close panel
           await fetchProfileData();
-          closeEditPanel();
+          closePanel();
         } else {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
@@ -1959,6 +2043,8 @@ const CRMDashboard = () => {
     fetchProfileData();
   }, [currentPage]);
 
+
+
   const fetchProfileData = async () => {
     try {
 
@@ -1975,15 +2061,34 @@ const CRMDashboard = () => {
       });
       console.log('Backend profile data:', response.data);
       if (response.data.success && response.data.data) {
-        const data = response.data.data; // create array 
-        setAllProfiles(response.data.data);
-        setAllProfilesData(response.data.data)
-        setTotalPages(response.data.totalPages);
+        const data = response.data; // create array
+        setAllProfilesData(data.data)
+
+        
+        if (activeCrmFilter == 0) {
+
+          setAllProfiles(data.data);
+        }
+        else {
+
+          const id = crmFilters[activeCrmFilter]._id
+          const filteredProfiles = data.data.filter(profile => {
+            return profile._leadStatus && profile._leadStatus._id === id;
+          });
+          setAllProfiles(filteredProfiles);
+
+
+        }
+        setTotalPages(data.totalPages);
+        setPageSize(data.limit)
+
+
 
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
-      updateCrmFiltersCounts(response.data.data);
+      updateCrmFiltersCounts(response.data.allData);
+
     } catch (error) {
       console.error('Error fetching profile data:', error);
     }
@@ -2039,28 +2144,31 @@ const CRMDashboard = () => {
     });
   }, [allProfiles, totalPages, currentPage, pageSize]);
 
-  const handleCrmFilterClick = (_id, index) => {
+  const handleCrmFilterClick = (index) => {
 
-    setCurrentPage(1);
-    if (_id === 'all') {
+    if (index === 0) {
       // Agar "all" filter select hua hai to pura data set kar do
       setAllProfiles(allProfilesData);
 
       setActiveCrmFilter(index)
-      fetchProfileData();
 
     } else {
       // Filter karo jisme leadStatus._id match ho
+
+      const id = crmFilters[index]._id
+      console.log(id ,'id' )
+      console.log(allProfilesData,'allProfilesData')
       const filteredProfiles = allProfilesData.filter(profile => {
-        return profile._leadStatus && profile._leadStatus._id === _id;
+        return profile._leadStatus && profile._leadStatus._id === id;
       });
+
+      console.log(filteredProfiles,'filteredProfiles')
 
 
       setActiveCrmFilter(index)
       setAllProfiles(filteredProfiles);
       // Calculate total pages
-      const totalPages = Math.ceil(filteredProfiles.length / pageSize);
-      setTotalPages(totalPages > 0 ? totalPages : 1);
+
 
     }
   };
@@ -2098,40 +2206,43 @@ const CRMDashboard = () => {
 
   const openEditPanel = async (profile = null, panel) => {
     console.log('panel', panel);
+    setSelectedProfile(null)
+    setShowPanel('')
+    setSelectedStatus(null)
+    setSelectedSubStatus(null)
+
 
     if (profile) {
       setSelectedProfile(profile);
     }
 
     // Close all panels first
-    setShowEditPanel(false);
-    setShowRefferPanel(false);
+
     setShowPopup(null);
     setSelectedConcernPerson(null);
 
-    setShowFollowupPanel(false);
-    setShowWhatsappPanel(false);
 
     if (panel === 'StatusChange') {
       if (profile) {
         const newStatus = profile?._leadStatus?._id || '';
         setSelectedStatus(newStatus);
 
-        if (newStatus) {
-          await fetchSubStatus(newStatus);
-        }
+        // if (newStatus) {
+        //   await fetchSubStatus(newStatus);
+        // }
 
         setSelectedSubStatus(profile?.selectedSubstatus || '');
       }
-      setShowEditPanel(true);
+      setShowPanel('editPanel')
+
     }
     else if (panel === 'SetFollowup') {
       setShowPopup(null)
-      setShowFollowupPanel(true);
+      setShowPanel('followUp')
     }
     else if (panel === 'bulkstatuschange') {
       setShowPopup(null)
-      setShowBulkStatusLead(true)
+      setShowPanel('bulkstatuschange')
 
     }
 
@@ -2140,15 +2251,15 @@ const CRMDashboard = () => {
     }
   };
 
-  const closeEditPanel = () => {
-    setShowEditPanel(false);
-    setShowBulkStatusLead(false)
-    setShowFollowupPanel(false);
-    setShowRefferBulkLead(false)
-    setShowRefferPanel(false);
-    setShowWhatsappPanel(false);
+
+  const closePanel = () => {
+    setShowPanel('');
     setShowPopup(null);
     setSelectedConcernPerson(null);
+    setSelectedProfiles(null);
+    setSelectedProfile(null);
+    setSelectedStatus(null)
+    setSelectedSubStatus(null)
     if (!isMobile) {
       setMainContentClass('col-12');
     }
@@ -2165,19 +2276,14 @@ const CRMDashboard = () => {
 
     }
 
-    setShowRefferPanel(false);
     setShowPopup(null)
-
-    setShowFollowupPanel(false);
-    setShowWhatsappPanel(false);
-    setShowEditPanel(false);
 
     if (panel === 'RefferAllLeads') {
 
-      setShowRefferBulkLead(true)
+      setShowPanel('RefferAllLeads');
 
     } else if (panel === 'Reffer') {
-      setShowRefferPanel(true);
+      setShowPanel('Reffer');
     }
 
     if (!isMobile) {
@@ -2231,42 +2337,28 @@ const CRMDashboard = () => {
         alert(response.data.message || 'Failed to refer lead');
       }
       await fetchProfileData();
-      closeRefferPanel();
-      closeEditPanel();
-      closeWhatsappPanel();
-      closeleadHistoryPanel();
+      closePanel();
+      closePanel();
+      closePanel();
+      closePanel();
     } catch (error) {
       console.error('Error referring lead:', error);
       alert('Failed to refer lead');
     }
   }
 
-  const closeRefferPanel = () => {
-    setShowRefferPanel(false);
-    setShowRefferBulkLead(false)
-    setShowFollowupPanel(false);
-    setSelectedConcernPerson(null);
-    if (!isMobile) {
-      setMainContentClass('col-12');
-    }
-  };
+
 
 
 
   const openWhatsappPanel = () => {
-    setShowWhatsappPanel(true);
-    setShowEditPanel(false);
+    setShowPanel('whatsapp');
     if (!isMobile) {
       setMainContentClass('col-8');
     }
   };
 
-  const closeWhatsappPanel = () => {
-    setShowWhatsappPanel(false);
-    if (!isMobile) {
-      setMainContentClass(showEditPanel ? 'col-8' : 'col-12');
-    }
-  };
+
 
   const openleadHistoryPanel = async (profile = null) => {
     if (profile) {
@@ -2275,11 +2367,10 @@ const CRMDashboard = () => {
 
     }
 
-    setShowPopup(null)
-
-    setLeadHistoryPanel(true)
-    setShowWhatsappPanel(false);
-    setShowEditPanel(false);
+    setShowPopup(null);
+    setShowPanel('leadHistory');
+    setSelectedConcernPerson(null);
+    setSelectedProfiles(null);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -2289,12 +2380,7 @@ const CRMDashboard = () => {
     setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
   };
 
-  const closeleadHistoryPanel = () => {
-    setLeadHistoryPanel(false)
-    if (!isMobile) {
-      setMainContentClass(showEditPanel || showWhatsappPanel ? 'col-8' : 'col-12');
-    }
-  };
+
 
   const scrollLeft = () => {
     const container = document.querySelector('.scrollable-content');
@@ -2322,13 +2408,15 @@ const CRMDashboard = () => {
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
             <h6 className="mb-0 followUp fw-medium">
-              {showEditPanel && 'Edit Status for '}
-              {showFollowupPanel && 'Set Followup for '}
-              {selectedProfile?._candidate?.name || 'Unknown'}
+              {(showPanel === 'editPanel' || showPanel === 'followUp') && `${showPanel === 'editPanel' ? 'Edit Status for ' : 'Set Followup for '}${selectedProfile?._candidate?.name || ''}`}
+
+
+              {(showPanel === 'bulkstatuschange') && 'Bulk Status Change'}
+
             </h6>
           </div>
           <div>
-            <button className="btn-close" type="button" onClick={closeEditPanel}>
+            <button className="btn-close" type="button" onClick={closePanel}>
               {/* <i className="fa-solid fa-xmark"></i> */}
             </button>
           </div>
@@ -2337,7 +2425,7 @@ const CRMDashboard = () => {
         <div className="card-body">
           <form>
 
-            {!showFollowupPanel && (
+            {(showPanel !== 'followUp') && (
               <>
                 <div className="mb-1">
                   <label htmlFor="status" className="form-label small fw-medium text-dark">
@@ -2396,7 +2484,7 @@ const CRMDashboard = () => {
             )}
 
 
-            {((seletectedSubStatus && seletectedSubStatus.hasFollowup) || showFollowupPanel) && (
+            {((seletectedSubStatus && seletectedSubStatus.hasFollowup && (showPanel !== 'bulkstatuschange')) || (showPanel === 'followUp') || (showPanel !== 'bulkstatuschange')) && (
 
               <div className="row mb-1">
                 <div className="col-6">
@@ -2442,7 +2530,7 @@ const CRMDashboard = () => {
                 </div>
               </div>)}
 
-            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || showFollowupPanel) && (
+            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || (setShowPanel === 'followUp')) && (
 
               <div className="mb-1">
                 <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
@@ -2463,7 +2551,7 @@ const CRMDashboard = () => {
                 type="button"
                 className="btn"
                 style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closeEditPanel}
+                onClick={closePanel}
               >
                 CLOSE
               </button>
@@ -2474,8 +2562,9 @@ const CRMDashboard = () => {
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
-                {showEditPanel && 'UPDATE STATUS'}
-                {showFollowupPanel && 'SET FOLLOWUP '}
+                {(showPanel === 'editPanel') && 'UPDATE STATUS'}
+                {(showPanel === 'followUp') && 'SET FOLLOWUP '}
+                {(showPanel === 'bulkstatuschange') && 'UPDATE BULK STATUS '}
               </button>
             </div>
           </form>
@@ -2486,10 +2575,10 @@ const CRMDashboard = () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${showEditPanel || showFollowupPanel || showBulkStatusLead ? 'show d-block' : 'd-none'}`}
+          className="modal show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeEditPanel();
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg">
@@ -2501,7 +2590,7 @@ const CRMDashboard = () => {
       );
     }
 
-    return showEditPanel || showFollowupPanel || showBulkStatusLead ? (
+    return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
       <div className="col-12 transition-col" id="editFollowupPanel">
         {panelContent}
       </div>
@@ -2520,12 +2609,13 @@ const CRMDashboard = () => {
             </div>
             <h6 className="mb-0 followUp fw-medium">
 
-              {showRefferPanel && 'Refer Lead '}
-              {selectedProfile?._candidate?.name || 'Unknown'} to Counselor
+              {showPanel === 'Reffer' && (`Refer Lead ${selectedProfile?._candidate?.name || 'Unknown'} to Counselor`)}
+              {showPanel === 'RefferAllLeads' && (`Refer All Lead to Counselor`)}
+
             </h6>
           </div>
           <div>
-            <button className="btn-close" type="button" onClick={closeRefferPanel}>
+            <button className="btn-close" type="button" onClick={closePanel}>
               {/* <i className="fa-solid fa-xmark"></i> */}
             </button>
           </div>
@@ -2570,7 +2660,7 @@ const CRMDashboard = () => {
                 type="button"
                 className="btn"
                 style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closeRefferPanel}
+                onClick={closePanel}
               >
                 CLOSE
               </button>
@@ -2581,7 +2671,7 @@ const CRMDashboard = () => {
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
-                {showRefferPanel ? 'REFER LEAD' : 'REFER BULK LEAD'}
+                {showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD'}
               </button>
             </div>
           </form>
@@ -2592,10 +2682,10 @@ const CRMDashboard = () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${showRefferPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
+          className={'modal show d-block'}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeRefferPanel();
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg">
@@ -2607,7 +2697,7 @@ const CRMDashboard = () => {
       );
     }
 
-    return showRefferPanel || showRefferBulkLead ? (
+    return (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
       <div className="col-12 transition-col" id="refferPanel">
         {panelContent}
       </div>
@@ -2638,7 +2728,7 @@ const CRMDashboard = () => {
             </a>
             <button
               className="btn btn-sm btn-outline-secondary"
-              onClick={closeWhatsappPanel}
+              onClick={closePanel}
               title="Close WhatsApp"
             >
               <i className="fas fa-times"></i>
@@ -2737,10 +2827,10 @@ const CRMDashboard = () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${showWhatsappPanel ? 'show d-block' : 'd-none'}`}
+          className='modal show d-block'
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeWhatsappPanel();
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
@@ -2752,7 +2842,7 @@ const CRMDashboard = () => {
       );
     }
 
-    return showWhatsappPanel ? (
+    return showPanel === 'whatsapp' ? (
       <div className="col-12 transition-col" id="whatsappPanel">
         {panelContent}
       </div>
@@ -2770,7 +2860,7 @@ const CRMDashboard = () => {
             </div>
             <h6 className="mb-0 fw-medium">Lead History</h6>
           </div>
-          <button className="btn-close" type="button" onClick={closeleadHistoryPanel}>
+          <button className="btn-close" type="button" onClick={closePanel}>
           </button>
         </div>
 
@@ -2799,7 +2889,7 @@ const CRMDashboard = () => {
                     <div className="timeline-content">
                       <div className="card border-0 shadow-sm">
                         <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2">
+                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
                             <span className="bg-light text-dark border">
                               {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
                                 day: '2-digit',
@@ -2861,7 +2951,7 @@ const CRMDashboard = () => {
               <button
                 type="button"
                 className="btn btn-outline-secondary"
-                onClick={closeleadHistoryPanel}
+                onClick={closePanel}
               >
                 <i className="fas fa-times me-1"></i>
                 Close
@@ -2875,10 +2965,10 @@ const CRMDashboard = () => {
     if (isMobile) {
       return (
         <div
-          className={`modal ${leadHistoryPanel ? 'show d-block' : 'd-none'}`}
+          className="modal show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closeleadHistoryPanel();
+            if (e.target === e.currentTarget) closePanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
@@ -2890,7 +2980,7 @@ const CRMDashboard = () => {
       );
     }
 
-    return leadHistoryPanel ? (
+    return showPanel === 'leadHistory' ? (
       <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
         {panelContent}
       </div>
@@ -2910,7 +3000,7 @@ const CRMDashboard = () => {
     });
   };
 
- 
+
 
   return (
     <div className="container-fluid">
@@ -3071,7 +3161,7 @@ const CRMDashboard = () => {
                             type="button"
                             onClick={() => {
                               setFilterData(prev => ({ ...prev, name: '' }));
-                              setAllProfiles(allProfilesData);
+                              fetchProfileData();
                             }}
                           >
                             <i className="fas fa-times"></i>
@@ -3118,7 +3208,7 @@ const CRMDashboard = () => {
                           <div className='d-flex position-relative'>
                             <button
                               className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
-                              onClick={() => handleCrmFilterClick(filter._id, index)}
+                              onClick={() => handleCrmFilterClick(index)}
                             >
                               {filter.name}
                               <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
@@ -3182,7 +3272,7 @@ const CRMDashboard = () => {
                           nextActionFromDate: null,
                           nextActionToDate: null,
                         });
-                        setAllProfiles(allProfilesData);
+                        fetchProfileData();
                       }}
                     >
                       <i className="fas fa-times-circle me-1"></i>
@@ -3679,7 +3769,7 @@ const CRMDashboard = () => {
                                   <div className="col-md-6">
                                     <div className="d-flex align-items-center">
                                       <div className="form-check me-3">
-                                        <input className="form-check-input" type="checkbox" />
+                                        <input onChange={(e) => handleCheckboxChange(profile, e.target.checked)} className="form-check-input" type="checkbox" />
                                       </div>
                                       <div className="me-3">
                                         <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
@@ -3708,14 +3798,14 @@ const CRMDashboard = () => {
                                       >
                                         <i className="fab fa-whatsapp"></i>
                                       </button> */}
-                                        <button
+                                        <a
                                           className="btn btn-outline-success btn-sm border-0"
-                                          onClick={openWhatsappPanel}
+                                          href={`https://wa.me/${profile._candidate?.mobile}`}
                                           style={{ fontSize: '20px' }}
                                           title="WhatsApp"
                                         >
                                           <i className="fab fa-whatsapp"></i>
-                                        </button>
+                                        </a>
                                       </div>
                                     </div>
                                   </div>
