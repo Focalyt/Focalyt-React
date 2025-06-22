@@ -276,7 +276,7 @@ const AdmissionList = () => {
   ];
   // Form data state
   const [formData, setFormData] = useState({
-    sectors: {
+    projects: {
       type: "includes",
       values: []
     },
@@ -304,7 +304,7 @@ const AdmissionList = () => {
 
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
-    sectors: false,
+    projects: false,
     verticals: false,
     course: false,
     center: false,
@@ -2883,13 +2883,13 @@ const AdmissionList = () => {
 
                   <div className="col-md-2">
                   <MultiSelectCheckbox
-                      title="Sectors"
+                      title="Projects"
                       options={sectorOptions}
-                      selectedValues={formData.sectors.values}
-                      onChange={(values) => handleCriteriaChange('sectors', values)}
+                      selectedValues={formData.projects.values}
+                      onChange={(values) => handleCriteriaChange('projects', values)}
                       icon="fas fa-sitemap"
-                      isOpen={dropdownStates.sectors}
-                      onToggle={() => toggleDropdown('sectors')}
+                      isOpen={dropdownStates.projects}
+                      onToggle={() => toggleDropdown('projects')}
                     />
                   </div>
                   <div className="col-md-2">
@@ -7134,8 +7134,8 @@ background: #fd2b5a;
               position: fixed !important;
               transition: 0.4s;
               background: white;
-              left:15.9%;
-              right:3%;
+              {/* left:15.9%;
+              right:3%; */}
             }
                 .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
         position: fixed !important;

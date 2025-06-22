@@ -550,7 +550,7 @@ const CRMDashboard = () => {
   ];
   // Form data state
   const [formData, setFormData] = useState({
-    sectors: {
+    projects: {
       type: "includes",
       values: []
     },
@@ -578,7 +578,7 @@ const CRMDashboard = () => {
 
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
-    sectors: false,
+    projects: false,
     verticals: false,
     course: false,
     center: false,
@@ -3328,13 +3328,13 @@ const CRMDashboard = () => {
                       </select>
                     </div> */}
                     <MultiSelectCheckbox
-                      title="Sectors"
+                      title="Project"
                       options={sectorOptions}
-                      selectedValues={formData.sectors.values}
-                      onChange={(values) => handleCriteriaChange('sectors', values)}
+                      selectedValues={formData.projects.values}
+                      onChange={(values) => handleCriteriaChange('projects', values)}
                       icon="fas fa-sitemap"
-                      isOpen={dropdownStates.sectors}
-                      onToggle={() => toggleDropdown('sectors')}
+                      isOpen={dropdownStates.projects}
+                      onToggle={() => toggleDropdown('projects')}
                     />
 
                   </div>
