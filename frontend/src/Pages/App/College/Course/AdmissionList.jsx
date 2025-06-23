@@ -399,6 +399,52 @@ const AdmissionList = () => {
     setIsUploading(false);
   };
 
+
+const downloadApplicationForm = async (candidateId) => {
+  try {
+    const response = await axios.get(
+      `${backendUrl}/college/generate-application-form/${candidateId}`,
+      {
+        responseType: 'blob', // Important for file download
+      }
+    );
+
+    console.log(response,'response')
+    const contentType = response.headers['content-type'];
+
+    if (contentType.includes('application/json')) {
+      const text = await response.data.text(); // convert blob to text
+      const json = JSON.parse(text);
+    
+      if (!json.status) {
+        alert(json.message || 'Something went wrong');
+        return;
+      }
+    }
+
+   
+
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'application_form.pdf'); // File name
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(url); 
+    
+
+
+  } catch (err) {
+    console.error('Error downloading PDF:', err);
+    alert('PDF download failed!');
+  }
+};
+
+
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -988,64 +1034,7 @@ const AdmissionList = () => {
     setSelectedStatus(e.target.value);
   };
 
-  const handleMoveToAdmission = async (profile) => {
-    try {
-      if (!profile || !profile._id) {
-        alert('No profile selected');
-        return;
-      }
-
-      // Check if all documents are verified using docCounts
-      if (profile.docCounts.verifiedCount !== profile.docCounts.totalRequired) {
-        alert('All documents must be verified before moving to admission list');
-        return;
-      }
-
-      // Show confirmation dialog
-      const confirmMove = window.confirm('Do you really want to move this profile to admission list?');
-      if (!confirmMove) {
-        return;
-      }
-
-      // Check if backend URL and token exist
-      if (!backendUrl) {
-        alert('Backend URL not configured');
-        return;
-      }
-
-      if (!token) {
-        alert('Authentication token missing');
-        return;
-      }
-
-      // Send PUT request to backend API to update status
-      const response = await axios.put(
-        `${backendUrl}/college/update/${profile._id}`,
-        {
-          admissionDone: true, // Set admission as done
-          remarks: 'Moved to admission'
-        },
-        {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.data.success) {
-        alert('Profile moved to admission successfully!');
-        // Refresh the profile data
-        await fetchProfileData();
-      } else {
-        console.error('API returned error:', response.data);
-        alert(response.data.message || 'Failed to move to admission');
-      }
-    } catch (error) {
-      console.error('Error moving to admission:', error);
-      alert('Failed to move to admission');
-    }
-  };
+  
 
   const handleTimeChange = (e) => {
     if (!followupDate) {
@@ -3309,9 +3298,9 @@ const AdmissionList = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
-                                              onClick={() => handleMoveToAdmission(profile)}
+                                              onClick={() => downloadApplicationForm(profile)}
                                             >
-                                              Move to Admission
+                                              Download Application Form
                                             </button>
                                             <button
                                               className="dropdown-item"
@@ -3439,9 +3428,9 @@ const AdmissionList = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
-                                              onClick={() => handleMoveToAdmission(profile)}
+                                              onClick={() => downloadApplicationForm(profile._id)}
                                             >
-                                              Move to Admission
+                                              Download Application Form
                                             </button>
                                             <button
                                               className="dropdown-item"

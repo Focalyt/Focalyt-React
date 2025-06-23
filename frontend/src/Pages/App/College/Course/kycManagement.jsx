@@ -1044,11 +1044,7 @@ const KYCManagement = () => {
         return;
       }
 
-      // Check if all documents are verified using docCounts
-      if (profile.docCounts.verifiedCount !== profile.docCounts.totalRequired) {
-        alert('All documents must be verified before moving to admission list');
-        return;
-      }
+      
 
       // Show confirmation dialog
       const confirmMove = window.confirm('Do you really want to move this profile to admission list?');

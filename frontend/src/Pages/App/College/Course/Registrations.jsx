@@ -2573,7 +2573,8 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (
+      return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
+
         <div
           className="modal show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -2587,7 +2588,7 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      );
+      ):null;
     }
 
     return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
@@ -2680,7 +2681,7 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (
+      return (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
         <div
           className={'modal show d-block'}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -2694,7 +2695,7 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      );
+      ) : null;
     }
 
     return (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
@@ -2825,7 +2826,7 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (
+      return showPanel === 'whatsapp' ? (
         <div
           className='modal show d-block'
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -2839,7 +2840,7 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      );
+      ): null;
     }
 
     return showPanel === 'whatsapp' ? (
@@ -2963,7 +2964,7 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (
+      return showPanel === 'leadHistory'? (
         <div
           className="modal show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -2977,10 +2978,10 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      );
+      ) : null;
     }
 
-    return showPanel === 'leadHistory' ? (
+    return showPanel === 'leadHistory'? (
       <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
         {panelContent}
       </div>
