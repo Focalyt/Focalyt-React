@@ -7,6 +7,7 @@ import moment from 'moment';
 import axios from 'axios'
 import './CourseCrm.css';
 import './crm.css';
+import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
 const MultiSelectCheckbox = ({
   title,
@@ -124,9 +125,27 @@ const MultiSelectCheckbox = ({
 };
 const CRMDashboard = () => {
 
+  const candidateRef = useRef();
+
+  const fetchProfile = (id) => {
+    if (candidateRef.current) {
+      console.log('start fetching',id)
+      candidateRef.current.fetchProfile(id);
+    }
+  };
+
+
+  const handleSaveCV = () => {
+    if (candidateRef.current) {
+      candidateRef.current.handleSaveCV();
+    }
+  };
+
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+
+  const [openModalId, setOpenModalId] = useState(null);
 
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
@@ -195,9 +214,6 @@ const CRMDashboard = () => {
 
 
 
-  useEffect(() => {
-    console.log('selectedProfiles', selectedProfiles)
-  }, [selectedProfiles])
 
   const handleCheckboxChange = (profile, checked) => {
     if (checked) {
@@ -2064,7 +2080,7 @@ const CRMDashboard = () => {
         const data = response.data; // create array
         setAllProfilesData(data.data)
 
-        
+
         if (activeCrmFilter == 0) {
 
           setAllProfiles(data.data);
@@ -2156,13 +2172,13 @@ const CRMDashboard = () => {
       // Filter karo jisme leadStatus._id match ho
 
       const id = crmFilters[index]._id
-      console.log(id ,'id' )
-      console.log(allProfilesData,'allProfilesData')
+      console.log(id, 'id')
+      console.log(allProfilesData, 'allProfilesData')
       const filteredProfiles = allProfilesData.filter(profile => {
         return profile._leadStatus && profile._leadStatus._id === id;
       });
 
-      console.log(filteredProfiles,'filteredProfiles')
+      console.log(filteredProfiles, 'filteredProfiles')
 
 
       setActiveCrmFilter(index)
@@ -2308,6 +2324,19 @@ const CRMDashboard = () => {
     }
     fetchConcernPersons();
   };
+  const handleFetchCandidate = async (profile = null) => {
+    setShowPopup(null)
+    setSelectedProfile(profile)
+    setOpenModalId(profile._id);
+  }
+
+  useEffect(() => {
+    console.log('useeffect', selectedProfile);
+    if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
+      fetchProfile(selectedProfile._candidate._id);
+    }
+  }, [selectedProfile]);
+  
 
 
   const handleConcernPersonChange = (e) => {
@@ -2369,6 +2398,22 @@ const CRMDashboard = () => {
 
     setShowPopup(null);
     setShowPanel('leadHistory');
+    setSelectedConcernPerson(null);
+    setSelectedProfiles(null);
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+  };
+
+  const openProfileEditPanel = async (profile = null) => {
+    if (profile) {
+      // Set selected profile
+      setSelectedProfile(profile);
+
+    }
+
+    setShowPopup(null);
+    setShowPanel('ProfileEdit');
     setSelectedConcernPerson(null);
     setSelectedProfiles(null);
     if (!isMobile) {
@@ -2573,7 +2618,7 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (
+      return  (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ?  (
         <div
           className="modal show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -2587,7 +2632,7 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      );
+      ): null;
     }
 
     return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
@@ -2680,7 +2725,7 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (
+      return  (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
         <div
           className={'modal show d-block'}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -2694,7 +2739,7 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      );
+      ): null ;
     }
 
     return (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
@@ -2825,7 +2870,7 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (
+      return showPanel === 'whatsapp' ? (
         <div
           className='modal show d-block'
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -2839,7 +2884,7 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      );
+      ): null ;
     }
 
     return showPanel === 'whatsapp' ? (
@@ -2963,7 +3008,7 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (
+      return showPanel === 'leadHistory' ? (
         <div
           className="modal show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -2977,7 +3022,7 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      );
+      ): null;
     }
 
     return showPanel === 'leadHistory' ? (
@@ -3977,6 +4022,44 @@ const CRMDashboard = () => {
                                             Set Followup
                                           </button>
 
+                                          {/* <button type="button" className="btn btn-primary border-0 text-black" data-bs-toggle="modal" data-bs-target={`#profileModal-${profile._id}`} style={{
+                                            width: "100%",
+                                            padding: "8px 16px",
+                                            border: "none",
+                                            background: "none",
+                                            textAlign: "left",
+                                            cursor: "pointer",
+                                            fontSize: "12px",
+                                            fontWeight: "600"
+                                          }}
+                                            onClick={() => {
+                                              handleFetchCandidate(profile);
+
+                                            }}
+                                          >
+
+                                            Profile Edit
+                                          </button> */}
+                                          <button
+                                            className="btn btn-primary border-0 text-black"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              handleFetchCandidate(profile);
+                                             
+                                            }}
+                                          >
+                                            Profile Edit
+                                          </button>
+
 
                                         </div>
                                       </div>
@@ -4110,6 +4193,42 @@ const CRMDashboard = () => {
                                             }}
                                           >
                                             Set Followup
+                                          </button>
+                                          {/* <button type="button" className="btn btn-primary border-0 text-black" data-bs-toggle="modal" data-bs-target={`profileModal-${profile._id}`} style={{
+                                            width: "100%",
+                                            padding: "8px 16px",
+                                            border: "none",
+                                            background: "none",
+                                            textAlign: "left",
+                                            cursor: "pointer",
+                                            fontSize: "12px",
+                                            fontWeight: "600"
+                                          }}
+                                            onClick={() => {
+                                              handleFetchCandidate(profile);
+
+                                            }}
+                                          >
+                                            Profile Edit
+                                          </button> */}
+                                          <button
+                                            className="btn btn-primary border-0 text-black"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              handleFetchCandidate(profile);
+                                              // open modal for this profile
+                                            }}
+                                          >
+                                            Profile Edit
                                           </button>
 
 
@@ -4751,6 +4870,8 @@ const CRMDashboard = () => {
                                         </div>
                                       </div>
                                     </div>
+
+
                                   )}
 
                                   {/* Job History Tab */}
@@ -5164,7 +5285,58 @@ const CRMDashboard = () => {
                                 </div>
                               )}
                             </div>
+
+                            {/* <div class="modal fade" id={`profileModal-${profile._id}`} data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby={`profileModalLabel-${profile._id}`} aria-hidden="true">
+                              <div class="modal-dialog modal-dialog-scrollable">
+                                <div class="modal-content new-modal-content">
+                                  <div class="modal-header">
+                                    <h1 class="modal-title fs-5" id={`profileModalLabel-${profile._id}`}>Modal title</h1>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                  </div>
+                                  <div class="modal-body">
+                                    <CandidateProfile ref={candidateRef} />
+                                  </div>
+                                  <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <button onClick={handleSaveCV} type="button" class="btn btn-primary">Save CV</button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div> */}
+
+                            {openModalId === profile._id && (
+                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                <div className="modal-dialog modal-dialog-scrollable">
+                                  <div className="modal-content new-modal-content">
+                                    <div className="modal-header">
+                                      <h1 className="modal-title fs-5">Modal title</h1>
+                                      <button type="button" className="btn-close" onClick={() => {setOpenModalId(null); setSelectedProfile(null)}}></button>
+                                    </div>
+                                    <div className="modal-body">
+                                      <CandidateProfile ref={candidateRef} />
+                                    </div>
+                                    <div className="modal-footer">
+                                      <button type="button" className="btn btn-secondary" onClick={() => {setOpenModalId(null) ; setSelectedProfile(null)}}>Close</button>
+                                      <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+
+                            <style>
+                              {
+                                `.new-modal-content{
+                                 width:1000px!important;
+                                 transform: translateX(25%);
+                                 }
+                                  `
+                              }
+                            </style>
                           </div>
+
+
                         ))}
 
 
@@ -5174,7 +5346,9 @@ const CRMDashboard = () => {
                     </div>
                   </div>
                 </div>
+
               </div>
+
               <nav aria-label="Page navigation" className="mt-4">
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <small className="text-muted">
@@ -5232,6 +5406,7 @@ const CRMDashboard = () => {
               </nav>
             </section>
           </div>
+
         </div>
 
         {/* Right Sidebar for Desktop - Panels */}
@@ -5252,6 +5427,16 @@ const CRMDashboard = () => {
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
       </div>
+
+      {/* <div style={{ background: 'rgba(0, 0, 0, 0.5)', width: '100%', position: 'absolute', minHeight: '100vh', top: '0', zIndex: '13', position: 'fixed' }}>
+        <div className='card' style={{ border: '1px solid red', width: '70%', height: '100%' }}>
+          <CandidateProfile />
+        </div>
+      </div> */}
+
+      {/* <!-- Button trigger modal --> */}
+
+
 
 
       <style>

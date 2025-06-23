@@ -1499,6 +1499,17 @@ const CandidateProfile = () => {
                     }));
                   })}
                 </div>
+                <div className="profile-summary">
+                  {createEditable(profileData?.personalInfo?.professionalSummary || '', 'Father name', (val) => {
+                    setProfileData(prev => ({
+                      ...prev,
+                      personalInfo: {
+                        ...(prev.personalInfo || {}),
+                        professionalSummary: val
+                      }
+                    }));
+                  })}
+                </div>
 
                 <div className="contact-info mb-3">
                   <div className="contact-item">

@@ -7,10 +7,10 @@ const User = () => {
   // Current step state
   const [currentStep, setCurrentStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
-    const [fileName, setFileName] = useState("");
-      const [uploadDate, setUploadDate] = useState("");
-    
-  
+  const [fileName, setFileName] = useState("");
+  const [uploadDate, setUploadDate] = useState("");
+
+
 
   // For tracking form completion status
   const [formData, setFormData] = useState({
@@ -78,7 +78,7 @@ const User = () => {
     year: '',
     orgLocation: {
       type: 'Point',
-      coordinates: [0,0],
+      coordinates: [0, 0],
       city: '',
       state: '',
       fullAddress: ''
@@ -103,10 +103,10 @@ const User = () => {
   const [educationList, setEducationList] = useState([]);
   const [isExperienced, setIsExperienced] = useState(true);
   const [declaration, setDeclaration] = useState({
-      isChecked: false,
-      text: 'I hereby declare that all the information provided above is true to the best of my knowledge.'
-    });
-  
+    isChecked: false,
+    text: 'I hereby declare that all the information provided above is true to the best of my knowledge.'
+  });
+
 
   // States for autocomplete and suggestions
   const [boardSuggestions, setBoardSuggestions] = useState([]);
@@ -212,8 +212,8 @@ const User = () => {
     }
   };
 
- // useEffect में आप निम्न प्रकार से इसे कॉल कर सकते हैं
- 
+  // useEffect में आप निम्न प्रकार से इसे कॉल कर सकते हैं
+
   // सामान्य ऑटोकम्पलीट इनिशियलाइज़ फंक्शन
   const initializeAutocomplete = (inputId, stateUpdater, index, propertyName) => {
     setTimeout(() => {
@@ -261,8 +261,8 @@ const User = () => {
 
             const locationKey = propertyName === 'schoolName' ? 'schoolLocation' :
               propertyName === 'collegeName' ? 'collegeLocation' :
-                propertyName === 'universityName' ? 'universityLocation' : 
-                propertyName === 'orgName' ? 'orgLocation' : null;
+                propertyName === 'universityName' ? 'universityLocation' :
+                  propertyName === 'orgName' ? 'orgLocation' : null;
 
             if (locationKey) {
               updated[index][locationKey] = {
@@ -287,40 +287,40 @@ const User = () => {
 
 
 
-  
-   
 
-     useEffect(() => {
-        if (!window.google || !window.google.maps || !window.google.maps.places) {
-          // If not loaded, load the script
-          if (!document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
-            const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
-            if (!apiKey) {
-              console.error("Missing Google Maps API key!");
-              return;
-            }
-    
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-            script.async = true;
-            script.defer = true;
-            script.onload = () => {
-              // Set a flag to indicate Google Maps is loaded
-              window.googleMapsLoaded = true;
-              // Trigger a state update to force re-render and initialize autocompletes
-              setProfileData(prev => ({ ...prev }));
-            };
-            document.head.appendChild(script);
-          }
-        } else {
-          window.googleMapsLoaded = true;
+
+
+  useEffect(() => {
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      // If not loaded, load the script
+      if (!document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
+        const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+        if (!apiKey) {
+          console.error("Missing Google Maps API key!");
+          return;
         }
-      }, []); // Empty dependency array - run once on mount
-       // Initialize address autocomplete separately
-    // useEffect में ऐसा करें
+
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          // Set a flag to indicate Google Maps is loaded
+          window.googleMapsLoaded = true;
+          // Trigger a state update to force re-render and initialize autocompletes
+          setProfileData(prev => ({ ...prev }));
+        };
+        document.head.appendChild(script);
+      }
+    } else {
+      window.googleMapsLoaded = true;
+    }
+  }, []); // Empty dependency array - run once on mount
+  // Initialize address autocomplete separately
+  // useEffect में ऐसा करें
 
 
-  const initializeCompanyAutocomplete = (inputId,index) => {
+  const initializeCompanyAutocomplete = (inputId, index) => {
     setTimeout(() => {
       const companyInput = document.getElementById(inputId);
       if (!companyInput || !window.google || !window.google.maps || !window.google.maps.places) {
@@ -363,81 +363,81 @@ const User = () => {
   };
 
   const updateFileInProfile = async (dataObject, schemaFieldName) => {
-      try {
-        const token = localStorage.getItem('token');
-        console.log('updateFileInProfile hitting')
-  
-        const res = await axios.patch(`${backendUrl}/candidate/updatefiles`, {
-          [schemaFieldName]: dataObject
-        }, {
-          headers: { 'x-auth': token }
-        });
-  
-        if (res.data.status) {
-          alert(`${schemaFieldName} updated successfully!`);
-  
-          // Dynamically update in local state too
-          setProfileData(prev => ({
-            ...prev,
-            personalInfo: {
-              ...(prev.personalInfo || {}),
-              [schemaFieldName]: [
-                ...(prev.personalInfo?.[schemaFieldName] || []),
-                dataObject
-              ]
-            }
-          }));
-  
-          window.location.reload();
-  
-        }
-      } catch (err) {
-        console.error(`${schemaFieldName} update failed:`, err);
+    try {
+      const token = localStorage.getItem('token');
+      console.log('updateFileInProfile hitting')
+
+      const res = await axios.patch(`${backendUrl}/candidate/updatefiles`, {
+        [schemaFieldName]: dataObject
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (res.data.status) {
+        alert(`${schemaFieldName} updated successfully!`);
+
+        // Dynamically update in local state too
+        setProfileData(prev => ({
+          ...prev,
+          personalInfo: {
+            ...(prev.personalInfo || {}),
+            [schemaFieldName]: [
+              ...(prev.personalInfo?.[schemaFieldName] || []),
+              dataObject
+            ]
+          }
+        }));
+
+        window.location.reload();
+
       }
-    };
+    } catch (err) {
+      console.error(`${schemaFieldName} update failed:`, err);
+    }
+  };
 
   const uploadCV = async (file, filename) => {
-      try {
-        const token = localStorage.getItem('token');
-        const formData = new FormData();
-        formData.append('file', file);
-  
-        const res = await axios.post(`${backendUrl}/api/uploadSingleFile/${filename}`, formData, {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-  
-        if (res.data.status && res.data.data.Location) {
-          // Store file info in localStorage before updating profile
-          const currentDate = new Date().toLocaleDateString('en-GB', {
-            day: 'numeric', month: 'short', year: 'numeric'
-          }).replace(/ /g, ' ');
-          localStorage.setItem('resumeFileName', file.name);
-          localStorage.setItem('resumeUploadDate', currentDate)
-  
-          // Set the state values
-          setFileName(file.name);
-          setUploadDate(currentDate);
-  
-  
-          // ✅ Resume uploaded, now update profile
-          const uploadeddata = {
-            name: file.name,
-            url: res.data.data.Location,
-            uploadedAt: new Date()
-          };
-          console.log('file uploaded on s3')
-  
-          await updateFileInProfile(uploadeddata, filename);
-  
-          window.location.reload();
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await axios.post(`${backendUrl}/api/uploadSingleFile/${filename}`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
         }
-      } catch (err) {
-        console.error("Upload failed:", err);
+      });
+
+      if (res.data.status && res.data.data.Location) {
+        // Store file info in localStorage before updating profile
+        const currentDate = new Date().toLocaleDateString('en-GB', {
+          day: 'numeric', month: 'short', year: 'numeric'
+        }).replace(/ /g, ' ');
+        localStorage.setItem('resumeFileName', file.name);
+        localStorage.setItem('resumeUploadDate', currentDate)
+
+        // Set the state values
+        setFileName(file.name);
+        setUploadDate(currentDate);
+
+
+        // ✅ Resume uploaded, now update profile
+        const uploadeddata = {
+          name: file.name,
+          url: res.data.data.Location,
+          uploadedAt: new Date()
+        };
+        console.log('file uploaded on s3')
+
+        await updateFileInProfile(uploadeddata, filename);
+
+        window.location.reload();
       }
-    };
+    } catch (err) {
+      console.error("Upload failed:", err);
+    }
+  };
 
   // Handle board input change
   const handleBoardInputChange = async (value, index) => {
@@ -500,7 +500,7 @@ const User = () => {
 
   // Handle education change
   const handleEducationChange = async (e, index) => {
-    const educationId = e.target.value;const updated = [...educations];
+    const educationId = e.target.value; const updated = [...educations];
     updated[index].education = educationId;
     updated[index].course = '';
     updated[index].specialization = '';
@@ -948,7 +948,7 @@ const User = () => {
                 setEducations(updated);
               }}
               onFocus={() => initializeAutocomplete(`university-name-${index}`, setEducations, index, 'universityName')}
-              
+
             />
           </div>
 
@@ -972,7 +972,7 @@ const User = () => {
           <div className="form-group">
             <label className="form-label">Passing Year</label>
             <input
-            id={`passing-year-${index}`}
+              id={`passing-year-${index}`}
               type="text"
               className="form-input"
               value={edu.passingYear || ''}
@@ -1127,7 +1127,7 @@ const User = () => {
 
       if (res.data.status) {
         alert('Profile saved successfully!');
-        
+
         // window.location.reload();
 
       } else {
@@ -1433,7 +1433,7 @@ const User = () => {
                           setExperiences(updated);
                         }}
                         placeholder="e.g. XYZ Technologies"
-              onFocus={() => initializeCompanyAutocomplete(`company-name-${index}`,index)}
+                        onFocus={() => initializeCompanyAutocomplete(`company-name-${index}`, index)}
 
                       />
                     </div>
@@ -1618,41 +1618,41 @@ const User = () => {
 
               <div className="certifications-container">
                 {certificates.map((cert, index) => (
-                  <div className="certificate-item" key={`certificate-${index}`} style={{flexDirection: 'column'}}>
-                    <div className ='certificateFieldMobile' style={{display:'flex' , gap: '15px' , width: '100%'}}>
-                    <div className="form-group">
-                      <label className="form-label">Certificate Name</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={cert.certificateName || ''}
-                        onChange={(e) => {
-                          const updated = [...certificates];
-                          updated[index].certificateName = e.target.value;
-                          setCertificates(updated);
-                        }}
-                        placeholder="Certificate name"
+                  <div className="certificate-item" key={`certificate-${index}`} style={{ flexDirection: 'column' }}>
+                    <div className='certificateFieldMobile' style={{ display: 'flex', gap: '15px', width: '100%' }}>
+                      <div className="form-group">
+                        <label className="form-label">Certificate Name</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={cert.certificateName || ''}
+                          onChange={(e) => {
+                            const updated = [...certificates];
+                            updated[index].certificateName = e.target.value;
+                            setCertificates(updated);
+                          }}
+                          placeholder="Certificate name"
 
-                      />
-                    </div>
+                        />
+                      </div>
 
-                    <div className="form-group w-100">
-                      <label className="form-label">Issuing Organization</label>
-                      <input
-                        type="text"
-                        id={`issuing-organization-${index}`}
-                        className="form-input"
-                        value={cert.orgName || ''}
-                        onChange={(e) => {
-                          const updated = [...certificates];
-                          updated[index].orgName = e.target.value;
-                          setCertificates(updated);
-                        }}
-                        placeholder="Issuing organization"
-                        onFocus={() => initializeAutocomplete(`issuing-organization-${index}`, setCertificates, index, 'orgName')}
+                      <div className="form-group w-100">
+                        <label className="form-label">Issuing Organization</label>
+                        <input
+                          type="text"
+                          id={`issuing-organization-${index}`}
+                          className="form-input"
+                          value={cert.orgName || ''}
+                          onChange={(e) => {
+                            const updated = [...certificates];
+                            updated[index].orgName = e.target.value;
+                            setCertificates(updated);
+                          }}
+                          placeholder="Issuing organization"
+                          onFocus={() => initializeAutocomplete(`issuing-organization-${index}`, setCertificates, index, 'orgName')}
 
-                      />
-                    </div>
+                        />
+                      </div>
                     </div>
                     <div className="form-row">
                       <div className="form-group half-width">
@@ -1734,7 +1734,19 @@ const User = () => {
           {currentStep === 4 && (
             <div className="step-content">
               <h2>Additional Information</h2>
-              <p className="form-description">Add skills, languages, and other relevant details</p>
+              {/* <p className="form-description">Add skills, languages, and other relevant details</p> */}
+
+              <div className="form-group">
+                <label className="form-label">Father's Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={profileData?.personalInfo?.fatherName || ''}
+
+                  placeholder="Enter father's full name"
+                />
+              </div>
+
 
               {/* Skills Section */}
               <div className="section-header">
@@ -1981,369 +1993,369 @@ const User = () => {
               <button className="submit-btn" onClick={async () => {
                 await handleContinue();
                 setShowPreview(true);
-                    
-                    // Need to wait for the preview to render
-                    setTimeout(async () => {
-                      try {
-                        // Now try to get the element
-                        const element = document.getElementById('resume-download');
-                        
-                        if (!element) {
-                          console.error("Resume element still not found after showing preview");
-                          alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
-                          return;
-                        }
-                        
-                        const opt = {
-                          margin: 0.5,
-                          filename: 'resume.pdf',
-                          image: { type: 'jpeg', quality: 0.98 },
-                          html2canvas: { scale: 2 },
-                          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-                        };
-                
-                        // Generate blob
-                        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
-                        
-                        // Create a file object from the blob
-                        const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
-                          type: 'application/pdf'
-                        });
-                        
-                        // Upload to focalytProfile
-                        await uploadCV(pdfFile, 'focalytProfile');
-                        
-                        // Close the preview
-                        setShowPreview(false);
-                        
-                        alert('Resume has been saved successfully, including the PDF for your profile!');
-                      } catch (err) {
-                        console.error("PDF generation error:", err);
-                        alert('Resume data saved, but there was an error generating the PDF profile.');
-                        setShowPreview(false); // Close preview on error
-                      }
-                    }, 1000);
+
+                // Need to wait for the preview to render
+                setTimeout(async () => {
+                  try {
+                    // Now try to get the element
+                    const element = document.getElementById('resume-download');
+
+                    if (!element) {
+                      console.error("Resume element still not found after showing preview");
+                      alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
+                      return;
+                    }
+
+                    const opt = {
+                      margin: 0.5,
+                      filename: 'resume.pdf',
+                      image: { type: 'jpeg', quality: 0.98 },
+                      html2canvas: { scale: 2 },
+                      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                    };
+
+                    // Generate blob
+                    const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+
+                    // Create a file object from the blob
+                    const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
+                      type: 'application/pdf'
+                    });
+
+                    // Upload to focalytProfile
+                    await uploadCV(pdfFile, 'focalytProfile');
+
+                    // Close the preview
+                    setShowPreview(false);
+
+                    alert('Resume has been saved successfully, including the PDF for your profile!');
+                  } catch (err) {
+                    console.error("PDF generation error:", err);
+                    alert('Resume data saved, but there was an error generating the PDF profile.');
+                    setShowPreview(false); // Close preview on error
+                  }
+                }, 1000);
 
 
-                }}>Save Profile</button>
+              }}>Save Profile</button>
             </div>
           )}
         </div>
 
         {/* Resume Preview Modal */}
-              {showPreview && (
-                <div className="resume-preview-modal">
-                  <div className="resume-preview-content">
-                    <div className="resume-preview-header">
-                      <h2>Resume Preview</h2>
-                      <button className="close-preview" onClick={() => setShowPreview(false)}>
-                        <i className="bi bi-x-lg"></i>
-                      </button>
+        {showPreview && (
+          <div className="resume-preview-modal">
+            <div className="resume-preview-content">
+              <div className="resume-preview-header">
+                <h2>Resume Preview</h2>
+                <button className="close-preview" onClick={() => setShowPreview(false)}>
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+
+              <div className="resume-preview-body">
+                <div id="resume-download" className="resume-document">
+                  {/* Header Section */}
+                  <div className="resume-document-header">
+                    <div className="resume-profile-section">
+                      {user?.image ? (
+                        <img
+                          src={`${bucketUrl}/${user.image}`}
+                          alt="Profile"
+                          className="resume-profile-image"
+                        />
+                      ) : (
+                        <div className="resume-profile-placeholder">
+                          <i className="bi bi-person-circle"></i>
+                        </div>
+                      )}
+
+                      <div className="resume-header-content">
+                        <h1 className="resume-name">
+                          {profileData?.personalInfo?.name || user?.name || 'Your Name'}
+                        </h1>
+                        <p className="resume-title">
+                          {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
+                        </p>
+                        <p className="resume-title">
+                          {profileData?.sex || 'Sex'}
+                        </p>
+
+                        <div className="resume-contact-details">
+                          {profileData?.mobile && (
+                            <div className="resume-contact-item">
+                              <i className="bi bi-telephone-fill"></i>
+                              <span>{profileData.mobile}</span>
+                            </div>
+                          )}
+                          {profileData?.email && (
+                            <div className="resume-contact-item">
+                              <i className="bi bi-envelope-fill"></i>
+                              <span>{profileData.email}</span>
+                            </div>
+                          )}
+                          {profileData?.dob && (
+                            <div className="resume-contact-item">
+                              <i className="bi bi-calendar-heart-fill"></i>
+
+                              {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric'
+                              }) : ''}
+                            </div>
+                          )}
+                          {profileData?.personalInfo?.currentAddress?.fullAddress && (
+
+                            <div className="resume-contact-item">
+                              <i className="bi bi-geo-alt-fill"></i>
+                              <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
+                            </div>
+                          )}
+
+                          {/* Add permanent address */}
+                          {profileData?.personalInfo?.permanentAddress && (
+                            <div className="resume-contact-item">
+                              <i className="bi bi-house-fill"></i>
+                              <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
+                            </div>
+                          )}
+
+                        </div>
+                      </div>
                     </div>
-        
-                    <div className="resume-preview-body">
-                      <div id="resume-download" className="resume-document">
-                        {/* Header Section */}
-                        <div className="resume-document-header">
-                          <div className="resume-profile-section">
-                            {user?.image ? (
-                              <img
-                                src={`${bucketUrl}/${user.image}`}
-                                alt="Profile"
-                                className="resume-profile-image"
-                              />
-                            ) : (
-                              <div className="resume-profile-placeholder">
-                                <i className="bi bi-person-circle"></i>
+
+                    <div className="resume-summary">
+                      <h2 className="resume-section-title">Professional Summary</h2>
+                      <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
+                    </div>
+                  </div>
+
+                  {/* Two Column Layout */}
+                  <div className="resume-document-body">
+                    {/* Left Column */}
+                    <div className="resume-column resume-left-column">
+                      {/* Experience Section */}
+                      {profileData?.experienceType === 'fresher' ? (
+                        /* Fresher Preview */
+                        <div className="resume-section">
+                          <h2 className="resume-section-title">Work Experience</h2>
+                          <div className="resume-experience-item">
+                            <div className="resume-item-header">
+                              <h3 className="resume-item-title">Fresher</h3>
+                            </div>
+                            {profileData?.fresherDetails && (
+                              <div className="resume-item-content">
+                                <p>{profileData.isExperienced}</p>
                               </div>
                             )}
-        
-                            <div className="resume-header-content">
-                              <h1 className="resume-name">
-                                {profileData?.personalInfo?.name || user?.name || 'Your Name'}
-                              </h1>
-                              <p className="resume-title">
-                                {profileData?.personalInfo?.professionalTitle || 'Professional Title'}
-                              </p>
-                              <p className="resume-title">
-                                {profileData?.sex || 'Sex'}
-                              </p>
-        
-                              <div className="resume-contact-details">
-                                {profileData?.mobile && (
-                                  <div className="resume-contact-item">
-                                    <i className="bi bi-telephone-fill"></i>
-                                    <span>{profileData.mobile}</span>
-                                  </div>
-                                )}
-                                {profileData?.email && (
-                                  <div className="resume-contact-item">
-                                    <i className="bi bi-envelope-fill"></i>
-                                    <span>{profileData.email}</span>
-                                  </div>
-                                )}
-                                {profileData?.dob && (
-                                  <div className="resume-contact-item">
-                                    <i className="bi bi-calendar-heart-fill"></i>
-        
-                                    {profileData.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', {
-                                      day: '2-digit',
-                                      month: 'long',
-                                      year: 'numeric'
-                                    }) : ''}
-                                  </div>
-                                )}
-                                {profileData?.personalInfo?.currentAddress?.fullAddress && (
-        
-                                  <div className="resume-contact-item">
-                                    <i className="bi bi-geo-alt-fill"></i>
-                                    <span>Current:{profileData.personalInfo.currentAddress.fullAddress}</span>
-                                  </div>
-                                )}
-        
-                                {/* Add permanent address */}
-                                {profileData?.personalInfo?.permanentAddress && (
-                                  <div className="resume-contact-item">
-                                    <i className="bi bi-house-fill"></i>
-                                    <span>Permanent: {profileData.personalInfo.permanentAddress.fullAddress}</span>
-                                  </div>
-                                )}
-        
-                              </div>
-                            </div>
-                          </div>
-        
-                          <div className="resume-summary">
-                            <h2 className="resume-section-title">Professional Summary</h2>
-                            <p>{profileData?.personalInfo?.summary || 'No summary provided'}</p>
                           </div>
                         </div>
-        
-                        {/* Two Column Layout */}
-                        <div className="resume-document-body">
-                          {/* Left Column */}
-                          <div className="resume-column resume-left-column">
-                            {/* Experience Section */}
-                            {profileData?.experienceType === 'fresher' ? (
-                              /* Fresher Preview */
-                              <div className="resume-section">
-                                <h2 className="resume-section-title">Work Experience</h2>
-                                <div className="resume-experience-item">
+                      ) : (
+                        /* Experienced Preview */
+                        experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                          <div className="resume-section">
+                            <h2 className="resume-section-title">Work Experience</h2>
+
+                            {experiences.map((exp, index) => (
+                              (exp.jobTitle || exp.companyName || exp.jobDescription) && (
+                                <div className="resume-experience-item" key={`resume-exp-${index}`}>
                                   <div className="resume-item-header">
-                                    <h3 className="resume-item-title">Fresher</h3>
+                                    {exp.jobTitle && (
+                                      <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                    )}
+                                    {exp.companyName && (
+                                      <p className="resume-item-subtitle">{exp.companyName}</p>
+                                    )}
+                                    {(exp.from || exp.to || exp.currentlyWorking) && (
+                                      <p className="resume-item-period">
+                                        {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                          year: 'numeric',
+                                          month: 'short',
+                                        }) : 'Start Date'}
+                                        {" - "}
+                                        {exp.currentlyWorking ? 'Present' :
+                                          exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                            year: 'numeric',
+                                            month: 'short',
+                                          }) : 'End Date'}
+                                      </p>
+                                    )}
+
                                   </div>
-                                  {profileData?.fresherDetails && (
+                                  {exp.jobDescription && (
                                     <div className="resume-item-content">
-                                      <p>{profileData.isExperienced}</p>
+                                      <p>{exp.jobDescription}</p>
                                     </div>
                                   )}
                                 </div>
-                              </div>
-                            ) : (
-                              /* Experienced Preview */
-                              experiences.length > 0 && experiences.some(exp => exp.jobTitle || exp.companyName || exp.jobDescription) && (
-                                <div className="resume-section">
-                                  <h2 className="resume-section-title">Work Experience</h2>
-        
-                                  {experiences.map((exp, index) => (
-                                    (exp.jobTitle || exp.companyName || exp.jobDescription) && (
-                                      <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                        <div className="resume-item-header">
-                                          {exp.jobTitle && (
-                                            <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                          )}
-                                          {exp.companyName && (
-                                            <p className="resume-item-subtitle">{exp.companyName}</p>
-                                          )}
-                                          {(exp.from || exp.to || exp.currentlyWorking) && (
-                                            <p className="resume-item-period">
-                                              {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                year: 'numeric',
-                                                month: 'short',
-                                              }) : 'Start Date'}
-                                              {" - "}
-                                              {exp.currentlyWorking ? 'Present' :
-                                                exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                  year: 'numeric',
-                                                  month: 'short',
-                                                }) : 'End Date'}
-                                            </p>
-                                          )}
-        
-                                        </div>
-                                        {exp.jobDescription && (
-                                          <div className="resume-item-content">
-                                            <p>{exp.jobDescription}</p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )
-                                  ))}
+                              )
+                            ))}
+                          </div>
+                        )
+                      )}
+                      {/* Education Section */}
+                      {educations.length > 0 && educations.some(edu =>
+                        edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
+                      ) && (
+                          <div className="resume-section">
+                            <h2 className="resume-section-title">Education</h2>
+
+                            {educations.map((edu, index) => (
+                              (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
+                                <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                  <div className="resume-item-header">
+                                    {edu.education && (
+                                      <h3 className="resume-item-title">
+                                        {educationList.find(e => e._id === edu.education)?.name || 'Education'}
+                                      </h3>
+                                    )}
+
+                                    {typeof edu.course === 'string' && edu.course && (
+                                      <h3 className="resume-item-title">
+                                        {
+                                          coursesList[index]?.find(course => course._id === edu.course)?.name
+                                          || edu.course  // fallback in case name not found
+                                        }
+                                      </h3>
+                                    )}
+
+                                    {edu.universityName && (
+                                      <p className="resume-item-subtitle">{edu.universityName}</p>
+                                    )}
+                                    {(edu.schoolName && !edu.universityName) && (
+                                      <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                    )}
+                                    {edu.collegeName && (
+                                      <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                    )}
+                                    {edu.passingYear && (
+                                      <p className="resume-item-period">{edu.passingYear}</p>
+                                    )}
+                                  </div>
+                                  <div className="resume-item-content">
+                                    {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                    {edu.specialization && <p>Specialization: {typeof edu.specialization === 'string' ? edu.specialization : 'Specialization'}</p>}
+                                  </div>
                                 </div>
                               )
-                            )}
-                            {/* Education Section */}
-                            {educations.length > 0 && educations.some(edu =>
-                              edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear
-                            ) && (
-                                <div className="resume-section">
-                                  <h2 className="resume-section-title">Education</h2>
-        
-                                  {educations.map((edu, index) => (
-                                    (edu.education || edu.course || edu.schoolName || edu.collegeName || edu.universityName || edu.passingYear) && (
-                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
-                                        <div className="resume-item-header">
-                                          {edu.education && (
-                                            <h3 className="resume-item-title">
-                                              {educationList.find(e => e._id === edu.education)?.name || 'Education'}
-                                            </h3>
-                                          )}
-        
-                                          {typeof edu.course === 'string' && edu.course && (
-                                            <h3 className="resume-item-title">
-                                              {
-                                                coursesList[index]?.find(course => course._id === edu.course)?.name
-                                                || edu.course  // fallback in case name not found
-                                              }
-                                            </h3>
-                                          )}
-        
-                                          {edu.universityName && (
-                                            <p className="resume-item-subtitle">{edu.universityName}</p>
-                                          )}
-                                          {(edu.schoolName && !edu.universityName) && (
-                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                          )}
-                                          {edu.collegeName && (
-                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                          )}
-                                          {edu.passingYear && (
-                                            <p className="resume-item-period">{edu.passingYear}</p>
-                                          )}
-                                        </div>
-                                        <div className="resume-item-content">
-                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                          {edu.specialization && <p>Specialization: {typeof edu.specialization === 'string' ? edu.specialization : 'Specialization'}</p>}
-                                        </div>
-                                      </div>
-                                    )
-                                  ))}
-                                </div>
-                              )}
-        
+                            ))}
                           </div>
-        
-                          {/* Right Column */}
-                          <div className="resume-column resume-right-column">
-                            {/* Skills Section */}
-                            {skills.length > 0 && skills.some(skill => skill.skillName) && (
-                              <div className="resume-section">
-                                <h2 className="resume-section-title">Skills</h2>
-        
-                                <div className="resume-skills-list">
-                                  {skills.map((skill, index) => (
-                                    skill.skillName && (
-                                      <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                        <div className="resume-skill-name">
-                                          {skill.skillName}
-                                        </div>
-                                        <div className="resume-skill-bar-container">
-                                          <div
-                                            className="resume-skill-bar"
-                                            style={{ width: `${skill.skillPercent || 0}%` }}
-                                          ></div>
-                                        </div>
-                                      </div>
-                                    )
-                                  ))}
+                        )}
+
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="resume-column resume-right-column">
+                      {/* Skills Section */}
+                      {skills.length > 0 && skills.some(skill => skill.skillName) && (
+                        <div className="resume-section">
+                          <h2 className="resume-section-title">Skills</h2>
+
+                          <div className="resume-skills-list">
+                            {skills.map((skill, index) => (
+                              skill.skillName && (
+                                <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                  <div className="resume-skill-name">
+                                    {skill.skillName}
+                                  </div>
+                                  <div className="resume-skill-bar-container">
+                                    <div
+                                      className="resume-skill-bar"
+                                      style={{ width: `${skill.skillPercent || 0}%` }}
+                                    ></div>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-        
-                            {/* Languages Section */}
-                            {languages.length > 0 && languages.some(lang => lang.lname) && (
-                              <div className="resume-section">
-                                <h2 className="resume-section-title">Languages</h2>
-        
-                                <div className="resume-languages-list">
-                                  {languages.map((lang, index) => (
-                                    lang.lname && (
-                                      <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                        <div className="resume-language-name">{lang.lname}</div>
-                                        <div className="resume-language-level">
-                                          {[1, 2, 3, 4, 5].map(dot => (
-                                            <span
-                                              key={`resume-lang-dot-${index}-${dot}`}
-                                              className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                            ></span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )
-                                  ))}
+                              )
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Languages Section */}
+                      {languages.length > 0 && languages.some(lang => lang.lname) && (
+                        <div className="resume-section">
+                          <h2 className="resume-section-title">Languages</h2>
+
+                          <div className="resume-languages-list">
+                            {languages.map((lang, index) => (
+                              lang.lname && (
+                                <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                  <div className="resume-language-name">{lang.lname}</div>
+                                  <div className="resume-language-level">
+                                    {[1, 2, 3, 4, 5].map(dot => (
+                                      <span
+                                        key={`resume-lang-dot-${index}-${dot}`}
+                                        className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                      ></span>
+                                    ))}
+                                  </div>
                                 </div>
+                              )
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Certifications Section */}
+                      {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
+                        <div className="resume-section">
+                          <h2 className="resume-section-title">Certifications</h2>
+
+                          <ul className="resume-certifications-list">
+                            {certificates.map((cert, index) => (
+                              (cert.certificateName || cert.orgName) && (
+                                <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                  {cert.certificateName && (
+                                    <strong>{cert.certificateName}</strong>
+                                  )}
+
+                                  {cert.orgName && (
+                                    <span className="resume-cert-org"> - {cert.orgName}</span>
+                                  )}
+
+                                  {(cert.month || cert.year) && (
+                                    <span className="resume-cert-date">
+                                      {cert.month && cert.year ?
+                                        ` (${cert.month}/${cert.year})` :
+                                        cert.month ?
+                                          ` (${cert.month})` :
+                                          cert.year ?
+                                            ` (${cert.year})` :
+                                            ''}
+                                    </span>
+                                  )}
+                                </li>
+                              )
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Projects Section */}
+                      {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                        <div className="resume-section">
+                          <h2 className="resume-section-title">Projects</h2>
+                          {projects.map((proj, index) => (
+                            (proj.projectName || proj.proDescription) && (
+                              <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                <div className="resume-item-header">
+                                  <h3 className="resume-project-title">
+                                    {proj.projectName || 'Project'}
+                                    {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
+                                  </h3>
+                                </div>
+                                {proj.proDescription && (
+                                  <div className="resume-item-content">
+                                    <p>{proj.proDescription}</p>
+                                  </div>
+                                )}
                               </div>
-                            )}
-        
-                            {/* Certifications Section */}
-                            {certificates.length > 0 && certificates.some(cert => cert.certificateName || cert.orgName) && (
-                              <div className="resume-section">
-                                <h2 className="resume-section-title">Certifications</h2>
-        
-                                <ul className="resume-certifications-list">
-                                  {certificates.map((cert, index) => (
-                                    (cert.certificateName || cert.orgName) && (
-                                      <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                        {cert.certificateName && (
-                                          <strong>{cert.certificateName}</strong>
-                                        )}
-        
-                                        {cert.orgName && (
-                                          <span className="resume-cert-org"> - {cert.orgName}</span>
-                                        )}
-        
-                                        {(cert.month || cert.year) && (
-                                          <span className="resume-cert-date">
-                                            {cert.month && cert.year ?
-                                              ` (${cert.month}/${cert.year})` :
-                                              cert.month ?
-                                                ` (${cert.month})` :
-                                                cert.year ?
-                                                  ` (${cert.year})` :
-                                                  ''}
-                                          </span>
-                                        )}
-                                      </li>
-                                    )
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-        
-                            {/* Projects Section */}
-                            {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
-                              <div className="resume-section">
-                                <h2 className="resume-section-title">Projects</h2>
-                                {projects.map((proj, index) => (
-                                  (proj.projectName || proj.proDescription) && (
-                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                      <div className="resume-item-header">
-                                        <h3 className="resume-project-title">
-                                          {proj.projectName || 'Project'}
-                                          {proj.proyear && <span className="resume-project-year"> ({proj.proyear})</span>}
-                                        </h3>
-                                      </div>
-                                      {proj.proDescription && (
-                                        <div className="resume-item-content">
-                                          <p>{proj.proDescription}</p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )
-                                ))}
-                              </div>
-                            )}
-                            {/* {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
+                            )
+                          ))}
+                        </div>
+                      )}
+                      {/* {projects.length > 0 && projects.some(p => p.projectName || p.proDescription) && (
                               <div className="resume-section">
                                 <h2 className="resume-section-title">Projects</h2>
                                 {projects.map((proj, index) => (
@@ -2374,75 +2386,75 @@ const User = () => {
                                 ))}
                               </div>
                             )} */}
-                            {/* Interests Section */}
-                            {interests.filter(i => i.trim() !== '').length > 0 && (
-                              <div className="resume-section">
-                                <h2 className="resume-section-title">Interests</h2>
-        
-                                <div className="resume-interests-tags">
-                                  {interests.filter(i => i.trim() !== '').map((interest, index) => (
-                                    <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                      {interest}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                      {/* Interests Section */}
+                      {interests.filter(i => i.trim() !== '').length > 0 && (
+                        <div className="resume-section">
+                          <h2 className="resume-section-title">Interests</h2>
+
+                          <div className="resume-interests-tags">
+                            {interests.filter(i => i.trim() !== '').map((interest, index) => (
+                              <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                {interest}
+                              </span>
+                            ))}
                           </div>
                         </div>
-        
-                        {/* Declaration */}
-                        <div className="extra-category">
-              <div className="category-title">
-                <i className="bi bi-file-text me-2"></i>
-                Declaration
-              </div>
+                      )}
+                    </div>
+                  </div>
 
-              <div className="declaration-container">
-                <div
-                  className="d-flex align-items-center declaration-content"
-                >
-                  <input
-                    type="checkbox"
-                    id="declaration-check"
-                    checked={declaration.isChecked}
-                    onChange={(e) => setDeclaration({
-                      ...declaration,
-                      isChecked: e.target.checked
+                  {/* Declaration */}
+                  <div className="extra-category">
+                    <div className="category-title">
+                      <i className="bi bi-file-text me-2"></i>
+                      Declaration
+                    </div>
 
-                    },
-                      console.log('Is Declaration Checked:', declaration.isChecked)
-                    )}
-                  />
+                    <div className="declaration-container">
+                      <div
+                        className="d-flex align-items-center declaration-content"
+                      >
+                        <input
+                          type="checkbox"
+                          id="declaration-check"
+                          checked={declaration.isChecked}
+                          onChange={(e) => setDeclaration({
+                            ...declaration,
+                            isChecked: e.target.checked
 
-                  <p className='ms-2'>I hereby declare that all the information provided above is true to the best of my knowledge.</p>
-                </div>
-              </div>
-            </div>
-        
+                          },
+                            console.log('Is Declaration Checked:', declaration.isChecked)
+                          )}
+                        />
+
+                        <p className='ms-2'>I hereby declare that all the information provided above is true to the best of my knowledge.</p>
                       </div>
                     </div>
-        
-                    <div className="resume-preview-actions">
-                      <button
-                        className="download-resume-btn"
-                        onClick={() => {
-                          const element = document.getElementById('resume-download');
-                          const opt = {
-                            margin: 0.5,
-                            filename: 'resume.pdf',
-                            image: { type: 'jpeg', quality: 0.98 },
-                            html2canvas: { scale: 2 },
-                            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-                          };
-        
-                          html2pdf().set(opt).from(element).save();
-                        }}
-                      >
-                        <i className="bi bi-download"></i> Download PDF
-                      </button>
-        
-        {/* <button
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="resume-preview-actions">
+                <button
+                  className="download-resume-btn"
+                  onClick={() => {
+                    const element = document.getElementById('resume-download');
+                    const opt = {
+                      margin: 0.5,
+                      filename: 'resume.pdf',
+                      image: { type: 'jpeg', quality: 0.98 },
+                      html2canvas: { scale: 2 },
+                      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                    };
+
+                    html2pdf().set(opt).from(element).save();
+                  }}
+                >
+                  <i className="bi bi-download"></i> Download PDF
+                </button>
+
+                {/* <button
           className="download-resume-btn"
           onClick={() => {
             const element = document.getElementById('resume-download');
@@ -2481,16 +2493,16 @@ const User = () => {
         >
           <i className="bi bi-download"></i> Download & Save PDF
         </button> */}
-                      <button
-                        className="close-preview-btn"
-                        onClick={() => setShowPreview(false)}
-                      >
-                        Close Preview
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+                <button
+                  className="close-preview-btn"
+                  onClick={() => setShowPreview(false)}
+                >
+                  Close Preview
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <style>{`
         .user-container {
