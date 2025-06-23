@@ -44,6 +44,7 @@ const appliedCoursesSchema = new Schema(
     kycStage: { type: Boolean, default: false },
     kyc: { type: Boolean, default: false },
     admissionDone: { type: Boolean, default: false },
+    admissionDate: { type: Date },
     dropout: { type: Boolean, default: false },
     // Followup info (optional, alag se track karenge)
     followupDate: {
@@ -120,7 +121,7 @@ const appliedCoursesSchema = new Schema(
     },
     uploadedDocs: [
       {
-        docsId: { type: ObjectId, ref: "courses.docsRequired" },
+        docsId: { type: ObjectId, ref: "Courses.docsRequired" },
         fileUrl: String,
         status: { type: String, enum: ["Pending", "Verified", "Rejected"], default: "Pending" },
         reason: { type: String },

@@ -337,7 +337,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				$or: [
 					// registeredBy field se match (single member ke liye)
 					{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
-			
+
 					// leadAssignment ke last element ki _id se match
 					{
 						$expr: {
@@ -383,13 +383,13 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					}
 				})
 				.sort({ createdAt: -1 })
-			
 
-				response.forEach(doc => {
-					if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
-					  appliedCourses.push(doc);
-					}
-				  });
+
+			response.forEach(doc => {
+				if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
+					appliedCourses.push(doc);
+				}
+			});
 		}
 
 		const filteredAppliedCourses = appliedCourses.filter(doc => {
@@ -527,7 +527,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			totalCount,
 			totalPages: Math.ceil(totalCount / limit),
 			data: result,
-			allData:results
+			allData: results
 		});
 
 	} catch (err) {
@@ -538,9 +538,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		});
 	}
 });
-
-
-
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
 	let college = await College.findOne({ _concernPerson: { $elemMatch: { _id: req.user._id } }, status: true })
@@ -2689,19 +2686,19 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 	try {
 		console.log('api working')
 		const { selectedProfiles, _leadStatus, _leadSubStatus, remarks } = req.body;
-		console.log(req.body,'body')
+		console.log(req.body, 'body')
 		if (!selectedProfiles || !_leadStatus || !_leadSubStatus) {
 			let missingFields = [];
-		  
+
 			if (!selectedProfiles) missingFields.push('selectedProfiles');
 			if (!_leadStatus) missingFields.push('_leadStatus');
 			if (!_leadSubStatus) missingFields.push('_leadSubStatus');
-		  
+
 			return res.status(500).json({
-			  success: false,
-			  message: `Missing required fields: ${missingFields.join(', ')}`
+				success: false,
+				message: `Missing required fields: ${missingFields.join(', ')}`
 			});
-		  }
+		}
 		const userId = req.user._id;
 
 		// Fetch the new status document (including sub-statuses) only once
@@ -2713,13 +2710,13 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 		const updatePromises = selectedProfiles.map(async (id) => {
 			// Find the AppliedCourse document by ID
 			const doc = await AppliedCourses.findById(id);
-			console.log('doc',doc)
+			console.log('doc', doc)
 			if (!doc) {
 				throw new Error(`AppliedCourse with ID ${id} not found`);
 			}
 
 			let actionParts = [];
-			
+
 			// Fetch the old status document (including sub-statuses)
 			const oldStatusDoc = await Status.findById(doc._leadStatus).lean();
 			const oldStatusTitle = oldStatusDoc ? oldStatusDoc.title : 'Unknown';
@@ -2770,7 +2767,7 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 
 			// Save the updated document
 			const newDocDetails = await doc.save();
-			console.log('newDocDetails',newDocDetails)
+			console.log('newDocDetails', newDocDetails)
 		});
 
 		// Wait for all updates to complete
@@ -3551,7 +3548,7 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 
 		const docId = profile.uploadedDocs.find(doc => doc._id.toString() === validUploadId.toString()).docsId;
 
-		console.log(docId,'docId');
+		console.log(docId, 'docId');
 
 		//merge docsRequired and uploadedDocs
 
@@ -3929,7 +3926,7 @@ router.route("/refer-leads")
 			});
 			const concernPerson = college._concernPerson;
 
-			console.log(concernPerson,'concernPerson');
+			console.log(concernPerson, 'concernPerson');
 
 			res.status(200).json({
 				status: true,
@@ -3947,7 +3944,7 @@ router.route("/refer-leads")
 	})
 	.post(isCollege, async (req, res) => {
 		try {
-			console.log(req.body,'req.body');
+			console.log(req.body, 'req.body');
 			let { appliedCourseId, counselorId } = req.body;
 			if (!appliedCourseId || !counselorId) {
 				return res.status(400).json({ success: false, message: 'appliedCourseId and counselorId are required.' });
@@ -3964,11 +3961,11 @@ router.route("/refer-leads")
 			}
 			// Find the applied course
 			const appliedCourse = await AppliedCourses.findById(appliedCourseId);
-			console.log(appliedCourse,'appliedCourse');
+			console.log(appliedCourse, 'appliedCourse');
 			const oldCounselor = await User.findById(appliedCourse.leadAssignment[appliedCourse.leadAssignment.length - 1]._id);
-			console.log(oldCounselor,'oldCounselor');
+			console.log(oldCounselor, 'oldCounselor');
 			const newCounselor = await User.findById(counselorId);
-			console.log(newCounselor,'newCounselor');
+			console.log(newCounselor, 'newCounselor');
 			if (!appliedCourse) {
 				return res.status(404).json({ success: false, message: 'Applied course not found.' });
 			}
@@ -3993,5 +3990,670 @@ router.route("/refer-leads")
 			return res.status(500).json({ success: false, message: 'Server error', error: err.message });
 		}
 	});
+
+router.get("/generate-application-form/:id", async (req, res) => {
+	try {
+		let { id } = req.params
+		if (typeof id === 'string') {
+			id = new mongoose.Types.ObjectId(id)
+		}
+
+		const getFinancialYear = () => {
+			const today = new Date();
+			const year = today.getFullYear();
+			const month = today.getMonth() + 1; // 0-based
+
+			if (month >= 4) {
+				// FY starts from April
+				return `${year}-${year + 1}`;
+			} else {
+				return `${year - 1}-${year}`;
+			}
+		};
+		const fy = getFinancialYear();
+
+
+		const getFinancialYearDates = () => {
+			const today = new Date();
+			const year = today.getFullYear();
+			const month = today.getMonth() + 1;
+
+			let startYear = month >= 4 ? year : year - 1;
+			let endYear = startYear + 1;
+
+			const startDate = new Date(`${startYear}-04-01T00:00:00.000Z`);
+			const endDate = new Date(`${endYear}-03-31T23:59:59.999Z`);
+
+			return { startDate, endDate };
+		};
+
+		const generateApplicationNumber = async () => {
+			// "2024-25"
+			const key = `Focalyt/${fy}`;
+			const { startDate, endDate } = getFinancialYearDates();
+			// Increment or create
+
+			const count = await AppliedCourses.find({
+				createdAt: { $gte: startDate, $lte: endDate }
+			}).countDocuments()
+
+
+			const paddedCount = count + 1
+			return `${key}/${paddedCount}`; // e.g. "Focalyt/2024-25/00027"
+		};
+		const applicationNumber = await generateApplicationNumber()
+
+		console.log('applicationNumber', applicationNumber)
+
+
+		let data = await AppliedCourses.findById(id)
+		.populate({
+			path: '_course',
+			populate: [
+				{
+					path: 'sectors',
+					select: 'name'
+				},
+				{
+					path: 'vertical',
+					select: 'name'  // Add the fields you want to populate from the `vertical` path
+				},
+				{
+					path: 'project',
+					select: 'name'  // Add the fields you want to populate from the `project` path
+				}
+			]
+		})
+			.populate('_leadStatus')
+			.populate('_center')
+			.populate('registeredBy')
+			.populate({
+				path: '_candidate',
+				populate: [
+					{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+				]
+			})
+			.populate({
+				path: 'logs',
+				populate: {
+					path: 'user',
+					select: 'name'
+				}
+			})
+		if (!data._candidate?.personalInfo?.image || data._candidate.personalInfo.image.trim() === '') {
+			console.log('pic required')
+			return res.json({ status: false, message: "Profile pic required" });
+		}
+
+		
+
+		const isDocsRequired = !!data?._course?.docsRequired?.length > 0
+
+		if (isDocsRequired) {
+			const requiredDocs = data._course?.docsRequired || [];
+			const uploadedDocs = data.uploadedDocs || [];
+
+			// Map uploaded docs by docsId for quick lookup
+			const uploadedDocsMap = {};
+			uploadedDocs.forEach(d => {
+				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+			});
+
+			// Prepare combined docs array
+			const allDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					// Agar uploaded hai to uploadedDoc details bhejo
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						mandatory: reqDoc.mandatory,
+						_id: reqDoc._id
+					};
+				} else {
+					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						mandatory: reqDoc.mandatory,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
+
+			if (requiredDocs) {
+
+				// Create a merged array with both required docs and uploaded docs info
+				combinedDocs = requiredDocs.map(reqDoc => {
+					// Convert Mongoose document to plain object
+					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+					// Find matching uploaded docs for this required doc
+					const matchingUploads = uploadedDocs.filter(
+						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+					);
+
+					return {
+						_id: docObj._id,
+						Name: docObj.Name || 'Document',
+						mandatory: docObj.mandatory,
+						description: docObj.description || '',
+						uploads: matchingUploads || []
+					};
+				});
+
+
+			} else {
+				console.log("Course not found or no docs required");
+			};
+
+			console.log(combinedDocs, 'combinedDocs')
+		}
+
+		const formatDate = (date) => {
+			const d = new Date(date);
+			const day = String(d.getDate()).padStart(2, '0');
+			const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+			const year = d.getFullYear();
+			return `${day}/${month}/${year}`;
+		};
+
+		const dobFormatted = formatDate(data._candidate.dob);
+
+		const logoPath = path.join(__dirname, '../../../controllers/public/public_assets/images/newpage/logo-ha.svg');
+		const logoBase64 = fs.readFileSync(logoPath, { encoding: 'base64' });
+		const imgTag = `<img src="data:image/svg+xml;base64,${logoBase64}" />`;
+		const htmlContent = `
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Form ${fy}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+			
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color:rgb(255, 255, 255);
+            padding: 0px;
+            height: 297mm;
+            width: 210mm;
+            min-width: 210mm;
+            min-height: 297mm;
+
+        }
+        
+        .form-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border: 2px solid #ddd;
+            padding: 5px;
+        }
+        
+        .header {
+            background-color: #4a5a8a;
+            color: white;
+            padding: 5px;
+            font-weight: bold;
+            font-size: 20px;
+            position: relative;
+        }
+        
+        .header-info {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .header-info table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .header-info td {
+            padding: 4px 0;
+            font-size: 15px;
+        }
+        
+        .header-info .label {
+            font-weight: bold;
+            width: 180px;
+        }
+        
+        .logo {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .logo img {
+            height: 40px;
+            width: auto;
+        }
+        
+        .section-header {
+            background-color: #4a5a8a;
+            color: white;
+            padding: 10px 15px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 0;
+        }
+        
+        .section-content {
+            padding: 15px;
+            position: relative;
+        }
+        
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        
+        .details-table td {
+            padding: 6px 5px;
+            font-size: 12px;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+        
+        .details-table .label {
+            font-weight: bold;
+            width: 140px;
+        }
+        
+        .details-table .value {
+            padding-left: 10px;
+        }
+        
+        .photo-section {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+        }
+        
+        .photo-placeholder {
+            width: 100px;
+            height: 120px;
+            border: 2px solid #ccc;
+            background-color: #f9f9f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .photo-img {
+            width: 100px;
+            height: 120px;
+            border: 2px solid #ccc;
+            object-fit: cover;
+        }
+        
+        .address-row {
+            display: flex;
+            gap: 30px;
+        }
+        
+        .address-col {
+            flex: 1;
+        }
+        
+        .documents-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .documents-table th,
+        .documents-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            font-size: 12px;
+        }
+        
+        .documents-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        
+        .document-link {
+            color: #0066cc;
+            text-decoration: underline;
+            font-size: 11px;
+        }
+        
+        .declaration-content {
+            font-size: 12px;
+            line-height: 1.4;
+            text-align: justify;
+        }
+        
+        .signature-section {
+            margin-top: 30px;
+            text-align: right;
+        }
+        
+        .signature-name {
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        
+        .clear {
+            clear: both;
+        }
+        
+        .personal-details-content {
+            margin-right: 120px;
+        }
+        .div-1 , .div-2 {
+            width:50%
+        }
+        .div-2{
+            padding: 50px;
+        }
+        .section-1st{
+            display: flex;
+            align-items: center;
+        }
+
+        
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <!-- Header -->
+        <div class="section-1st">
+            <div class="div-1">
+                <!-- Header -->
+                <div class="header">
+                    APPLICATION FORM ${fy}
+
+                </div>
+
+                <!-- Header Information -->
+                <div class="header-info">
+                    <table>
+
+                        <tr>
+                            <td class="label">Project :</td>
+                            <td>${data?._course?.project?.name || ''}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Course :</td>
+                            <td>${data?._course?.name || ''}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Application Form Number:</td>
+                            <td>${applicationNumber}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Branch:</td>
+                            <td>${data?._center?.name || ''}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="div-2">
+            ${imgTag}
+
+            </div>
+        </div>
+        
+        <!-- Personal Details -->
+        <div class="section-header">
+            PERSONAL DETAILS
+        </div>
+        
+        <div class="section-content">
+            <div class="photo-section">
+                <div class="photo-placeholder">
+				${data._candidate?.personalInfo?.image
+				? `<img class="photo-img" src="${data._candidate.personalInfo.image}" />`
+				: `<div class="photo-placeholder">Photo</div>`}
+				  
+                </div>
+            </div>
+            
+            <div class="personal-details-content">
+                <table class="details-table">
+                    <tr>
+                        <td class="label">Full Name:</td>
+                        <td class="value">${data?._candidate?.name || ''}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Email:</td>
+                        <td class="value">${data?._candidate?.email || ''}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Mobile:</td>
+                        <td class="value">${data?._candidate?.mobile || ''}</td>
+                    </tr>
+                    
+                    <tr>
+                        <td class="label">Date of Birth:</td>
+                        <td class="value">${dobFormatted || ''}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Gender:</td>
+                        <td class="value">${data?._candidate?.sex || ''}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="clear"></div>
+        </div>
+        
+        <!-- Permanent Address -->
+        <div class="section-header">
+            PERMANENT ADDRESS DETAILS
+        </div>
+        
+        <div class="section-content">
+            <div class="address-row">
+                <div class="address-col">
+                    <table class="details-table">
+                        <tr>
+                            <td class="label">Address Line 1:</td>
+                            <td class="value">${data?._candidate?.personalInfo?.currentAddress?.fullAddress || ''}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">State:</td>
+                            <td class="value">${data?._candidate?.personalInfo?.currentAddress?.state || ''}</td>
+                        </tr>
+                        
+                    </table>
+                </div>
+                <div class="address-col">
+                    <table class="details-table">
+					<tr>
+                            <td class="label">City:</td>
+                            <td class="value">${data?._candidate?.personalInfo?.currentAddress?.city || ''}</td>
+
+                        </tr>
+						<tr>
+                            <td class="label">Country:</td>
+                            <td class="value">Domestic (Indian Resident)</td>
+                        </tr>                      
+                        
+                       
+                    </table>
+                </div>
+            </div>
+        </div>     
+       
+        
+        <!-- Documents Upload -->
+
+		${isDocsRequired ?
+				`   <div class="section-header">
+            DOCUMENTS UPLOAD
+        </div>
+        
+        <div class="section-content">
+            <table class="documents-table">
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+  ${combinedDocs.map(doc => `
+    <tr>
+      <td>${doc.Name} ${doc.mandatory ? '<span style="color:red">*</span>' : ''} </td>
+     <td>${doc.uploads?.length ? doc.uploads[doc.uploads.length - 1].status : 'Not Uploaded'}</td>
+
+    </tr>
+  `).join('')}
+</tbody>
+            </table>
+        </div>
+		` : ''}
+        
+
+        
+        <!-- Declaration -->
+        <div class="section-header">
+            DECLARATION
+        </div>
+        
+        <div class="section-content">
+            <div class="declaration-content">
+                <p>I certify that the information submitted by me in support of this application, is true to the best of my knowledge and belief. I understand that in the event of any information being found false or incorrect, my admission is liable to be rejected / cancelled at any stage of the program. I undertake to abide by the disciplinary rules and regulations of Focal Skills Development.</p>
+                
+                <div class="signature-section">
+                    <div class="signature-name">${data._candidate.name}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+  `;
+
+		const browser = await puppeteer.launch({
+			headless: true,
+			args: ['--no-sandbox', '--disable-setuid-sandbox'],
+		});
+
+		const page = await browser.newPage();
+		await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+
+		const pdfBuffer = await page.pdf({
+			format: "A4",
+			printBackground: true,
+		});
+
+		await browser.close();
+
+		// Send PDF buffer as a downloadable file
+		res.set({
+			"Content-Type": "application/pdf",
+			"Content-Disposition": `attachment; filename="application_form.pdf"`,
+			"Content-Length": pdfBuffer.length,
+		});
+
+		return res.send(pdfBuffer );
+
+	} catch (err) {
+		console.error("PDF generation error:", err);
+		res.status(500).send({ status: false, message: "Failed to generate PDF" });
+	}
+
+})
+
+router.get('dashbord-data',isCollege, async (req,res)=>{
+	try{
+	// INSERT_YOUR_CODE
+		// Example dashboard data API for college
+		const collegeId = req.user.collegeId || req.user.college || req.query.collegeId;
+		if (!collegeId) {
+			return res.status(400).json({ status: false, message: "Missing collegeId" });
+		}
+
+		// Example: Fetch counts for dashboard cards
+		const [
+			totalAdmissions,
+			pendingDocs,
+			batchAssigned,
+			zeroPeriod,
+			batchFreezed,
+			dropout
+		] = await Promise.all([
+			AppliedCourses.countDocuments({ _college: collegeId }).populate({
+				path: '_course',
+				populate: [
+					{
+						path: 'sectors',
+						select: 'name'
+					},
+					{
+						path: 'vertical',
+						select: 'name'  // Add the fields you want to populate from the `vertical` path
+					},
+					{
+						path: 'project',
+						select: 'name'  // Add the fields you want to populate from the `project` path
+					}
+				]
+			})
+				.populate('_leadStatus')
+				.populate('_center')
+				.populate('registeredBy')
+				.populate({
+					path: '_candidate',
+					populate: [
+						{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+					]
+				})
+				.populate({
+					path: 'logs',
+					populate: {
+						path: 'user',
+						select: 'name'
+					}
+				}),
+			AppliedCourses.countDocuments({ _college: collegeId, status: "pendingDocs" }),
+			AppliedCourses.countDocuments({ _college: collegeId, status: "documentDone" }),
+			AppliedCourses.countDocuments({ _college: collegeId, status: "zeroPeriod" }),
+			AppliedCourses.countDocuments({ _college: collegeId, status: "batchFreeze" }),
+			AppliedCourses.countDocuments({ _college: collegeId, status: "dropout" }),
+		]);
+
+		const data = {
+			totalAdmissions,
+			pendingDocs,
+			batchAssigned,
+			zeroPeriod,
+			batchFreezed,
+			dropout
+		};
+
+		console.log(totalAdmissions,'totalAdmissions')
+
+		return res.json({ status: true, data });
+	}
+	catch (err) {
+		console.error("Dashboard data error:", err);
+		return res.status(500).json({ status: false, message: "Failed to fetch dashboard data", error: err.message });
+	}
+	}
+)
 
 module.exports = router;
