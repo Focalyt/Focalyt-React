@@ -13,7 +13,7 @@ const csv = require("fast-csv");
 
 
 const {
-	Import,	
+	Import,
 	Qualification,
 	Skill,
 	Country,
@@ -206,9 +206,9 @@ router
 				rows[0][5] !== "College Official Email ID" ||
 				rows[0][6] !== "Registered Mobile no." ||
 				rows[0][7] !==
-					"Courses(Doctorate, Certificate, Post Graduation, Diploma, PhD etc.)" ||
+				"Courses(Doctorate, Certificate, Post Graduation, Diploma, PhD etc.)" ||
 				rows[0][8] !==
-					"Streams(Computer Course, Pharmacy,Phd In English etc.)" ||
+				"Streams(Computer Course, Pharmacy,Phd In English etc.)" ||
 				rows[0][9] !== "Aggregate CGPA till last Semester on 10 point scale"
 			) {
 				checkFileError = false;
@@ -676,7 +676,7 @@ router
 	});
 
 router.route("/course/:courseId/apply")
-	
+
 	.post(isCollege, async (req, res) => {
 		try {
 			let { courseId } = req.params;
@@ -737,13 +737,13 @@ router.route("/course/:courseId/apply")
 			if (
 				candidate.appliedCourses &&
 				candidate.appliedCourses.some(applied =>
-				  applied.courseId && applied.courseId.toString() === courseId.toString()
+					applied.courseId && applied.courseId.toString() === courseId.toString()
 				)
-			  ) {
+			) {
 				console.log("Already applied");
 				return res.status(400).json({ status: false, msg: "Course already applied." });
-			  }
-			  
+			}
+
 			const apply = await Candidate.findOneAndUpdate(
 				{ mobile: mobile },
 				{
@@ -878,7 +878,7 @@ router.route("/addleaddandcourseapply")
 			// ✅ Create CandidateProfile
 			const candidate = await Candidate.create(candidateData);
 
-			console.log('selectedCenter' , typeof selectedCenter)
+			console.log('selectedCenter', typeof selectedCenter)
 			// ✅ Insert AppliedCourses Record
 			const appliedCourseEntry = await AppliedCourses.create({
 				_candidate: candidate._id,
@@ -992,9 +992,8 @@ router.route("/createResume/:id").get(auth1, async (req, res) => {
 		const dataObj = {
 			id: req.params.id,
 			reCreate: !!req.query.reCreate,
-			url: `${req.protocol}://${req.get("host")}/candidateForm/${
-				req.params.id
-			}`,
+			url: `${req.protocol}://${req.get("host")}/candidateForm/${req.params.id
+				}`,
 		};
 
 		const candidate = await Candidate.findById(req.params.id);
@@ -1027,12 +1026,43 @@ router.route("/single").get(auth1, function (req, res) {
 	});
 });
 router.route("/clearlog").post(auth1, async function (req, res) {
-    const college = await College.findOne({
-        _concernPerson: req.session.user._id,
-    });
-    const clearlogs = await Import.deleteMany({
-        _college: college._id,
-    });
-    return res.json({ status: true });
+	const college = await College.findOne({
+		_concernPerson: req.session.user._id,
+	});
+	const clearlogs = await Import.deleteMany({
+		_college: college._id,
+	});
+	return res.json({ status: true });
+});
+
+router.get('/getCandidateProfile/:id', [isCollege], async (req, res) => {
+	try {
+		const user = req.user;
+		let { id } = req.params
+		console.log('id',id)
+
+		const educations = await Qualification.find({ status: true });
+
+		if (typeof id === 'String') {
+			id = new mongoose.Types.ObjectId
+		}
+
+		const candidate = await Candidate.findById(id);
+		console.log(candidate, 'candidate')
+
+		if (!candidate) {
+			return res.status(404).json({ status: false, message: "Candidate not found" });
+		}
+
+
+		res.status(200).json({
+			status: true,
+			message: "Profile fetched successfully",
+			data: { candidate, educations }
+		});
+	} catch (error) {
+		console.error('Error fetching profile:', error);
+		res.status(500).json({ status: false, message: "Error fetching profile data" });
+	}
 });
 module.exports = router;

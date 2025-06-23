@@ -182,7 +182,7 @@
 .main-menu.menu-light .navigation>li ul .active>a {
   color: #fff;
 }
-@media (max-width: 768px) {
+@media (max-width: 1199px) {
   .app-content.content {
     margin-left: 0;
   }
