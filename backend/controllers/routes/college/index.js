@@ -4573,87 +4573,237 @@ router.get("/generate-application-form/:id", async (req, res) => {
 
 	} catch (err) {
 		console.error("PDF generation error:", err);
-		res.status(500).send({ status: false, message: "Failed to generate PDF" });
-	}
+		res.status(500).send({ status: false, message: "Failed to generate PDF" });	}
 
 })
 
-router.get('dashbord-data',isCollege, async (req,res)=>{
-	try{
-	// INSERT_YOUR_CODE
-		// Example dashboard data API for college
-		const collegeId = req.user.collegeId || req.user.college || req.query.collegeId;
-		if (!collegeId) {
-			return res.status(400).json({ status: false, message: "Missing collegeId" });
-		}
+// router.get('dashbord-data',isCollege, async (req,res)=>{
+// 	try{
 
-		// Example: Fetch counts for dashboard cards
-		const [
-			totalAdmissions,
-			pendingDocs,
-			batchAssigned,
-			zeroPeriod,
-			batchFreezed,
-			dropout
-		] = await Promise.all([
-			AppliedCourses.countDocuments({ _college: collegeId }).populate({
-				path: '_course',
-				populate: [
-					{
-						path: 'sectors',
-						select: 'name'
-					},
-					{
-						path: 'vertical',
-						select: 'name'  // Add the fields you want to populate from the `vertical` path
-					},
-					{
-						path: 'project',
-						select: 'name'  // Add the fields you want to populate from the `project` path
-					}
-				]
-			})
-				.populate('_leadStatus')
-				.populate('_center')
-				.populate('registeredBy')
-				.populate({
-					path: '_candidate',
-					populate: [
-						{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
-					]
-				})
-				.populate({
-					path: 'logs',
-					populate: {
-						path: 'user',
-						select: 'name'
-					}
-				}),
-			AppliedCourses.countDocuments({ _college: collegeId, status: "pendingDocs" }),
-			AppliedCourses.countDocuments({ _college: collegeId, status: "documentDone" }),
-			AppliedCourses.countDocuments({ _college: collegeId, status: "zeroPeriod" }),
-			AppliedCourses.countDocuments({ _college: collegeId, status: "batchFreeze" }),
-			AppliedCourses.countDocuments({ _college: collegeId, status: "dropout" }),
-		]);
+// 		try {
+// 			const user = req.user;
+// 			const teamMembers = await getAllTeamMembers(user._id);
+// 			const college = await College.findOne({
+// 				'_concernPerson._id': user._id
+// 			});
+	
+// 			const page = parseInt(req.query.page) || 1;      // Default page 1
+// 			const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+// 			const skip = (page - 1) * limit;
+	
+// 			let appliedCourses = [];
+	
+// 			for (const member of teamMembers) {
+// 				const response = await AppliedCourses.find({
+// 					kycStage: { $nin: [true] },
+// 					kyc: { $nin: [true] },
+// 					admissionDone: { $nin: [true] },
+// 					$or: [
+// 						// registeredBy field se match (single member ke liye)
+// 						{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
+	
+// 						// leadAssignment ke last element ki _id se match
+// 						{
+// 							$expr: {
+// 								$eq: [
+// 									{ $arrayElemAt: ["$leadAssignment._id", -1] },
+// 									member
+// 								]
+// 							}
+// 						}
+// 					]
+// 				})
+// 					.populate({
+// 						path: '_course',
+// 						populate: [
+// 							{
+// 								path: 'sectors',
+// 								select: 'name'
+// 							},
+// 							{
+// 								path: 'vertical',
+// 								select: 'name'  // Add the fields you want to populate from the `vertical` path
+// 							},
+// 							{
+// 								path: 'project',
+// 								select: 'name'  // Add the fields you want to populate from the `project` path
+// 							}
+// 						]
+// 					})
+// 					.populate('_leadStatus')
+// 					.populate('_center')
+// 					.populate('registeredBy')
+// 					.populate({
+// 						path: '_candidate',
+// 						populate: [
+// 							{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+// 						]
+// 					})
+// 					.populate({
+// 						path: 'logs',
+// 						populate: {
+// 							path: 'user',
+// 							select: 'name'
+// 						}
+// 					})
+// 					.sort({ createdAt: -1 })
+	
+	
+// 				response.forEach(doc => {
+// 					if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
+// 						appliedCourses.push(doc);
+// 					}
+// 				});
+// 			}
+	
+// 			const filteredAppliedCourses = appliedCourses.filter(doc => {
+// 				// _course must be populated!
+// 				return doc._course && String(doc._course.college) === String(college._id);
+// 			});
+	
+// 			const results = filteredAppliedCourses.map(doc => {
+// 				let selectedSubstatus = null;
+	
+// 				if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+// 					selectedSubstatus = doc._leadStatus.substatuses.find(
+// 						sub => sub._id.toString() === doc._leadSubStatus.toString()
+// 					);
+// 				}
+	
+// 				const docObj = doc.toObject();
+	
+// 				const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+// 				if (docObj._course) {
+// 					docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+// 				}
+	
+// 				const requiredDocs = docObj._course?.docsRequired || [];
+// 				const uploadedDocs = docObj.uploadedDocs || [];
+	
+// 				// Map uploaded docs by docsId for quick lookup
+// 				const uploadedDocsMap = {};
+// 				uploadedDocs.forEach(d => {
+// 					if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+// 				});
+	
+// 				// Prepare combined docs array
+// 				const allDocs = requiredDocs.map(reqDoc => {
+// 					const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+// 					if (uploadedDoc) {
+// 						// Agar uploaded hai to uploadedDoc details bhejo
+// 						return {
+// 							...uploadedDoc,
+// 							Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+// 							mandatory: reqDoc.mandatory,
+// 							_id: reqDoc._id
+// 						};
+// 					} else {
+// 						// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+// 						return {
+// 							docsId: reqDoc._id,
+// 							Name: reqDoc.Name,
+// 							mandatory: reqDoc.mandatory,
+// 							status: "Not Uploaded",
+// 							fileUrl: null,
+// 							reason: null,
+// 							verifiedBy: null,
+// 							verifiedDate: null,
+// 							uploadedAt: null
+// 						};
+// 					}
+// 				});
+	
+// 				if (requiredDocs) {
+// 					docsRequired = requiredDocs
+	
+// 					// Create a merged array with both required docs and uploaded docs info
+// 					combinedDocs = docsRequired.map(reqDoc => {
+// 						// Convert Mongoose document to plain object
+// 						const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+	
+// 						// Find matching uploaded docs for this required doc
+// 						const matchingUploads = uploadedDocs.filter(
+// 							uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+// 						);
+	
+// 						return {
+// 							_id: docObj._id,
+// 							Name: docObj.Name || 'Document',
+// 							mandatory: docObj.mandatory,
+// 							description: docObj.description || '',
+// 							uploads: matchingUploads || []
+// 						};
+// 					});
+	
+	
+// 				} else {
+// 					console.log("Course not found or no docs required");
+// 				};
+	
+// 				// Count calculations
+// 				let verifiedCount = 0;
+// 				let RejectedCount = 0;
+// 				let pendingVerificationCount = 0;
+// 				let notUploadedCount = 0;
+	
+// 				allDocs.forEach(doc => {
+// 					if (doc.status === "Verified") verifiedCount++;
+// 					else if (doc.status === "Rejected") RejectedCount++;
+// 					else if (doc.status === "Pending") pendingVerificationCount++;
+// 					else if (doc.status === "Not Uploaded") notUploadedCount++;
+// 				});
+	
+// 				const totalRequired = allDocs.length;
+// 				const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
+// 				const uploadPercentage = totalRequired > 0
+// 					? Math.round((uploadedCount / totalRequired) * 100)
+// 					: 0;
+// 				return {
+// 					...docObj,
+// 					selectedSubstatus,
+// 					uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+// 					docCounts: {
+// 						totalRequired,
+// 						RejectedCount,
+// 						uploadedCount,
+// 						verifiedCount,
+// 						pendingVerificationCount,
+// 						notUploadedCount,
+// 						uploadPercentage
+// 					}
+// 				};
+// 			});
+	
+	
+	
+// 			const totalCount = results.length
+	
+// 			const result = results.slice(skip, skip + limit);
+	
+	
+	
+	
+// 			res.status(200).json({
+// 				success: true,
+// 				count: result.length,
+// 				page,
+// 				limit,
+// 				totalCount,
+// 				totalPages: Math.ceil(totalCount / limit),
+// 				data: result,
+// 				allData: results
+// 			});
+	
+// 		} catch (err) {
+// 			console.error(err);
+// 			res.status(500).json({
+// 				success: false,
+// 				message: "Server Error"
+// 			});
+// 		}
+	
 
-		const data = {
-			totalAdmissions,
-			pendingDocs,
-			batchAssigned,
-			zeroPeriod,
-			batchFreezed,
-			dropout
-		};
 
-		console.log(totalAdmissions,'totalAdmissions')
-
-		return res.json({ status: true, data });
-	}
-	catch (err) {
-		console.error("Dashboard data error:", err);
-		return res.status(500).json({ status: false, message: "Failed to fetch dashboard data", error: err.message });
-	}
-	}
-)
+// )
 
 module.exports = router;

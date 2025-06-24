@@ -651,7 +651,7 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
 
     // Check if email already exists
 
-    if(body.email){
+    if(body.email && body.email !== editUser.email){
     const existingUser = await User.findOne({
       email: body.email.toLowerCase(),
       role: 2,
@@ -668,7 +668,7 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
   }
 
 
-  if(body.mobile){
+  if(body.mobile && body.mobile !== editUser.mobile){
     // Check if mobile already exists
     const existingMobile = await User.findOne({
       mobile: parseInt(body.mobile),
