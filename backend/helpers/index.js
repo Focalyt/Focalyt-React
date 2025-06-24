@@ -535,16 +535,23 @@ module.exports.sendSms = async (body) => {
 
 module.exports.getAllTeamMembers = async (userId, allUserIds = []) => {
   try {
+    // Convert allUserIds to string for comparison
+    const userIdStr = userId.toString();
+    if (allUserIds.map(id => id.toString()).includes(userIdStr)) {
+      // Already visited, skip to prevent infinite loop
+      return allUserIds;
+    }
+
+    console.log('getAllTeamMembers called for', userIdStr);
+
     // Find the user by userId and populate their 'my_team' field to get their team members
     const user = await User.findById(userId).populate('my_team');
-    
     if (!user) {
       return allUserIds;
     }
 
     // Add the current user's userId to the array
     allUserIds.push(user._id);
-
 
     // Recursively add all team members to the array
     for (const teamMember of user.my_team) {

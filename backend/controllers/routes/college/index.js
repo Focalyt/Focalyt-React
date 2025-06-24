@@ -317,8 +317,10 @@ router.route("/register")
 router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 	try {
+		console.log('====================>!api called')
 		const user = req.user;
 		const teamMembers = await getAllTeamMembers(user._id);
+		console.log('teamMembers', teamMembers)
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});

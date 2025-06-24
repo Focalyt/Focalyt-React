@@ -421,7 +421,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                       onClick={() => {
                         setUserForm(prev => ({
                           ...prev,
-                          reporting_managers: users.map(u => u.user_id)
+                          reporting_managers: users.filter(user => user.user_id !== editUser?.user_id).map(u => u.user_id)
                         }));
                       }}
                     >
@@ -439,7 +439,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                   </div>
                 </div>
                 <div className="card-body" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                  {users.map(user => {
+                  {users.filter(user => user.user_id !== editUser?.user_id).map(user => {
                     const isSelected = userForm.reporting_managers.includes(user.user_id);
 
                     return (

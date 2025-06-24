@@ -24,9 +24,7 @@ const AppliedCourses = require('../../models/appliedCourses');
 
 // Permission Checker Utility Function
 const hasPermission = (user, permission) => {
-  console.log(user, 'user')
   const permissionType = user.permissions?.permission_type;
-
   if (permissionType === 'Admin') return true;
 
   if (permissionType === 'View Only') {
@@ -602,7 +600,6 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
 //update User
 
 router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), logUserActivity((req) => `Update user: ${req.body.name}`)], async (req, res) => {
-  console.log('api called add user')
   try {
 
     let body = req.body;
@@ -740,17 +737,23 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
 
       body.reporting_managers = await Promise.all(
         body.reporting_managers.map(async (manager) => {
+          // Always convert to ObjectId if string
           if (typeof manager === 'string') {
-            return new mongoose.Types.ObjectId(manager);
+            manager = new mongoose.Types.ObjectId(manager);
           }
-          
+
+          console.log('manager', manager)
+          console.log('userId', userId)
+
           // Update the reporting manager and add userId to their my_team array if it's not already there
           const updateMyTeam = await User.findOneAndUpdate(
             { _id: manager },
             { $addToSet: { my_team: userId } },  // Using $addToSet to avoid duplicates
             { new: true }
           );
-    
+
+          console.log('updateMyTeam', updateMyTeam);
+
           return updateMyTeam._id;
         })
       );
