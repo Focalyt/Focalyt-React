@@ -81,4 +81,5 @@ module.exports.UserActivityLog = require("./userActivityLog");
 module.exports.Status = require("./status");
 module.exports.ApprovalRequest = require("./approval");
 module.exports.LeadAssignmentRule = require("./leadAssignmentRule");
+module.exports.EventType = require("./eventType");
 // module.exports.Manager = required("");

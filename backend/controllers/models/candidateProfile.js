@@ -80,6 +80,7 @@ const candidateProfileSchema = new Schema(
           city: { type: ObjectId, ref: "City" },
         },
       ],
+      fatherName:{type : String},
       skills: [
         {
           skillName: { type: String },

@@ -135,9 +135,13 @@ const CRMDashboard = () => {
   };
 
 
-  const handleSaveCV = () => {
+  const handleSaveCV = async () => {
     if (candidateRef.current) {
-      candidateRef.current.handleSaveCV();
+      const result = await candidateRef.current.handleSaveCV();
+      console.log(result,'result')
+      if (result === true) {
+        setOpenModalId(null) ; setSelectedProfile(null)
+      }
     }
   };
 
@@ -3849,6 +3853,7 @@ const CRMDashboard = () => {
                                           href={`https://wa.me/${profile._candidate?.mobile}`}
                                           style={{ fontSize: '20px' }}
                                           title="WhatsApp"
+                                          target="_blank"
                                         >
                                           <i className="fab fa-whatsapp"></i>
                                         </a>
@@ -5332,6 +5337,13 @@ const CRMDashboard = () => {
                                  width:1000px!important;
                                  transform: translateX(25%);
                                  }
+
+                                 @media(max-width:768px){
+                                 .new-modal-content{
+                                 width:100%!important;
+                                 transform: translateX(0%)
+                                 }
+                                 }
                                   `
                               }
                             </style>
@@ -6519,7 +6531,6 @@ background: #fd2b5a;
 @media (max-width: 768px) {
     .modal-dialog {
         margin: 0.5rem;
-        max-width: calc(100% - 1rem);
     }
 
     .whatsapp-chat .modal-content {
@@ -7092,6 +7103,9 @@ background: #fd2b5a;
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+.modal-content{
+width:100%;
+}
     .document-modal-content {
         width: 98%;
         margin: 1rem;

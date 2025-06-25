@@ -9,6 +9,41 @@ const readXlsxFile = require("read-excel-file/node");
 const mongoose = require("mongoose");
 // const csv = require("csv-parser");
 const csv = require("fast-csv");
+const uuid = require('uuid/v1');
+const multer = require('multer');
+const AWS = require('aws-sdk');
+
+const {
+	accessKeyId,
+	
+	secretAccessKey,
+	region,
+	bucketName,
+	mimetypes,
+  } = require('../../../config');
+  
+  
+  AWS.config.update({
+	accessKeyId,
+	secretAccessKey,
+	region,
+  });
+  
+  const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+  
+  const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
+  if (!fs.existsSync(destination)) fs.mkdirSync(destination);
+  
+  const storage = multer.diskStorage({
+	destination,
+	filename: (req, file, cb) => {
+	  const ext = path.extname(file.originalname);
+	  const basename = path.basename(file.originalname, ext);
+	  cb(null, `${basename}-${Date.now()}${ext}`);
+	},
+  });
+  
+  const upload = multer({ storage }).single('file');
 
 
 
@@ -1065,4 +1100,227 @@ router.get('/getCandidateProfile/:id', [isCollege], async (req, res) => {
 		res.status(500).json({ status: false, message: "Error fetching profile data" });
 	}
 });
+
+router.post('/saveProfile', [isCollege], async (req, res) => {
+	try {
+		console.log("save profile...")
+	  const user = req.user;
+  
+	  const {
+		name,
+		email,
+		mobile,
+		sex,
+		dob,
+		whatsapp,
+		personalInfo,
+		experiences,
+		qualifications,
+		declaration,
+		isExperienced,showProfileForm
+	  } = req.body;
+  
+	  console.log('experiences from frontend',experiences)
+  
+	  // Build dynamic update object
+	  const updatePayload = {
+		
+	  };
+  
+	  // Root level fields (only if present)
+	  if (showProfileForm) updatePayload.showProfileForm = showProfileForm;
+	  if (name) updatePayload.name = name;
+	  if (email) updatePayload.email = email;
+	  if (typeof isExperienced !== 'undefined') {
+		updatePayload.isExperienced = isExperienced;
+	  }
+	  
+	  if (sex) updatePayload.sex = sex;
+	  if (dob) updatePayload.dob = dob;
+	  if (whatsapp) updatePayload.whatsapp = whatsapp;
+  
+	  // personalInfo: Only non-empty fields
+	  if (personalInfo) {
+		updatePayload.personalInfo = {};
+  
+		if (personalInfo.professionalTitle) updatePayload.personalInfo.professionalTitle = personalInfo.professionalTitle;
+		if (personalInfo.declaration) updatePayload.personalInfo.declaration = personalInfo.declaration;
+		if (personalInfo.totalExperience) updatePayload.personalInfo.totalExperience = personalInfo.totalExperience;
+		if (personalInfo.professionalSummary) updatePayload.personalInfo.professionalSummary = personalInfo.professionalSummary;
+		if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
+		if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;
+		if (personalInfo.permanentAddress) updatePayload.personalInfo.permanentAddress = personalInfo.permanentAddress;
+		if (personalInfo.currentAddress) updatePayload.personalInfo.currentAddress = personalInfo.currentAddress;
+  
+		if (Array.isArray(personalInfo.voiceIntro) && personalInfo.voiceIntro.length > 0) {
+		  updatePayload.personalInfo.voiceIntro = personalInfo.voiceIntro;
+		}
+		if (Array.isArray(personalInfo.skills) && personalInfo.skills.length > 0) updatePayload.personalInfo.skills = personalInfo.skills;
+		if (Array.isArray(personalInfo.certifications) && personalInfo.certifications.length > 0) updatePayload.personalInfo.certifications = personalInfo.certifications;
+		if (Array.isArray(personalInfo.languages) && personalInfo.languages.length > 0) {
+		  updatePayload.personalInfo.languages = personalInfo.languages
+			.filter(lang => lang.name && typeof lang.level === 'number')
+			.map(lang => ({
+			  name: lang.name,
+			  level: lang.level
+			}));
+		}
+  
+		if (Array.isArray(personalInfo.projects) && personalInfo.projects.length > 0) updatePayload.personalInfo.projects = personalInfo.projects;
+		if (Array.isArray(personalInfo.interest) && personalInfo.interest.length > 0) updatePayload.personalInfo.interest = personalInfo.interest;
+  
+	  }
+  
+	 
+	  // Work experience
+  if (Array.isArray(experiences) && experiences.length > 0) {
+	updatePayload.experiences = experiences.map(exp => ({
+	  jobTitle: exp.jobTitle || '',
+	  companyName: exp.companyName || '',
+	  jobDescription: exp.jobDescription || '',
+	  currentlyWorking: exp.currentlyWorking || false,
+	  from: exp.from ? new Date(exp.from) : null,
+	  to: exp.to ? new Date(exp.to) : null,
+	  location: exp.location || {
+		type: 'Point',
+		coordinates: [0, 0],
+		city: '',
+		state: '',
+		fullAddress: ''
+	  }
+	}));
+  }
+  
+  
+	  // Qualifications (sanitize and only if non-empty)
+	  if (Array.isArray(qualifications) && qualifications.length > 0) {
+		updatePayload.qualifications = qualifications
+		  .filter(q => q.education)
+		  .map(q => ({
+			education: q.education,
+			boardName: q.boardName || '',
+			schoolName: q.schoolName || '',
+			collegeName: q.collegeName || '',
+			universityName: q.universityName || '',
+			passingYear: q.passingYear || '',
+			marks: q.marks || '',
+			course: q.course || undefined,
+			specialization: q.specialization || '',
+			universityLocation: q.universityLocation || {
+			  type: 'Point',
+			  coordinates: [0, 0],
+			  city: '',
+			  state: '',
+			  fullAddress: ''
+			},
+			collegeLocation: q.collegeLocation || {
+			  type: 'Point',
+			  coordinates: [0, 0],
+			  city: '',
+			  state: '',
+			  fullAddress: ''
+			},
+			schoolLocation: q.schoolLocation || {
+			  type: 'Point',
+			  coordinates: [0, 0],
+			  city: '',
+			  state: '',
+			  fullAddress: ''
+			}
+		  }));
+	  }
+	  console.log('updatePayload', updatePayload)
+	  console.log('Incoming Data:', req.body);
+	
+	  // Final DB Update
+	  const updatedProfile = await Candidate.findOneAndUpdate(
+		{ mobile: mobile },
+		{ $set: updatePayload },
+		{ new: true, runValidators: true }
+	  );
+  
+	  console.log('updatedProfile', updatedProfile)
+  
+  
+	  return res.status(200).json({ status: true, message: 'Profile updated successfully', data: updatedProfile });
+	} catch (error) {
+	  console.error('Error saving profile data:', error);
+	  return res.status(500).json({ status: false, message: 'Error saving profile data', error: error.message });
+	}
+  });
+
+  router.patch('/updatefiles', [isCollege], async (req, res) => {
+	try {
+	  // Step 1: Find dynamic key (should be only 1 key in body)
+  
+	  console.log('updatefiles')
+	  const keys = Object.keys(req.body);
+	  if (keys.length !== 1) {
+		return res.send({ status: false, message: 'Invalid request structure' });
+	  }
+  
+	  const fieldName = keys[0];
+	  const fileData = req.body[fieldName];
+  
+	  console.log('fieldName',fieldName,'fileData',fileData)
+  
+	  // Step 2: Validate allowed fields
+	  const arrayFields = ['resume', 'voiceIntro'];
+	  const singleFields = ['profilevideo', 'image','focalytProfile'];
+  
+	  if (![...arrayFields, ...singleFields].includes(fieldName)) {
+		return res.send({ status: false, message: 'Unauthorized field update' });
+	  }
+  
+	  // Step 3: Create update object
+	  const updateQuery = arrayFields.includes(fieldName)
+		? { $push: { [`personalInfo.${fieldName}`]: fileData } }
+		: { [`personalInfo.${fieldName}`]: fileData.url }; // Assuming single fields hold only URL
+  console.log('updateQuery',updateQuery)
+	  // Step 4: Execute update
+	  const candidate = await Candidate.findOneAndUpdate(
+		{ mobile: req.user.mobile },
+		updateQuery
+	  );
+  
+  
+	  return res.send({ status: true, message: `${fieldName} updated successfully` });
+  
+	} catch (err) {
+	  console.error("❌ Error updating file in profile:", err);
+	  return res.send({ status: false, message: 'Error updating file in profile' });
+	}
+  });
+
+  router.post('/upload-profile-pic/:filename',[isCollege],async(req,res)=>{
+	try {
+		console.log('api hiting upload file')
+		const { name, mimetype: ContentType } = req.files.file;
+		const {mobile} = req.body
+		console.log('body',req.body)
+		const ext = name.split('.').pop();
+		const { filename } = req.params
+		let userId = await Candidate.findOne({mobile:mobile}).select('_id')
+		console.log('userId',userId)
+		const key = `uploads/${userId}/${filename}/${uuid()}.${ext}`;
+		console.log('key',key)
+		if (!mimetypes.includes(ext.toLowerCase())) throw new InvalidParameterError('File type not supported!');
+	
+		const data = req.files.file.data
+		const params = {
+		  Bucket: bucketName, Body: data, Key: key, ContentType,
+		};
+
+		console.log('params',params)
+	
+		const url = await s3.upload(params).promise()
+		console.log('url',url)
+		
+
+		const updatedProfile = await Candidate.findOneAndUpdate({mobile:mobile},{$set:{personalInfo:{image:url.Location}}},{new:true})
+		console.log('updatedProfile',updatedProfile)
+		return res.send({status:true,message:'Profile picture updated successfully',data:updatedProfile})
+	
+	  } catch (err) { return req.errFunc(err); }
+  })
 module.exports = router;

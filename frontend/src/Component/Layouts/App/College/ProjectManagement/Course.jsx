@@ -54,6 +54,26 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     fetchCourses()
   }, []);
 
+  useEffect(() => {
+    const urlParams = getURLParams();
+    console.log('Course initial URL setup - current params:', urlParams);
+    
+    // If we're not in course or batch stage, set to course stage
+    if (urlParams.stage !== 'course' && urlParams.stage !== 'batch') {
+      console.log('Setting to course stage');
+      updateURL({ 
+        stage: 'course',
+        centerId: selectedCenter?._id,
+        centerName: selectedCenter?.name,
+        projectId: selectedProject?._id,
+        projectName: selectedProject?.name,
+        verticalId: selectedVertical?.id,
+        verticalName: selectedVertical?.name
+      });
+    }
+  }, [selectedCenter, selectedProject, selectedVertical]);
+
+
   const fetchCourses = async (params) => {
     try {
 
@@ -151,12 +171,73 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   const handleCourseClick = (course) => {
     setSelectedCourseForBatches(course);
     setShowBatches(true);
+    
+    updateURL({ 
+      stage: 'batch', 
+      courseId: course._id, 
+      courseName: course.name,
+      centerId: selectedCenter?._id,
+      centerName: selectedCenter?.name,
+      projectId: selectedProject?._id,
+      projectName: selectedProject?.name,
+      verticalId: selectedVertical?.id,
+      verticalName: selectedVertical?.name
+    });
   };
+
+  useEffect(() => {
+    const urlParams = getURLParams();
+    console.log('Course component - URL params:', urlParams);
+    
+    // Only restore state if courses are loaded
+    if (courses.length === 0) {
+      console.log('Courses not loaded yet, skipping state restoration');
+      return;
+    }
+    
+    if (urlParams.stage === "batch" && urlParams.courseId) {
+      // Find course from current courses list
+      const course = courses.find(c => c._id === urlParams.courseId);
+      if (course) {
+        setSelectedCourseForBatches(course);
+        setShowBatches(true);
+        console.log('Restored to batch view for course:', course.name);
+      } else {
+        // Course not found, reset to course view
+        console.warn('Course not found in current list, resetting to course view');
+        updateURL({ 
+          stage: 'course',
+          centerId: selectedCenter?._id,
+          centerName: selectedCenter?.name,
+          projectId: selectedProject?._id,
+          projectName: selectedProject?.name,
+          verticalId: selectedVertical?.id,
+          verticalName: selectedVertical?.name
+        });
+        setShowBatches(false);
+      }
+    } else {
+      // Default to course view
+      setShowBatches(false);
+      console.log('Restored to course view');
+    }
+  }, [courses, selectedCenter, selectedProject, selectedVertical]);
 
   // Function to go back to courses view
   const handleBackToCourses = () => {
     setShowBatches(false);
     setSelectedCourseForBatches(null);
+    
+     // Update URL to course view while preserving navigation context
+     updateURL({ 
+      stage: 'course',
+      centerId: selectedCenter?._id,
+      centerName: selectedCenter?.name,
+      projectId: selectedProject?._id,
+      projectName: selectedProject?.name,
+      verticalId: selectedVertical?.id,
+      verticalName: selectedVertical?.name
+    });
   };
 
   const closeModal = () => {
@@ -252,7 +333,39 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
       </div>
     );
   }
+  // URL-based state management
+  const getURLParams = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return {
+      stage: urlParams.get('stage') || 'course',
+      courseId: urlParams.get('courseId'),
+      courseName: urlParams.get('courseName'),
+      centerId: urlParams.get('centerId'),
+      centerName: urlParams.get('centerName'),
+      projectId: urlParams.get('projectId'),
+      projectName: urlParams.get('projectName'),
+      verticalId: urlParams.get('verticalId'),
+      verticalName: urlParams.get('verticalName')
+    };
+  };
 
+  const updateURL = (params) => {
+    const url = new URL(window.location);
+    
+    // Clear existing params
+    url.searchParams.delete('stage');
+    url.searchParams.delete('courseId');
+    url.searchParams.delete('courseName');
+    
+    // Set new params
+    Object.keys(params).forEach(key => {
+      if (params[key]) {
+        url.searchParams.set(key, params[key]);
+      }
+    });
+    
+    window.history.replaceState({}, '', url);
+  };
   return (
     <div className="container py-4">
       {/* ======== ADD THIS: Back Button and Header ======== */}

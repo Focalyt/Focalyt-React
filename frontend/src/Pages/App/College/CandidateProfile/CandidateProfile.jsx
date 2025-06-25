@@ -132,60 +132,60 @@ const CandidateProfile = forwardRef((props, ref) => {
         return size <= 5 * 1024 * 1024; // 5MB
     };
 
-    const handleFileUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    // const handleFileUpload = async (e) => {
+    //     const file = e.target.files[0];
+    //     if (!file) return;
 
-        const fileType = file.name;
-        const fileSize = file.size;
+    //     const fileType = file.name;
+    //     const fileSize = file.size;
 
-        if (!checkCvValidation(fileType) && !checkCVSize(fileSize)) {
-            alert("Upload the CV in .docx, .doc, .jpg, .jpeg, .png or pdf format and size should be less than 5MB");
-            e.target.value = '';
-            return;
-        } else if (checkCvValidation(fileType) && !checkCVSize(fileSize)) {
-            alert("Uploaded CV size should be less than 5MB");
-            e.target.value = '';
-            return;
-        } else if (!checkCvValidation(fileType) && checkCVSize(fileSize)) {
-            alert("Upload the CV in .docx, .doc, .jpg, .jpeg, .png or pdf format");
-            e.target.value = '';
-            return;
-        }
+    //     if (!checkCvValidation(fileType) && !checkCVSize(fileSize)) {
+    //         alert("Upload the CV in .docx, .doc, .jpg, .jpeg, .png or pdf format and size should be less than 5MB");
+    //         e.target.value = '';
+    //         return;
+    //     } else if (checkCvValidation(fileType) && !checkCVSize(fileSize)) {
+    //         alert("Uploaded CV size should be less than 5MB");
+    //         e.target.value = '';
+    //         return;
+    //     } else if (!checkCvValidation(fileType) && checkCVSize(fileSize)) {
+    //         alert("Upload the CV in .docx, .doc, .jpg, .jpeg, .png or pdf format");
+    //         e.target.value = '';
+    //         return;
+    //     }
 
-        const formData = new FormData();
-        formData.append("file", file);
+    //     const formData = new FormData();
+    //     formData.append("file", file);
 
-        const headers = {
-            headers: {
-                'x-auth': localStorage.getItem('token'),
-                'Content-Type': 'multipart/form-data'
-            }
-        };
+    //     const headers = {
+    //         headers: {
+    //             'x-auth': token,
+    //             'Content-Type': 'multipart/form-data'
+    //         }
+    //     };
 
-        try {
-            const result = await axios.post(`${backendUrl}/api/uploadSingleFile`, formData, headers);
-            console.log("📦 Upload response:", result.data);
+    //     try {
+    //         const result = await axios.post(`${backendUrl}/api/uploadSingleFile`, formData, headers);
+    //         console.log("📦 Upload response:", result.data);
 
-            if (result.data.status) {
-                localStorage.setItem("resume", result.data.data.Key); // Saving key like original
+    //         if (result.data.status) {
+    //             localStorage.setItem("resume", result.data.data.Key); // Saving key like original
 
-                // Store file info in localStorage
-                const currentDate = new Date().toLocaleDateString('en-GB', {
-                    day: 'numeric', month: 'short', year: 'numeric'
-                }).replace(/ /g, ' ');
+    //             // Store file info in localStorage
+    //             const currentDate = new Date().toLocaleDateString('en-GB', {
+    //                 day: 'numeric', month: 'short', year: 'numeric'
+    //             }).replace(/ /g, ' ');
 
-                localStorage.setItem('resumeFileName', file.name);
-                localStorage.setItem('resumeUploadDate', currentDate);
+    //             localStorage.setItem('resumeFileName', file.name);
+    //             localStorage.setItem('resumeUploadDate', currentDate);
 
-                setFileName(file.name);
-                setUploadDate(currentDate);
-            }
-        } catch (error) {
-            console.error("Upload failed:", error);
-            alert("Something went wrong while uploading the resume.");
-        }
-    };
+    //             setFileName(file.name);
+    //             setUploadDate(currentDate);
+    //         }
+    //     } catch (error) {
+    //         console.error("Upload failed:", error);
+    //         alert("Something went wrong while uploading the resume.");
+    //     }
+    // };
 
 
     // Audio recording state
@@ -287,13 +287,38 @@ const CandidateProfile = forwardRef((props, ref) => {
         }
     };
 
+    const uploadProfilePic = async (file, filename) => {
+        try {      
+            console.log('uploadProfilePic hitting',profileData.mobile)
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('mobile', profileData.mobile);
+
+            const res = await axios.post(`${backendUrl}/college/candidate/upload-profile-pic/${filename}`, formData, {
+                headers: {
+                    'x-auth': token,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            if (res.data.status) {
+                alert('Profile picture updated successfully')
+                window.location.reload();
+                console.log('file uploaded on s3')
+
+            }
+        } catch (err) {
+            console.error("Upload failed:", err);
+        }
+    };
+
 
     const updateFileInProfile = async (dataObject, schemaFieldName) => {
         try {
             const token = localStorage.getItem('token');
             console.log('updateFileInProfile hitting')
 
-            const res = await axios.patch(`${backendUrl}/candidate/updatefiles`, {
+            const res = await axios.patch(`${backendUrl}/college/candidate/updatefiles`, {
                 [schemaFieldName]: dataObject
             }, {
                 headers: { 'x-auth': token }
@@ -1117,7 +1142,6 @@ const CandidateProfile = forwardRef((props, ref) => {
                     alert("Please accept the declaration before saving your resume.");
                     return;
                 }
-                const token = localStorage.getItem('token');
                 const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
                 const monthNames = {
                     "01": "January",
@@ -1239,8 +1263,10 @@ const CandidateProfile = forwardRef((props, ref) => {
                 };
 
                 console.log("📤 CV Payload being sent to backend:", cvPayload);
+                let isValid; // or false based on logic
 
-                const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
+
+                const res = await axios.post(`${backendUrl}/college/candidate/saveProfile`, cvPayload, {
                     headers: {
                         'x-auth': token
                     }
@@ -1248,57 +1274,21 @@ const CandidateProfile = forwardRef((props, ref) => {
 
                 if (res.data.status) {
                     alert('CV Saved Successfully!');
+
+                    isValid = true;
                     // window.location.reload();
+                    return isValid;
 
                 } else {
                     alert('Failed to save CV!');
+
+                    isValid = true;
+                    // window.location.reload();
+                    return isValid;
+
                 }
             }
-            {
-                setShowPreview(true);
 
-                // Need to wait for the preview to render
-                setTimeout(async () => {
-                    try {
-                        // Now try to get the element
-                        const element = document.getElementById('resume-download');
-
-                        if (!element) {
-                            console.error("Resume element still not found after showing preview");
-                            alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
-                            return;
-                        }
-
-                        const opt = {
-                            margin: 0.5,
-                            filename: 'resume.pdf',
-                            image: { type: 'jpeg', quality: 0.98 },
-                            html2canvas: { scale: 2 },
-                            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-                        };
-
-                        // Generate blob
-                        const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
-
-                        // Create a file object from the blob
-                        const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
-                            type: 'application/pdf'
-                        });
-
-                        // Upload to focalytProfile
-                        await uploadCV(pdfFile, 'focalytProfile');
-
-                        // Close the preview
-                        setShowPreview(false);
-
-                        alert('Resume has been saved successfully, including the PDF for your profile!');
-                    } catch (err) {
-                        console.error("PDF generation error:", err);
-                        alert('Resume data saved, but there was an error generating the PDF profile.');
-                        setShowPreview(false); // Close preview on error
-                    }
-                }, 1000);
-            }
         } catch (err) {
             console.error("Error saving CV:", err);
             alert("An error occurred while saving your CV");
@@ -1308,7 +1298,7 @@ const CandidateProfile = forwardRef((props, ref) => {
     const fetchProfile = async (id) => {
         try {
 
-            console.log(id,'id')
+            console.log(id, 'id')
 
             const response = await axios.get(`${backendUrl}/college/candidate/getCandidateProfile/${id}`, {
                 headers: {
@@ -1405,7 +1395,7 @@ const CandidateProfile = forwardRef((props, ref) => {
     }))
 
 
-   
+
 
 
 
@@ -1521,7 +1511,7 @@ const CandidateProfile = forwardRef((props, ref) => {
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (file) {
-                                                    uploadCV(file, 'image');
+                                                    uploadProfilePic(file, 'image');
                                                     e.target.value = null;
                                                 }
                                             }}
@@ -1582,21 +1572,25 @@ const CandidateProfile = forwardRef((props, ref) => {
                                 <div className="contact-info mb-3">
                                     <div className="contact-item">
                                         <i className="bi bi-telephone"></i>
-                                        {createEditable(profileData?.mobile || '', 'Phone Number', (val) => {
+                                        {/* {createEditable(profileData?.mobile || '', 'Phone Number', (val) => {
                                             setProfileData(prev => ({
                                                 ...prev,
                                                 mobile: val
                                             }));
-                                        })}
+                                        })} */}
+                                        <span><strong>Phone Number:</strong> {profileData?.mobile || 'N/A'}</span>
+
                                     </div>
                                     <div className="contact-item">
                                         <i className="bi bi-envelope"></i>
-                                        {createEditable(profileData?.email || '', 'Email Address', (val) => {
+                                        {/* {createEditable(profileData?.email || '', 'Email Address', (val) => {
                                             setProfileData(prev => ({
                                                 ...prev,
                                                 email: val
                                             }));
-                                        })}
+                                        })} */}
+                                        <label className="form-label fw-bold m-0">Email Address:</label>
+                                        <div>{profileData?.email || 'N/A'}</div>
                                     </div>
 
                                     {/* New Row for Gender and DOB */}

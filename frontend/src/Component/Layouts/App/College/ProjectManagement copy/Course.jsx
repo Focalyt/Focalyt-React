@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import Batch from '../../../../Layouts/App/College/ProjectManagement/Batch';
+import Batch from '../../../../Layouts/App/College/ProjectManagement copy/Batch';
 import qs from 'query-string';
-const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
+
+const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject = null, onBackToProjects = null, selectedVertical = null, onBackToVerticals = null }) => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -54,22 +55,49 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
     fetchCourses()
   }, []);
 
+  // Set up initial URL with current context
+  useEffect(() => {
+    const urlParams = getURLParams();
+    console.log('Course initial URL setup - current params:', urlParams);
+    
+    // If we're not in course or batch stage, set to course stage
+    if (urlParams.stage !== 'course' && urlParams.stage !== 'batch') {
+      console.log('Setting to course stage');
+      updateURL({ 
+        stage: 'course',
+        centerId: selectedCenter?._id,
+        centerName: selectedCenter?.name,
+        projectId: selectedProject?._id,
+        projectName: selectedProject?.name,
+        verticalId: selectedVertical?.id,
+        verticalName: selectedVertical?.name
+      });
+    }
+  }, [selectedCenter, selectedProject, selectedVertical]);
+
   const fetchCourses = async (params) => {
     try {
 
       const headers = {
         'x-auth': token,
       };
-      const queryString = qs.stringify(params);
 
-      const response = await axios.get(`${backendUrl}/college/courses?${queryString}`, { headers });
 
-      console.log("Fetched courses:", response.data.course);
+      const response = await axios.get(`${backendUrl}/college/all_courses_centerwise`, {
+        params: {
+          centerId: selectedCenter._id,
+          projectId: selectedProject._id
+        },
+        headers: headers // make sure headers are passed correctly
+      });
+
+
+      console.log("Fetched courses:", response.data.data);
       console.log(" Response :", response);
 
 
       if (response.data) {
-        const updatedCourses = (response.data.courses || []).map(course => ({
+        const updatedCourses = (response.data.data || []).map(course => ({
           ...course,
           status: course.status === true ? 'active' : 'inactive'
         }));
@@ -144,12 +172,75 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
   const handleCourseClick = (course) => {
     setSelectedCourseForBatches(course);
     setShowBatches(true);
+
+    // Update URL with course and navigation info
+    updateURL({ 
+      stage: 'batch', 
+      courseId: course._id, 
+      courseName: course.name,
+      centerId: selectedCenter?._id,
+      centerName: selectedCenter?.name,
+      projectId: selectedProject?._id,
+      projectName: selectedProject?.name,
+      verticalId: selectedVertical?.id,
+      verticalName: selectedVertical?.name
+    });
   };
+
+  useEffect(() => {
+    const urlParams = getURLParams();
+    console.log('Course component - URL params:', urlParams);
+    
+    // Only restore state if courses are loaded
+    if (courses.length === 0) {
+      console.log('Courses not loaded yet, skipping state restoration');
+      return;
+    }
+    
+    if (urlParams.stage === "batch" && urlParams.courseId) {
+      // Find course from current courses list
+      const course = courses.find(c => c._id === urlParams.courseId);
+      if (course) {
+        setSelectedCourseForBatches(course);
+        setShowBatches(true);
+        console.log('Restored to batch view for course:', course.name);
+      } else {
+        // Course not found, reset to course view
+        console.warn('Course not found in current list, resetting to course view');
+        updateURL({ 
+          stage: 'course',
+          centerId: selectedCenter?._id,
+          centerName: selectedCenter?.name,
+          projectId: selectedProject?._id,
+          projectName: selectedProject?.name,
+          verticalId: selectedVertical?.id,
+          verticalName: selectedVertical?.name
+        });
+        setShowBatches(false);
+      }
+    } else {
+      // Default to course view
+      setShowBatches(false);
+      console.log('Restored to course view');
+    }
+  }, [courses, selectedCenter, selectedProject, selectedVertical]); // Depend on courses and navigation context
+
 
   // Function to go back to courses view
   const handleBackToCourses = () => {
     setShowBatches(false);
     setSelectedCourseForBatches(null);
+
+    // Update URL to course view while preserving navigation context
+    updateURL({ 
+      stage: 'course',
+      centerId: selectedCenter?._id,
+      centerName: selectedCenter?.name,
+      projectId: selectedProject?._id,
+      projectName: selectedProject?.name,
+      verticalId: selectedVertical?.id,
+      verticalName: selectedVertical?.name
+    });
   };
 
   const closeModal = () => {
@@ -241,10 +332,44 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
         </div> */}
 
         {/* Batch Component with filtered data */}
-        <Batch selectedCourse={selectedCourseForBatches} />
+        <Batch selectedCourse={selectedCourseForBatches} onBackToCourses={handleBackToCourses} selectedCenter={selectedCenter} onBackToCenters={onBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
       </div>
     );
   }
+
+  // URL-based state management
+  const getURLParams = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return {
+      stage: urlParams.get('stage') || 'course',
+      courseId: urlParams.get('courseId'),
+      courseName: urlParams.get('courseName'),
+      centerId: urlParams.get('centerId'),
+      centerName: urlParams.get('centerName'),
+      projectId: urlParams.get('projectId'),
+      projectName: urlParams.get('projectName'),
+      verticalId: urlParams.get('verticalId'),
+      verticalName: urlParams.get('verticalName')
+    };
+  };
+
+  const updateURL = (params) => {
+    const url = new URL(window.location);
+    
+    // Clear existing params
+    url.searchParams.delete('stage');
+    url.searchParams.delete('courseId');
+    url.searchParams.delete('courseName');
+    
+    // Set new params
+    Object.keys(params).forEach(key => {
+      if (params[key]) {
+        url.searchParams.set(key, params[key]);
+      }
+    });
+    
+    window.history.replaceState({}, '', url);
+  };
 
   return (
     <div className="container py-4">
@@ -252,27 +377,37 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
           <div className="d-flex align-items-center gap-3">
-            {onBackToCenters && (
-              <button
-                className="btn btn-outline-secondary"
-                onClick={onBackToCenters}
-                title="Back to Centers"
-              >
-                <i className="bi bi-arrow-left me-1"></i>
-                Back
-              </button>
-            )}
-            <div>
-              <h4 className="mb-0">Courses</h4>
-              {/* {selectedCenter && (
-                <small className="text-muted">
-                  Showing courses for: <strong>{selectedCenter.name} ({selectedCenter.code})</strong>
-                </small>
-              )} */}
+
+            <div className='d-flex align-items-center'>
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
+              <span className="mx-2"> &gt; </span>
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+                {selectedProject.name} Project
+              </h5>
+              <span className="mx-2"> &gt; </span>
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
+                {selectedCenter.name} Centers
+              </h5>
+              <span className="mx-2"> &gt; </span>
+              <h5 className="breadcrumb-item mb-0" aria-current="page">
+                All Courses
+              </h5>
             </div>
           </div>
         </div>
+
         <div>
+
+          {onBackToCenters && (
+            <button
+              onClick={onBackToCenters}
+              className="btn btn-light"
+              title="Back to Verticals"
+            >
+              <i className="bi bi-arrow-left"></i>
+              <span>Back</span>
+            </button>
+          )}
 
           <button className="btn btn-outline-secondary me-2 border-0 bg-transparent" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
@@ -332,7 +467,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null }) => {
                         </span>
 
                         <span className="bg-primary">{course.sectors && course.sectors.length > 0 ? course.sectors[0].name : 'N/A'}
-</span>
+                        </span>
                         {/* ======== ADD THIS: Show center code badge ======== */}
                         {selectedCenter && (
                           <span className="text-secondary">

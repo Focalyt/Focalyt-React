@@ -14,6 +14,8 @@ import Course from './Pages/Front/Courses/Course';
 import Jobs from './Pages/Front/Jobs/Jobs';
 import Contact from './Pages/Front/Contact/Contact';
 import CourseDetails from './Pages/Front/CourseDetails/CourseDetails';
+import EmployersTermsofService from './Pages/Front/EmpTerms/EmpTerms';
+import UserAgreement from './Pages/Front/UserAgreement/UserAgreement';
 import "./App.css";
 // import CompanyLogin from './Component/Layouts/App/Company/CompanyLogin';
 import Community from './Pages/Front/Community/Community';
@@ -59,6 +61,7 @@ import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
+import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
 import AddCourse from './Pages/App/College/Course/AddCourse';
 import ViewCourses from './Pages/App/College/Course/ViewCourse';
 import EditCourse from './Pages/App/College/Course/EditCourse';
@@ -70,6 +73,8 @@ import ApprovalManagement from './Pages/App/College/ApprovalManagement/ApprovalM
 import Status from './Pages/App/College/Status/status';
 import MyFollowup from './Pages/App/College/MyFollowup/MyFollowup';
 import AddLeads from './Pages/App/College/Course/AddLeads';
+
+import Batches from './Component/Layouts/App/College/ProjectManagement copy/Batch copy';
 
 import CompanyLayout from './Component/Layouts/App/Company';
 import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
@@ -87,7 +92,8 @@ import ViewJd from './Pages/App/Company/Jobs/ViewJd';
 import IntCandiate from './Pages/App/Company/Candidate/IntrestedCandidates';
 import ListCandidate from './Pages/App/Company/Candidate/ListCandidate';
 import NearByCandidate from './Pages/App/Company/Candidate/NearByCandidate';
-import Batch from './Component/Layouts/App/College/ProjectManagement/Student'
+import Batch from './Component/Layouts/App/College/ProjectManagement/Student';
+import RegistrationCards from './Component/Layouts/App/College/RegistrationCards/RegistrationCards';
 import ResumeTest from './Pages/Front/Resume/Resume';
 import AttendanceManagement from './Component/Layouts/App/College/ProjectManagement/AttendanceManagement'
 const Layout = () => {
@@ -139,7 +145,8 @@ const Layout = () => {
         <Route path="/events" element={<Event />} />
         <Route path="/studentRegistration" element={<Registration />} />
         <Route path="/Resumetest" element={<ResumeTest/>}/>
-
+        <Route path="/employersTermsofService" element={<EmployersTermsofService/>}/>
+        <Route path="/userAgreement" element={<UserAgreement/>}/>
         {/* Candidate Parent Route */}
         <Route path="/candidate/login" element={<CandidateLogin />} />
         <Route path="/candidate" element={<CandidateLayout />}>
@@ -179,7 +186,6 @@ const Layout = () => {
 
         <Route path="/institute/login" element={<CollegeLogin />} />
         <Route path="/institute/register" element={<CollegeRegister />} />
-
         {/* CollegeLayout will wrap only protected pages */}
         <Route path="/institute" element={<CollegeLayout  />}>
           <Route path="dashboard" element={<Dashboard />} />
@@ -198,10 +204,12 @@ const Layout = () => {
           <Route path="courses/edit/:id" element={<EditCourse />} />
           <Route path='accessManagement' element={<AccessManagement/>}/>
           <Route path='projectmanagment' element={<CandidateManagementPortal/>}/>
+          <Route path='candidatemanagment_old' element={<CandidateManagementPortal_old/>}/>
           <Route path='approvalManagement' element={<ApprovalManagement/>}/>
           <Route path='statusdesign' element={<Status/>}/>
           <Route path = 'myfollowup' element={<MyFollowup/>}/>
-    
+          <Route path='registrationcards' element={<RegistrationCards/>}/>
+          <Route path='batches' element={<Batches/>}/>
           {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
           <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
           <Route path='batch' element={<Batch/>}/>

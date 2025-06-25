@@ -101,6 +101,7 @@ const CandidateProfile = () => {
   const [uploadDate, setUploadDate] = useState("");
   const [showResumeViewer, setShowResumeViewer] = useState(false);
   const [resumeUrl, setResumeUrl] = useState('');
+  const [updateNumber, setUpdateNumber] = useState(false);
   const viewResume = () => {
     try {
       // Get the resume URL from local storage or from your state
@@ -206,6 +207,55 @@ const CandidateProfile = () => {
   const videoChunksRef = useRef([]);
   const videoRecorderRef = useRef(null);
 
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [oldPhoneNumber, setOldPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+
+  const [errors, setErrors] = useState({
+    oldPhone: '',
+    otp: '',
+    newPhone: ''
+  });
+
+  const openPhoneModal = () => {
+    setShowPhoneModal(true);
+    // Clear previous data when opening modal
+    setOldPhoneNumber('');
+    setOtp('');
+    setNewPhoneNumber('');
+    setIsOtpSent(false);
+    setErrors({});
+  };
+
+  const closePhoneModal = () => {
+    setShowPhoneModal(false);
+    // Reset all states when closing
+    setOldPhoneNumber('');
+    setOtp('');
+    setNewPhoneNumber('');
+    setIsOtpSent(false);
+    setOtpLoading(false);
+    setUpdateLoading(false);
+    setErrors({});
+  };
+
+  const sendOtp = async () => { }
+
+  const updatePhoneNumber = async () => { }
+
+  const handleOldPhoneChange = (e) => { }
+
+  const handleOtpChange = (e) => { }
+
+  const handleNewPhoneChange = (e) => { }
+
+
+
   const startVideoRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -237,7 +287,13 @@ const CandidateProfile = () => {
       setIsRecordingVideo(false);
     }
   };
+  const openModal = () => {
+    setUpdateNumber(true);
+  };
 
+  const closeModal = () => {
+    setUpdateNumber(false);
+  };
 
   // Backend URL
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -1500,7 +1556,7 @@ const CandidateProfile = () => {
                   })}
                 </div>
                 <div className="profile-summary">
-                  {createEditable(profileData?.personalInfo?.professionalSummary || '', 'Father name', (val) => {
+                  {/* {createEditable(profileData?.personalInfo?.professionalSummary || '', 'Father name', (val) => {
                     setProfileData(prev => ({
                       ...prev,
                       personalInfo: {
@@ -1508,27 +1564,45 @@ const CandidateProfile = () => {
                         professionalSummary: val
                       }
                     }));
-                  })}
+                  })} */}
+                  <label className="form-label fw-bold">Father Name:</label>
+                  <div>{profileData?.personalInfo?.professionalSummary || 'N/A'}</div>
                 </div>
 
                 <div className="contact-info mb-3">
                   <div className="contact-item">
                     <i className="bi bi-telephone"></i>
-                    {createEditable(profileData?.mobile || '', 'Phone Number', (val) => {
+                    {/* {createEditable(profileData?.mobile || '', 'Phone Number', (val) => {
                       setProfileData(prev => ({
                         ...prev,
                         mobile: val
                       }));
-                    })}
+                    })} */}
+                    <span><strong>Phone Number:</strong> {profileData?.mobile || 'N/A'}</span>
+
+                    <button
+                      type="button"
+                      className="border-0 bg-transparent"
+                      onClick={openPhoneModal}
+                    >
+                      <i
+                        className="bi bi-pencil ms-2 text-primary"
+                        style={{ cursor: 'pointer', color: '#fc2b5a' }}
+                        title="Edit"
+                      ></i>
+                    </button>
+
                   </div>
                   <div className="contact-item">
                     <i className="bi bi-envelope"></i>
-                    {createEditable(profileData?.email || '', 'Email Address', (val) => {
+                    {/* {createEditable(profileData?.email || '', 'Email Address', (val) => {
                       setProfileData(prev => ({
                         ...prev,
                         email: val
                       }));
-                    })}
+                    })} */}
+                    <label className="form-label fw-bold m-0">Email Address:</label>
+                    <div>{profileData?.email || 'N/A'}</div>
                   </div>
 
                   {/* New Row for Gender and DOB */}
@@ -2914,6 +2988,8 @@ const CandidateProfile = () => {
               </div>
             </div>
           </div>
+
+
         </div>
 
         {/* Voice Recording Section */}
@@ -3038,18 +3114,18 @@ const CandidateProfile = () => {
               alert("Please accept the declaration before saving your resume.");
               return;
             }
- // Certificate Validation
-                const certificatesValid = certificates.every(cert => {
-                  if (cert.month || cert.year || cert.currentlypursuing) {
-                    return cert.certificateName && cert.orgName;
-                  }
-                  return true;
-                });
+            // Certificate Validation
+            const certificatesValid = certificates.every(cert => {
+              if (cert.month || cert.year || cert.currentlypursuing) {
+                return cert.certificateName && cert.orgName;
+              }
+              return true;
+            });
 
-                if (!certificatesValid) {
-                  alert("Please complete all required certificate fields (name and organization) for certificates with dates or marked as 'Currently Pursuing'");
-                  return;
-                }
+            if (!certificatesValid) {
+              alert("Please complete all required certificate fields (name and organization) for certificates with dates or marked as 'Currently Pursuing'");
+              return;
+            }
             // First save the resume data
             await handleSaveCV();
 
@@ -3848,6 +3924,245 @@ const CandidateProfile = () => {
           </div>
         </div>
       )}
+      {/* {updateNumber && (
+        <>
+          <div
+            className="modal-backdrop show"
+            style={{
+              position: 'static',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1040
+            }}
+            onClick={closeModal}
+          >
+            
+          </div>
+
+
+          <div className="" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50% -50%)' }}>
+
+
+            <div class="card mt-5 shadow-lg">
+              <div class="card-body p-4">
+                <h2 class="card-title text-center mb-4 fw-bold text-dark">
+                  Update Phone Number
+                </h2>
+
+                <form>
+                  <div class="mb-3">
+                    <label for="oldNumber" class="form-label fw-medium">
+                      Enter Old Number
+                    </label>
+                    <div class="d-flex gap-2">
+                      <input
+                        type="tel"
+                        id="oldNumber"
+                        name="oldNumber"
+                        placeholder="Enter your current phone number"
+                        class="form-control flex-fill"
+                      />
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                      >
+                        Send OTP
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="otp" class="form-label fw-medium">
+                      Enter OTP
+                    </label>
+                    <input
+                      type="text"
+                      id="otp"
+                      name="otp"
+                      placeholder="Enter 6-digit OTP"
+                      maxlength="6"
+                      class="form-control"
+                    />
+                    <div class="form-text text-muted">
+                      OTP sent to <span id="phoneDisplay"></span>
+                    </div>
+                  </div>
+
+                  <div class="mb-4">
+                    <label for="newNumber" class="form-label fw-medium">
+                      Enter New Number
+                    </label>
+                    <input
+                      type="tel"
+                      id="newNumber"
+                      name="newNumber"
+                      placeholder="Enter your new phone number"
+                      class="form-control"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    class="btn btn-success w-100 fw-medium"
+                  >
+                    Update Phone Number
+                  </button>
+                </form>
+              </div>
+            </div>
+
+          </div>
+        </>
+      )} */}
+
+
+{showPhoneModal && (
+  <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+    <div className="modal-backdrop show" onClick={closePhoneModal}></div>
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h5 className="modal-title">Update Phone Number</h5>
+          <button 
+            type="button" 
+            className="btn-close" 
+            onClick={closePhoneModal}
+          ></button>
+        </div>
+        
+        <div className="modal-body">
+          <form onSubmit={(e) => e.preventDefault()}>
+            {/* Old Phone Number Field */}
+            <div className="mb-3">
+              <label htmlFor="oldNumber" className="form-label fw-medium">
+                Enter Current Phone Number
+              </label>
+              <div className="d-flex gap-2">
+                <input
+                  type="tel"
+                  id="oldNumber"
+                  className={`form-control flex-fill ${errors.oldPhone ? 'is-invalid' : ''}`}
+                  placeholder="Enter your current phone number"
+                  value={oldPhoneNumber}
+                  onChange={handleOldPhoneChange}
+                  disabled={isOtpSent}
+                  maxLength="10"
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={sendOtp}
+                  disabled={otpLoading || isOtpSent || !oldPhoneNumber}
+                >
+                  {otpLoading ? (
+                    <span className="spinner-border spinner-border-sm me-1"></span>
+                  ) : null}
+                  {isOtpSent ? 'OTP Sent' : 'Send OTP'}
+                </button>
+              </div>
+              {errors.oldPhone && (
+                <div className="invalid-feedback d-block">{errors.oldPhone}</div>
+              )}
+            </div>
+
+            {/* OTP Field - Only show after OTP is sent */}
+            {isOtpSent && (
+              <div className="mb-3">
+                <label htmlFor="otp" className="form-label fw-medium">
+                  Enter OTP
+                </label>
+                <input
+                  type="text"
+                  id="otp"
+                  className={`form-control ${errors.otp ? 'is-invalid' : ''}`}
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChange={handleOtpChange}
+                  maxLength="6"
+                />
+                {errors.otp && (
+                  <div className="invalid-feedback">{errors.otp}</div>
+                )}
+                <div className="form-text text-muted">
+                  OTP sent to +91-{oldPhoneNumber}
+                </div>
+              </div>
+            )}
+
+            {/* New Phone Number Field - Only show after OTP is sent */}
+            {isOtpSent && (
+              <div className="mb-4">
+                <label htmlFor="newNumber" className="form-label fw-medium">
+                  Enter New Phone Number
+                </label>
+                <input
+                  type="tel"
+                  id="newNumber"
+                  className={`form-control ${errors.newPhone ? 'is-invalid' : ''}`}
+                  placeholder="Enter your new phone number"
+                  value={newPhoneNumber}
+                  onChange={handleNewPhoneChange}
+                  maxLength="10"
+                />
+                {errors.newPhone && (
+                  <div className="invalid-feedback">{errors.newPhone}</div>
+                )}
+              </div>
+            )}
+
+            {/* Update Button - Only show when OTP is sent */}
+            {isOtpSent && (
+              <button
+                type="button"
+                className="btn btn-success w-100 fw-medium"
+                onClick={updatePhoneNumber}
+                disabled={updateLoading || !otp || !newPhoneNumber}
+              >
+                {updateLoading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2"></span>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Phone Number'
+                )}
+              </button>
+            )}
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+<style jsx>{`
+  .modal.show {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  
+  .modal-backdrop.show {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+  }
+  
+  .modal-dialog {
+    position: relative;
+    z-index: 1050;
+    margin: auto;
+  }
+  
+  .spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+  }
+`}</style>
 
       <style>
         {`

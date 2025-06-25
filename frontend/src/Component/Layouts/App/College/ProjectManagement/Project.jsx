@@ -320,17 +320,46 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     setSelectedProject(project);
     setShowShareModal(true);
   };
+  useEffect(() => {
+    // Improved localStorage restoration logic
+    const stage = localStorage.getItem("cmsStage");
+    const savedProject = JSON.parse(localStorage.getItem("selectedProject") || "null");
+  
+    console.log('Project component - Restoring state from localStorage:', { stage, savedProject });
+  
+    if (stage === "center" && savedProject) {
+      // Ensure we have valid project data
+      if (savedProject._id && savedProject.name) {
+        setSelectedProjectForCenters(savedProject);
+        setShowCenters(true);
+        console.log('Restored to center view for project:', savedProject.name);
+      } else {
+        // Invalid data, reset to project view
+        console.warn('Invalid saved project data, resetting to project view');
+        localStorage.setItem("cmsStage", "project");
+        localStorage.removeItem("selectedProject");
+        setShowCenters(false);
+      }
+    } else {
+      // Default to project view
+      setShowCenters(false);
+      console.log('Restored to project view');
+    }
+  }, []);
 
   // New function to handle project click for centers
   const handleProjectClick = (project) => {
     setSelectedProjectForCenters(project);
     setShowCenters(true);
+    localStorage.setItem("cmsStage", "center");
+    localStorage.setItem("selectedProject", JSON.stringify(project));
   };
 
   // Function to go back to projects view
   const handleBackToProjects = () => {
     setShowCenters(false);
-    setSelectedProjectForCenters(null);
+    setSelectedProjectForCenters(null);localStorage.setItem("cmsStage", "project");
+    localStorage.removeItem("selectedProject");
   };
 
   const closeModal = () => {
