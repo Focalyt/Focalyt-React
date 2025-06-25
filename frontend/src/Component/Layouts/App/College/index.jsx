@@ -17,6 +17,9 @@ import {
 
 function CollegeLayout({ children }) {
   const navigate = useNavigate();
+  const userData = JSON.parse(sessionStorage.getItem('user'))
+  const isUser = JSON.parse(sessionStorage.getItem('user'))?.role === 2 ? true : false
+  
   const [user, setUser] = useState();
   const location = useLocation();
 
@@ -31,14 +34,12 @@ function CollegeLayout({ children }) {
   // }, []);
 
   useEffect(() => {
-    const storedUser = sessionStorage.getItem('user');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      setUser(parsed);
+    if (isUser) {
+      setUser(userData);
     } else {
       navigate('/institute/login');
     }
-  }, []);
+  }, [isUser]);
 
   const [openDropdown, setOpenDropdown] = useState(null);
   const profileMenuRef = useRef(null);

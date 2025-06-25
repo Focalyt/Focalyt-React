@@ -239,7 +239,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       console.log(reponse, 'reponse')
       if(reponse.status){
         alert('User added successfully')
-        onClose()
+        onAddUser()
       }
       else{
         alert('Error adding user: ' + reponse.data.error)

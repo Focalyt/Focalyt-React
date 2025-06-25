@@ -9,43 +9,12 @@ import moment from 'moment';
 
 import Student from '../../../../Layouts/App/College/ProjectManagement/Student';
 
-const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= null, onBackToCenters=null, selectedProject=null, onBackToProjects=null, selectedVertical=null, onBackToVerticals=null }) => {
+const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter = null, onBackToCenters = null, selectedProject = null, onBackToProjects = null, selectedVertical = null, onBackToVerticals = null }) => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
-  const getURLParams = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return {
-      stage: urlParams.get('stage') || 'batch',
-      courseId: urlParams.get('courseId'),
-      courseName: urlParams.get('courseName'),
-      centerId: urlParams.get('centerId'),  
-      centerName: urlParams.get('centerName'),
-      projectId: urlParams.get('projectId'),
-      projectName: urlParams.get('projectName'),
-      verticalId: urlParams.get('verticalId'),
-      verticalName: urlParams.get('verticalName'),
-    };
-  };
-
-  const updateURL = (params) => {
-    const url = new URL(window.location);
-    
-    // Clear existing params  
-    url.searchParams.delete('stage');
-    url.searchParams.delete('courseId');
-    url.searchParams.delete('courseName');
-    url.searchParams.delete('centerId');
-    url.searchParams.delete('centerName');
-    url.searchParams.delete('projectId'); 
-    url.searchParams.delete('projectName');
-    url.searchParams.delete('verticalId');
-    url.searchParams.delete('verticalName');
-    url.searchParams.delete('batchId');
-    url.searchParams.delete('batchName');
-  };    
   // State to store batches
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -294,7 +263,7 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
 
     // Search filter
     if (searchQuery.trim()) {
-      filtered = filtered.filter(admission => 
+      filtered = filtered.filter(admission =>
         admission._candidate?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         admission._candidate?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         admission._candidate?.mobile.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -311,11 +280,8 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
 
     setLoadingAdmissions(true);
     try {
-      const response = await axios.get(`${backendUrl}/college/appliedCandidates`, {
-        params: {
-          courseId: selectedCourse?._id,
-          centerId: selectedCenter?._id
-        },
+      const response = await axios.get(`${backendUrl}/college/admission-list/${selectedCourse?._id}/${selectedCenter?._id}`, {
+
         headers: {
           'x-auth': token
         }
@@ -437,7 +403,7 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
           ? {
             ...b,
             ...formData,
-            courseName:  '',
+            courseName: '',
             centerName: 'Virtual Center',
             maxStudents: parseInt(formData.maxStudents) || 0
           }
@@ -1683,55 +1649,8 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
                       </div>
                     </div>
 
-                    {/* Course Progress */}
-                    <div className="mb-2">
-                      <div className="d-flex justify-content-between small text-muted mb-1">
-                        <span>Course Progress</span>
-                        <span>Week {batch.currentWeek}/{batch.totalWeeks} ({progressPercentage}%)</span>
-                      </div>
-                      <div className="progress" style={{ height: '4px' }}>
-                        <div
-                          className="progress-bar bg-primary"
-                          role="progressbar"
-                          style={{ width: `${progressPercentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
 
-                    {/* Completion Progress */}
-                    <div className="mb-3">
-                      <div className="d-flex justify-content-between small text-muted mb-1">
-                        <span>Completion Rate</span>
-                        <span>{batch.completedStudents}/{batch.enrolledStudents} ({completionPercentage}%)</span>
-                      </div>
-                      <div className="progress" style={{ height: '4px' }}>
-                        <div
-                          className="progress-bar text-success"
-                          role="progressbar"
-                          style={{ width: `${completionPercentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
 
-                    {/* Batch Stats */}
-                    <div className="row small text-muted">
-                      <div className="col-3 text-center">
-                        <div className="fw-bold text-warning">{batch.enrolledStudents}</div>
-                        <div>Enrolled</div>
-                      </div>
-                      <div className="col-3 text-center">
-                        <div className="fw-bold text-primary">{batch.currentWeek}</div>
-                        <div>Week</div>
-                      </div>
-                      <div className="col-3 text-center">
-                        <div className="fw-bold text-success">{batch.completedStudents}</div>
-                        <div>Completed</div>
-                      </div>
-                      <div className="col-3 text-center">
-                        <div className="fw-bold text-info">{batch.maxStudents}</div>
-                        <div>Capacity</div>
-                      </div>
-                    </div>
 
                     <div className="small text-muted mt-3">
                       <div className="row">
@@ -1740,6 +1659,16 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
                         </div>
                         <div className="col-6">
                           <i className="bi bi-calendar-check me-1"></i>End: <strong>{batch.endDate}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="small text-muted mt-3">
+                      <div className="row">
+                        <div className="col-6">
+                          <i className="bi bi-calendar-event me-1"></i>Start: <strong>{new Date(batch.zeroPeriodStartDate).toLocaleDateString()}</strong>
+                        </div>
+                        <div className="col-6">
+                          <i className="bi bi-calendar-check me-1"></i>End: <strong>{new Date(batch.zeroPeriodEndDate).toLocaleDateString()}</strong>
                         </div>
                       </div>
                     </div>
@@ -1912,6 +1841,21 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
                                         >
                                           History List
                                         </button>
+                                        <button
+                                          className="dropdown-item"
+                                          style={{
+                                            width: "100%",
+                                            padding: "8px 16px",
+                                            border: "none",
+                                            background: "none",
+                                            textAlign: "left",
+                                            cursor: "pointer",
+                                            fontSize: "12px",
+                                            fontWeight: "600"
+                                          }}
+                                        >
+                                          Assign Batch
+                                        </button>
 
 
 
@@ -1994,6 +1938,21 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
                                           onClick={() => openleadHistoryPanel(profile)}
                                         >
                                           History List
+                                        </button>
+                                        <button
+                                          className="dropdown-item"
+                                          style={{
+                                            width: "100%",
+                                            padding: "8px 16px",
+                                            border: "none",
+                                            background: "none",
+                                            textAlign: "left",
+                                            cursor: "pointer",
+                                            fontSize: "12px",
+                                            fontWeight: "600"
+                                          }}
+                                        >
+                                          Assign Batch
                                         </button>
 
 
@@ -2379,10 +2338,10 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
 
                                               <div className="resume-contact-details">
 
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-telephone-fill"></i>
-                                                    <span>{profile._candidate?.mobile}</span>
-                                                  </div>
+                                                <div className="resume-contact-item">
+                                                  <i className="bi bi-telephone-fill"></i>
+                                                  <span>{profile._candidate?.mobile}</span>
+                                                </div>
 
 
                                                 <div className="resume-contact-item">
@@ -3465,7 +3424,7 @@ const Batch = ({ selectedCourse=null, onBackToCourses =null, selectedCenter= nul
         }
       </style>
 
-      
+
     </div>
   );
 };

@@ -117,9 +117,9 @@ const CandidateManagementPortal = () => {
 
 
   const handleEdit = async (vertical) => {
-    await setEditingVertical(vertical);
+     setEditingVertical(vertical);
     console.log('vertical', vertical)
-    await setFormData({
+    setFormData({
       description: vertical.code,
       name: vertical.name,
       status: vertical.status === 'active' ? true : false
