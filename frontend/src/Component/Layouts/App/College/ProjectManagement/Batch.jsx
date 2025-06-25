@@ -3342,7 +3342,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
               {!isMobile && (
                 <div className="col-4">
-                  <div className="row site-header--sticky--register--panels w-25">
+                  <div className="row site-header--sticky--register--panels w-md-25 w-100">
                     {renderLeadHistoryPanel()}
                     {renderBatchAssignPanel()}
                   </div>

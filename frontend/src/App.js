@@ -74,7 +74,6 @@ import Status from './Pages/App/College/Status/status';
 import MyFollowup from './Pages/App/College/MyFollowup/MyFollowup';
 import AddLeads from './Pages/App/College/Course/AddLeads';
 
-import Batches from './Component/Layouts/App/College/ProjectManagement copy/Batch copy';
 
 import CompanyLayout from './Component/Layouts/App/Company';
 import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
@@ -209,7 +208,6 @@ const Layout = () => {
           <Route path='statusdesign' element={<Status/>}/>
           <Route path = 'myfollowup' element={<MyFollowup/>}/>
           <Route path='registrationcards' element={<RegistrationCards/>}/>
-          <Route path='batches' element={<Batches/>}/>
           {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
           <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
           <Route path='batch' element={<Batch/>}/>
