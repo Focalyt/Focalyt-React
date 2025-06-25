@@ -41,6 +41,31 @@ const CandidateManagementPortal = () => {
 
   ]);
 
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  // URL-based state management
+  const getInitialState = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stage = urlParams.get('stage') || localStorage.getItem("cmsStage") || 'vertical';
+    const savedVertical = JSON.parse(localStorage.getItem("selectedVertical") || "null");
+    
+    return { stage, savedVertical };
+  };
+
+  const updateURL = (stage, vertical = null) => {
+    const url = new URL(window.location);
+    url.searchParams.set('stage', stage);
+    if (vertical) {
+      url.searchParams.set('verticalId', vertical.id);
+      url.searchParams.set('verticalName', vertical.name);
+    } else {
+      url.searchParams.delete('verticalId');
+      url.searchParams.delete('verticalName');
+    }
+    window.history.replaceState({}, '', url);
+  };
+
   useEffect(() => {
 
     fetchVerticals();
@@ -170,11 +195,45 @@ const CandidateManagementPortal = () => {
     setShowShareModal(true);
   };
 
+  useEffect(() => {
+    // Improved localStorage and URL-based restoration logic
+    const { stage, savedVertical } = getInitialState();
+  
+    console.log('Restoring state from localStorage and URL:', { stage, savedVertical });
+  
+    if (stage === "project" && savedVertical) {
+      // Ensure we have valid vertical data
+      if (savedVertical.id && savedVertical.name) {
+        setSelectedVerticalForProjects(savedVertical);
+        setShowProjects(true);
+        setShowVertical(false);
+        console.log('Restored to project view for vertical:', savedVertical.name);
+      } else {
+        // Invalid data, reset to vertical view
+        console.warn('Invalid saved vertical data, resetting to vertical view');
+        localStorage.setItem("cmsStage", "vertical");
+        localStorage.removeItem("selectedVertical");
+        updateURL('vertical');
+        setShowVertical(true);
+        setShowProjects(false);
+      }
+    } else {
+      // Default to vertical view
+      setShowVertical(true);
+      setShowProjects(false);
+      updateURL('vertical');
+      console.log('Restored to vertical view');
+    }
+  }, []);
+
   // New function to handle vertical click for projects
   const handleVerticalClick = (vertical) => {
     setSelectedVerticalForProjects(vertical);
     setShowProjects(true);
-    setShowVertical(false)
+    setShowVertical(false);
+    localStorage.setItem("cmsStage", "project");
+    localStorage.setItem("selectedVertical", JSON.stringify(vertical));
+    updateURL('project', vertical);
   };
 
   // Function to go back to verticals view
@@ -183,6 +242,10 @@ const CandidateManagementPortal = () => {
     setShowVertical(true)
 
     setSelectedVerticalForProjects(null);
+
+    localStorage.setItem("cmsStage", "vertical");
+    localStorage.removeItem("selectedVertical");
+    updateURL('vertical');
   };
 
   const closeModal = () => {

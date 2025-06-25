@@ -6,6 +6,43 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
+
+    const getURLParams = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        return {
+            stage: urlParams.get('stage') || 'center',
+            centerId: urlParams.get('centerId'),
+            centerName: urlParams.get('centerName'),
+            projectId: urlParams.get('projectId'),
+            projectName: urlParams.get('projectName'),
+            verticalId: urlParams.get('verticalId'),
+            verticalName: urlParams.get('verticalName'),
+            courseId: urlParams.get('courseId'),
+            courseName: urlParams.get('courseName')
+        };
+    };
+
+    const updateURL = (params) => {
+        const url = new URL(window.location);
+        
+        // Clear existing params
+        url.searchParams.delete('stage');
+        url.searchParams.delete('centerId');
+        url.searchParams.delete('centerName');
+        url.searchParams.delete('courseId');
+        url.searchParams.delete('courseName');
+        
+        // Set new params
+        Object.keys(params).forEach(key => {
+            if (params[key]) {
+                url.searchParams.set(key, params[key]);
+            }
+        });
+        
+        window.history.replaceState({}, '', url);
+    };
+
+
     const [activeCenterTab, setActiveCenterTab] = useState('Active Centers');
     const [searchQuery, setSearchQuery] = useState('');
     const [showAddForm, setShowAddForm] = useState(false);
@@ -64,17 +101,17 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     }, [formData]);
 
     const filteredCenters = centers.filter(center => {
-  // Check project array safely
- 
+        // Check project array safely
 
-  if (activeCenterTab === 'Active Centers' && center.status !== 'active') return false;
-  if (activeCenterTab === 'Inactive Centers' && center.status !== 'inactive') return false;
 
-  return center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    center.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    center.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    center.location.toLowerCase().includes(searchQuery.toLowerCase());
-});
+        if (activeCenterTab === 'Active Centers' && center.status !== 'active') return false;
+        if (activeCenterTab === 'Inactive Centers' && center.status !== 'inactive') return false;
+
+        return center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            center.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            center.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            center.location.toLowerCase().includes(searchQuery.toLowerCase());
+    });
 
 
 
@@ -147,7 +184,88 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
             alert(error.message || 'Error deleting center');
         }
     };
+    useEffect(() => {
+        // URL-based state restoration logic
+        const urlParams = getURLParams();
+        console.log('Center component - URL params:', urlParams);
+        
+        // Only restore state if centers are loaded
+        if (centers.length === 0) {
+            console.log('Centers not loaded yet, skipping state restoration');
+            return;
+        }
+        
+        if (urlParams.stage === "course" && urlParams.centerId) {
+            // Find center from current centers list
+            const center = centers.find(c => c._id === urlParams.centerId);
+            if (center) {
+                setSelectedCenterForCourses(center);
+                setShowCourses(true);
+                console.log('Restored to course view for center:', center.name);
+            } else {
+                // Center not found, reset to center view
+                console.warn('Center not found in current list, resetting to center view');
+                updateURL({ 
+                    stage: 'center',
+                    projectId: selectedProject?._id,
+                    projectName: selectedProject?.name,
+                    verticalId: selectedVertical?.id,
+                    verticalName: selectedVertical?.name
+                });
+                setShowCourses(false);
+            }
+        } else if (urlParams.stage === "batch") {
+            // For batch stage, we need to restore the full navigation context
+            if (urlParams.centerId) {
+                const center = centers.find(c => c._id === urlParams.centerId);
+                if (center) {
+                    setSelectedCenterForCourses(center);
+                    setShowCourses(true);
+                    console.log(`Restored to ${urlParams.stage} view with center:`, center.name);
+                } else {
+                    console.warn('Center not found, resetting to center view');
+                    updateURL({ 
+                        stage: 'center',
+                        projectId: selectedProject?._id,
+                        projectName: selectedProject?.name,
+                        verticalId: selectedVertical?.id,
+                        verticalName: selectedVertical?.name
+                    });
+                    setShowCourses(false);
+                }
+            } else {
+                console.warn('No center context found, resetting to center view');
+                updateURL({ 
+                    stage: 'center',
+                    projectId: selectedProject?._id,
+                    projectName: selectedProject?.name,
+                    verticalId: selectedVertical?.id,
+                    verticalName: selectedVertical?.name
+                });
+                setShowCourses(false);
+            }
+        } else {
+            // Default to center view
+            setShowCourses(false);
+            console.log('Restored to center view');
+        }
+    }, [centers, selectedProject, selectedVertical]); // Depend on centers, selectedProject, and selectedVertical
 
+    
+    useEffect(() => {
+        const urlParams = getURLParams();
+        if (urlParams.stage === 'course' && urlParams.centerId) {
+            // If the URL shows 'course' stage and a centerId, go to courses
+            const center = centers.find(c => c._id === urlParams.centerId);
+            if (center) {
+                setSelectedCenterForCourses(center);
+                setShowCourses(true);
+            }
+        } else {
+            // Default to 'center' stage
+            setShowCourses(false);
+        }
+    }, [centers]);
 
     useEffect(() => {
 
@@ -256,7 +374,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                     body: JSON.stringify({ projectId: selectedProject._id }),
                 });
 
-                 if (!response.ok) {
+                if (!response.ok) {
                     const err = await response.json();
                     throw new Error(err.message || 'Failed to add center');
                 }
@@ -309,12 +427,29 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     const handleCenterClick = (center) => {
         setSelectedCenterForCourses(center);
         setShowCourses(true);
+        updateURL({
+            stage: 'course',
+            centerId: center._id,
+            centerName: center.name,
+            projectId: selectedProject?._id,
+            projectName: selectedProject?.name,
+            verticalId: selectedVertical?.id,
+            verticalName: selectedVertical?.name
+        });
     };
 
     // Function to go back to centers view
     const handleBackToCenters = () => {
         setShowCourses(false);
         setSelectedCenterForCourses(null);
+
+        updateURL({
+            stage: 'center',
+            projectId: selectedProject?._id,
+            projectName: selectedProject?.name,
+            verticalId: selectedVertical?.id,
+            verticalName: selectedVertical?.name
+        });
     };
 
     const closeModal = () => {

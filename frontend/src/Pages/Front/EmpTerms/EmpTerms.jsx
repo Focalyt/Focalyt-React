@@ -3,18 +3,6 @@ import React from 'react'
 const EmpTerms = () => {
   return (
     <>
-    
-    
-
-    {/* <meta content="text/html; charset=UTF-8" http-equiv="content-type" />
-    <title>Focalyt - Top Blue Collar Job Board in India | Powered by Focal Skill</title>
-    <link rel="icon" type="image/x-icon" href="/images/ico/faviconnew.ico">
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
-      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
-      crossorigin="anonymous"
-    /> */}
     <style type="text/css">
     {`
       .lst-kix_fl7dnubbxi43-8 > li {
@@ -2004,23 +1992,20 @@ const EmpTerms = () => {
             >The Focalyt Platform (including any mobile based applications,
             website and web applications) is provided by Focalyt. Through the
             Focalyt Platform any person with a verified account can post jobs
-            (&quot;</span
-          ><span class="c7 c6">Job Poster</span
-          ><span class="c3"
+            (&quot;</span><span class="c7 c6">Job Poster</span><span class="c3"
             >&quot;) to the Focalyt Platform, access and participate in the
             services provided by Focalyt. By using Focalyt Platform, you consent to
             the terms of the Terms of Service in addition to our Privacy
-            Policy.</span
-          >
+            Policy.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c6"
             >A Job Poster accessing the Focalyt Platform shall be bound by these
             Terms of Service, and all other rules, regulations and terms of use
             referred to herein or provided by Focalyt in relation to any services
-            provided via the Focalyt Platform (&quot;</span
-          ><span class="c7 c6">Focalyt Services</span
-          ><span class="c3">&quot;).</span>
+            provided via the Focalyt Platform (&quot;</span>
+            <span class="c7 c6">Focalyt Services</span>
+            <span class="c3">&quot;).</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2043,8 +2028,7 @@ const EmpTerms = () => {
             the time frame prescribed in the email or notification, the Job
             Poster will be deemed to have accepted the modified Terms of
             Service, rules, regulations and terms of use referred to herein or
-            provided by Focalyt.</span
-          >
+            provided by Focalyt.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2052,54 +2036,46 @@ const EmpTerms = () => {
             additional rules and regulations set down in that respect. To the
             extent that these Terms of Service are inconsistent with the
             additional conditions set down, the additional conditions shall
-            prevail. Focalyt may, at its sole and absolute discretion:<br
-          /></span>
+            prevail. Focalyt may, at its sole and absolute discretion:<br/></span>
         </li>
       </ol>
       <ol class="c2 lst-kix_6ipt9l1tw55n-1 start" start="1">
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Restrict, suspend, or terminate any Job Poster&#39;s access to all
-            or any part of the Focalyt Platform or Focalyt Services;</span
-          >
+            or any part of the Focalyt Platform or Focalyt Services;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Change, suspend, or discontinue all or any part of the Focalyt
-            Platform or Focalyt Services;</span
-          >
+            Platform or Focalyt Services;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Reject, move, or remove any material that may be submitted by a Job
-            Poster;</span
-          >
+            Poster;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Move or remove any content that is available on the Focalyt
-            Platform;</span
-          >
+            Platform;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Deactivate or delete a Job Poster&#39;s account and all related
-            information and files on the account;</span
-          >
+            information and files on the account;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Establish general practices and limits concerning use of Focalyt
-            Platform;</span
-          >
+            Platform;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Assign its rights and liabilities to all Job Poster accounts
             hereunder to any entity (post such assignment intimation of such
             assignment shall be sent to all Job Posters to their registered
-            email ids).</span
-          >
+            email ids).</span>
         </li>
       </ol>
       <ol class="c2 lst-kix_6ipt9l1tw55n-0" start="5">
@@ -2114,8 +2090,7 @@ const EmpTerms = () => {
             deactivate or delete the Job Poster&#39;s account and all related
             information on the account, delete any content posted by the Job
             Poster on Focalyt and further, take technical and legal steps as it
-            deems necessary.</span
-          >
+            deems necessary.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2124,21 +2099,18 @@ const EmpTerms = () => {
             in the event of suspension or removal of the Job Poster&#39;s
             account or Focalyt Services on account of any negligence or deficiency
             on the part of Focalyt, but not if such suspension or removal is
-            affected due to:<br
-          /></span>
+            affected due to:<br/></span>
         </li>
       </ol>
       <ol class="c2 lst-kix_6ipt9l1tw55n-1 start" start="1">
         <li class="c0 li-bullet-0">
           <span class="c3"
             >any breach or inadequate performance by the Job Poster of any of
-            these Terms of Service; or</span
-          >
+            these Terms of Service; or</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
-            >any circumstances beyond the reasonable control of Focalyt.</span
-          >
+            >any circumstances beyond the reasonable control of Focalyt.</span >
         </li>
       </ol>
       <ol class="c2 lst-kix_6ipt9l1tw55n-0" start="7">
@@ -2147,8 +2119,7 @@ const EmpTerms = () => {
             >By accepting these Terms of Service Job Posters are providing their
             consent to receiving communications such as announcements,
             administrative messages and advertisements from Focalyt or any of its
-            partners, licensors or associates.</span
-          >
+            partners, licensors or associates.</span>
         </li>
       </ol>
       <h2 class="c4" id="h.prvrsb8adpjk">
@@ -2163,8 +2134,7 @@ const EmpTerms = () => {
             organization, view the profiles of suitable candidates who have the
             requisite skills and experience for the particular job(s) that the
             Job Poster is hiring for and schedule interviews with potential
-            candidates/employees.</span
-          >
+            candidates/employees.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2184,8 +2154,7 @@ const EmpTerms = () => {
             acknowledges that any incorrect information or misrepresentations
             about a job will affect the efficacy of the Focalyt Platform and Focalyt
             Services and that Focalyt shall have the right to remove a job posting
-            or suspend the Job Poster&rsquo;s account.</span
-          >
+            or suspend the Job Poster&rsquo;s account.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c6"
@@ -2193,23 +2162,20 @@ const EmpTerms = () => {
             remain active only for a period of 60 (sixty) days from the date of
             application to the job posts and upon the expiry of the said period
             of 60 (sixty) days, such job applications shall be archived
-            (&quot;</span
-          ><span class="c7 c6">Archived Job Applications</span
-          ><span class="c3"
-            >&quot;). The Job Posters shall not have access to the list to the
+            (&quot;</span>
+            <span class="c7 c6">Archived Job Applications</span>
+            <span class="c3">&quot;). The Job Posters shall not have access to the list to the
             list of such candidates or to the Archived Job Applications upon the
             expiry of 60 (sixty) days. The candidates, however, may re-apply to
             a job post (if still active) after the expiry of 60 (sixty) days
             from the date such candidate made their first application to the
-            same job post.</span
-          >
+            same job post.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Job Posters agree that they shall at all times be bound by and
             adhere to the Code of Conduct while posting jobs through the Focalyt
-            Platform and while using the Focalyt Services.</span
-          >
+            Platform and while using the Focalyt Services.</span>
         </li>
       </ol>
       <h2 class="c4" id="h.bvaa6ppt26st">
@@ -2217,10 +2183,9 @@ const EmpTerms = () => {
       </h2>
       <ol class="c2 lst-kix_dmlj87vkaoet-0 start" start="1">
         <li class="c1 li-bullet-0">
-          <span class="c6">The intellectual property rights (&quot;</span
-          ><span class="c7 c6">Intellectual Property Rights</span
-          ><span class="c3"
-            >&quot;)in all software underlying the Focalyt Platform and the Focalyt
+          <span class="c6">The intellectual property rights (&quot;</span>
+          <span class="c7 c6">Intellectual Property Rights</span>
+          <span class="c3">&quot;)in all software underlying the Focalyt Platform and the Focalyt
             Services and material published on the Focalyt Platform, including
             (but not limited to) software, advertisements, content (whether
             written, audio and/or visual), photographs, graphics, images,
@@ -2231,18 +2196,16 @@ const EmpTerms = () => {
             reproduce, create derivative works of, distribute, publicly perform,
             publicly display, or in any way exploit any of the materials or
             content on Focalyt either in whole or in part without express written
-            license from Focalyt</span
-          >
+            license from Focalyt</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c6"
             >Job Posters are solely responsible for all materials (whether
             publicly posted or privately transmitted) that they upload, post,
             e-mail, transmit, or otherwise make available via the Focalyt Platform
-            (&quot;</span
-          ><span class="c7 c6">Job Posters&#39; Content</span
-          ><span class="c3"
-            >&quot;). Each Job Poster represents and warrants that they own all
+            (&quot;</span>
+            <span class="c7 c6">Job Posters&#39; Content</span>
+            <span class="c3">&quot;). Each Job Poster represents and warrants that they own all
             Intellectual Property Rights in the Job Posters&rsquo; Content and
             that no part of the Job Poster&#39;s Content infringes any
             third-party rights. Job Posters further confirm and undertake to not
@@ -2257,8 +2220,7 @@ const EmpTerms = () => {
             arising out of such display or use of the names, logos, marks,
             labels, trademarks, copyrights or intellectual and proprietary
             rights on the Focalyt Platform, by such Job Poster or through the Job
-            Poster&#39;s commissions or omissions</span
-          >
+            Poster&#39;s commissions or omissions</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2267,8 +2229,7 @@ const EmpTerms = () => {
             non-exclusive, sub-licensable license to use, reproduce, create
             derivative works of, distribute, publicly perform, publicly display,
             transfer, transmit, and/or publish Job Posters&#39; Content for any
-            of the following purposes:<br
-          /></span>
+            of the following purposes:<br/></span>
         </li>
       </ol>
       <ol class="c2 lst-kix_dmlj87vkaoet-1 start" start="1">
@@ -2278,20 +2239,17 @@ const EmpTerms = () => {
         <li class="c0 li-bullet-0">
           <span class="c3"
             >distributing Job Posters&#39; Content, either electronically or via
-            other media, to potential candidates, and/or</span
-          >
+            other media, to potential candidates, and/or</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >storing Job Posters&#39; Content in a remote database accessible by
-            end users, for a charge.</span
-          >
+            end users, for a charge.</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >This license shall apply to the distribution and the storage of Job
-            Posters&#39; Content in any form, medium, or technology.</span
-          >
+            Posters&#39; Content in any form, medium, or technology.</span>
         </li>
       </ol>
       <ol class="c2 lst-kix_dmlj87vkaoet-0" start="4">
@@ -2304,8 +2262,7 @@ const EmpTerms = () => {
             controversy or issues against these names, logos, marks, labels,
             trademarks, copyrights or intellectual and proprietary rights must
             be directly addressed to the respective parties under notice to
-            Focalyt.</span
-          >
+            Focalyt.</span>
         </li>
       </ol>
       <h2 class="c4" id="h.7j3s7cpawabz">
@@ -2323,8 +2280,7 @@ const EmpTerms = () => {
             residing in any third-party Internet site or mobile application.
             Focalyt&#39;s inclusion of third-party content or links to third-party
             Internet sites or mobile applications is not an endorsement by Focalyt
-            of such third-party Internet site or mobile application.</span
-          >
+            of such third-party Internet site or mobile application.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2342,8 +2298,8 @@ const EmpTerms = () => {
             any sort incurred as a result of any such transactions/offers with
             third parties. Any questions, complaints, or claims related to any
             third-party product or service should be directed to the appropriate
-            vendor.</span
-          >
+            vendor.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2352,8 +2308,7 @@ const EmpTerms = () => {
             candidates). Focalyt does not guarantee the accuracy, integrity,
             quality of the content provided by third parties and such content
             may not relied upon by the Job Posters in utilizing the Focalyt
-            Services provided on the Focalyt Platform.</span
-          >
+            Services provided on the Focalyt Platform.</span>
         </li>
       </ol>
       <h2 class="c4" id="h.4dm9x47xggj1">
@@ -2366,30 +2321,30 @@ const EmpTerms = () => {
             (including but not limited to email addresses, mobile phone numbers,
             government identity documentation) and payment information, is
             subject to Focalyt&#39;s Privacy Policy which is available at Privacy
-            Policy.</span
-          >
+            Policy.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >We do not share personal information of any individual with other
             companies/entities without obtaining permission. We may share all
             such information that we have in our possession in accordance with
-            our Privacy Policy</span
-          >
+            our Privacy Policy</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Once the personal information has been shared with you, you shall,
-            at all times, be responsible to secure such information.</span
-          >
+            at all times, be responsible to secure such information.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >You warrant and represent that you shall not disclose or transfer
             personal information shared by us to any sub-processors without
             ensuring that adequate and equivalent safeguards to the personal
-            information.</span
-          >
+            information.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2399,8 +2354,8 @@ const EmpTerms = () => {
             the event you are found to be misusing the information shared with
             you, we shall, at our sole discretion, delete your account with
             immediate effect and you will be blocked from using/ accessing Focalyt
-            Platform in future.</span
-          >
+            Platform in future.</span>
+          
         </li>
       </ol>
       <h2 class="c4" id="h.2rkgnl5rdiej">
@@ -2414,16 +2369,15 @@ const EmpTerms = () => {
             Poster does not abide by these Terms of Service and all other rules,
             regulations and terms of use, Focalyt may, at its sole and absolute
             discretion, take necessary remedial action, including but not
-            limited to:</span
-          >
+            limited to:</span>
+
         </li>
       </ol>
       <ol class="c2 lst-kix_my2fyhx00j5h-1 start" start="1">
         <li class="c0 li-bullet-0">
           <span class="c3"
             >restricting, suspending, or terminating any Job Poster&#39;s access
-            to all or any part of Focalyt Services;</span
-          >
+            to all or any part of Focalyt Services;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
@@ -2432,8 +2386,7 @@ const EmpTerms = () => {
             the Job Poster&#39;s account on the date of deactivation or deletion
             shall be transferred to the Job Poster&#39;s bank account on record
             with Focalyt subject to a processing fee (if any) applicable on such
-            transfers as set out herein.</span
-          >
+            transfers as set out herein.</span>
         </li>
       </ol>
       <ol class="c2 lst-kix_my2fyhx00j5h-0" start="2">
@@ -2443,14 +2396,12 @@ const EmpTerms = () => {
             information at the time of registration and at all other times (as
             required by Focalyt). Job Posters further agree to update and keep
             updated their registration information and information related to
-            job posts made on the Focalyt Platform.</span
-          >
+            job posts made on the Focalyt Platform.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >A Job Poster shall not register or operate more than one Job Poster
-            account with Focalyt.</span
-          >
+            account with Focalyt.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2458,8 +2409,7 @@ const EmpTerms = () => {
             from Focalyt by marking e-mails or sending SMSs from Focalyt. Focalyt
             shall not be held liable if any e-mail/SMS remains unread by a Job
             Poster as a result of such e-mail getting delivered to the Job
-            Poster&#39;s junk or spam folder.</span
-          >
+            Poster&#39;s junk or spam folder.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2468,39 +2418,34 @@ const EmpTerms = () => {
             Posters are responsible for maintaining the confidentiality of their
             accounts and passwords. Job Posters agree to immediately notify
             Focalyt of any unauthorized use of their passwords or accounts or any
-            other breach of security.</span
-          >
+            other breach of security.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Job Posters agree to exit/log-out of their accounts at the end of
             each session. Focalyt shall not be responsible for any loss or damage
             that may result if the Job Poster fails to comply with these
-            requirements.</span
-          >
+            requirements.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Job Posters agree not to use cheats, exploits, automation,
             software, bots, hacks or any unauthorized third-party software
             designed to modify or interfere with the Focalyt Services and/or Focalyt
-            experience or assist in such activity.</span
-          >
+            experience or assist in such activity.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Job Posters agree not to copy, modify, rent, lease, loan, sell,
             assign, distribute, reverse engineer, grant a security interest in,
             or otherwise transfer any right to the technology or software
-            underlying Focalyt or Focalyt&rsquo;s Services.</span
-          >
+            underlying Focalyt or Focalyt&rsquo;s Services.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Job Posters agree that without Focalyt&#39;s express written consent,
             they shall not modify or cause to be modified any files or software
-            that are part of Focalyt&#39;s Services or the Focalyt Platform.</span
-          >
+            that are part of Focalyt&#39;s Services or the Focalyt Platform.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2508,8 +2453,7 @@ const EmpTerms = () => {
             the disruption or overburdening of (a) any computer or server used
             to offer or support Focalyt or the Focalyt&rsquo;s Services (each a
             &quot;Server&quot;); or (2) the enjoyment of Focalyt Services by any
-            other Job Poster or person.</span
-          >
+            other Job Poster or person.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2517,8 +2461,7 @@ const EmpTerms = () => {
             any type of attack, including without limitation to distribution of
             a virus, denial of service, or other attempts to disrupt Focalyt
             Services or any other person&#39;s use or enjoyment of Focalyt
-            Services.</span
-          >
+            Services.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2529,22 +2472,19 @@ const EmpTerms = () => {
             attempting to circumvent or modify, or encouraging or assisting any
             other person to circumvent or modify, any security, technology,
             device, or software that underlies or is part of Focalyt
-            Services.</span
-          >
+            Services.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >A Job Poster shall not publish any content that is patently false
             and untrue, and is written or published in any form, with the intent
             to mislead or harass a person, entity or agency for financial gain
-            or to cause any injury to any person.</span
-          >
+            or to cause any injury to any person.</span>
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Without limiting the foregoing, Job Posters agree not to use Focalyt
-            for any of the following:<br
-          /></span>
+            for any of the following:<br/></span>
         </li>
       </ol>
       <ol class="c2 lst-kix_my2fyhx00j5h-1 start" start="1">
@@ -2552,30 +2492,28 @@ const EmpTerms = () => {
           <span class="c3"
             >To engage in any obscene, offensive, indecent, racial, communal,
             anti-national, objectionable, defamatory or abusive action or
-            communication;</span
-          >
+            communication;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To harass, stalk, threaten, or otherwise violate any legal rights
-            of other individuals;</span
-          >
+            of other individuals;</span>
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To publish, post, upload, e-mail, distribute, or disseminate
             (collectively, &quot;Transmit&quot;) any inappropriate, profane,
             defamatory, infringing, obscene, indecent, or unlawful
-            content;</span
-          >
+            content;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To Transmit files that contain viruses, corrupted files, or any
             other similar software or programs that may damage or adversely
             affect the operation of another person&#39;s computer, Focalyt, any
-            software, hardware, or telecommunications equipment;</span
-          >
+            software, hardware, or telecommunications equipment;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
@@ -2584,39 +2522,39 @@ const EmpTerms = () => {
             marketing for a third party, promoting business of a third party,
             selling financial products such as loans, insurance, promoting demat
             account openings, without the express written consent of
-            Focalyt;</span
-          >
+            Focalyt;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To download any file, recompile or disassemble or otherwise affect
             our products that you know or reasonably should know cannot be
-            legally obtained in such manner;</span
-          >
+            legally obtained in such manner;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To falsify or delete any author attributions, legal or other proper
             notices or proprietary designations or labels of the origin or the
-            source of software or other material;</span
-          >
+            source of software or other material;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To restrict or inhibit any other Job Poster from using and enjoying
-            any public area within our sites;</span
-          >
+            any public area within our sites;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To collect or store personal information about other Job
-            Posters;</span
-          >
+            Posters;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
-            >To collect or store information about potential candidates;</span
-          >
+            >To collect or store information about potential candidates;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
@@ -2626,35 +2564,35 @@ const EmpTerms = () => {
             party associated with the Job Poster or to whom such Job Poster
             makes such mined information available, for either a commercial
             purpose of for the Job Poster&rsquo;s own use at a future
-            date;</span
-          >
+            date;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To interfere with or disrupt the Focalyt and/or the Focalyt Platform,
-            Focalyt servers, or Focalyt networks;</span
-          >
+            Focalyt servers, or Focalyt networks;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To impersonate any person or entity, including, but not limited to,
             a representative of Focalyt, or falsely state or otherwise
             misrepresent Job Poster&#39;s affiliation with a person or
-            entity;</span
-          >
+            entity;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To forge headers or manipulate identifiers or other data in order
             to disguise the origin of any content transmitted through Focalyt or
-            to manipulate Job Poster&#39;s presence on the Focalyt Platform;</span
-          >
+            to manipulate Job Poster&#39;s presence on the Focalyt Platform;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >To take any action that imposes an unreasonably or
-            disproportionately large load on Focalyt&rsquo;s infrastructure;</span
-          >
+            disproportionately large load on Focalyt&rsquo;s infrastructure;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3">To engage in any illegal activities.</span>
@@ -2665,8 +2603,8 @@ const EmpTerms = () => {
             defence, security or sovereignty of India, friendly relations with
             foreign States, or public order, or causes incitement to the
             commission of any cognisable offence or prevents investigation of
-            any offence or is insulting other nation.</span
-          >
+            any offence or is insulting other nation.</span>
+          
         </li>
       </ol>
       <ol class="c2 lst-kix_my2fyhx00j5h-0" start="15">
@@ -2681,8 +2619,8 @@ const EmpTerms = () => {
             Focalyt&rsquo;s opinion fall within any of the said categories and/or
             change such username and intimate the Job Poster or delete such
             username and posts from Focalyt, deny such Job Poster access to Focalyt,
-            or any combination of these options.</span
-          >
+            or any combination of these options.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2696,8 +2634,8 @@ const EmpTerms = () => {
             Focalyt Platform, Focalyt Services or any information available for
             access through the Focalyt Platform or Focalyt Services, except those
             automated means that Focalyt has approved in advance and in
-            writing.</span
-          >
+            writing.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2705,8 +2643,8 @@ const EmpTerms = () => {
             processes. Nothing contained in these Terms of Service shall limit
             Focalyt&#39;s right to comply with governmental, court, and
             law-enforcement requests or requirements relating to Job
-            Posters&#39; use of Focalyt.</span
-          >
+            Posters&#39; use of Focalyt.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2726,14 +2664,14 @@ const EmpTerms = () => {
             affiliates harmless of any and all losses that may be suffered by
             Focalyt its Directors, officers, employees, agents, affiliates by
             virtue of such false declaration having been made by said
-            person.</span
-          >
+            person.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Focalyt may not be held responsible for any content contributed by
-            Job Posters on the Focalyt Platform.</span
-          >
+            Job Posters on the Focalyt Platform.</span>
+          
         </li>
       </ol>
       <h2 class="c4" id="h.81wi3qssuf8n">
@@ -2743,33 +2681,33 @@ const EmpTerms = () => {
         <li class="c1 li-bullet-0">
           <span class="c3"
             >The Focalyt Platform is open only to persons above the age of 18
-            years.</span
-          >
+            years.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >The Focalyt Platform is open only to persons, currently residing in
-            India.</span
-          >
+            India.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Persons who wish to participate must have a valid email address
-            and/or mobile phone number.</span
-          >
+            and/or mobile phone number.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Focalyt may on receipt of information bar a person from accessing
             their Focalyt account if such person is found to be in violation of
-            any part of these Terms of Service or the Code of Conduct.</span
-          >
+            any part of these Terms of Service or the Code of Conduct.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Only those Job Posters who have successfully registered on the
-            Focalyt Platform shall be eligible to Post Jobs.</span
-          >
+            Focalyt Platform shall be eligible to Post Jobs.</span>
+          
         </li>
       </ol>
       <h2 class="c4" id="h.bqna2iplbp5">
@@ -2784,15 +2722,15 @@ const EmpTerms = () => {
             Service, or the rights and obligations of the Job Poster(s) or
             Focalyt, as well as the exclusive jurisdiction to grant interim or
             preliminary relief in case of any dispute referred to arbitration as
-            given below arises between the Job Poster(s) and Focalyt (&quot;</span
-          ><span class="c6 c7">Dispute</span
-          ><span class="c3"
+            given below arises between the Job Poster(s) and Focalyt (&quot;</span>
+          <span class="c6 c7">Dispute</span>
+          <span class="c3"
             >&quot;), the disputing parties hereto shall endeavor to settle such
             Dispute amicably. The attempt to bring about an amicable settlement
             shall be considered to have failed if not resolved within 30
             (thirty) days from the date of communicating the Dispute in
-            writing.</span
-          >
+            writing.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c6"
@@ -2802,15 +2740,15 @@ const EmpTerms = () => {
             finally resolved by arbitration. The Arbitration shall be conducted
             by an Arbitral Tribunal consisting of a sole arbitrator in
             accordance with the Rules of the Delhi International Arbitration
-            Centre (&quot;</span
-          ><span class="c7 c6">DIAC Rules</span
-          ><span class="c3"
+            Centre (&quot;</span>
+          <span class="c7 c6">DIAC Rules</span>
+          <span class="c3"
             >&quot;), which rules are deemed to be incorporated by reference in
             this clause. The seat of the arbitration shall be New Delhi. The
             Tribunal shall consist of one arbitrator. The language of the
             arbitration shall be English. The law governing the arbitration
-            agreement shall be Indian Law.</span
-          >
+            agreement shall be Indian Law.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2819,14 +2757,14 @@ const EmpTerms = () => {
             at New Delhi, having jurisdiction to grant relief on any Disputes.
             The pursuit of equitable or injunctive relief shall not be a waiver
             of the duty of the Parties to pursue any remedy (including for
-            monetary damages) through the arbitration described herein.</span
-          >
+            monetary damages) through the arbitration described herein.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >The arbitration award will be final and binding on the
-            Parties.</span
-          >
+            Parties.</span>
+          
         </li>
       </ol>
       <h2 class="c4" id="h.78m7b6gj5kxr">
@@ -2839,8 +2777,8 @@ const EmpTerms = () => {
             Platform voluntarily and at their own risk. Focalyt shall, under no
             circumstances be held responsible or liable on account of any loss
             or damage sustained by Job Posters or any other person or entity
-            during the course of access to the Focalyt Platform.</span
-          >
+            during the course of access to the Focalyt Platform.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2852,16 +2790,16 @@ const EmpTerms = () => {
             Services including (but not limited to) personal injury and damage
             to property and whether direct, indirect, consequential,
             foreseeable, due to some negligent act or omission on their part, or
-            otherwise.</span
-          >
+            otherwise.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Focalyt accepts no liability, whether jointly or severally, for any
             errors or omissions, whether on behalf of itself or third parties in
             relation to the data/information collated and published on the Focalyt
-            Platform.</span
-          >
+            Platform.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2874,8 +2812,8 @@ const EmpTerms = () => {
             employees and agents on the happening of such an event (including
             without limitation cost of attorney, legal charges etc.) on full
             indemnity basis for any loss/damage suffered by Focalyt on account of
-            such act on the part of the Job Posters.</span
-          >
+            such act on the part of the Job Posters.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2884,8 +2822,8 @@ const EmpTerms = () => {
             to such Job Poster&#39;s engagement with the Focalyt Platform. In no
             event shall Focalyt be liable to any Job Poster for acts or omissions
             arising out of or related to Job Poster&#39;s engagement with the
-            Focalyt Platform.</span
-          >
+            Focalyt Platform.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2897,8 +2835,8 @@ const EmpTerms = () => {
             associates, group companies, sponsors, employees, or representatives
             for all and any injuries, accidents, or mishaps (whether known or
             unknown) or (whether anticipated or unanticipated) arising out of
-            the provision of Focalyt Services.</span
-          >
+            the provision of Focalyt Services.</span>
+          
         </li>
       </ol>
       <h2 class="c4" id="h.4ru4s3ep8swo">
@@ -2911,16 +2849,16 @@ const EmpTerms = () => {
             parent/holding company, subsidiaries, affiliates, directors,
             officers, professional advisors, employees shall be responsible for
             the deletion, the failure to store, the mis-delivery, or the
-            untimely delivery of any information or material.</span
-          >
+            untimely delivery of any information or material.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >To the extent permitted under law, Focalyt shall not be responsible
             for any harm resulting from downloading or accessing any information
             or material, the quality of servers, products, Focalyt Services or
-            sites.</span
-          >
+            sites.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2929,15 +2867,15 @@ const EmpTerms = () => {
             competence, acceptance and risk, and the Job Poster will be solely
             responsible for any potential damage to Job Poster&#39;s computer
             system or loss of data that results from a Job Poster&#39;s download
-            of any such material.</span
-          >
+            of any such material.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >Focalyt shall make best endeavours to ensure that the Focalyt(s) is
             error-free and secure, however, neither Focalyt nor any of its
-            partners, licensors or associates makes any warranty that:</span
-          >
+            partners, licensors or associates makes any warranty that:</span>
+          
         </li>
       </ol>
       <ol class="c2 lst-kix_60q1n0b7joiy-1 start" start="1">
@@ -2949,21 +2887,20 @@ const EmpTerms = () => {
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Focalyt Platform will be uninterrupted, timely, secure, or error
-            free</span
-          >
+            free</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >the results that may be obtained from the use of Focalyt Platform
-            will be accurate or reliable; and</span
-          >
+            will be accurate or reliable; and</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >the quality of any products, Focalyt Services, information, or other
             material that Job Posters purchase or obtain through the Focalyt
-            Platform will meet Job Posters&#39; expectations.</span
-          >
+            Platform will meet Job Posters&#39; expectations.</span>
         </li>
       </ol>
       <ol class="c2 lst-kix_60q1n0b7joiy-0" start="5">
@@ -2976,8 +2913,8 @@ const EmpTerms = () => {
             Poster&#39;s account of the amount of erroneous payment. In case of
             exercise of remedies in accordance with this clause, Focalyt agrees to
             notify the Job Poster of the error and of the exercise of the
-            remedy(ies) to rectify the same.</span
-          >
+            remedy(ies) to rectify the same.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2985,8 +2922,8 @@ const EmpTerms = () => {
             licensors or associates shall be liable for any direct, indirect,
             incidental, special, or consequential damages arising out of the use
             of or inability to use our sites, even if we have been advised of
-            the possibility of such damages.</span
-          >
+            the possibility of such damages.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -2996,15 +2933,15 @@ const EmpTerms = () => {
             government, or the board of directors shall be deemed cancelled or
             terminated, if such permission or authority is either not obtained
             or denied either before or after the availability of the relevant
-            Focalyt Services are hosted or provided.</span
-          >
+            Focalyt Services are hosted or provided.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >To the extent permitted under law, in the event of suspension or
             closure of any Focalyt Services Job Posters shall not be entitled to
-            make any demands, claims, on any nature whatsoever.</span
-          >
+            make any demands, claims, on any nature whatsoever.</span>
+          
         </li>
       </ol>
       <h2 class="c4" id="h.rqczyzl4b4fb">
@@ -3022,28 +2959,27 @@ const EmpTerms = () => {
             person on whose behalf such Job Poster is making the complaint, or
             is in the nature of impersonation in an electronic form, including
             artificially morphed images of such individual, please share the
-            same with us by writing to us.</span
-          >
+            same with us by writing to us.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
             >In the complaint or grievance, the Job Poster shall include the
-            following information:<br
-          /></span>
+            following information:<br/></span>
         </li>
       </ol>
       <ol class="c2 lst-kix_fpyzmh7wkcmt-1 start" start="1">
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Name and contact details: name, address, contact number and email
-            address;</span
-          >
+            address;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Relation to the subject matter of the complaint, i.e. complainant
-            or person acting on behalf of an affected person;</span
-          >
+            or person acting on behalf of an affected person;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
@@ -3052,27 +2988,27 @@ const EmpTerms = () => {
             of such person and a statement that the Job Poster is authorised to
             act on behalf of such person and to provide such person&#39;s
             personal information to Focalyt in relation to the
-            complaint/grievance;</span
-          >
+            complaint/grievance;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >Description of the complaint or grievance with clear identification
             of the Content in relation to which such complaint or grievance is
-            made;</span
-          >
+            made;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >A statement that the Job Poster believes, in good faith, that the
-            Content violates these Terms and Conditions;</span
-          >
+            Content violates these Terms and Conditions;</span>
+          
         </li>
         <li class="c0 li-bullet-0">
           <span class="c3"
             >A statement that the information provided in the complaint or
-            grievance is accurate.</span
-          >
+              grievance is accurate.</span>
+          
         </li>
       </ol>
       <ol class="c2 lst-kix_fpyzmh7wkcmt-0" start="3">
@@ -3085,49 +3021,48 @@ const EmpTerms = () => {
             proprietary to the respective owners. Job Posters are requested to
             send Focalyt a written notice/ intimation if Job Posters notice any
             act of infringement on the Focalyt Platform, which must include the
-            following information:<br
-          /></span>
+            following information:<br/></span>
         </li>
       </ol>
       <ol class="c2 lst-kix_fpyzmh7wkcmt-1 start" start="1">
         <li class="c5 li-bullet-0">
           <span class="c3"
             >A clear identification of the copyrighted work allegedly
-            infringed;</span
-          >
+            infringed;</span>
+          
         </li>
         <li class="c5 li-bullet-0">
           <span class="c3"
             >A clear identification of the allegedly infringing material on the
-            Focalyt Platform;</span
-          >
+            Focalyt Platform;</span>
+          
         </li>
         <li class="c5 li-bullet-0">
           <span class="c3"
             >Contact details: name, address, e-mail address and phone
-            number;</span
-          >
+            number;</span>
+          
         </li>
         <li class="c5 li-bullet-0">
           <span class="c3"
             >A statement that the Job Poster believes, in good faith, that the
             use of the copyrighted material allegedly infringed on the Focalyt
             Platform is not authorized by the Job Poster&rsquo;s agent or the
-            law;</span
-          >
+            law;</span>
+          
         </li>
         <li class="c5 li-bullet-0">
           <span class="c3"
             >A statement that the information provided in the notice is accurate
             and that the signatory is authorized to act on behalf of the owner
-            of an exclusive copyright right that is allegedly infringed;</span
-          >
+            of an exclusive copyright right that is allegedly infringed;</span>
+          
         </li>
         <li class="c5 li-bullet-0">
           <span class="c3"
             >Job Poster&rsquo;s signature or a signature of the Job
-            Poster&rsquo;s authorized agent.</span
-          >
+            Poster&rsquo;s authorized agent.</span>
+          
         </li>
       </ol>
       <ol class="c2 lst-kix_fpyzmh7wkcmt-0" start="4">
@@ -3145,8 +3080,8 @@ const EmpTerms = () => {
             clarification or assistance with the investigation, or verify the
             statements made in the complaint, grievance or notice, and the Job
             Poster acknowledges that timely assistance with the investigation
-            would facilitate the redressal of the same.</span
-          >
+            would facilitate the redressal of the same.</span>
+          
         </li>
         <li class="c1 li-bullet-0">
           <span class="c3"
@@ -3157,8 +3092,8 @@ const EmpTerms = () => {
             replace the Grievance Redressal Officer at its discretion through
             publication of the name and title of such replacement on the
             website, which replacement shall come into effect immediately upon
-            publication.</span
-          >
+            publication.</span>
+          
         </li>
       </ol>
       <h2 class="c4" id="h.h7qj3m6r5xx0">
@@ -3166,12 +3101,11 @@ const EmpTerms = () => {
       </h2>
       <ol class="c2 lst-kix_fl7dnubbxi43-0 start" start="1">
         <li class="c1 li-bullet-0">
-          <span class="c6">If you subscribe to our paid Services (&quot;</span
-          ><span class="c7 c6">Paid Services</span
-          ><span class="c3"
-            >&quot;), you agree to adhere to the additional terms specific to
-            the Paid Services.</span
-          >
+          <span class="c6">If you subscribe to our paid Services (&quot;</span>
+          <span class="c7 c6">Paid Services</span>
+          <span class="c3">&quot;), you agree to adhere to the additional terms specific to
+            the Paid Services.</span>
+          
         </li>
       </ol>
       <p class="c9"><span class="c10"></span></p>

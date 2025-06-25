@@ -244,7 +244,7 @@ module.exports.authenti = async (req, res, next) => {
     if (!user) throw req.ykError("User not found in authenti");
     req.user = user;
     req.token = token;
-    return next();
+    return next();  
   } catch (err) {
     return req.errFunc(err);
   }

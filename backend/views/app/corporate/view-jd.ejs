@@ -65,6 +65,14 @@
                             <input class="form-control" value="<%= jd.experience == '0' ? 'Fresher' : jd.experience%>" readonly>
                           </div>
                           <div class="col-xl-2 mb-1">
+                            <label>Experience</label>
+                            <input class="form-control"
+                                   value="<%= jd.experience == '0' ? 'Fresher' : `${jd.experience || 0} Years ${jd.experienceMonths || 0} Months` %>"
+                                   readonly>
+                          </div>
+                          
+                          
+                          <div class="col-xl-2 mb-1">
                             <label>Qualification</label>
                             <input class="form-control text-capitalize" value="<%=jd._qualification?.name%>" readonly>
                           </div>
@@ -188,7 +196,7 @@
                             <div class="image-upload">
                               <div class="input-group">
                                 <div class="input-group-prepend">
-                                  <span class="input-group-text" id="inputGroupPrepend2"><a href="<%= process.env.MIPIE_BUCKET_URL +'/' + jd.jobVideo %>"
+                                  <span class="input-group-text" id="inputGroupPrepend2"><a href="<%=jd.jobVideo %>"
                                     target="_blank">View JD</a></span>
                                 </div>
                               </div> 
@@ -225,10 +233,10 @@
                           <th>Candidates</th>
                           <th>Gender</th>
                           <th>Qualification</th>
-                          <th>Branch</th>
                           <th>Experience</th>
-                          <th>Action</th>
+                          
                           <th>Applied on</th>
+                          <th>Action</th>
                           </tr>
                         </thead>
                         <tbody id="table-body" class="text-capitalize">
@@ -237,16 +245,31 @@
                             <tr>
                               <td><%= candidate?._candidate?.name %></td>
                               <td><%= candidate?._candidate?.sex %></td>
-                              <td><%= (qualifications?.find(q => candidate?._candidate?.highestQualification == q._id ))?.name %></td>
-                              <td><%= candidate?._candidate?.qualifications[0]?.Qualification?.name ? candidate?._candidate?.qualifications[0]?.Qualification?.name : "NA" %></td>
+                              <td><%= candidate?._candidate?.highestQualification?.name || "NA" %></td>
+
+                              <!-- <td><%= (qualifications?.find(q => candidate?._candidate?.highestQualification == q._id ))?.name %></td> -->
                               <td><%= !candidate?._candidate?.isExperienced ? 'Fresher' : candidate?._candidate?.totalExperience ? candidate?._candidate.totalExperience + ' Years' : 'NA' %></td>
-                              <td><%= moment(candidate?._candidate.createdAt).format('MMM DD YYYY')%></td>
+                              <td><%= moment(candidate._candidate?.createdAt).format('MMM DD YYYY')%></td>
                               <td class="actions" id="socail-iconw">
-                                <a href="/company/candidate/<%=candidate?._candidate._id%>"><i
-                                  class="fa-regular fa-user fa-lg"></i></a>
-                                 <a href="https://wa.me/91<%= candidate?._candidate?.whatsapp %>" target="_blank"> <img src="/public_assets/images/whatsappicon.png" width="18%" class="mx-1"></a> 
-                                 <a href="tel:<%= candidate?._candidate?.mobile %>"> <img src="/public_assets/images/telephone.png" width="18.5%"> </a>
+                                <% if (candidate && candidate._candidate) { %>
+                                  <a href="/company/newcandidate/<%= candidate._candidate._id %>">
+                                    <i class="fa-regular fa-user fa-lg"></i>
+                                  </a>
+                                  <% if (candidate._candidate.whatsapp) { %>
+                                    <a href="https://wa.me/91<%= candidate._candidate.whatsapp %>" target="_blank">
+                                      <img src="/public_assets/images/whatsappicon.png" width="18%" class="mx-1">
+                                    </a>
+                                  <% } %>
+                                  <% if (candidate._candidate.mobile) { %>
+                                    <a href="tel:<%= candidate._candidate.mobile %>">
+                                      <img src="/public_assets/images/telephone.png" width="18.5%">
+                                    </a>
+                                  <% } %>
+                                <% } else { %>
+                                  <span>NA</span>
+                                <% } %>
                               </td>
+                              
                             </tr>
                             <% }) } else {%>
                               <tr><td class="text-center" colspan="6">No Record Found</td></tr>
@@ -268,4 +291,5 @@
 
         <% include ./partials/footer%>
 
-        
+      </body>
+      </html>

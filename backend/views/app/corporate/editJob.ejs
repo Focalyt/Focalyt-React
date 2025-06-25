@@ -2,6 +2,8 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
   <script src="https://cdn.rawgit.com/harvesthq/chosen/gh-pages/chosen.jquery.min.js"></script>
   <link href="https://cdn.rawgit.com/harvesthq/chosen/gh-pages/chosen.min.css" rel="stylesheet" />
+  <script src="https://cdn.rawgit.com/harvesthq/chosen/gh-pages/chosen.jquery.min.js"></script>
+  <link href="https://cdn.rawgit.com/harvesthq/chosen/gh-pages/chosen.min.css" rel="stylesheet" />
 
   <body class="vertical-layout vertical-menu-modern 2-columns  navbar-floating footer-static  " data-open="click"
     data-menu="vertical-menu-modern" data-col="2-columns">
@@ -13,7 +15,7 @@
           <div class="header-navbar-shadow"></div>
           <div class="content-wrapper"></div>
           <form>
-            <section id="Concerned-Person ">
+            <section id="Concerned-Person">
               <div class="row">
                 <div class="col-xl-12 px-3 text-right">
                   <a href="/company/list/jobs" class="btn btn-outline-primary">All Job Details</a>
@@ -34,7 +36,7 @@
                                 oninvalid="this.setCustomValidity('Enter Company Name Here')"
                                 oninput="this.setCustomValidity('')" required />
                             </div>
-                            <div   class="col-xl-3 mb-1" id="jd-title">
+                            <div class="col-xl-3 mb-1" id="jd-title">
                               <label>Title</label><span class="mandatory"> *</span></label>
                               <input class="form-control" id="jobTitle" type="text" name="title"
                                 value="<%= jd?.title %>" required="required"
@@ -90,8 +92,27 @@
                                     <%= jd?.experience %>
                                   </option>
                                   <%}%>
-                                    <option value="0" <% if(jd?.experience=='0' ) {%> selected <% } %> >Fresher</option>
+                                    <option value="0" <% if(jd?.experience=='0' ) {%> selected <% } %> >0</option>
                                     <% for (var i=1; i <=25; i++ ) { %>
+                                      <option value="<%= i %>">
+                                        <%= i %>
+                                      </option>
+                                      <% } %>
+                              </select>
+                            </div>
+                            <div class="col-xl-3 mb-1" id="jd-exp-field-month">
+                              <label>Experience (In Months)</label><span class="mandatory"> *</span></label>
+                              <select class="form-control" id="jd-exp-mon" name="experienceMonths" value="" required
+                                oninvalid="this.setCustomValidity('Please Select Experience in Months')"
+                                oninput="this.setCustomValidity('')">
+                                <option value="">Select option</option>
+                                <% if(jd?.experienceMonths) { %>
+                                  <option value="<%= jd?.experienceMonths %>" class="text-capitalize" selected>
+                                    <%= jd?.experienceMonths %>
+                                  </option>
+                                  <%}%>
+                                    <option value="0" <% if(jd?.experienceMonths=='0' ) {%> selected <% } %> >0</option>
+                                    <% for (var i=1; i <=12; i++ ) { %>
                                       <option value="<%= i %>">
                                         <%= i %>
                                       </option>
@@ -137,11 +158,11 @@
                               </select>
                             </div>
 
-                            <!-- <div class="col-xl-2 mb-1">
+                            <div class="col-xl-2 mb-1">
                               <label>Cut Price</label>
                               <input class="form-control" id="cutprice" type="number" value="<%=jd.cutprice%>">
-                              
-                            </div>     -->
+
+                            </div>
 
                             <div class="col-xl-3 mb-1" id="sub-qua-field">
                               <label>Stream</label><span class="mandatory"> *</span></label>
@@ -223,10 +244,9 @@
                             </div>
                             <div class="col-xl-4 mb-1">
                               <label for="noOfVacancies">Number of Vacancies</label>
-                              <input id="noOfVacancies" class="form-control" type="number" name="noOfPosition" 
-                                     onkeypress="if(this.value.length==4) return false" 
-                                     value="<%= jd?.noOfPosition %>" 
-                                     maxlength="3" />
+                              <input id="noOfVacancies" class="form-control" type="number" name="noOfPosition"
+                                onkeypress="if(this.value.length==4) return false" value="<%= jd?.noOfPosition %>"
+                                maxlength="3" />
                             </div>
                           </div>
                         </div>
@@ -403,9 +423,8 @@
                             </div>
                             <div class="col-xl-2 mb-1">
                               <label for="timings">Shift Timings</label>
-                              <input id="timings" class="form-control" type="text" name="shifttimings"                                      
-                                     value="<%= jd?.shifttimings %>" 
-                                     maxlength="3" />
+                              <input id="timings" class="form-control" type="text" name="shifttimings"
+                                value="<%= jd?.shifttimings %>" maxlength="3" />
                             </div>
                             <div class="col-xl-3 mb-1" id="jd-work-field">
                               <div class="demo-inline-spacing">
@@ -418,8 +437,7 @@
                                 </div>
                                 <div class="form-check form-check-inline">
                                   <input class="form-check-input" type="radio" name="work" id="wfh"
-                                    value="Work from home" <% if(jd?.work==='Work from home' ) {%> checked <%
-                                    } %>/>
+                                    value="Work from home" <% if(jd?.work==='Work from home' ) {%> checked <% } %>/>
                                     <label class="form-check-label" for="wfh">Work from home</label>
                                 </div>
                                 <div class="form-check form-check-inline">
@@ -461,9 +479,10 @@
 
                             <div class="col-xl-3">
                               <label for="remarks">Remarks</label>
-                              <textarea id="remarks" name="remarks" class="form-control" cols="3" rows="3" maxlength="150"><%= jd?.remarks %></textarea>
+                              <textarea id="remarks" name="remarks" class="form-control" cols="3" rows="3"
+                                maxlength="150"><%= jd?.remarks %></textarea>
                             </div>
-                            
+
                           </div>
                         </div>
                       </div>
@@ -483,57 +502,67 @@
                               <select id="payOut" class="form-control" name="payOut">
                                 <option value="">Select option</option>
                                 <option value="Daily" <% if(jd?.payOut==='Daily' ) {%> selected <% } %>>Daily</option>
-                                <option value="Weekly" <% if(jd?.payOut==='Weekly' ) {%> selected <% } %>>Weekly</option>
-                                <option value="Monthly" <% if(jd?.payOut==='Monthly' ) {%> selected <% } %>>Monthly</option>
+                                <option value="Weekly" <% if(jd?.payOut==='Weekly' ) {%> selected <% } %>>Weekly
+                                </option>
+                                <option value="Monthly" <% if(jd?.payOut==='Monthly' ) {%> selected <% } %>>Monthly
+                                </option>
                                 <option value="NA" <% if(jd?.payOut==='NA' ) {%> selected <% } %>>NA</option>
                               </select>
                             </div>
-                            
+
                             <div class="col-xl-3 mb-1">
                               <label for="techSkills">Tech Skills Required</label>
-                              <select id="techSkills" class="form-control chosen" multiple name="_techSkills" data-placeholder="Select Technical Skills">
-                                <% techskills.forEach((item) => { %>
+                              <select id="techSkills" class="form-control chosen" multiple name="_techSkills"
+                                data-placeholder="Select Technical Skills">
+                                <% techskills.forEach((item)=> { %>
                                   <% if(jd?._techSkills.includes(item._id)) { %>
                                     <option value="<%= item._id %>" class="text-capitalize" selected>
                                       <%= item.name %>
                                     </option>
-                                  <% } else { %>
-                                    <option value="<%= item._id %>" class="text-capitalize">
-                                      <%= item.name %>
-                                    </option>
-                                  <% } %>
-                                <% }); %>
+                                    <% } else { %>
+                                      <option value="<%= item._id %>" class="text-capitalize">
+                                        <%= item.name %>
+                                      </option>
+                                      <% } %>
+                                        <% }); %>
                               </select>
                             </div>
-                            
+
                             <div class="col-xl-3 mb-1">
                               <label for="nonTechSkills">Non Tech Skills Required</label>
-                              <select id="nonTechSkills" class="form-control chosen" multiple name="_nonTechSkills" data-placeholder="Select Non-Technical Skills">
-                                <% nontechskills.forEach((item) => { %>
+                              <select id="nonTechSkills" class="form-control chosen" multiple name="_nonTechSkills"
+                                data-placeholder="Select Non-Technical Skills">
+                                <% nontechskills.forEach((item)=> { %>
                                   <% if(jd?._nonTechSkills.includes(item._id)) { %>
                                     <option value="<%= item._id %>" class="text-capitalize" selected>
                                       <%= item.name %>
                                     </option>
-                                  <% } else { %>
-                                    <option value="<%= item._id %>" class="text-capitalize">
-                                      <%= item.name %>
-                                    </option>
-                                  <% } %>
-                                <% }); %>
+                                    <% } else { %>
+                                      <option value="<%= item._id %>" class="text-capitalize">
+                                        <%= item.name %>
+                                      </option>
+                                      <% } %>
+                                        <% }); %>
                               </select>
                             </div>
-                            
+
                             <div class="col-xl-3 mb-1">
                               <label for="requirement">Requirement (If any)</label>
                               <select id="requirement-feild" class="form-control" name="requirement">
                                 <option value="">Select option</option>
-                                <option value="Two Wheeler" <% if(jd?.requirement==='Two Wheeler' ) {%> selected <% } %>>Two Wheeler</option>
-                                <option value="Four Wheeler" <% if(jd?.requirement==='Four Wheeler' ) {%> selected <% } %>>Four Wheeler</option>
-                                <option value="Driving License" <% if(jd?.requirement==='Driving License' ) {%> selected <% } %>>Driving License</option>
-                                <option value="Passport" <% if(jd?.payOut==='Passport' ) {%> selected <% } %>>Passport</option>
+                                <option value="Two Wheeler" <% if(jd?.requirement==='Two Wheeler' ) {%> selected <% } %>
+                                    >Two
+                                    Wheeler</option>
+                                <option value="Four Wheeler" <% if(jd?.requirement==='Four Wheeler' ) {%> selected <% }
+                                    %>
+                                    >Four Wheeler</option>
+                                <option value="Driving License" <% if(jd?.requirement==='Driving License' ) {%> selected
+                                  <% } %>>Driving License</option>
+                                <option value="Passport" <% if(jd?.payOut==='Passport' ) {%> selected <% } %>>Passport
+                                </option>
                               </select>
                             </div>
-                            
+
                             <div class="col-xl-3 mb-1 fixed" id="salaryRange-field" name="salaryRange">
                               <label>Salary Range (Monthly in Rs.)</label><span class="mandatory"> *</span></label>
                               <br />
@@ -662,33 +691,33 @@
                         <div class="card-body" id="questionanswerlist">
                           <%if(jd?.questionsAnswers?.length>0){%>
                             <%jd?.questionsAnswers.forEach((item)=>{%>
-                          <div class="row questionanswerrow">
-                            <div class="col-xl-6 mb-1">
-                              <label>Question</label>
-                              <textarea name="question" class="form-control" col="50"
-                                rows="1"><%=item.Question%></textarea>
-                            </div>
-                            <div class="col-xl-6 mb-1">
-                              <label>Answer</label>
-                              <textarea name="answer" class="form-control" col="50"
-                                rows="1"><%=item.Answer%></textarea>
-                            </div>
-                           </div>
-                           <%})%>
-                           <%}else {%>
-                            <div class="row questionanswerrow">
-                              <div class="col-xl-6 mb-1">
-                                <label>Question</label>
-                                <textarea name="question" class="form-control" col="50"
-                                  rows="1">Do you offer safe working environment ?</textarea>
+                              <div class="row questionanswerrow">
+                                <div class="col-xl-6 mb-1">
+                                  <label>Question</label>
+                                  <textarea name="question" class="form-control" col="50"
+                                    rows="1"><%=item.Question%></textarea>
+                                </div>
+                                <div class="col-xl-6 mb-1">
+                                  <label>Answer</label>
+                                  <textarea name="answer" class="form-control" col="50"
+                                    rows="1"><%=item.Answer%></textarea>
+                                </div>
                               </div>
-                              <div class="col-xl-6 mb-1">
-                                <label>Answer</label>
-                                <textarea name="answer" class="form-control" col="50"
-                                  rows="1">Yes we do offer as we are ISO certified</textarea>
-                              </div>
-                             </div>
-                            <%}%>
+                              <%})%>
+                                <%}else {%>
+                                  <div class="row questionanswerrow">
+                                    <div class="col-xl-6 mb-1">
+                                      <label>Question</label>
+                                      <textarea name="question" class="form-control" col="50"
+                                        rows="1">Do you offer safe working environment ?</textarea>
+                                    </div>
+                                    <div class="col-xl-6 mb-1">
+                                      <label>Answer</label>
+                                      <textarea name="answer" class="form-control" col="50"
+                                        rows="1">Yes we do offer as we are ISO certified</textarea>
+                                    </div>
+                                  </div>
+                                  <%}%>
 
                         </div>
                         <div class="col-xl-12 mb-1 text-right">
@@ -714,18 +743,106 @@
                             </div>
                             <div class="col-xl-5">
                               <label for="duties">Job Duties</label>
-                              <textarea id="duties" name="duties" class="form-control" cols="3" rows="3" maxlength="150"><%= jd?.duties %></textarea>
-                          </div>
+                              <textarea id="duties" name="duties" class="form-control" cols="3" rows="3"
+                                maxlength="150"><%= jd?.duties %></textarea>
+                            </div>
                             <div class="col-xl-3 mb-1" id="video">
                               <label>Add Video JD</label>
-                              <input class="form-control" type="file" name="jobVideo"
-                                      placeholder="Add Youtube url" id="jobvideo" value="<%= jd?.jobVideo %>">
-                              </div>
+                              <% if(jd?.jobVideo) { %>
+                                <div class="video-preview-container position-relative">
+                                  <video style="max-height: 150px;width: 250px;" controls>
+                                    <source src="<%= jd.jobVideo %>" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                  </video>
+                                  <button type="button" class="btn btn-danger btn-sm remove-video-btn"
+                                    onclick="removeVideo('<%= jd.jobVideo %>')">
+                                    &#10006;
+                                  </button>
+                                </div>
+
+
+                                <style>
+                                  .video-preview-container {
+                                    display: inline-block;
+                                    position: relative;
+                                  }
+
+                                  .remove-video-btn {
+                                    position: absolute;
+                                    top: 5px;
+                                    right: 5px;
+                                    padding: 2px 8px;
+                                    border-radius: 50%;
+                                    background-color: #dc3545;
+                                    color: #fff;
+                                    border: none;
+                                    cursor: pointer;
+                                  }
+
+                                  .remove-video-btn:hover {
+                                    background-color: #c82333;
+                                  }
+                                </style>
+                                <% }%>
+                                  <input class="form-control  <% if(jd?.jobVideo) { %> d-none <% }%>" type="file"
+                                    name="jobVideo" onchange="validateVideoFile(this)" placeholder="Add Video Jd "
+                                    accept="video/mp4, video/mov, video/avi" id="jobvideo">
+
+
+
                             </div>
-                            <div class="col-xl-12 mb-1 text-right">
-                              <button id="sub-btn"
-                                class="btn btn-success waves-effect waves-light text-white">SUBMIT</button>
+                            <div class="col-xl-3 mb-1" id="video">
+                              <label>Add Thumbnail JD</label>
+
+                              <% if(jd?.jobVideoThumbnail) { %>
+                                <div class="thumbnail-preview-container position-relative">
+
+                                  <img src="<%= jd.jobVideoThumbnail %>" alt="">
+                                  <button type="button" class="btn btn-danger btn-sm remove-video-btn"
+                                    onclick="removethumbnail('<%= jd.jobVideoThumbnail %>')">
+                                    &#10006;
+                                  </button>
+                                </div>
+
+
+                                <style>
+                                  .thumbnail-preview-container {
+                                    display: inline-block;
+                                    position: relative;
+                                  }
+
+                                  .thumbnail-preview-container img {
+                                    max-width: 150px;
+                                  }
+
+                                  .remove-video-btn {
+                                    position: absolute;
+                                    top: 5px;
+                                    right: 5px;
+                                    padding: 2px 8px;
+                                    border-radius: 50%;
+                                    background-color: #dc3545;
+                                    color: #fff;
+                                    border: none;
+                                    cursor: pointer;
+                                  }
+
+                                  .remove-video-btn:hover {
+                                    background-color: #c82333;
+                                  }
+                                </style>
+                                <% }%>
+                                  <input accept="image/*" onchange="validateImageFile(this)"
+                                    class="form-control <% if(jd?.jobVideoThumbnail) { %> d-none <% }%>" type="file"
+                                    name="jobVideoThumbnail" id="jobVideoThumbnail">
+
+
+
                             </div>
+                          </div>
+                          <div class="col-xl-12 mb-1 text-right">
+                            <button id="sub-btn"
+                              class="btn btn-success waves-effect waves-light text-white">SUBMIT</button>
                           </div>
                         </div>
                       </div>
@@ -733,8 +850,9 @@
                   </div>
                 </div>
               </div>
-            </section>
-          </form>
+        </div>
+        </section>
+        </form>
         </div>
 
 
@@ -1030,7 +1148,7 @@
           src="https://maps.googleapis.com/maps/api/js?key=<%= process.env.AUTH_KEY_GOGGLE%>&callback=initMap&libraries=places&v=weekly"
           defer></script>
         <script>
-          let lessCoins=false
+          let lessCoins = false
           function initMap() {
 
             const options = {
@@ -1096,6 +1214,44 @@
               return true;
             }
           }
+          // function validateVideoFile(input) {
+          //   let file = input.files[0];
+          //   if (file) {
+          //     if (!checkJDVideoValidation(file.name)) {
+          //       alert("Please upload video in mp4, mov, or avi format only!");
+          //       input.value = ""; // Reset the file input
+          //     }
+          //   }
+          // }
+
+          function validateVideoFile(input) {
+              const file = input.files[0];
+
+              if (file) {
+                const fileType = file.name.split('.').pop().toLowerCase();
+                const allowedTypes = ['mp4', 'mov', 'avi'];
+                const maxSize = 9 * 1024 * 1024; // 9MB in bytes
+
+                if (!allowedTypes.includes(fileType)) {
+                  alert("❌ Invalid file format! Only MP4, MOV, and AVI files are allowed.");
+                  input.value = ""; // clear input
+                  return false;
+                }
+
+                if (file.size > maxSize) {
+                  alert("❌ File size too large! Maximum allowed size is 9MB.");
+                  input.value = ""; // clear input
+                  return false;
+                }
+
+                // Optional: show file size in console
+                console.log("✅ Video file accepted, size: " + (file.size / (1024 * 1024)).toFixed(2) + " MB");
+              }
+
+              return true;
+            }
+
+
           function uploadJD(event) {
             let file = event.target.files[0];
             let body = {
@@ -1133,7 +1289,7 @@
               return false;
             }
             event.preventDefault();
-           
+
             const creditsLeft = +("<%=company.creditLeft%>")
             const coinsRequired = +("<%=coinsRequired?.contactcoins %>")
             let isContactvalue = "<%= jd?.isContact %>";
@@ -1143,70 +1299,128 @@
               document.getElementById("sub-btn").setAttribute("data-toggle", "modal");
               document.getElementById("sub-btn").setAttribute("data-target", "#addCoins");
               document.getElementById("sub-btn").setAttribute("data-dismiss", "modal");
-              lessCoins=true;
+              lessCoins = true;
             }
             else {
               document.getElementById("sub-btn").removeAttribute("data-toggle");
-              lessCoins=false;
+              lessCoins = false;
               document.getElementById("sub-btn").removeAttribute("data-target");
               document.getElementById("sub-btn").removeAttribute("data-dismiss");
             }
-  debugger
-            let body = {
-              displayCompanyName: $('#organizationName').val(),   
-                _techSkills: $('#techSkills').val(),
-                requirement: $('#requirement-feild').val(),
-                _nonTechSkills: $('#nonTechSkills').val(),             
-                noOfPosition: $('#noOfVacancies').val(),
-                shifttimings:$('#shifttimings').val(),
-                remarks: $('#remarks').val(),
-                title: $('#jobTitle').val(),
-                _industry: $('#jd-industry').val(),
-                experience: $('#jd-exp').val(),
-                _qualification: $('#jd-qua').val(),
-                _subQualification: $('#jd-subqua').val(),
-                isedited: $('#availService').val(),
-                validity: $('#endDate').val(),
-                state: $('#state-field').val(),
-                city: $('#city').val(),
-                place: $('#place').val(),
-                latitude: $('#latitude').val(),
-                longitude: $('#longitude').val(), 
-                payOut: $('#payOut').val(),
-                genderPreference:  $('[name=genderPreference]:checked').val(),
-                jobType: $('#inlineRadio1').val() || $('#inlineRadio2').val(),
-                compensation: $('#inlineRadio3').val()||$('#inlineRadio4').val()|| $('#inlineRadio5').val(),
-                pay: $('[name=pay]:checked').val(),
-                jobDescription: $('#jobDescription').val(),
-                duties:$('#duties').val(),
-                ageMin: $('#min-age').val(),
-                ageMax: $('#max-age').val(),
-                nameof: $('#name').val(),
-                shift: $('[name=shift]:checked').val(),
-                salaryRange: $('#salaryRange-feild').val(),
-                jobVideo: $('#jobvideo').val(),
-                work: $('[name=work]:checked').val(),
-                benifits: $('#additional-benifits').val(),
-                isFixed: document.getElementById('fixedCheck').checked ? true : false ,
-                isContact: document.getElementById('contact-directly-yes').checked  ? true : false,
-                phoneNumberof: $('#phoneNumber').val(),
-                whatsappNumberof: $('#whatsappNumber').val(),
-                emailof: $('#email').val(),
-                nameof:$('#name').val(),
-                cutprice:$('#cutprice').val(),
-                questionsAnswers: getQuestionAnswers()
-              };
-              if(body['isFixed']==true){
-                body['amount']=$('#fixed-range-input').val();
-              }else {
-                body['min']= $('#min-input').val();
-                body['max']= $('#max-input').val();
+
+
+
+            document.getElementById('jobvideo').addEventListener('change', function () {
+              let file = this.files[0]; // Get selected file
+              if (file) {
+                let fileType = file.name.split('.').pop().toLowerCase();
+                let allowedTypes = ['mp4', 'mov', 'avi'];
+                let maxSize = 50 * 1024 * 1024; // 50MB limit
+
+                if (!allowedTypes.includes(fileType)) {
+                  alert("❌ Invalid file format! Only MP4, MOV, and AVI files are allowed.");
+                  this.value = ''; // Reset input field
+                  return;
+                }
+
+                if (file.size > maxSize) {
+                  alert("❌ File size too large! Maximum allowed size is 50MB.");
+                  this.value = ''; // Reset input field
+                }
               }
-            if(!lessCoins){
-              axios.post("/company/editJobs/<%= jd?._id%>", body).then((res) => {
-                 if(res.status&&res){
-                  window.location.href="/company/list/jobs"
-                 }
+            });
+
+            document.getElementById('jobVideoThumbnail').addEventListener('change', function () {
+              let file = this.files[0]; // Get selected file
+              if (file) {
+                let fileType = file.name.split('.').pop().toLowerCase();
+                let allowedTypes = ['jpg', 'jpeg', 'png'];
+                let maxSize = 10 * 1024 * 1024; // 10MB limit
+
+                if (!allowedTypes.includes(fileType)) {
+                  alert("❌ Invalid file format! Only PNG, JPG, and JPEG files are allowed.");
+                  this.value = ''; // Reset input field
+                  return;
+                }
+
+                if (file.size > maxSize) {
+                  alert("❌ File size too large! Maximum allowed size is 10MB.");
+                  this.value = ''; // Reset input field
+                }
+              }
+            });
+
+
+
+            let formData = new FormData(document.querySelector("form")); // FormData Object बनाएं
+
+            // let body = {
+            //   displayCompanyName: $('#organizationName').val(),
+            //   _techSkills: $('#techSkills').val(),
+            //   requirement: $('#requirement-feild').val(),
+            //   _nonTechSkills: $('#nonTechSkills').val(),
+            //   noOfPosition: $('#noOfVacancies').val(),
+            //   shifttimings: $('#shifttimings').val(),
+            //   remarks: $('#remarks').val(),
+            //   title: $('#jobTitle').val(),
+            //   _industry: $('#jd-industry').val(),
+            //   experience: $('#jd-exp').val(),
+            //   _qualification: $('#jd-qua').val(),
+            //   _subQualification: $('#jd-subqua').val(),
+            //   isedited: $('#availService').val(),
+            //   validity: $('#endDate').val(),
+            //   state: $('#state-field').val(),
+            //   city: $('#city').val(),
+            //   place: $('#place').val(),
+            //   latitude: $('#latitude').val(),
+            //   longitude: $('#longitude').val(),
+            //   payOut: $('#payOut').val(),
+            //   genderPreference: $('[name=genderPreference]:checked').val(),
+            //   jobType: $('#inlineRadio1').val() || $('#inlineRadio2').val(),
+            //   compensation: $('#inlineRadio3').val() || $('#inlineRadio4').val() || $('#inlineRadio5').val(),
+            //   pay: $('[name=pay]:checked').val(),
+            //   jobDescription: $('#jobDescription').val(),
+            //   duties: $('#duties').val(),
+            //   ageMin: $('#min-age').val(),
+            //   ageMax: $('#max-age').val(),
+            //   nameof: $('#name').val(),
+            //   shift: $('[name=shift]:checked').val(),
+            //   salaryRange: $('#salaryRange-feild').val(),
+            //   jobVideo: $('#jobvideo').val(),
+            //   work: $('[name=work]:checked').val(),
+            //   benifits: $('#additional-benifits').val(),
+            //   isFixed: document.getElementById('fixedCheck').checked ? true : false,
+            //   isContact: document.getElementById('contact-directly-yes').checked ? true : false,
+            //   phoneNumberof: $('#phoneNumber').val(),
+            //   whatsappNumberof: $('#whatsappNumber').val(),
+            //   emailof: $('#email').val(),
+            //   nameof: $('#name').val(),
+            //   cutprice: $('#cutprice').val(),
+            //   questionsAnswers: getQuestionAnswers()
+            // };
+            // if (body['isFixed'] == true) {
+            //   body['amount'] = $('#fixed-range-input').val();
+            // } else {
+            //   body['min'] = $('#min-input').val();
+            //   body['max'] = $('#max-input').val();
+            // }
+
+            let fileInput = document.getElementById('jobvideo');
+            if (fileInput.files.length > 0) {
+              formData.append("jobVideo", fileInput.files[0]); // Only the first selected file
+            };
+
+            let fileThumbnailInput = document.getElementById('jobVideoThumbnail');
+            if (fileThumbnailInput.files.length > 0) {
+              formData.append("jobVideoThumbnail", fileThumbnailInput.files[0]); // Only the first selected file
+            }
+
+
+            if (!lessCoins) {
+              axios.post("/company/editJobs/<%= jd?._id%>", formData).then((res) => {
+                if (res.status && res) {
+                  window.location.href = "/company/list/jobs"
+                }
               })
             }
           })
@@ -1231,7 +1445,7 @@
             Array.from(elements).forEach((item) => {
               let queAnsObj = {}
               let formControls = item.querySelectorAll('.form-control');
-              if(formControls[0].value.trim()!==""&&formControls[1].value.trim()!==""){
+              if (formControls[0].value.trim() !== "" && formControls[1].value.trim() !== "") {
                 queAnsObj['Question'] = formControls[0].value;
                 queAnsObj['Answer'] = formControls[1].value;
                 questionsAnswersArray.push(queAnsObj);
@@ -1379,24 +1593,79 @@
               firstError.focus();
             }
             return flag
+          };
+
+          const checkJDThumbnailValidation = (image) => {
+            let regex = /(\.jpg|\.jpeg|\.png)$/i;
+            if (!regex.exec(image)) {
+              return false;
+            } else {
+              return true;
+            }
+          }
+          function validateImageFile(input) {
+            let file = input.files[0];
+            if (file) {
+              if (!checkJDThumbnailValidation(file.name)) {
+                alert("Please upload image in png, jpg, or jpeg format only!");
+                input.value = ""; // Reset the file input
+              }
+            }
           }
 
+          function getKeyFromS3Url(url) {
+            const s3BaseUrl = "https://mipie-bucket.s3.ap-south-1.amazonaws.com/";
+            return url.replace(s3BaseUrl, "");
+          }
 
-          function removeVideo() {
-            header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
+          function removethumbnail(url) {
+            header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } };
+            const location = url // yeh full URL hai
+            const key = getKeyFromS3Url(location);
+
             let data = {
-              key: $('#jobvideo').val(),
-            }
+              key: key
+            };
+
+
+            axios.post('/api/deleteSingleFile', data, header)
+              .then(res => {
+                axios.post("/company/removeVideoThuumbnailJd/<%= jd?._id%>")
+                  .then(() => {
+                    $('.thumbnail-preview-container').hide();
+                    $('#jobVideoThumbnail').removeClass('d-none');
+
+                  })
+                  .catch(err => console.log(err.message))
+              }).catch(err => console.log(err.message))
+          };
+
+          function removeVideo(url) {
+            header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
+            const location = url; // yeh full URL hai
+            const key = getKeyFromS3Url(location);
+
+            let data = {
+              key: key
+            };
+
             axios.post('/api/deleteSingleFile', data, header)
               .then(res => {
                 axios.post("/company/removeVideoJd/<%= jd?._id%>")
                   .then(() => {
-                    $('.uploadedvideo').hide()
-                    $('#jobvideo').val('')
+                    $('.video-preview-container').hide();
+                    $('#jobvideo').removeClass('d-none');
+
+
                   })
                   .catch(err => console.log(err.message))
               }).catch(err => console.log(err.message))
           }
+          
+
+
+
+
           function showContactInfo() {
             document.getElementById("contact-info").style.display = "block";
             var coinLabel = document.querySelector('label[for="25 coin"]');
@@ -1436,6 +1705,10 @@
             }
           })
 
+
+
+
         </script>
         <% include ./partials/footer %>
   </body>
+  </html>

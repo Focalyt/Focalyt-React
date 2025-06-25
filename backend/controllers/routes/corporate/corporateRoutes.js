@@ -13,6 +13,7 @@ const {
   Skill,
   Company,
   Candidate,
+  CandidateProfile,
   Qualification,
   State,
   City,
@@ -36,6 +37,7 @@ const {
 const { candidateHiringStatusCashBack, checkCandidateCashBack } = require('../services/cashback')
 const candidateServices = require('../services/candidate')
 const users = require("../../models/users");
+const multer = require('multer');
 const templates = require("../../models/templates")
 const AWS = require("aws-sdk");
 const { crypto, randomBytes } = require("crypto");
@@ -70,48 +72,75 @@ AWS.config.update({
   region: region,
 });
 
+// Define the custom error
+class InvalidParameterError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'InvalidParameterError';
+  }
+}
+
+const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
+const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+
+const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
+if (!fs.existsSync(destination)) fs.mkdirSync(destination);
+
+const storage = multer.diskStorage({
+  destination,
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, `${basename}-${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({ storage }).single('file');
+
+
 
 const apiKey = process.env.MIPIE_RAZORPAY_KEY
 const razorSecretKey = process.env.MIPIE_RAZORPAY_SECRET
 
 router.route('/')
-.get(async (req,res) => {
-  let user = req.session.user
-  if(user && user.role === 1){
-    res.redirect("/company/dashboard");
-  }
-  else{
-    res.redirect("/company/login");
-  }
-})
+  .get(async (req, res) => {
+    let user = req.session.user
+    if (user && user.role === 1) {
+      res.redirect("/company/dashboard");
+    }
+    else {
+      res.redirect("/company/login");
+    }
+  })
 
 router.route("/dashboard").get(isCompany, async (req, res) => {
   try {
     const company = await Company.findOne({
       _concernPerson: req.session.user._id,
     }).select('_id availableCredit unmasked name creditLeft');
-  
+    console.log('company route hit')
     const vacancyCount = await Vacancy.find({
       _company: company._id,
       status: true,
     }).countDocuments();
-  
-    let ongoingCandidates = await HiringStatus.find({ 
-      company: company._id, 
-      status: { $nin: ['shortlisted', 'Shortlisted', 'rejected'] }, 
-      isDeleted: false 
-    }).populate({ 
-      path: 'candidate', 
-      select: 'name highestQualification isExperienced totalExperience ' 
+
+    let ongoingCandidates = await HiringStatus.find({
+      company: company._id,
+      status: { $nin: ['shortlisted', 'Shortlisted', 'rejected'] },
+      isDeleted: false
+    }).populate({
+      path: 'candidate',
+      select: 'name highestQualification isExperienced totalExperience '
     }).limit(5);
-  
-    let shortlistedCandidates = await HiringStatus.find({ 
-      company: company._id, 
-      isDeleted: false 
+
+    let shortlistedCandidates = await HiringStatus.find({
+      company: company._id,
+      isDeleted: false
     }).countDocuments();
-  
+
     let jobs = await Vacancy.find({ _company: company._id, status: true }).select('_id');
-  
+
     let populate = [
       {
         path: '_job',
@@ -120,20 +149,20 @@ router.route("/dashboard").get(isCompany, async (req, res) => {
       {
         path: '_candidate',
         select: 'name totalExperience highestQualification qualifications',
-        populate:{
+        populate: {
           path: 'highestQualification',
           select: 'name',
-          model:'Qualification'
+          model: 'Qualification'
         }
       }
-    ];  
+    ];
 
-    
+
     let appliedCandidates = await AppliedJobs.find({ _company: company._id })
       .populate(populate)
       .sort({ createdAt: -1 })
       .limit(5);
-    let qualifications = await Qualification.find({ status: true,isDeleted:false }).select('_id name');
+    let qualifications = await Qualification.find({ status: true, isDeleted: false }).select('_id name');
     const menu = "dashboard";
     res.render(`${req.vPath}/app/corporate/dashboard`, {
       company,
@@ -152,7 +181,7 @@ router.route("/dashboard").get(isCompany, async (req, res) => {
 
 
 router
-  .route("/myProfile")  
+  .route("/myProfile")
   .get(isCompany, async (req, res) => {
     const menu = "myProfile";
     let user = await users.findOne({
@@ -340,15 +369,15 @@ router.get("/list-candidates", isCompany, async (req, res) => {
     let loc = data.jdLocation.split(',')
     companyLong = Number(loc[0])
     companyLat = Number(loc[1])
-  }else{
+  } else {
     sorting = [
-      { $sort: { appliedJobs: -1} }
+      { $sort: { appliedJobs: -1 } }
     ]
   }
   const perPage = 20;
   const p = parseInt(req.query.page);
   const page = p || 1;
-  const count = await Candidate.find({...filterFields, location: { $exists: true }}).countDocuments();
+  const count = await Candidate.find({ ...filterFields, location: { $exists: true } }).countDocuments();
   let agg = candidateServices.companyCandidateList(sorting, perPage, page, filterFields, [companyLong, companyLat], company._id)
   let candidates = await Candidate.aggregate(agg)
   const totalPages = Math.ceil(count / perPage);
@@ -366,9 +395,9 @@ router.get("/list-candidates", isCompany, async (req, res) => {
   let subQualification = await SubQualification.find({ status: true })
   let skills = await Skill.find({ status: true })
   let today = moment().startOf('day').toDate()
-  const jobs = await Vacancy.find({ _company: company._id, status: true, validity: {$gte: today} });
+  const jobs = await Vacancy.find({ _company: company._id, status: true, validity: { $gte: today } });
   const coinsRequired = await CoinsAlgo.findOne().select("SMS shortlist")
-  let vacancies = await Vacancy.find({ _company: company._id, location: {$exists: true}, status: true, validity: {$gte: today} }).select('location title')
+  let vacancies = await Vacancy.find({ _company: company._id, location: { $exists: true }, status: true, validity: { $gte: today } }).select('location title')
   let template = await templates.find({ status: true }).select("name templateId categories message")
 
   res.render(`${req.vPath}/app/corporate/listCandidates`, {
@@ -535,13 +564,16 @@ router
   })
   .post(async (req, res) => {
     try {
-      const { value , error } = await CompanyValidators.register(req.body)
+      const { value, error } = await CompanyValidators.register(req.body)
       if (error) {
-				console.log('====== register error ', error, value)
-				return res.send({ status: "failure", error: "Something went wrong!" });
-			}
-      const { firstName, lastName, email, phoneNumber, companyName } = value;
-     
+        console.log('====== register error ', error, value)
+        return res.send({ status: "failure", error: "Something went wrong!" });
+      }
+      const { firstName, lastName, email, phoneNumber, companyName, password,
+        confirmPassword } = value;
+      if (!password || !confirmPassword || password !== confirmPassword) {
+        return res.send({ status: "failure", error: "Passwords do not match!" });
+      }
       let checkEmail = await users.findOne({
         email: email,
         isDeleted: false,
@@ -558,7 +590,7 @@ router
           error: "Number and Email already exists!",
         });
       }
-
+      const hashedPassword = await bcrypt.hash(password, 10);
       const name = firstName + " " + lastName;
       if (!checkEmail && !checkNumber) {
         const user = await User.create({
@@ -566,6 +598,7 @@ router
           email,
           mobile: phoneNumber,
           role: 1,
+          password: hashedPassword,
         });
         if (!user) {
           return res.send({
@@ -601,11 +634,12 @@ router
     }
   });
 router.get("/login", async (req, res) => {
-  let user = req.session.user 
-  if(user && user.role == 1){
+  let user = req.session.user
+  if (user && user.role == 1) {
     res.redirect("/company/dashboard");
   }
   res.render(`${req.vPath}/app/corporate/login`);
+  console.log('login route hit')
 });
 router.get("/get-all-candidates", [isCompany], async (req, res) => {
   const candidates = await CandidateRegister.find({});
@@ -630,15 +664,24 @@ router.get(
   "/get-candidate-details",
   [isCompany, authenti],
   async (req, res) => {
-    const { userId } = req.query;
-    const candidates = await Candidate.findOne({ _id: userId });
+    let { userId } = req.query;
+    console.log('userId',userId)
+    userId = mongoose.Types.ObjectId.isValid(userId)
+        ? new mongoose.Types.ObjectId(userId)
+        : userId;
+    const candidates = await CandidateProfile.findOne({ _id: userId });
+    console.log('candidates',candidates)
     const concernedPersonId = req.user._id;
+    console.log('concernedPersonId',concernedPersonId)
     const companyDetails = await Company.findOne({ _concernPerson: concernedPersonId, status: true, isDeleted: false });
     if (!companyDetails) {
       return res.status(404).send({ status: false, msg: 'Company not found!' })
     }
+    console.log('companyDetails',companyDetails)
     let coins = await CoinsAlgo.findOne({})
-    if (!companyDetails.creditLeft || companyDetails.creditLeft < coins.shortlist) {
+
+    if (companyDetails.creditLeft < coins.shortlist) {
+      console.log("Please Subscribe to Unmask More!")
       return res
         .status(400)
         .send({ status: false, msg: "Please Subscribe to Unmask More!" });
@@ -779,7 +822,62 @@ router.get("/candidate/:candidateId", [isCompany], async (req, res) => {
     coins
   });
 });
+router.get("/newcandidate/:candidateId", [isCompany], async (req, res) => {
+  let menu
+  let { src } = req.query
+  if (src == 'onGoing') { menu = "ongoing-candidates"; }
+  else if (src == 'shortlisted') { menu = "shortlisted-candidates"; }
+  else { menu = "list-candidates"; }
+  const user = req.companyUser;
+  let company = await Company.findOne({ _concernPerson: user }).select('companyExecutives _id unmasked availableCredit creditLeft');
 
+  const populate = [
+    {
+      path: "appliedJobs",
+      match: { '_company': company._id },
+      select: "_id",
+    }
+  ];
+
+  const candidateId = req.params.candidateId;
+
+  const candidate = await CandidateProfile.findOne({
+    _id: candidateId,
+  }).populate(populate);
+
+
+  console.log('Candidate Details:', candidate);
+  // console.log('candidate.personalInfo.certifications', candidate.personalInfo.certifications);
+  // console.log('candidate.personalInfo.languages', candidate.personalInfo.languages);
+
+  let hiringStatus = await HiringStatus.findOne({ candidate: candidateId, company: company._id, isDeleted: false }, 'status createdAt updatedAt comment job eventDate concernedPerson')
+    .populate({ path: 'job', select: 'title' })
+
+  if (!hiringStatus) {
+    candidate.mobile = "0";
+    candidate.email = "XXXXXXXXXX";
+    masked = true;
+  } else {
+    masked = false;
+  }
+
+  console.log('masked', masked)
+
+  const qualification = await Qualification.find({ status: true }).sort({ basic: -1 })
+  const jobs = await Vacancy.find({ _company: company._id, status: true })
+  let coins = await CoinsAlgo.findOne({})
+  res.render(`${req.vPath}/app/corporate/candidateProfile_copy`, {
+    candidate,
+    menu,
+    masked,
+    jobs,
+    hiringStatus,
+    qualification,
+    company,
+    coins,
+    moment
+  });
+});
 router.post("/removeimage", isCompany, async (req, res) => {
   const company = await Company.findOne({
     _concernPerson: req.session.user._id,
@@ -811,6 +909,7 @@ router.post("/removevideo", isCompany, async (req, res) => {
   res.send({ status: 200, message: "Profile Updated Successfully" });
 });
 
+
 router.post("/removelogo", isCompany, async (req, res) => {
   const company = await Company.findOne({
     _concernPerson: req.session.user._id,
@@ -839,10 +938,34 @@ router.post("/removeVideoJd/:_id", isCompany, async (req, res) => {
   req.flash("success", "Vacancy updated successfully!");
   res.send({ status: 200, message: "Vacancy Updated Successfully" });
 });
+
+router.post("/removeVideoThuumbnailJd/:_id", isCompany, async (req, res) => {
+  try {
+    const vacancy = await Vacancy.findById(req.params._id);
+    if (!vacancy) throw req.ykError("Vacancy doesn't exist!");
+
+    if (!vacancy.jobVideoThumbnail) {
+      return res.status(400).json({ status: false, message: "No thumbnail to delete." });
+    }
+
+    // Optional: Delete file from S3
+    // await deleteSingleFile(vacancy.jobVideoThumbnail);
+
+    vacancy.jobVideoThumbnail = "";
+    await vacancy.save();
+
+    req.flash("success", "Vacancy updated successfully!");
+    return res.status(200).json({ status: true, message: "Vacancy Updated Successfully" });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ status: false, message: err.message || "Something went wrong" });
+  }
+});
+
 router.get("/list/jobs", isCompany, async (req, res) => {
   try {
     const menu = "jobList";
-    const userId = req.user._id;
+    const userId = req.session.user._id;
     const user = await User.findOne({ _id: userId })
     const company = await Company.findOne({ _concernPerson: userId, status: true })
     let shortlistedCandCount;
@@ -879,7 +1002,7 @@ router.get("/list/jobs", isCompany, async (req, res) => {
     ];
     canAdd = false
     if (company.name && user.email && user.mobile && company.cityId && company.stateId && user.whatsapp
-      && user.designation && user.name && company._industry ) {
+      && user.designation && user.name && company._industry) {
       canAdd = true
     }
 
@@ -965,18 +1088,31 @@ router.get("/jobs/:id", isCompany, async (req, res) => {
   const jd = await Vacancy.findOne({
     _id: req.params.id,
   }).populate(populate);
- console.log(jd)
+  console.log(jd)
   const populateForCandidate = [
     {
       path: '_candidate',
-      select: 'name highestQualification qualifications sex isExperienced totalExperience _id mobile whatsapp',
-      populate: {
-        path: 'qualifications.0.Qualification', select: 'name'
-      }
+      select: 'name mobile whatsapp sex isExperienced highestQualification creditLeft personalInfo.totalExperience qualifications',
+      populate: [
+        {
+          path: 'highestQualification',
+          select: 'name'
+        },
+        {
+          path: 'qualifications.education',
+          select: 'name'
+        },
+        {
+          path: 'qualifications.course',
+          select: 'name'
+        }
+      ]
     }
-  ]
+  ];
+
   let appliedCandidates = await AppliedJobs.find({ _job: req.params.id }).populate(populateForCandidate)
   let qualifications = await Qualification.find({ status: true }).select('_id name');
+  console.log('appliedCandidates', appliedCandidates)
   res.render(`${req.vPath}/app/corporate/view-jd`, { menu, jd, appliedCandidates, qualifications });
 });
 async function getUploadedURL() {
@@ -1060,6 +1196,7 @@ router.get('/editJobs/:id', isCompany, async (req, res) => {
     const city = hasState
       ? await City.find({ stateId: st.stateId })
       : [];
+    console.log('jd', jd)
     res.render(`${req.vPath}/app/corporate/editJob`, {
       menu,
       jd,
@@ -1106,7 +1243,7 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
     if (!job) {
       return res.status(400).send({ status: 'false', message: "Job not found" })
     }
-    if(job?.isedited){
+    if (job?.isedited) {
       updatedJob['isedited'] = true
     }
     if (req.body.isContact == true) {
@@ -1122,12 +1259,12 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
       updatedJob['emailof'] = "";
     }
     if (updatedJob["isEdit"] == "true") {
-      updatedJob[ "_subQualification"] = []
+      updatedJob["_subQualification"] = []
     }
     if (industryValue) {
       updatedJob['_industry'] = industryValue._id
     }
-   
+
     const coins = +(coinsRequired.contactcoins)
     if (updatedJob.isContact == true && updatedJob.isedited == true && job?.isedited == false) {
       let jobDetails = await Company.findOneAndUpdate(
@@ -1137,9 +1274,113 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
         },
         { new: true, upsert: true }
       );
-      
+
+
+
     }
-    
+    const companyId = company._id;
+    const jobTitle = req.body.title
+
+    let files = req.files?.jobVideo; // Ensure correct key from FormData
+    const filesArray = Array.isArray(files) ? files : [files]; // Convert to array if single file
+
+
+
+    if (files) {
+
+      // ✅ Upload Files to S3
+      const uploadedFiles = [];
+      const uploadPromises = [];
+
+      filesArray.forEach((item) => {
+        const { name, mimetype } = item;
+        const ext = name?.split('.').pop().toLowerCase();
+
+        console.log(`Processing File: ${name}, Extension: ${ext}`);
+
+        if (!allowedImageExtensions.includes(ext) && !allowedVideoExtensions.includes(ext)) {
+          throw new Error(`File type not supported: ${ext}`);
+        }
+
+        // Determine fileType
+        const fileType = allowedImageExtensions.includes(ext) ? "image" : "video";
+
+        // Generate unique S3 key
+        const key = `Jobs/${companyId}/${jobTitle}/${fileType}s/${uuid()}.${ext}`;
+        const params = {
+          Bucket: bucketName,
+          Key: key,
+          Body: item.data,
+          ContentType: mimetype,
+        };
+
+        // Upload to S3
+        uploadPromises.push(
+          s3.upload(params).promise().then((uploadResult) => {
+            uploadedFiles.push({
+              fileURL: uploadResult.Location,
+              fileType,
+            });
+          })
+        );
+      });
+
+      // ✅ Wait for all uploads to complete
+      await Promise.all(uploadPromises);
+      console.log("Upload Files", uploadedFiles[0].fileURL)
+      updatedJob['jobVideo'] = uploadedFiles[0].fileURL;
+    }
+
+    let thumbnailfiles = req.files?.jobVideoThumbnail; // Ensure correct key from FormData
+    const thumbnailfilesArray = Array.isArray(thumbnailfiles) ? thumbnailfiles : [thumbnailfiles]; // Convert to array if single file
+    console.log("thumbnailfiles", thumbnailfiles)
+
+
+    if (thumbnailfiles) {
+      // ✅ Upload Files to S3
+      const uploadedThumbnailFiles = [];
+      const uploadThumbnailPromises = [];
+
+      thumbnailfilesArray.forEach((item) => {
+        const { name, mimetype } = item;
+        const ext = name?.split('.').pop().toLowerCase();
+
+        console.log(`Processing File: ${name}, Extension: ${ext}`);
+
+        if (!allowedImageExtensions.includes(ext) && !allowedVideoExtensions.includes(ext)) {
+          throw new Error(`File type not supported: ${ext}`);
+        }
+
+        // Determine fileType
+        const fileType = allowedImageExtensions.includes(ext) ? "image" : "video";
+
+        // Generate unique S3 key
+        const key = `Jobs/${companyId}/${jobTitle}/${fileType}s/${uuid()}.${ext}`;
+        const params = {
+          Bucket: bucketName,
+          Key: key,
+          Body: item.data,
+          ContentType: mimetype,
+        };
+
+        // Upload to S3
+        uploadThumbnailPromises.push(
+          s3.upload(params).promise().then((uploadResult) => {
+            uploadedThumbnailFiles.push({
+              fileURL: uploadResult.Location,
+              fileType,
+            });
+          })
+        );
+      });
+
+      // ✅ Wait for all uploads to complete
+      await Promise.all(uploadThumbnailPromises);
+      console.log("Upload Files", uploadedThumbnailFiles[0].fileURL)
+      updatedJob['jobVideoThumbnail'] = uploadedThumbnailFiles[0].fileURL;
+    };
+
+
     const jd = await Vacancy.findOneAndUpdate({ _id: req.params.jobId }, updatedJob);
     if (!jd) {
       return res.send({ status: 'false', error: 'job updation failed' });
@@ -1154,10 +1395,22 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
 
 
 router
-  .get("/addjobsdetails", isCompany, async (req, res) => {
+  .get("/addjobs/:id?", isCompany, async (req, res) => {
     try {
-
+      const { id } = req.params;
+      let vacancy, city;
+      if (id) {
+        vacancy = await Vacancy.findOne({ _id: id, status: true });
+      }
+      if (vacancy) {
+        let st = {};
+        if (vacancy?.state) {
+          st = await State.findOne({ _id: vacancy?.state, status: { $ne: false } });
+        }
+        city = await City.find({ stateId: st.stateId, status: { $ne: false } })
+      }
       let company = await Company.findOne({ _concernPerson: req.companyUser }).select('name creditLeft availableCredit')
+      const menu = "addjobs";
       const coinsRequired = await CoinsAlgo.findOne().select("contactcoins")
       const industry = await Industry.find({ status: true });
       const jobCategory = await JobCategory.find({ status: true });
@@ -1166,10 +1419,8 @@ router
       const state = await State.find({ countryId: "101" });
       const techskills = await Skill.find({ type: "technical", status: true });
       const nontechskills = await Skill.find({ type: "non technical", status: true });
-      
-      console.log("industry" , industry)
-        return res.json ({
-        
+      res.render(`${req.vPath}/app/corporate/add-jd`, {
+        menu,
         industry,
         jobCategory,
         qualification,
@@ -1177,6 +1428,8 @@ router
         techskills,
         nontechskills,
         subQualification,
+        vacancy,
+        city,
         company,
         coinsRequired,
       });
@@ -1193,11 +1446,12 @@ router
         _concernPerson: req.session.user._id,
         status: true
       });
+      const jobTitle = req.body.title
       if (!company) {
         req.flash('error', 'Your company is deactivated')
         return res.redirect("/company/list/jobs");
       }
-      console.log(req.body,"+++++>")
+      console.log(req.body, "+++++>")
       if (req.body) {
         Object.keys(req.body).forEach((key) => {
           if (req.body[key] !== "") {
@@ -1211,12 +1465,107 @@ router
           }
         }
       }
-      const companyId = await Company.findOne({
-        _concernPerson: req.session.user._id,
-        status: true
-      });
+      const companyId = company._id
 
-      jobDetails._company = companyId._id;
+      let files = req.files?.jobVideo; // Ensure correct key from FormData
+      const filesArray = Array.isArray(files) ? files : [files]; // Convert to array if single file
+
+
+      if (files) {
+        // ✅ Upload Files to S3
+        const uploadedFiles = [];
+        const uploadPromises = [];
+
+        filesArray.forEach((item) => {
+          const { name, mimetype } = item;
+          const ext = name?.split('.').pop().toLowerCase();
+
+          console.log(`Processing File: ${name}, Extension: ${ext}`);
+
+          if (!allowedImageExtensions.includes(ext) && !allowedVideoExtensions.includes(ext)) {
+            throw new Error(`File type not supported: ${ext}`);
+          }
+
+          // Determine fileType
+          const fileType = allowedImageExtensions.includes(ext) ? "image" : "video";
+
+          // Generate unique S3 key
+          const key = `Jobs/${companyId}/${jobTitle}/${fileType}s/${uuid()}.${ext}`;
+          const params = {
+            Bucket: bucketName,
+            Key: key,
+            Body: item.data,
+            ContentType: mimetype,
+          };
+
+          // Upload to S3
+          uploadPromises.push(
+            s3.upload(params).promise().then((uploadResult) => {
+              uploadedFiles.push({
+                fileURL: uploadResult.Location,
+                fileType,
+              });
+            })
+          );
+        });
+
+        // ✅ Wait for all uploads to complete
+        await Promise.all(uploadPromises);
+        console.log("Upload Files", uploadedFiles[0].fileURL)
+        jobDetails['jobVideo'] = uploadedFiles[0].fileURL;
+      };
+
+      let thumbnailfiles = req.files?.jobVideoThumbnail; // Ensure correct key from FormData
+      const thumbnailfilesArray = Array.isArray(thumbnailfiles) ? thumbnailfiles : [thumbnailfiles]; // Convert to array if single file
+      console.log("thumbnailfiles", thumbnailfiles)
+
+
+      if (thumbnailfiles) {
+        // ✅ Upload Files to S3
+        const uploadedThumbnailFiles = [];
+        const uploadThumbnailPromises = [];
+
+        thumbnailfilesArray.forEach((item) => {
+          const { name, mimetype } = item;
+          const ext = name?.split('.').pop().toLowerCase();
+
+          console.log(`Processing File: ${name}, Extension: ${ext}`);
+
+          if (!allowedImageExtensions.includes(ext) && !allowedVideoExtensions.includes(ext)) {
+            throw new Error(`File type not supported: ${ext}`);
+          }
+
+          // Determine fileType
+          const fileType = allowedImageExtensions.includes(ext) ? "image" : "video";
+
+          // Generate unique S3 key
+          const key = `Jobs/${companyId}/${jobTitle}/${fileType}s/${uuid()}.${ext}`;
+          const params = {
+            Bucket: bucketName,
+            Key: key,
+            Body: item.data,
+            ContentType: mimetype,
+          };
+
+          // Upload to S3
+          uploadThumbnailPromises.push(
+            s3.upload(params).promise().then((uploadResult) => {
+              uploadedThumbnailFiles.push({
+                fileURL: uploadResult.Location,
+                fileType,
+              });
+            })
+          );
+        });
+
+        // ✅ Wait for all uploads to complete
+        await Promise.all(uploadThumbnailPromises);
+        console.log("Upload Files", uploadedThumbnailFiles[0].fileURL)
+        jobDetails['jobVideoThumbnail'] = uploadedThumbnailFiles[0].fileURL;
+      };
+
+
+      jobDetails._company = companyId;
       if (jobDetails['isEdit'] == "true") {
         jobDetails['_subQualification'] = []
       }
@@ -1233,10 +1582,12 @@ router
         jobDetails['emailof'] = "";
       }
       const jd = await Vacancy.create(jobDetails);
-      
+
+      console.log("jd", jd)
+
       const coins = +(coinsRequired.contactcoins)
       if (jobDetails.isContact === true || jobDetails.isContact === "true") {
-        if(company.creditLeft>=coins){
+        if (company.creditLeft >= coins) {
           let jobDetails = await Company.findOneAndUpdate(
             { _concernPerson: req.session.user._id },
             {
@@ -1352,26 +1703,112 @@ router.post("/candidate/statusUpdate", [isCompany, authenti], async (req, res) =
   return res.status(200).send({ status: true, msg: data.type });
 });
 
+// router.route("/createResume/:id").get(isCompany, authenti, async (req, res) => {
+//   try {
+
+//     let url = `${req.protocol}://${req.get("host")}/candidateForm/${req.session.user._id}/${req.params.id}`
+//     console.log(url)
+
+//     const candidate = await Candidate.findById(req.params.id);
+
+//     if (!candidate || !candidate._id) throw req.ykError("No candidate found!");
+//     console.log(candidate)
+
+//     let params = {};
+//     console.log(process.env.NODE_ENV )
+//     if (process.env.NODE_ENV !== "development") {
+//       params = {
+//         executablePath: "/usr/bin/chromium-browser",
+//       };
+//     }
+//     console.log("params",params)
+//     const logo = fs.readFileSync(path.join(__dirname, '../../../public/images/elements/mipie-footer.png'), { encoding: 'base64' });
+//     const browser = await puppeteer.launch(params);
+//     const page = await browser.newPage();
+//     await page.goto(url, { waitUntil: "networkidle2" });
+//     if (!fs.existsSync(path.join(__dirname, '../../../public/documents'))) {
+//       fs.mkdirSync(path.join(__dirname, '../../../public/documents'));
+//       console.log("directory created")
+//     }
+//     console.log("directory found")
+//     const data = await page.pdf({
+
+//       path: path.join(__dirname, `../../../public/documents/output${req.params.id}.pdf`),
+//       format: 'A4',
+//       displayHeaderFooter: true,
+//       preferCSSPageSize: true,
+//       headerTemplate: `
+//      <div style="display:flex;width:90%;font-size: 10px;padding: 5px 0;margin:auto;">
+//        <div style="width:25%;text-align:right"></div>
+//      </div>`,
+//       footerTemplate: `<footer style="margin: auto; width: 100%; border-top:1px solid #666;">
+//      <a href = "${baseUrl}">
+//      <img width="70%" height="auto" style="float: right; padding-right: 20px; padding-left: 36px; width: 25%" src="data:image/png;base64,${logo}" alt="Pivohub" />
+//      </a>
+//      </footer>`,
+//       margin: {
+//         top: '30px',
+//         bottom: '50px',
+//         right: '30px',
+//         left: '30px',
+//       },
+//     });
+//     await browser.close();
+
+//     if (!data) {
+//       throw req.ykError("Unable to create pdf1");
+//     }
+
+//     req.flash("success", "Create pdf successfully!");
+
+//     res.send({
+//       status: 200,
+//       uploadData: `${req.protocol}://${req.get("host")}/documents/output${req.params.id
+//         }.pdf`,
+//     });
+//   } catch (err) {
+//     console.log(err.message);
+//     req.flash("error", err.message || "Something went wrong!");
+//     return res.send({ status: false, err });
+//   }
+// });
+
 router.route("/createResume/:id").get(isCompany, authenti, async (req, res) => {
   try {
 
     let url = `${req.protocol}://${req.get("host")}/candidateForm/${req.session.user._id}/${req.params.id}`
+    console.log(url)
 
     const candidate = await Candidate.findById(req.params.id);
 
     if (!candidate || !candidate._id) throw req.ykError("No candidate found!");
+    console.log(candidate)
 
+    // Modify your code to use bundled Chromium in development
     let params = {};
     if (process.env.NODE_ENV !== "development") {
       params = {
-        executablePath: "/usr/bin/chromium-browser",
+        executablePath: "/usr/bin/google-chrome-stable",
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      };
+    } else {
+      // For local development, let Puppeteer use its bundled Chromium
+      params = {
+        headless: "new" // Use the new headless mode
       };
     }
-    const logo = fs.readFileSync(path.join(__dirname, '../../../public/images/elements/mipie-footer.png'), { encoding: 'base64' });
     const browser = await puppeteer.launch(params);
+    console.log("params", params)
+    const logo = fs.readFileSync(path.join(__dirname, '../../../public/images/elements/mipie-footer.png'), { encoding: 'base64' });
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle2" });
+    if (!fs.existsSync(path.join(__dirname, '../../../public/documents'))) {
+      fs.mkdirSync(path.join(__dirname, '../../../public/documents'));
+      console.log("directory created")
+    }
+    console.log("directory found")
     const data = await page.pdf({
+
       path: path.join(__dirname, `../../../public/documents/output${req.params.id}.pdf`),
       format: 'A4',
       displayHeaderFooter: true,
@@ -1411,7 +1848,6 @@ router.route("/createResume/:id").get(isCompany, authenti, async (req, res) => {
     return res.send({ status: false, err });
   }
 });
-
 router.route("/changeStatus").patch(isCompany, async (req, res) => {
   try {
     const updata = { $set: { status: req.body.status } };
@@ -1596,7 +2032,7 @@ router.post('/paymentStatus', [isCompany, authenti], async (req, res) => {
     _offer
   }
   let alreadyAllocated = await PaymentDetails.findOne({ paymentId, _company })
-  if(alreadyAllocated){
+  if (alreadyAllocated) {
     return res.status(400).send({ status: false, msg: 'Already Allocated!' })
   }
   console.log('coins allocation start', addPayment)
@@ -1805,7 +2241,7 @@ router.get('/nearbyCandidates', [isCompany], async (req, res) => {
     let state = await State.find({ countryId: "101", status: { $ne: false } });
     let company = await Company.findOne({ _concernPerson: req.companyUser }).select('_id')
     let today = moment().startOf('day').toDate()
-    let vacancies = await Vacancy.find({ _company: company._id, location: {$exists: true}, status: true, validity: {$gte: today} }).select('location title')
+    let vacancies = await Vacancy.find({ _company: company._id, location: { $exists: true }, status: true, validity: { $gte: today } }).select('location title')
     res.render(`${req.vPath}/app/corporate/nearbyCandidates`, {
       menu: "nearbyCandidates", skills, state, subQualification, qualification, jdLocation: vacancies
     });
@@ -1854,7 +2290,7 @@ router.get(
     if (subQualification) {
       filter["qualifications"] = { $elemMatch: { subQualification: new mongoose.Types.ObjectId(subQualification) } }
     }
-    if(jdLocation) {
+    if (jdLocation) {
       let loc = jdLocation.split(',')
       long = Number(loc[0])
       lat = Number(loc[1])
@@ -1928,13 +2364,13 @@ router.get('/notificationCount', [isCompany, authenti], async (req, res) => {
   }
 })
 
-router.get('/interested-candidates', isCompany, async(req , res)=>{
-  try{
+router.get('/interested-candidates', isCompany, async (req, res) => {
+  try {
     const company = await Company.findOne({
       _concernPerson: req.session.user._id,
     }).select("_id name companyExecutives")
 
-    let menu ='interested-candidates'
+    let menu = 'interested-candidates'
     let populate = [
       {
         path: '_job',
@@ -1942,37 +2378,72 @@ router.get('/interested-candidates', isCompany, async(req , res)=>{
       },
       {
         path: '_candidate',
-        select: 'name totalExperience highestQualification qualifications',
-        populate:[
+        select: 'name mobile email sex dob totalExperience highestQualification qualifications',
+        populate: [
           {
-          path: 'highestQualification',
-          select: 'name',
-          model:'Qualification'
-          },
-          {
-            path:'city',
-            select:'name'
-          },
-          {
-            path:'state',
-            select:'name'
+            path: 'highestQualification',
+            select: 'name',
+            model: 'Qualification'
           }]
       }
-    ];  
+    ];
 
     const p = parseInt(req.query.page);
     const page = p || 1;
     const perPage = 20;
 
-    let count = await AppliedJobs.countDocuments({_company:company._id})
-    const totalPages = Math.ceil(count / perPage); 
+    let count = await AppliedJobs.countDocuments({ _company: company._id })
+    const totalPages = Math.ceil(count / perPage);
     let appliedCandidates = await AppliedJobs.find({ _company: company._id })
       .populate(populate)
       .skip(perPage * page - perPage)
       .limit(perPage)
       .sort({ createdAt: -1 })
 
-    return res.render(`${req.vPath}/app/corporate/interestedCandidates.ejs`,{
+    
+    // अब हर candidate के लिए hiringStatus और masked flag जोड़ें
+    
+
+const appliedCandidatesWithMasked = await Promise.all(
+  appliedCandidates.map(async (applied) => {
+    const candidate = applied._candidate;
+    let masked = false;
+
+    if (!candidate) {
+      masked = true;
+    } else {
+      // isValid को function की तरह कॉल करें
+      const candidateId = mongoose.Types.ObjectId.isValid(candidate._id)
+        ? new mongoose.Types.ObjectId(candidate._id)
+        : candidate._id;
+
+      const companyId = mongoose.Types.ObjectId.isValid(company._id)
+        ? new mongoose.Types.ObjectId(company._id)
+        : company._id;
+
+      const hiringStatus = await HiringStatus.findOne({
+        candidate: candidateId,
+        company: companyId,
+        isDeleted: false
+      });
+
+      if (!hiringStatus) {
+        masked = true;
+      }
+    }
+
+    return {
+      ...applied.toObject ? applied.toObject() : applied,
+      masked
+    };
+  })
+);
+
+appliedCandidates = appliedCandidatesWithMasked;
+
+    
+
+    return res.render(`${req.vPath}/app/corporate/interestedCandidates.ejs`, {
       menu,
       appliedCandidates,
       company,
@@ -1980,7 +2451,7 @@ router.get('/interested-candidates', isCompany, async(req , res)=>{
       page
     })
   }
-  catch(err){
+  catch (err) {
     console.log(err)
     req.flash(err.message)
     return res.redirect("back")
@@ -2023,7 +2494,7 @@ router.get('/interested-candidates', isCompany, async(req , res)=>{
 //     return res.status(404).send({ status: false, message: "Candidate doesn't exist" })
 //   }
 //   const candidateStatus = await HiringStatus.create(hiringDetails)
-  
+
 //   if (!candidateStatus) {
 //     return res.status(400).send({ status: false, message: "Can't Update Candidate Hiring Status" })
 //   }

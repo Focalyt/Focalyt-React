@@ -10,13 +10,15 @@ const {
   City,
   Company,
   PaymentDetails,
-  Candidate,
   HiringStatus,
   Vacancy,
   AppliedJobs,
-  AppliedCourses
+  AppliedCourses,
+  QualificationCourse,
+EventType
 
 } = require('../../models');
+const Candidate = require('../../models/candidateProfile')
 const moment = require('moment')
 
 const appBannerRoutes = require('./appBanner');
@@ -41,6 +43,8 @@ const vacancyTypeRoutes = require('./vacancyType');
 const universityRoutes = require('./university');
 const stateRoutes = require('./states');
 const cityRoutes = require('./city');
+const crmStreamRoutes = require('./stream');
+const eventTypeRoutes = require('./eventType');
 // const { isAdmin } = require('../../../helpers');
 const miPieCoinsRoutes = require('./miPieCoins')
 const paymentRoutes = require('./payments')
@@ -64,6 +68,7 @@ const teamRoutes=require('./team')
 const eventRoutes = require('./events');
 const addCenterRoutes = require('./center');
 const addPortalAccessRoutes = require('./portalAccess');
+const addControlRoutes = require('./autoControl');
 
 const router = express.Router();
 router.use('/appBanner', appBannerRoutes);
@@ -78,6 +83,7 @@ router.use('/coverLetter', coverLetterRoutes);
 router.use('/jobCategory', jobCategoryRoutes);
 router.use('/jobSubCategory', jobSubCategoryRoutes);
 router.use('/qualification', qualificationRoutes);
+router.use('/stream' , crmStreamRoutes);
 router.use('/mockInterview', mockInterviewRoutes);
 router.use('/industry', industryRoutes);
 router.use('/skill', skillRoutes);
@@ -110,6 +116,8 @@ router.use('/team', teamRoutes);
 router.use('/event', eventRoutes);
 router.use('/center', addCenterRoutes);
 router.use('/portalaccess', addPortalAccessRoutes);
+router.use('/autocontrol', addControlRoutes);
+router.use('/eventType', eventTypeRoutes);
 
 // router.use(isAdmin);
 router.post ('/courses',async(req,res)=>{
@@ -127,7 +135,7 @@ router.get('/', async (req, res) => {
 
     if (userId) {
       loggedInUser = await User.findById(userId);
-      console.log("Logged In User Details:", loggedInUser);
+      
     }
 
 

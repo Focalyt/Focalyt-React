@@ -1,16 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import Course from '../../../../Layouts/App/College/ProjectManagement/Course';
+import Course from '../../../../Layouts/App/College/ProjectManagement copy/Course';
 
-const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerticals = null,selectedVertical = null }) => {
+const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerticals = null, selectedVertical = null }) => {
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
+    
+    // URL-based state management
+    const getURLParams = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        return {
+            stage: urlParams.get('stage') || 'center',
+            centerId: urlParams.get('centerId'),
+            centerName: urlParams.get('centerName'),
+            projectId: urlParams.get('projectId'),
+            projectName: urlParams.get('projectName'),
+            verticalId: urlParams.get('verticalId'),
+            verticalName: urlParams.get('verticalName'),
+            courseId: urlParams.get('courseId'),
+            courseName: urlParams.get('courseName')
+        };
+    };
+
+    const updateURL = (params) => {
+        const url = new URL(window.location);
+        
+        // Clear existing params
+        url.searchParams.delete('stage');
+        url.searchParams.delete('centerId');
+        url.searchParams.delete('centerName');
+        url.searchParams.delete('courseId');
+        url.searchParams.delete('courseName');
+        
+        // Set new params
+        Object.keys(params).forEach(key => {
+            if (params[key]) {
+                url.searchParams.set(key, params[key]);
+            }
+        });
+        
+        window.history.replaceState({}, '', url);
+    };
+
     const [activeCenterTab, setActiveCenterTab] = useState('Active Centers');
     const [searchQuery, setSearchQuery] = useState('');
     const [showAddForm, setShowAddForm] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
     const [editingCenter, setEditingCenter] = useState(null);
+    const [alignCenter, setShowAlignCenter] = useState(null);
+    const [selctedAlignCenter, setSelctedAlignCenter] = useState('');
     const [viewMode, setViewMode] = useState('grid');
     const [showShareModal, setShowShareModal] = useState(false);
     const [selectedCenter, setSelectedCenter] = useState(null);
@@ -29,18 +68,20 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         code: '',
         name: '',
         location: '',
-        address:'',
+        address: '',
         city: '',
         state: '',
         country: 'India',
         type: 'main',
         status: 'active',
         capacity: '',
-        project: selectedProject?._id || ''
+        project: selectedProject ? [selectedProject._id] : []
     });
 
     const [centers, setCenters] = useState([
 
+    ]);
+    const [allCenters, setallCenters] = useState([
     ]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -56,18 +97,16 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     }, [selectedProject]);
 
     useEffect(() => {
-       console.log(formData,"formData")
+        console.log(formData, "formData")
     }, [formData]);
 
     const filteredCenters = centers.filter(center => {
-        // Filter by selected project if provided
-        if (selectedProject && center.project !== selectedProject._id) return false;
+        // Check project array safely
 
-        // Filter by tab
+
         if (activeCenterTab === 'Active Centers' && center.status !== 'active') return false;
         if (activeCenterTab === 'Inactive Centers' && center.status !== 'inactive') return false;
 
-        // Filter by search query
         return center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             center.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
             center.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -96,12 +135,19 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         setShowAddForm(true);
     };
 
+    const handleAlign = () => {
+        setEditingCenter(null);
+        setShowAddForm(null);
+        resetForm();
+        setShowAlignCenter(true);
+    };
+
     const handleEdit = (center) => {
         setEditingCenter(center);
-        console.log('center',center)
+        console.log('center', center)
         setFormData({
             name: center.name,
-            address: center.address,           
+            address: center.address,
             status: center.status,
         });
         setShowEditForm(true);
@@ -113,36 +159,124 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     };
 
     const confirmDelete = async () => {
-  if (!centerToDelete) return;
+        if (!centerToDelete) return;
 
-  try {
- 
+        try {
 
-    const response = await fetch(`${backendUrl}/college/center_delete/${centerToDelete._id}`, {
-      method: 'DELETE',
-      headers: {
-        'x-auth': token,
-      },
-    });
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.message || 'Failed to delete center');
-    }
-fetchCenters()
-    setShowDeleteModal(false);
-    setCenterToDelete(null);
-  } catch (error) {
-    alert(error.message || 'Error deleting center');
-  }
-};
+            const response = await fetch(`${backendUrl}/college/center_delete/${centerToDelete._id}`, {
+                method: 'DELETE',
+                headers: {
+                    'x-auth': token,
+                },
+            });
 
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || 'Failed to delete center');
+            }
+            fetchCenters()
+            setShowDeleteModal(false);
+            setCenterToDelete(null);
+        } catch (error) {
+            alert(error.message || 'Error deleting center');
+        }
+    };
+    useEffect(() => {
+        // URL-based state restoration logic
+        const urlParams = getURLParams();
+        console.log('Center component - URL params:', urlParams);
+        
+        // Only restore state if centers are loaded
+        if (centers.length === 0) {
+            console.log('Centers not loaded yet, skipping state restoration');
+            return;
+        }
+        
+        if (urlParams.stage === "course" && urlParams.centerId) {
+            // Find center from current centers list
+            const center = centers.find(c => c._id === urlParams.centerId);
+            if (center) {
+                setSelectedCenterForCourses(center);
+                setShowCourses(true);
+                console.log('Restored to course view for center:', center.name);
+            } else {
+                // Center not found, reset to center view
+                console.warn('Center not found in current list, resetting to center view');
+                updateURL({ 
+                    stage: 'center',
+                    projectId: selectedProject?._id,
+                    projectName: selectedProject?.name,
+                    verticalId: selectedVertical?.id,
+                    verticalName: selectedVertical?.name
+                });
+                setShowCourses(false);
+            }
+        } else if (urlParams.stage === "batch") {
+            // For batch stage, we need to restore the full navigation context
+            if (urlParams.centerId) {
+                const center = centers.find(c => c._id === urlParams.centerId);
+                if (center) {
+                    setSelectedCenterForCourses(center);
+                    setShowCourses(true);
+                    console.log(`Restored to ${urlParams.stage} view with center:`, center.name);
+                } else {
+                    console.warn('Center not found, resetting to center view');
+                    updateURL({ 
+                        stage: 'center',
+                        projectId: selectedProject?._id,
+                        projectName: selectedProject?.name,
+                        verticalId: selectedVertical?.id,
+                        verticalName: selectedVertical?.name
+                    });
+                    setShowCourses(false);
+                }
+            } else {
+                console.warn('No center context found, resetting to center view');
+                updateURL({ 
+                    stage: 'center',
+                    projectId: selectedProject?._id,
+                    projectName: selectedProject?.name,
+                    verticalId: selectedVertical?.id,
+                    verticalName: selectedVertical?.name
+                });
+                setShowCourses(false);
+            }
+        } else {
+            // Default to center view
+            setShowCourses(false);
+            console.log('Restored to center view');
+        }
+    }, [centers, selectedProject, selectedVertical]); // Depend on centers, selectedProject, and selectedVertical
+
+    
+    useEffect(() => {
+        const urlParams = getURLParams();
+        if (urlParams.stage === 'course' && urlParams.centerId) {
+            // If the URL shows 'course' stage and a centerId, go to courses
+            const center = centers.find(c => c._id === urlParams.centerId);
+            if (center) {
+                setSelectedCenterForCourses(center);
+                setShowCourses(true);
+            }
+        } else {
+            // Default to 'center' stage
+            setShowCourses(false);
+        }
+    }, [centers]);
 
     useEffect(() => {
 
         fetchCenters();
 
     }, []);
+
+    useEffect(() => {
+
+        fetchAllCenters();
+        console.log('all centers', allCenters)
+
+    }, [alignCenter]);
 
     const fetchCenters = async () => {
         setLoading(true);
@@ -168,6 +302,32 @@ fetchCenters()
         }
     }
 
+    const fetchAllCenters = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await fetch(`${backendUrl}/college/list-centers`, {
+                headers: {
+                    'x-auth': token,
+                },
+            });
+            if (!response.ok) throw new Error('Failed to fetch centers');
+
+            const data = await response.json();
+            if (data.success) {
+                console.log('response', data)
+                setallCenters(data.data);
+            } else {
+                setError('Failed to load centers');
+            }
+
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+
     if (loading) return <p>Loading centers...</p>;
     if (error) return <p style={{ color: 'red' }}>{error}</p>;
 
@@ -175,15 +335,15 @@ fetchCenters()
 
 
     const handleSubmit = async () => {
-        if (!formData.name?.trim()) {
-            alert('Please fill in all required fields');
-            return;
-        }
+
 
         try {
 
 
+
             if (editingCenter) {
+
+
                 // Edit existing center (PUT)
                 const response = await fetch(`${backendUrl}/college/edit_center/${editingCenter._id}`, {
                     method: 'PUT',
@@ -201,7 +361,33 @@ fetchCenters()
 
                 fetchCenters()
                 setShowEditForm(false);
-            } else {
+            } else if (alignCenter) {
+
+                const response = await fetch(`${backendUrl}/college/asign_center/${selctedAlignCenter}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth': token,
+                    },
+                    body: JSON.stringify({ projectId: selectedProject._id }),
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.message || 'Failed to add center');
+                }
+                fetchCenters()
+                closeModal();
+                alert('Center aligned Successfully')
+
+
+            }
+            else {
+
+                if (!formData.name?.trim()) {
+                    alert('Please fill in all required fields');
+                    return;
+                }
                 // Add new center (POST)
                 const response = await fetch(`${backendUrl}/college/add_canter`, {
                     method: 'POST',
@@ -239,17 +425,39 @@ fetchCenters()
     const handleCenterClick = (center) => {
         setSelectedCenterForCourses(center);
         setShowCourses(true);
+
+        // Update URL with center and course stage
+        updateURL({
+            stage: 'course',
+            centerId: center._id,
+            centerName: center.name,
+            projectId: selectedProject?._id,
+            projectName: selectedProject?.name,
+            verticalId: selectedVertical?.id,
+            verticalName: selectedVertical?.name
+        });
     };
 
     // Function to go back to centers view
     const handleBackToCenters = () => {
         setShowCourses(false);
         setSelectedCenterForCourses(null);
+
+        // Update URL to center stage
+        updateURL({
+            stage: 'center',
+            projectId: selectedProject?._id,
+            projectName: selectedProject?.name,
+            verticalId: selectedVertical?.id,
+            verticalName: selectedVertical?.name
+        });
     };
 
     const closeModal = () => {
         setShowAddForm(false);
         setShowEditForm(false);
+        setShowAlignCenter(false);
+        setSelctedAlignCenter('')
         resetForm();
         setEditingCenter(null);
     };
@@ -340,7 +548,7 @@ fetchCenters()
                 </div> */}
 
                 {/* Course Component with filtered data */}
-                <Course selectedCenter={selectedCenterForCourses} />
+                <Course selectedCenter={selectedCenterForCourses} onBackToCenters={handleBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
             </div>
         );
     }
@@ -356,13 +564,13 @@ fetchCenters()
                     <div className="d-flex align-items-center gap-3">
 
                         <div className='d-flex align-items-center'>
-                            <h4 onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h4>
+                            <h4 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h4>
                             <span className="mx-2"> &gt; </span>
-                            <h5 onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+                            <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
                                 {selectedProject.name} Project
                             </h5>
                             <span className="mx-2"> &gt; </span>
-                            <h5  className="breadcrumb-item mb-0" aria-current="page">
+                            <h5 className="breadcrumb-item mb-0" aria-current="page">
                                 Centers
                             </h5>
                         </div>
@@ -373,7 +581,7 @@ fetchCenters()
                     {onBackToProjects && (
                         <button
                             onClick={onBackToProjects}
-                            className="btn btn-light"
+                            className="btn btn-light me-2"
                             title="Back to Verticals"
                         >
                             <i className="bi bi-arrow-left"></i>
@@ -386,7 +594,8 @@ fetchCenters()
                     <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
                         <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
                     </button>
-                    <button className="btn btn-primary" onClick={handleAdd}>Add Center</button>
+                    <button className="btn btn-primary me-2" onClick={handleAlign}>Align Exsting Center</button>
+                    <button className="btn btn-primary" onClick={handleAdd}>Add New Center</button>
                 </div>
             </div>
 
@@ -535,62 +744,95 @@ fetchCenters()
             )}
 
             {/* Add/Edit Modal */}
-            {(showAddForm || showEditForm) && (
+            {(showAddForm || showEditForm || alignCenter) && (
                 <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                     <div className="modal-dialog modal-dialog-centered modal-lg">
                         <div className="modal-content">
                             <div className="modal-header text-success text-white">
-                                <h5 className="modal-title">{editingCenter ? 'Edit Center' : 'Add New Center'}</h5>
+                                <h5 className="modal-title">
+                                    {alignCenter
+                                        ? 'Align Existing Center'
+                                        : editingCenter
+                                            ? 'Edit Center'
+                                            : 'Add New Center'}
+                                </h5>
                                 <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
                             </div>
-                            <div className="modal-body">
-                                <div className="row">
-                                    <div className="col-md-6 mb-3">
-                                        <label className="form-label">Center Name *</label>
+                            {alignCenter ?
+                                <div className="modal-body">
+                                    <div className="row">
+
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Select Centers</label>
+                                            <select
+                                                className="form-select"
+                                                value={selctedAlignCenter}
+                                                onChange={(e) => setSelctedAlignCenter(e.target.value)}
+                                            >
+                                                <option value="" disabled>
+                                                    Select Center
+                                                </option>
+                                                {allCenters.map(center => (
+                                                    <option key={center._id} value={center._id}>
+                                                        {center.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+
+                                        </div>
+                                    </div>
+                                </div> :
+                                <div className="modal-body">
+                                    <div className="row">
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Center Name *</label>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                                                placeholder="Enter center name"
+                                            />
+                                        </div>
+
+                                    </div>
+
+
+                                    <div className="mb-3">
+                                        <label className="form-label">Location/Address</label>
                                         <input
                                             type="text"
                                             className="form-control"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                                            placeholder="Enter center name"
+                                            value={formData.address}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                                            placeholder="Enter location or address"
                                         />
                                     </div>
 
-                                </div>
+                                    <div className="row">
 
-
-                                <div className="mb-3">
-                                    <label className="form-label">Location/Address</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        value={formData.address}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                                        placeholder="Enter location or address"
-                                    />
-                                </div>
-
-                                <div className="row">
-
-                                    <div className="col-md-6 mb-3">
-                                        <label className="form-label">Status</label>
-                                        <select
-                                            className="form-select"
-                                            value={formData.status}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                                        >
-                                            <option value="active">Active</option>
-                                            <option value="inactive">Inactive</option>
-                                        </select>
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Status</label>
+                                            <select
+                                                className="form-select"
+                                                value={formData.status}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                                            >
+                                                <option value="active">Active</option>
+                                                <option value="inactive">Inactive</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
+                                </div>}
+
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={closeModal}>
                                     Cancel
                                 </button>
                                 <button type="button" className="btn btn-success" onClick={handleSubmit}>
-                                    {editingCenter ? 'Update Center' : 'Add Center'}
+                                    {alignCenter
+                                        ? 'Align Center'
+                                        : editingCenter ? 'Update Center' : 'Add Center'}
                                 </button>
                             </div>
                         </div>

@@ -7,6 +7,7 @@ const subQualificationSchema = new Schema({
     type: String, lowercase: false, trim: true,
   },
   _qualification: { type: ObjectId, ref: 'Qualification' },
+  _course: { type: ObjectId, ref: 'courses' },
   subStream : {type : String , trim: true},
   status: {
     type: Boolean,
