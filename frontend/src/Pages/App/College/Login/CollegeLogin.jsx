@@ -38,14 +38,15 @@ const CollegeLogin = () => {
     const logoUrl = "/Assets/images/logo/logo.png";
 
     useEffect(() => {
-        if (userData.role === 2) {
+        console.log('userData', userData)
+        if (userData?.role === 2) {
             if (returnUrl) {
                 navigate(returnUrl);
             } else {
                 navigate('/institute/dashboard');
             }
         }
-    }, [userData, returnUrl]);
+    }, [userData]);
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const loginBtnRef = useRef(null);
