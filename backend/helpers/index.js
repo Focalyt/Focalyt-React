@@ -542,7 +542,6 @@ module.exports.getAllTeamMembers = async (userId, allUserIds = []) => {
       return allUserIds;
     }
 
-    console.log('getAllTeamMembers called for', userIdStr);
 
     // Find the user by userId and populate their 'my_team' field to get their team members
     const user = await User.findById(userId).populate('my_team');

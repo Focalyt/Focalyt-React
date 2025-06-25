@@ -21,13 +21,18 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentEndMonth, setCurrentEndMonth] = useState(new Date());
 
+  // Helper function to format date as YYYY-MM-DD without timezone issues
+  const formatDateToYYYYMMDD = (date) => {
+    return date.getFullYear() + '-' +
+      String(date.getMonth() + 1).padStart(2, '0') + '-' +
+      String(date.getDate()).padStart(2, '0');
+  };
+
   const dateRanges = [
     { id: 'today', label: 'Today' },
     { id: 'yesterday', label: 'Yesterday' },
     { id: 'todayYesterday', label: 'Today and yesterday' },
     { id: 'last7', label: 'Last 7 days' },
-    { id: 'last14', label: 'Last 14 days' },
-    { id: 'last28', label: 'Last 28 days' },
     { id: 'last30', label: 'Last 30 days' },
     { id: 'thisWeek', label: 'This week' },
     { id: 'lastWeek', label: 'Last week' },
@@ -64,12 +69,6 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
       case 'last7':
         startDate.setDate(today.getDate() - 6);
         break;
-      case 'last14':
-        startDate.setDate(today.getDate() - 13);
-        break;
-      case 'last28':
-        startDate.setDate(today.getDate() - 27);
-        break;
       case 'last30':
         startDate.setDate(today.getDate() - 29);
         break;
@@ -100,8 +99,8 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
     }
 
     return {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0]
+      startDate: formatDateToYYYYMMDD(startDate),
+      endDate: formatDateToYYYYMMDD(endDate)
     };
   };
 
@@ -295,7 +294,16 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
             </div>
           </div>
 
-          <div className="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
+          <div
+            className="d-flex justify-content-end gap-2 mt-3 pt-3 border-top"
+            style={{
+              position: 'sticky',
+              bottom: 0,
+              background: '#fff',
+              zIndex: 10,
+              paddingBottom: '1rem'
+            }}
+          >
             <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button className="btn btn-primary" onClick={handleUpdate}>Update</button>
           </div>
@@ -313,6 +321,7 @@ const LeadAnalyticsDashboard = () => {
   // Initialize with today's date
   const getInitialDates = () => {
     const today = new Date();
+    // Use the same reliable date formatting method
     const todayStr = today.getFullYear() + '-' +
       String(today.getMonth() + 1).padStart(2, '0') + '-' +
       String(today.getDate()).padStart(2, '0');
@@ -348,8 +357,15 @@ const LeadAnalyticsDashboard = () => {
     // Calculate days difference
     const daysDiff = Math.floor((endDateObj - startDateObj) / (1000 * 60 * 60 * 24)) + 1;
     
+    // Helper function to format date as YYYY-MM-DD without timezone issues
+    const formatDateToYYYYMMDD = (date) => {
+      return date.getFullYear() + '-' +
+        String(date.getMonth() + 1).padStart(2, '0') + '-' +
+        String(date.getDate()).padStart(2, '0');
+    };
+    
     // Try to match with predefined periods
-    if (daysDiff === 1 && dateRange.startDate === today.toISOString().split('T')[0]) {
+    if (daysDiff === 1 && dateRange.startDate === formatDateToYYYYMMDD(today)) {
       setSelectedPeriod('today');
       setUseCustomDate(false);
     } else if (daysDiff === 7) {
@@ -390,31 +406,44 @@ const LeadAnalyticsDashboard = () => {
           return;
         }
   
-        // Replace with your actual profile API endpoint
-          const response = await axios.get(`${backendUrl}/college/appliedCandidates`, {
-            headers: {
+        // Build query parameters for date filtering
+        let queryParams = {};
+        
+        if (useCustomDate && startDate && endDate) {
+          // Custom date range
+          queryParams.startDate = startDate;
+          queryParams.endDate = endDate;
+        } else if (!useCustomDate && selectedPeriod && selectedPeriod !== 'all') {
+          // Predefined period
+          queryParams.period = selectedPeriod;
+        }
+        // If no date filter is selected, send no parameters (will return all data)
+  
+        // Use the new dashboard API with date filtering
+        const response = await axios.get(`${backendUrl}/college/dashbord-data`, {
+          headers: {
             'x-auth': token,
           },
+          params: queryParams
         });
-        console.log('Backend profile data:', response.data);
+        
+        console.log('Backend dashboard data:', response.data);
         if (response.data.success && response.data.data) {
-          const data = response.data; // create array
-          setAppliedCoursesData(data.data || [])
-  
+          setAppliedCoursesData(response.data.data || []);
         } else {
-          console.error('Failed to fetch profile data', response.data.message);
+          console.error('Failed to fetch dashboard data', response.data.message);
           setAppliedCoursesData([]);
         }
   
       } catch (error) {
-        console.error('Error fetching profile data:', error);
+        console.error('Error fetching dashboard data:', error);
         setAppliedCoursesData([]);
       } finally {
         setIsLoading(false);
       }
     };
     fetchProfileData();
-  }, [token, backendUrl]);
+  }, [token, backendUrl, startDate, endDate, selectedPeriod, useCustomDate]);
 
   useEffect(() => {
     console.log(appliedCoursesData, 'appliedCoursesData')
@@ -426,182 +455,15 @@ const LeadAnalyticsDashboard = () => {
     appliedCoursesData[0]._leadStatus.substatuses = [{ title: 'Test Substatus' }];
   }
 
-  // Filter data based on selected period
-  const filterDataByPeriod = (data) => {
-    if (!data || !Array.isArray(data)) return [];
-    if (!useCustomDate && selectedPeriod === 'all') return data;
-    
-    const now = new Date();
-    let startDateFilter = new Date();
-    let endDateFilter = new Date();
-    
-    if (useCustomDate && startDate && endDate) {
-      // Use custom date range
-      startDateFilter = new Date(startDate);
-      endDateFilter = new Date(endDate);
-      endDateFilter.setHours(23, 59, 59, 999); // Include the entire end date
-    } else if (useCustomDate && (!startDate || !endDate)) {
-      // If custom date is selected but dates are incomplete, return all data
-      return data;
-    } else {
-      // Use predefined periods
-      switch (selectedPeriod) {
-        case 'today':
-          startDateFilter.setHours(0, 0, 0, 0);
-          endDateFilter = new Date(startDateFilter);
-          endDateFilter.setHours(23, 59, 59, 999);
-          break;
-        case 'yesterday':
-          startDateFilter = new Date(now);
-          startDateFilter.setDate(startDateFilter.getDate() - 1);
-          startDateFilter.setHours(0, 0, 0, 0);
-          endDateFilter = new Date(startDateFilter);
-          endDateFilter.setHours(23, 59, 59, 999);
-          break;
-        case 'todayYesterday':
-          startDateFilter = new Date(now);
-          startDateFilter.setDate(startDateFilter.getDate() - 1);
-          startDateFilter.setHours(0, 0, 0, 0);
-          endDateFilter = now;
-          break;
-        case 'last7':
-          startDateFilter.setDate(now.getDate() - 6);
-          endDateFilter = now;
-          break;
-        case 'last14':
-          startDateFilter.setDate(now.getDate() - 13);
-          endDateFilter = now;
-          break;
-        case 'last28':
-          startDateFilter.setDate(now.getDate() - 27);
-          endDateFilter = now;
-          break;
-        case 'last30':
-          startDateFilter.setDate(now.getDate() - 29);
-          endDateFilter = now;
-          break;
-        case 'thisWeek':
-          startDateFilter = new Date(now);
-          startDateFilter.setDate(now.getDate() - now.getDay());
-          startDateFilter.setHours(0, 0, 0, 0);
-          endDateFilter = now;
-          break;
-        case 'lastWeek':
-          startDateFilter = new Date(now);
-          startDateFilter.setDate(now.getDate() - now.getDay() - 7);
-          startDateFilter.setHours(0, 0, 0, 0);
-          endDateFilter = new Date(now);
-          endDateFilter.setDate(now.getDate() - now.getDay() - 1);
-          endDateFilter.setHours(23, 59, 59, 999);
-          break;
-        case 'thisMonth':
-          startDateFilter = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDateFilter = now;
-          break;
-        case 'lastMonth':
-          startDateFilter = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          endDateFilter = new Date(now.getFullYear(), now.getMonth(), 0);
-          endDateFilter.setHours(23, 59, 59, 999);
-          break;
-        case 'week':
-          startDateFilter.setDate(now.getDate() - 7);
-          endDateFilter = now;
-          break;
-        case 'month':
-          startDateFilter.setDate(now.getDate() - 30);
-          endDateFilter = now;
-          break;
-        case 'quarter':
-          startDateFilter.setMonth(now.getMonth() - 3);
-          endDateFilter = now;
-          break;
-        case 'year':
-          startDateFilter.setFullYear(now.getFullYear() - 1);
-          endDateFilter = now;
-          break;
-        case 'maximum':
-          startDateFilter = new Date('2020-01-01');
-          endDateFilter = now;
-          break;
-        default:
-          return data;
-      }
-    }
-    
-    return data.filter(lead => {
-      if (!lead || !lead.createdAt) return false;
-      const leadDate = new Date(lead.createdAt);
-      return leadDate >= startDateFilter && leadDate <= endDateFilter;
-    });
-  };
+  // Data is now filtered by backend, so we use it directly
+  const filteredData = appliedCoursesData;
   
   // Get daily admissions data
   const getDailyAdmissions = () => {
     const admissionsByDate = {};
     
-    // First apply date filter on admission date
-    let admissionsToProcess = appliedCoursesData.filter(lead => lead && lead.admissionDone && lead.admissionDate);
-    
-    if (useCustomDate && startDate && endDate) {
-      const startDateFilter = new Date(startDate);
-      const endDateFilter = new Date(endDate);
-      endDateFilter.setHours(23, 59, 59, 999);
-      
-      admissionsToProcess = admissionsToProcess.filter(lead => {
-        if (!lead.admissionDate) return false;
-        const admissionDate = new Date(lead.admissionDate);
-        return admissionDate >= startDateFilter && admissionDate <= endDateFilter;
-      });
-    } else if (useCustomDate && (!startDate || !endDate)) {
-      // If custom date is selected but incomplete, show all admissions
-      // admissionsToProcess remains unchanged
-    } else if (selectedPeriod !== 'all') {
-      const now = new Date();
-      let startDateFilter = new Date();
-      
-      switch (selectedPeriod) {
-        case 'today':
-          startDateFilter.setHours(0, 0, 0, 0);
-          admissionsToProcess = admissionsToProcess.filter(lead => {
-            if (!lead.admissionDate) return false;
-            const admissionDate = new Date(lead.admissionDate);
-            return admissionDate >= startDateFilter;
-          });
-          break;
-        case 'week':
-          startDateFilter.setDate(now.getDate() - 7);
-          admissionsToProcess = admissionsToProcess.filter(lead => {
-            if (!lead.admissionDate) return false;
-            const admissionDate = new Date(lead.admissionDate);
-            return admissionDate >= startDateFilter;
-          });
-          break;
-        case 'month':
-          startDateFilter.setMonth(now.getMonth() - 1);
-          admissionsToProcess = admissionsToProcess.filter(lead => {
-            if (!lead.admissionDate) return false;
-            const admissionDate = new Date(lead.admissionDate);
-            return admissionDate >= startDateFilter;
-          });
-          break;
-        case 'quarter':
-          startDateFilter.setMonth(now.getMonth() - 3);
-          admissionsToProcess = admissionsToProcess.filter(lead => {
-            if (!lead.admissionDate) return false;
-            const admissionDate = new Date(lead.admissionDate);
-            return admissionDate >= startDateFilter;
-          });
-          break;
-        case 'year':
-          startDateFilter.setFullYear(now.getFullYear() - 1);
-          admissionsToProcess = admissionsToProcess.filter(lead => {
-            if (!lead.admissionDate) return false;
-            const admissionDate = new Date(lead.admissionDate);
-            return admissionDate >= startDateFilter;
-          });
-          break;
-      }
-    }
+    // Use filtered data from backend and apply center filter
+    let admissionsToProcess = filteredData.filter(lead => lead && lead.admissionDone && lead.admissionDate);
     
     // Apply center filter if selected
     if (selectedCenter !== 'all') {
@@ -654,9 +516,6 @@ const LeadAnalyticsDashboard = () => {
     return sortedAdmissions;
   };
   
-  // Apply period filter to main data
-  const filteredData = filterDataByPeriod(appliedCoursesData);
-
   // Get counselor-status matrix from actual data
   const [expandedStatus, setExpandedStatus] = useState(null);
   const [allStatuses, setAllStatuses] = useState([]);
@@ -756,7 +615,13 @@ const LeadAnalyticsDashboard = () => {
   const getCenterAnalytics = () => {
     const centerData = {};
     
-    filteredData.forEach(lead => {
+    // Apply center filter if selected
+    let dataToProcess = filteredData;
+    if (selectedCenter !== 'all') {
+      dataToProcess = filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
+    }
+    
+    dataToProcess.forEach(lead => {
       const centerName = lead._center?.name || 'Unknown';
       
       if (!centerData[centerName]) {
@@ -769,22 +634,18 @@ const LeadAnalyticsDashboard = () => {
           dropouts: 0,
           revenue: 0,
           counselors: {},
-          statusCounts: {},
-          hot: 0,
-          warm: 0,
-          cold: 0
+          statusCounts: {}
         };
       }
       
       centerData[centerName].totalLeads++;
-      const statusKey = (lead._leadStatus?.title || 'Unknown').toLowerCase();
-      centerData[centerName].statusCounts[statusKey] = (centerData[centerName].statusCounts[statusKey] || 0) + 1;
       
-      // Count by status type
+      // Count by actual status from database
       const status = (lead._leadStatus?.title || 'Unknown').trim();
-      if (status === 'Hot') centerData[centerName].hot++;
-      else if (status === 'Warm') centerData[centerName].warm++;
-      else if (status === 'Cold') centerData[centerName].cold++;
+      if (!centerData[centerName].statusCounts[status]) {
+        centerData[centerName].statusCounts[status] = 0;
+      }
+      centerData[centerName].statusCounts[status]++;
       
       if (lead.courseStatus === 1) centerData[centerName].assigned++;
       else centerData[centerName].due++;
@@ -824,7 +685,13 @@ const LeadAnalyticsDashboard = () => {
     let missedFollowups = 0;
     let plannedFollowups = 0;
     
-    filteredData.forEach(lead => {
+    // Apply center filter if selected
+    let dataToProcess = filteredData;
+    if (selectedCenter !== 'all') {
+      dataToProcess = filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
+    }
+    
+    dataToProcess.forEach(lead => {
       if (lead && lead.followups && Array.isArray(lead.followups) && lead.followups.length > 0) {
         lead.followups.forEach(followup => {
           if (followup && followup.status) {
@@ -852,12 +719,40 @@ const LeadAnalyticsDashboard = () => {
     dropoutRate: parseFloat(data.DropoutRate)
   }));
 
-  const statusDistribution = [
-    { name: 'Hot', value: Object.values(counselorMatrix).reduce((sum, c) => sum + c.Hot, 0) },
-    { name: 'Warm', value: Object.values(counselorMatrix).reduce((sum, c) => sum + c.Warm, 0) },
-    { name: 'Cold', value: Object.values(counselorMatrix).reduce((sum, c) => sum + c.Cold, 0) }
-  ];
+  // Create status distribution from actual data
+  const statusCounts = {};
   
+  // Apply center filter if selected
+  let dataToProcess = filteredData;
+  if (selectedCenter !== 'all') {
+    dataToProcess = filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
+  }
+  
+  dataToProcess.forEach(lead => {
+    const status = (lead._leadStatus?.title || 'Unknown').trim();
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+  });
+
+  const statusDistribution = Object.entries(statusCounts).map(([status, count]) => ({
+    name: status,
+    value: count
+  }));
+
+  // Generate colors for different statuses
+  const generateColors = (statuses) => {
+    const colorPalette = [
+      '#dc2626', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', 
+      '#ef4444', '#f97316', '#06b6d4', '#84cc16', '#ec4899'
+    ];
+    const colors = {};
+    statuses.forEach((status, index) => {
+      colors[status] = colorPalette[index % colorPalette.length];
+    });
+    return colors;
+  };
+
+  const colors = generateColors(statusDistribution.map(s => s.name));
+
   // Prepare daily admissions chart data (last 7 days)
   const admissionTrendData = dailyAdmissions.slice(0, 7).reverse().map(day => ({
     date: day.date,
@@ -865,22 +760,57 @@ const LeadAnalyticsDashboard = () => {
     revenue: day.revenue / 1000 // in thousands
   }));
 
-  const colors = {
-    Hot: '#dc2626',
-    Warm: '#f59e0b',
-    Cold: '#3b82f6'
-  };
-
   function getSubstatusTotal(data, status, substatuses) {
     if (!data[status] || !data[status].substatuses) return 0;
     return substatuses.reduce((sum, sub) => sum + (data[status].substatuses[sub] || 0), 0);
   }
 
+  const getCourseWiseDocStats = () => {
+    const courseStats = {};
+    filteredData.forEach(lead => {
+      const courseName = lead._course?.name || 'Unknown';
+      if (!courseStats[courseName]) {
+        courseStats[courseName] = {
+          totalLeads: 0,
+          docsPending: 0,
+          docsVerified: 0
+        };
+      }
+      courseStats[courseName].totalLeads++;
+      // Count docs for this lead
+      if (Array.isArray(lead.uploadedDocs)) {
+        lead.uploadedDocs.forEach(doc => {
+          if (doc.status === 'Verified') courseStats[courseName].docsVerified++;
+          else if (doc.status === 'Pending' || doc.status === 'Not Uploaded') courseStats[courseName].docsPending++;
+        });
+      }
+    });
+    return courseStats;
+  };
+
+  const getCourseWisePendingDocs = () => {
+    const courseDocs = {};
+    filteredData.forEach(lead => {
+      const courseName = lead._course?.name || 'Unknown';
+      if (!courseDocs[courseName]) courseDocs[courseName] = {};
+      if (Array.isArray(lead.uploadedDocs)) {
+        lead.uploadedDocs.forEach(doc => {
+          if (doc.status === 'Pending' || doc.status === 'Not Uploaded') {
+            const docName = doc.Name || 'Unknown Document';
+            if (!courseDocs[courseName][docName]) courseDocs[courseName][docName] = 0;
+            courseDocs[courseName][docName]++;
+          }
+        });
+      }
+    });
+    return courseDocs;
+  };
+
   return (
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
       <div className="mb-4">
-        <h1 className="display-5 fw-bold text-dark mb-2">Lead Analytics Dashboard</h1>
+        <h1 className="display-5 fw-bold text-dark mb-2">Dashboard</h1>
         <p className="text-muted">Real-time analytics based on Applied Courses data</p>
       </div>
 
@@ -937,8 +867,6 @@ const LeadAnalyticsDashboard = () => {
                             !useCustomDate && selectedPeriod === 'yesterday' ? 'Yesterday' :
                             !useCustomDate && selectedPeriod === 'todayYesterday' ? 'Today and yesterday' :
                             !useCustomDate && selectedPeriod === 'last7' ? 'Last 7 days' :
-                            !useCustomDate && selectedPeriod === 'last14' ? 'Last 14 days' :
-                            !useCustomDate && selectedPeriod === 'last28' ? 'Last 28 days' :
                             !useCustomDate && selectedPeriod === 'last30' ? 'Last 30 days' :
                             !useCustomDate && selectedPeriod === 'thisWeek' ? 'This week' :
                             !useCustomDate && selectedPeriod === 'lastWeek' ? 'Last week' :
@@ -989,8 +917,7 @@ const LeadAnalyticsDashboard = () => {
                   selectedPeriod === 'yesterday' ? 'Yesterday' :
                   selectedPeriod === 'todayYesterday' ? 'Today and yesterday' :
                   selectedPeriod === 'last7' ? 'Last 7 days' :
-                  selectedPeriod === 'last14' ? 'Last 14 days' :
-                  selectedPeriod === 'last28' ? 'Last 28 days' :
+                  selectedPeriod === 'last30' ? 'Last 30 days' :
                   selectedPeriod === 'thisWeek' ? 'This week' :
                   selectedPeriod === 'lastWeek' ? 'Last week' :
                   selectedPeriod === 'thisMonth' ? 'This month' :
@@ -1027,8 +954,6 @@ const LeadAnalyticsDashboard = () => {
                     : selectedPeriod === 'yesterday' ? 'Yesterday'
                     : selectedPeriod === 'todayYesterday' ? 'Today and yesterday'
                     : selectedPeriod === 'last7' ? 'Last 7 Days'
-                    : selectedPeriod === 'last14' ? 'Last 14 Days' 
-                    : selectedPeriod === 'last28' ? 'Last 28 Days'
                     : selectedPeriod === 'last30' ? 'Last 30 Days'
                     : selectedPeriod === 'thisWeek' ? 'This Week'
                     : selectedPeriod === 'lastWeek' ? 'Last Week'
@@ -1310,6 +1235,64 @@ const LeadAnalyticsDashboard = () => {
             </div>
           </div>
 
+          {/* Course-wise Document Status Table */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <h2 className="h5 fw-semibold mb-4">Course-wise Document Status</h2>
+              <div className="table-responsive">
+                <table className="table table-hover align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Course</th>
+                      <th>Total Leads</th>
+                      <th>Docs Pending</th>
+                      <th>Docs Verified</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(getCourseWiseDocStats()).map(([course, stats]) => (
+                      <tr key={course}>
+                        <td>{course}</td>
+                        <td>{stats.totalLeads}</td>
+                        <td>{stats.docsPending}</td>
+                        <td>{stats.docsVerified}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Course-wise Pending Documents Table */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <h2 className="h5 fw-semibold mb-4">Course-wise Pending Documents</h2>
+              <div className="table-responsive">
+                <table className="table table-hover align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Course</th>
+                      <th>Document Name</th>
+                      <th>Pending in Leads</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(getCourseWisePendingDocs()).map(([course, docs]) =>
+                      Object.entries(docs).map(([docName, count], idx) => (
+                        <tr key={course + docName}>
+                          <td>{idx === 0 ? course : ''}</td>
+                          <td>{docName}</td>
+                          <td>{count}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           {/* Center-wise Analytics */}
           <div className="card shadow-sm mb-4">
             <div className="card-body">
@@ -1339,21 +1322,50 @@ const LeadAnalyticsDashboard = () => {
                           <p className="text-danger small">{data.dropouts} dropouts</p>
                         </div>
                       </div>
-                      
-                      <div className="mb-3">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <span className="text-muted small">Lead Distribution:</span>
+
+                      {/* Center-wise Bar Chart */}
+                      <div className="row g-3 mb-3">
+                        <div className="col-12">
+                          <ResponsiveContainer width="100%" height={180}>
+                            <BarChart data={[
+                              { name: 'Leads', value: data.totalLeads },
+                              { name: 'Admissions', value: data.admissions },
+                              { name: 'Dropouts', value: data.dropouts },
+                              { name: 'KYC', value: data.kyc },
+                              { name: 'Revenue', value: data.revenue }
+                            ]}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="value" fill="#6366f1" />
+                            </BarChart>
+                          </ResponsiveContainer>
                         </div>
-                        <div className="d-flex gap-2">
-                          <div className="flex-fill bg-danger bg-opacity-10 rounded p-2 text-center">
-                            <span className="small fw-medium text-danger">Hot: {data.hot}</span>
-                          </div>
-                          <div className="flex-fill bg-warning bg-opacity-10 rounded p-2 text-center">
-                            <span className="small fw-medium text-warning">Warm: {data.warm}</span>
-                          </div>
-                          <div className="flex-fill bg-primary bg-opacity-10 rounded p-2 text-center">
-                            <span className="small fw-medium text-primary">Cold: {data.cold}</span>
-                          </div>
+                      </div>
+
+                      {/* Center-wise Pie Chart for Status Distribution */}
+                      <div className="row g-3 mb-3">
+                        <div className="col-12">
+                          <ResponsiveContainer width="100%" height={180}>
+                            <PieChart>
+                              <Pie
+                                data={Object.entries(data.statusCounts).map(([status, count]) => ({ name: status, value: count }))}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                outerRadius={60}
+                                fill="#8884d8"
+                                dataKey="value"
+                              >
+                                {Object.keys(data.statusCounts).map((status, idx) => (
+                                  <Cell key={status} fill={["#10b981", "#f59e0b", "#ef4444", "#6366f1", "#3b82f6", "#8b5cf6", "#84cc16", "#ec4899"][idx % 8]} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                            </PieChart>
+                          </ResponsiveContainer>
                         </div>
                       </div>
                       

@@ -314,33 +314,315 @@ router.route("/register")
 			return res.send({ status: false, error: err.message });
 		}
 	});
-router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
+
+
+
+// router.route("/appliedCandidates").get(isCollege, async (req, res) => {
+
+// 	try {
+// 		console.log('====================>!api called')
+// 		const user = req.user;
+// 		const teamMembers = await getAllTeamMembers(user._id);
+// 		console.log('teamMembers', teamMembers)
+// 		const college = await College.findOne({
+// 			'_concernPerson._id': user._id
+// 		});
+
+// 		const page = parseInt(req.query.page) || 1;      // Default page 1
+// 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+// 		const skip = (page - 1) * limit;
+
+// 		let appliedCourses = [];
+
+// 		for (const member of teamMembers) {
+// 			const response = await AppliedCourses.find({
+// 				kycStage: { $nin: [true] },
+// 				kyc: { $nin: [true] },
+// 				admissionDone: { $nin: [true] },
+// 				$or: [
+// 					// registeredBy field se match (single member ke liye)
+// 					{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
+
+// 					// leadAssignment ke last element ki _id se match
+// 					{
+// 						$expr: {
+// 							$eq: [
+// 								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+// 								member
+// 							]
+// 						}
+// 					}
+// 				]
+// 			})
+// 				.populate({
+// 					path: '_course',
+// 					populate: [
+// 						{
+// 							path: 'sectors',
+// 							select: 'name'
+// 						},
+// 						{
+// 							path: 'vertical',
+// 							select: 'name'  // Add the fields you want to populate from the `vertical` path
+// 						},
+// 						{
+// 							path: 'project',
+// 							select: 'name'  // Add the fields you want to populate from the `project` path
+// 						}
+// 					]
+// 				})
+// 				.populate('_leadStatus')
+// 				.populate('_center')
+// 				.populate('registeredBy')
+// 				.populate({
+// 					path: '_candidate',
+// 					populate: [
+// 						{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+// 					]
+// 				})
+// 				.populate({
+// 					path: 'logs',
+// 					populate: {
+// 						path: 'user',
+// 						select: 'name'
+// 					}
+// 				})
+// 				.sort({ createdAt: -1 })
+
+
+// 			response.forEach(doc => {
+// 				if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
+// 					appliedCourses.push(doc);
+// 				}
+// 			});
+// 		}
+
+// 		const filteredAppliedCourses = appliedCourses.filter(doc => {
+// 			// _course must be populated!
+// 			return doc._course && String(doc._course.college) === String(college._id);
+// 		});
+
+// 		const results = filteredAppliedCourses.map(doc => {
+// 			let selectedSubstatus = null;
+
+// 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+// 				selectedSubstatus = doc._leadStatus.substatuses.find(
+// 					sub => sub._id.toString() === doc._leadSubStatus.toString()
+// 				);
+// 			}
+
+// 			const docObj = doc.toObject();
+
+// 			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+// 			if (docObj._course) {
+// 				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+// 			}
+
+// 			const requiredDocs = docObj._course?.docsRequired || [];
+// 			const uploadedDocs = docObj.uploadedDocs || [];
+
+// 			// Map uploaded docs by docsId for quick lookup
+// 			const uploadedDocsMap = {};
+// 			uploadedDocs.forEach(d => {
+// 				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+// 			});
+
+// 			// Prepare combined docs array
+// 			const allDocs = requiredDocs.map(reqDoc => {
+// 				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+// 				if (uploadedDoc) {
+// 					// Agar uploaded hai to uploadedDoc details bhejo
+// 					return {
+// 						...uploadedDoc,
+// 						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+// 						mandatory: reqDoc.mandatory,
+// 						_id: reqDoc._id
+// 					};
+// 				} else {
+// 					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+// 					return {
+// 						docsId: reqDoc._id,
+// 						Name: reqDoc.Name,
+// 						mandatory: reqDoc.mandatory,
+// 						status: "Not Uploaded",
+// 						fileUrl: null,
+// 						reason: null,
+// 						verifiedBy: null,
+// 						verifiedDate: null,
+// 						uploadedAt: null
+// 					};
+// 				}
+// 			});
+
+// 			if (requiredDocs) {
+// 				docsRequired = requiredDocs
+
+// 				// Create a merged array with both required docs and uploaded docs info
+// 				combinedDocs = docsRequired.map(reqDoc => {
+// 					// Convert Mongoose document to plain object
+// 					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+// 					// Find matching uploaded docs for this required doc
+// 					const matchingUploads = uploadedDocs.filter(
+// 						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+// 					);
+
+// 					return {
+// 						_id: docObj._id,
+// 						Name: docObj.Name || 'Document',
+// 						mandatory: docObj.mandatory,
+// 						description: docObj.description || '',
+// 						uploads: matchingUploads || []
+// 					};
+// 				});
+
+
+// 			} else {
+// 				console.log("Course not found or no docs required");
+// 			};
+
+// 			// Count calculations
+// 			let verifiedCount = 0;
+// 			let RejectedCount = 0;
+// 			let pendingVerificationCount = 0;
+// 			let notUploadedCount = 0;
+
+// 			allDocs.forEach(doc => {
+// 				if (doc.status === "Verified") verifiedCount++;
+// 				else if (doc.status === "Rejected") RejectedCount++;
+// 				else if (doc.status === "Pending") pendingVerificationCount++;
+// 				else if (doc.status === "Not Uploaded") notUploadedCount++;
+// 			});
+
+// 			const totalRequired = allDocs.length;
+// 			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
+// 			const uploadPercentage = totalRequired > 0
+// 				? Math.round((uploadedCount / totalRequired) * 100)
+// 				: 0;
+// 			return {
+// 				...docObj,
+// 				selectedSubstatus,
+// 				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+// 				docCounts: {
+// 					totalRequired,
+// 					RejectedCount,
+// 					uploadedCount,
+// 					verifiedCount,
+// 					pendingVerificationCount,
+// 					notUploadedCount,
+// 					uploadPercentage
+// 				}
+// 			};
+// 		});
+
+
+
+// 		const totalCount = results.length
+
+// 		const result = results.slice(skip, skip + limit);
+
+
+
+
+// 		res.status(200).json({
+// 			success: true,
+// 			count: result.length,
+// 			page,
+// 			limit,
+// 			totalCount,
+// 			totalPages: Math.ceil(totalCount / limit),
+// 			data: result,
+// 			allData: results
+// 		});
+
+// 	} catch (err) {
+// 		console.error(err);
+// 		res.status(500).json({
+// 			success: false,
+// 			message: "Server Error"
+// 		});
+// 	}
+// });
+
+router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 	try {
-		console.log('====================>!api called')
 		const user = req.user;
-		const teamMembers = await getAllTeamMembers(user._id);
-		console.log('teamMembers', teamMembers)
+		let teamMembers = await getAllTeamMembers(user._id);
+
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
 
-		const page = parseInt(req.query.page) || 1;      // Default page 1
-		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 50;
 		const skip = (page - 1) * limit;
 
-		let appliedCourses = [];
+		// Extract ALL filter parameters from query
+		const {
+			name,
+			courseType,
+			status,
+			leadStatus,
+			sector,
+			createdFromDate,
+			createdToDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
+			// Multi-select filters (these come as JSON strings)
+			projects,
+			verticals,
+			course,
+			center,
+			counselor
+		} = req.query;
 
-		for (const member of teamMembers) {
-			const response = await AppliedCourses.find({
+		// Parse multi-select filter values
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays:', parseError);
+		}
+
+		if (counselorArray.length > 0) {
+			teamMembers = counselorArray
+		}
+
+		
+
+		console.log('teamMembers', teamMembers)
+
+		let allFilteredResults = [];
+
+		for (let member of teamMembers) {
+			// Build aggregation pipeline
+			let aggregationPipeline = [];
+
+			if(typeof member === 'string'){
+				member = new mongoose.Types.ObjectId(member)
+
+			}
+
+
+			// Base match stage
+			let baseMatchStage = {
 				kycStage: { $nin: [true] },
 				kyc: { $nin: [true] },
 				admissionDone: { $nin: [true] },
 				$or: [
-					// registeredBy field se match (single member ke liye)
-					{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
-
-					// leadAssignment ke last element ki _id se match
+					{ registeredBy: member },
 					{
 						$expr: {
 							$eq: [
@@ -350,56 +632,301 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 						}
 					}
 				]
-			})
-				.populate({
-					path: '_course',
-					populate: [
-						{
-							path: 'sectors',
-							select: 'name'
-						},
-						{
-							path: 'vertical',
-							select: 'name'  // Add the fields you want to populate from the `vertical` path
-						},
-						{
-							path: 'project',
-							select: 'name'  // Add the fields you want to populate from the `project` path
-						}
-					]
-				})
-				.populate('_leadStatus')
-				.populate('_center')
-				.populate('registeredBy')
-				.populate({
-					path: '_candidate',
-					populate: [
-						{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
-					]
-				})
-				.populate({
-					path: 'logs',
-					populate: {
-						path: 'user',
-						select: 'name'
+			};
+
+			// Add date filters to base match
+			if (createdFromDate || createdToDate) {
+				baseMatchStage.createdAt = {};
+				if (createdFromDate) {
+					baseMatchStage.createdAt.$gte = new Date(createdFromDate);
+				}
+				if (createdToDate) {
+					const toDate = new Date(createdToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.createdAt.$lte = toDate;
+				}
+			}
+
+			if (modifiedFromDate || modifiedToDate) {
+				baseMatchStage.updatedAt = {};
+				if (modifiedFromDate) {
+					baseMatchStage.updatedAt.$gte = new Date(modifiedFromDate);
+				}
+				if (modifiedToDate) {
+					const toDate = new Date(modifiedToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.updatedAt.$lte = toDate;
+				}
+			}
+
+			if (nextActionFromDate || nextActionToDate) {
+				baseMatchStage.followupDate = {};
+				if (nextActionFromDate) {
+					baseMatchStage.followupDate.$gte = new Date(nextActionFromDate);
+				}
+				if (nextActionToDate) {
+					const toDate = new Date(nextActionToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.followupDate.$lte = toDate;
+				}
+			}
+
+			// Status filters
+			if (status && status !== 'true') {
+				baseMatchStage._leadStatus = new mongoose.Types.ObjectId(status);
+			}
+			if (leadStatus) {
+				baseMatchStage._leadStatus = new mongoose.Types.ObjectId(leadStatus);
+			}
+
+			// Add base match stage
+			aggregationPipeline.push({ $match: baseMatchStage });
+
+			// Lookup stages for all related collections
+			aggregationPipeline.push(
+				// Course lookup with sectors, vertical, project population
+				{
+					$lookup: {
+						from: 'courses',
+						localField: '_course',
+						foreignField: '_id',
+						as: '_course',
+						pipeline: [
+							{
+								$lookup: {
+									from: 'sectors',
+									localField: 'sectors',
+									foreignField: '_id',
+									as: 'sectors'
+								}
+							},
+							{
+								$lookup: {
+									from: 'verticals',
+									localField: 'vertical',
+									foreignField: '_id',
+									as: 'vertical'
+								}
+							},
+							{
+								$lookup: {
+									from: 'projects',
+									localField: 'project',
+									foreignField: '_id',
+									as: 'project'
+								}
+							}
+						]
 					}
-				})
-				.sort({ createdAt: -1 })
+				},
+				{ $unwind: '$_course' },
 
+				// Lead Status lookup
+				{
+					$lookup: {
+						from: 'status',
+						localField: '_leadStatus',
+						foreignField: '_id',
+						as: '_leadStatus'
+					}
+				},
+				{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
 
+				// Center lookup
+				{
+					$lookup: {
+						from: 'centers',
+						localField: '_center',
+						foreignField: '_id',
+						as: '_center'
+					}
+				},
+				{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+
+				// Registered By lookup
+				{
+					$lookup: {
+						from: 'users',
+						localField: 'registeredBy',
+						foreignField: '_id',
+						as: 'registeredBy'
+					}
+				},
+				{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+
+				// Candidate lookup with applied courses
+				{
+					$lookup: {
+						from: 'candidateprofiles',
+						localField: '_candidate',
+						foreignField: '_id',
+						as: '_candidate',
+						pipeline: [
+							{
+								$lookup: {
+									from: 'appliedcourses',
+									localField: '_appliedCourses',
+									foreignField: '_id',
+									as: '_appliedCourses',
+									pipeline: [
+										{
+											$lookup: {
+												from: 'courses',
+												localField: '_course',
+												foreignField: '_id',
+												as: '_course'
+											}
+										},
+										{
+											$lookup: {
+												from: 'users',
+												localField: 'registeredBy',
+												foreignField: '_id',
+												as: 'registeredBy'
+											}
+										},
+										{
+											$lookup: {
+												from: 'centers',
+												localField: '_center',
+												foreignField: '_id',
+												as: '_center'
+											}
+										},
+										{
+											$lookup: {
+												from: 'status',
+												localField: '_leadStatus',
+												foreignField: '_id',
+												as: '_leadStatus'
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+
+				// Logs lookup
+				{
+					$lookup: {
+						from: 'logs',
+						localField: 'logs',
+						foreignField: '_id',
+						as: 'logs',
+						pipeline: [
+							{
+								$lookup: {
+									from: 'users',
+									localField: 'user',
+									foreignField: '_id',
+									as: 'user'
+								}
+							},
+							{ $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }
+						]
+					}
+				},
+				{
+					$unwind: {
+						path: '$logs', preserveNullAndEmptyArrays: true
+					}
+				}
+			);
+
+			// Filter by college
+			aggregationPipeline.push({
+				$match: {
+					'_course.college': college._id
+				}
+			});
+
+			// Apply additional filters based on populated data
+			let additionalMatches = {};
+
+			// Course type filter
+			if (courseType) {
+				additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(courseType, 'i') };
+			}
+
+			// Sector filter (multi-select)
+			if (projectsArray.length > 0) {
+				additionalMatches['_course.sectors._id'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			// Verticals filter (multi-select)
+			if (verticalsArray.length > 0) {
+				console.log('verticalsArray', verticalsArray)
+				additionalMatches['_course.vertical._id'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			// Course filter (multi-select)
+			if (courseArray.length > 0) {
+				additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			// Center filter (multi-select)
+			if (centerArray.length > 0) {
+				additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			// Counselor filter (multi-select)
+			// if (counselorArray.length > 0) {
+			// 	console.log('counselorArray', counselorArray)
+			// 	additionalMatches.$or = [
+			// 		// Check if any counselor ID exists in leadAssignment array
+			// 		{ 'leadAssignment._id': { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) } },
+			// 		// Check if the last leadAssignment ID is in the counselor array
+			// 		{
+			// 			$expr: {
+			// 				$in: [
+			// 					{ $arrayElemAt: ["$leadAssignment._id", -1] },
+			// 					counselorArray.map(id => new mongoose.Types.ObjectId(id))
+			// 				]
+			// 			}
+			// 		}
+			// 	];
+			// }
+			// Name search filter
+			if (name && name.trim()) {
+				const searchRegex = new RegExp(name.trim(), 'i');
+				additionalMatches.$or = additionalMatches.$or ? [
+					...additionalMatches.$or,
+					{ '_candidate.name': searchRegex },
+					{ '_candidate.mobile': parseInt(searchRegex) },
+					{ '_candidate.email': searchRegex }
+				] : [
+					{ '_candidate.name': searchRegex },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.email': searchRegex }
+				];
+			}
+
+			// Add additional match stage if any filters are applied
+			if (Object.keys(additionalMatches).length > 0) {
+				aggregationPipeline.push({ $match: additionalMatches });
+			}
+
+			// Sort by creation date
+			aggregationPipeline.push({
+				$sort: { createdAt: -1 }
+			});
+
+			// Execute aggregation
+			const response = await AppliedCourses.aggregate(aggregationPipeline);
+
+			// Add unique results to the main array
 			response.forEach(doc => {
-				if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
-					appliedCourses.push(doc);
+				if (!allFilteredResults.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
+					allFilteredResults.push(doc);
 				}
 			});
 		}
 
-		const filteredAppliedCourses = appliedCourses.filter(doc => {
-			// _course must be populated!
-			return doc._course && String(doc._course.college) === String(college._id);
-		});
-
-		const results = filteredAppliedCourses.map(doc => {
+		// Process results for document counts and other formatting
+		const results = allFilteredResults.map(doc => {
 			let selectedSubstatus = null;
 
 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
@@ -408,15 +935,14 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				);
 			}
 
-			const docObj = doc.toObject();
-
-			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
-			if (docObj._course) {
-				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+			// Process sectors to show first sector name
+			const firstSectorName = doc._course?.sectors?.[0]?.name || 'N/A';
+			if (doc._course) {
+				doc._course.sectors = firstSectorName;
 			}
 
-			const requiredDocs = docObj._course?.docsRequired || [];
-			const uploadedDocs = docObj.uploadedDocs || [];
+			const requiredDocs = doc._course?.docsRequired || [];
+			const uploadedDocs = doc.uploadedDocs || [];
 
 			// Map uploaded docs by docsId for quick lookup
 			const uploadedDocsMap = {};
@@ -424,38 +950,11 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
 			});
 
-			// Prepare combined docs array
-			const allDocs = requiredDocs.map(reqDoc => {
-				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
-				if (uploadedDoc) {
-					// Agar uploaded hai to uploadedDoc details bhejo
-					return {
-						...uploadedDoc,
-						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
-						mandatory: reqDoc.mandatory,
-						_id: reqDoc._id
-					};
-				} else {
-					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
-					return {
-						docsId: reqDoc._id,
-						Name: reqDoc.Name,
-						mandatory: reqDoc.mandatory,
-						status: "Not Uploaded",
-						fileUrl: null,
-						reason: null,
-						verifiedBy: null,
-						verifiedDate: null,
-						uploadedAt: null
-					};
-				}
-			});
+			let combinedDocs = [];
 
 			if (requiredDocs) {
-				docsRequired = requiredDocs
-
 				// Create a merged array with both required docs and uploaded docs info
-				combinedDocs = docsRequired.map(reqDoc => {
+				combinedDocs = requiredDocs.map(reqDoc => {
 					// Convert Mongoose document to plain object
 					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
 
@@ -472,11 +971,32 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 						uploads: matchingUploads || []
 					};
 				});
+			}
 
-
-			} else {
-				console.log("Course not found or no docs required");
-			};
+			// Prepare combined docs array for legacy compatibility
+			const allDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,
+						mandatory: reqDoc.mandatory,
+						_id: reqDoc._id
+					};
+				} else {
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						mandatory: reqDoc.mandatory,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
 
 			// Count calculations
 			let verifiedCount = 0;
@@ -496,10 +1016,11 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			const uploadPercentage = totalRequired > 0
 				? Math.round((uploadedCount / totalRequired) * 100)
 				: 0;
+
 			return {
-				...docObj,
+				...doc,
 				selectedSubstatus,
-				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				uploadedDocs: combinedDocs,
 				docCounts: {
 					totalRequired,
 					RejectedCount,
@@ -512,24 +1033,40 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			};
 		});
 
+		// Calculate CRM filter counts
+		const crmFilterCounts = await calculateCrmFilterCounts(teamMembers, college._id, {
+			name,
+			courseType,
+			sector,
+			createdFromDate,
+			createdToDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
+			projectsArray,
+			verticalsArray,
+			courseArray,
+			centerArray,
+			counselorArray
+		});
 
+		console.log('crmFilterCounts', crmFilterCounts)
 
-		const totalCount = results.length
-
-		const result = results.slice(skip, skip + limit);
-
-
-
+		// Apply pagination
+		const totalCount = results.length;
+		const paginatedResult = results.slice(skip, skip + limit);
 
 		res.status(200).json({
 			success: true,
-			count: result.length,
+			count: paginatedResult.length,
 			page,
 			limit,
 			totalCount,
 			totalPages: Math.ceil(totalCount / limit),
-			data: result,
-			allData: results
+			data: paginatedResult,
+			allData: results,
+			crmFilterCounts
 		});
 
 	} catch (err) {
@@ -540,6 +1077,278 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		});
 	}
 });
+
+// Helper function to calculate CRM filter counts with applied filters
+async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters = {}) {
+	const counts = { all: 0 };
+
+	try {
+		// First get all statuses from the database
+		const allStatuses = await Status.find({}).select('_id title milestone');
+
+		// Initialize counts for each status
+		allStatuses.forEach(status => {
+			counts[status._id.toString()] = {
+				_id: status._id,
+				name: status.title,
+				milestone: status.milestone,
+				count: 0
+			};
+		});
+
+		for (let member of teamMembers) {
+			// Build base aggregation pipeline
+			let basePipeline = [];
+
+			if(typeof member === 'string'){
+				member = new mongoose.Types.ObjectId(member)
+			}
+
+			// Base match stage
+			let baseMatchStage = {
+				kycStage: { $nin: [true] },
+				kyc: { $nin: [true] },
+				admissionDone: { $nin: [true] },
+				$or: [
+					{ registeredBy: member },
+					{
+						$expr: {
+							$eq: [
+								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								member
+							]
+						}
+					}
+				]
+			};
+
+			// Add date filters
+			if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
+				baseMatchStage.createdAt = {};
+				if (appliedFilters.createdFromDate) {
+					baseMatchStage.createdAt.$gte = new Date(appliedFilters.createdFromDate);
+				}
+				if (appliedFilters.createdToDate) {
+					const toDate = new Date(appliedFilters.createdToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.createdAt.$lte = toDate;
+				}
+			}
+
+			if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
+				baseMatchStage.updatedAt = {};
+				if (appliedFilters.modifiedFromDate) {
+					baseMatchStage.updatedAt.$gte = new Date(appliedFilters.modifiedFromDate);
+				}
+				if (appliedFilters.modifiedToDate) {
+					const toDate = new Date(appliedFilters.modifiedToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.updatedAt.$lte = toDate;
+				}
+			}
+
+			if (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate) {
+				baseMatchStage.followupDate = {};
+				if (appliedFilters.nextActionFromDate) {
+					baseMatchStage.followupDate.$gte = new Date(appliedFilters.nextActionFromDate);
+				}
+				if (appliedFilters.nextActionToDate) {
+					const toDate = new Date(appliedFilters.nextActionToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.followupDate.$lte = toDate;
+				}
+			}
+
+			basePipeline.push({ $match: baseMatchStage });
+
+			// Add lookups
+			basePipeline.push(
+				{
+					$lookup: {
+						from: 'courses',
+						localField: '_course',
+						foreignField: '_id',
+						as: '_course',
+						pipeline: [
+							{
+								$lookup: {
+									from: 'sectors',
+									localField: 'sectors',
+									foreignField: '_id',
+									as: 'sectors'
+								}
+							},
+							{
+								$lookup: {
+									from: 'verticals',
+									localField: 'vertical',
+									foreignField: '_id',
+									as: 'vertical'
+								}
+							},
+							{
+								$lookup: {
+									from: 'projects',
+									localField: 'project',
+									foreignField: '_id',
+									as: 'project'
+								}
+							}
+						]
+					}
+				},
+				{ $unwind: '$_course' },
+				{
+					$lookup: {
+						from: 'centers',
+						localField: '_center',
+						foreignField: '_id',
+						as: '_center'
+					}
+				},
+				{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+
+				{
+					$lookup: {
+						from: 'users',
+						localField: 'registeredBy',
+						foreignField: '_id',
+						as: 'registeredBy'
+					}
+				},
+				{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+				{
+					$lookup: {
+						from: 'candidateprofiles',
+						localField: '_candidate',
+						foreignField: '_id',
+						as: '_candidate'
+					}
+				},
+				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+
+			);
+
+			// Filter by college FIRST
+			basePipeline.push({
+				$match: {
+					'_course.college': collegeId
+				}
+			});
+
+			// Apply additional filters
+			let additionalMatches = {};
+
+			if (appliedFilters.courseType) {
+				additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(appliedFilters.courseType, 'i') };
+			}
+
+			if (appliedFilters.projectsArray && appliedFilters.projectsArray.length > 0) {
+				additionalMatches['_course.sectors._id'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			if (appliedFilters.verticalsArray && appliedFilters.verticalsArray.length > 0) {
+				additionalMatches['_course.vertical._id'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			if (appliedFilters.courseArray && appliedFilters.courseArray.length > 0) {
+				additionalMatches['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
+				additionalMatches['_center._id'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+
+			
+			if (appliedFilters.name && appliedFilters.name.trim()) {
+				const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
+				additionalMatches.$or = additionalMatches.$or ? [
+					...additionalMatches.$or,
+					{ '_candidate.name': searchRegex },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.email': searchRegex }
+				] : [
+					{ '_candidate.name': searchRegex },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.email': searchRegex }
+				];
+			}
+
+			if (Object.keys(additionalMatches).length > 0) {
+				basePipeline.push({ $match: additionalMatches });
+			}
+
+			// Get all leads count (without status filter)
+			const allLeadsAggregation = await AppliedCourses.aggregate([
+				...basePipeline,
+				{ $count: "total" }
+			]);
+
+			const allLeadsCount = allLeadsAggregation[0]?.total || 0;
+			counts.all += allLeadsCount;
+
+			// Get status-wise counts with proper grouping
+			const statusCountsAggregation = await AppliedCourses.aggregate([
+				...basePipeline,
+				// Add a stage to handle null leadStatus
+				{
+					$addFields: {
+						leadStatusId: {
+							$ifNull: ["$_leadStatus", null]
+						}
+					}
+				},
+				// Group by leadStatusId
+				{
+					$group: {
+						_id: "$leadStatusId",
+						count: { $sum: 1 }
+					}
+				}
+			]);
+
+
+			// Update counts
+			statusCountsAggregation.forEach(statusGroup => {
+				const statusId = statusGroup._id;
+				const count = statusGroup.count;
+
+				if (statusId) {
+					const statusKey = statusId.toString();
+					if (counts[statusKey]) {
+						counts[statusKey].count += count;
+					}
+				} else {
+					// Handle null status
+					if (!counts['null']) {
+						counts['null'] = {
+							_id: null,
+							name: 'No Status',
+							milestone: null,
+							count: 0
+						};
+					}
+					counts['null'].count += count;
+				}
+			});
+		}
+
+		// Remove statuses with 0 count (optional)
+		const finalCounts = {};
+		Object.keys(counts).forEach(key => {
+			if (key === 'all' || (counts[key].count && counts[key].count > 0)) {
+				finalCounts[key] = counts[key];
+			}
+		});
+
+		return finalCounts;
+
+	} catch (error) {
+		console.error('Error calculating CRM filter counts:', error);
+		return { all: 0 };
+	}
+}
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
 	let college = await College.findOne({ _concernPerson: { $elemMatch: { _id: req.user._id } }, status: true })
@@ -4049,23 +4858,23 @@ router.get("/generate-application-form/:id", async (req, res) => {
 
 
 		let data = await AppliedCourses.findById(id)
-		.populate({
-			path: '_course',
-			populate: [
-				{
-					path: 'sectors',
-					select: 'name'
-				},
-				{
-					path: 'vertical',
-					select: 'name'  // Add the fields you want to populate from the `vertical` path
-				},
-				{
-					path: 'project',
-					select: 'name'  // Add the fields you want to populate from the `project` path
-				}
-			]
-		})
+			.populate({
+				path: '_course',
+				populate: [
+					{
+						path: 'sectors',
+						select: 'name'
+					},
+					{
+						path: 'vertical',
+						select: 'name'  // Add the fields you want to populate from the `vertical` path
+					},
+					{
+						path: 'project',
+						select: 'name'  // Add the fields you want to populate from the `project` path
+					}
+				]
+			})
 			.populate('_leadStatus')
 			.populate('_center')
 			.populate('registeredBy')
@@ -4087,7 +4896,7 @@ router.get("/generate-application-form/:id", async (req, res) => {
 			return res.json({ status: false, message: "Profile pic required" });
 		}
 
-		
+
 
 		const isDocsRequired = !!data?._course?.docsRequired?.length > 0
 
@@ -4571,241 +5380,438 @@ router.get("/generate-application-form/:id", async (req, res) => {
 			"Content-Length": pdfBuffer.length,
 		});
 
-		return res.send(pdfBuffer );
+		return res.send(pdfBuffer);
 
 	} catch (err) {
 		console.error("PDF generation error:", err);
-		res.status(500).send({ status: false, message: "Failed to generate PDF" });	}
+		res.status(500).send({ status: false, message: "Failed to generate PDF" });
+	}
 
 })
 
-// router.get('dashbord-data',isCollege, async (req,res)=>{
-// 	try{
-
-// 		try {
-// 			const user = req.user;
-// 			const teamMembers = await getAllTeamMembers(user._id);
-// 			const college = await College.findOne({
-// 				'_concernPerson._id': user._id
-// 			});
-	
-// 			const page = parseInt(req.query.page) || 1;      // Default page 1
-// 			const limit = parseInt(req.query.limit) || 50;   // Default limit 50
-// 			const skip = (page - 1) * limit;
-	
-// 			let appliedCourses = [];
-	
-// 			for (const member of teamMembers) {
-// 				const response = await AppliedCourses.find({
-// 					kycStage: { $nin: [true] },
-// 					kyc: { $nin: [true] },
-// 					admissionDone: { $nin: [true] },
-// 					$or: [
-// 						// registeredBy field se match (single member ke liye)
-// 						{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
-	
-// 						// leadAssignment ke last element ki _id se match
-// 						{
-// 							$expr: {
-// 								$eq: [
-// 									{ $arrayElemAt: ["$leadAssignment._id", -1] },
-// 									member
-// 								]
-// 							}
-// 						}
-// 					]
-// 				})
-// 					.populate({
-// 						path: '_course',
-// 						populate: [
-// 							{
-// 								path: 'sectors',
-// 								select: 'name'
-// 							},
-// 							{
-// 								path: 'vertical',
-// 								select: 'name'  // Add the fields you want to populate from the `vertical` path
-// 							},
-// 							{
-// 								path: 'project',
-// 								select: 'name'  // Add the fields you want to populate from the `project` path
-// 							}
-// 						]
-// 					})
-// 					.populate('_leadStatus')
-// 					.populate('_center')
-// 					.populate('registeredBy')
-// 					.populate({
-// 						path: '_candidate',
-// 						populate: [
-// 							{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
-// 						]
-// 					})
-// 					.populate({
-// 						path: 'logs',
-// 						populate: {
-// 							path: 'user',
-// 							select: 'name'
-// 						}
-// 					})
-// 					.sort({ createdAt: -1 })
-	
-	
-// 				response.forEach(doc => {
-// 					if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
-// 						appliedCourses.push(doc);
-// 					}
-// 				});
-// 			}
-	
-// 			const filteredAppliedCourses = appliedCourses.filter(doc => {
-// 				// _course must be populated!
-// 				return doc._course && String(doc._course.college) === String(college._id);
-// 			});
-	
-// 			const results = filteredAppliedCourses.map(doc => {
-// 				let selectedSubstatus = null;
-	
-// 				if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
-// 					selectedSubstatus = doc._leadStatus.substatuses.find(
-// 						sub => sub._id.toString() === doc._leadSubStatus.toString()
-// 					);
-// 				}
-	
-// 				const docObj = doc.toObject();
-	
-// 				const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
-// 				if (docObj._course) {
-// 					docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
-// 				}
-	
-// 				const requiredDocs = docObj._course?.docsRequired || [];
-// 				const uploadedDocs = docObj.uploadedDocs || [];
-	
-// 				// Map uploaded docs by docsId for quick lookup
-// 				const uploadedDocsMap = {};
-// 				uploadedDocs.forEach(d => {
-// 					if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
-// 				});
-	
-// 				// Prepare combined docs array
-// 				const allDocs = requiredDocs.map(reqDoc => {
-// 					const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
-// 					if (uploadedDoc) {
-// 						// Agar uploaded hai to uploadedDoc details bhejo
-// 						return {
-// 							...uploadedDoc,
-// 							Name: reqDoc.Name,        // Required document ka name bhi add kar lo
-// 							mandatory: reqDoc.mandatory,
-// 							_id: reqDoc._id
-// 						};
-// 					} else {
-// 						// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
-// 						return {
-// 							docsId: reqDoc._id,
-// 							Name: reqDoc.Name,
-// 							mandatory: reqDoc.mandatory,
-// 							status: "Not Uploaded",
-// 							fileUrl: null,
-// 							reason: null,
-// 							verifiedBy: null,
-// 							verifiedDate: null,
-// 							uploadedAt: null
-// 						};
-// 					}
-// 				});
-	
-// 				if (requiredDocs) {
-// 					docsRequired = requiredDocs
-	
-// 					// Create a merged array with both required docs and uploaded docs info
-// 					combinedDocs = docsRequired.map(reqDoc => {
-// 						// Convert Mongoose document to plain object
-// 						const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
-	
-// 						// Find matching uploaded docs for this required doc
-// 						const matchingUploads = uploadedDocs.filter(
-// 							uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
-// 						);
-	
-// 						return {
-// 							_id: docObj._id,
-// 							Name: docObj.Name || 'Document',
-// 							mandatory: docObj.mandatory,
-// 							description: docObj.description || '',
-// 							uploads: matchingUploads || []
-// 						};
-// 					});
-	
-	
-// 				} else {
-// 					console.log("Course not found or no docs required");
-// 				};
-	
-// 				// Count calculations
-// 				let verifiedCount = 0;
-// 				let RejectedCount = 0;
-// 				let pendingVerificationCount = 0;
-// 				let notUploadedCount = 0;
-	
-// 				allDocs.forEach(doc => {
-// 					if (doc.status === "Verified") verifiedCount++;
-// 					else if (doc.status === "Rejected") RejectedCount++;
-// 					else if (doc.status === "Pending") pendingVerificationCount++;
-// 					else if (doc.status === "Not Uploaded") notUploadedCount++;
-// 				});
-	
-// 				const totalRequired = allDocs.length;
-// 				const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
-// 				const uploadPercentage = totalRequired > 0
-// 					? Math.round((uploadedCount / totalRequired) * 100)
-// 					: 0;
-// 				return {
-// 					...docObj,
-// 					selectedSubstatus,
-// 					uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
-// 					docCounts: {
-// 						totalRequired,
-// 						RejectedCount,
-// 						uploadedCount,
-// 						verifiedCount,
-// 						pendingVerificationCount,
-// 						notUploadedCount,
-// 						uploadPercentage
-// 					}
-// 				};
-// 			});
-	
-	
-	
-// 			const totalCount = results.length
-	
-// 			const result = results.slice(skip, skip + limit);
-	
-	
-	
-	
-// 			res.status(200).json({
-// 				success: true,
-// 				count: result.length,
-// 				page,
-// 				limit,
-// 				totalCount,
-// 				totalPages: Math.ceil(totalCount / limit),
-// 				data: result,
-// 				allData: results
-// 			});
-	
-// 		} catch (err) {
-// 			console.error(err);
-// 			res.status(500).json({
-// 				success: false,
-// 				message: "Server Error"
-// 			});
-// 		}
-	
+router.get('/dashbord-data', isCollege, async (req, res) => {
 
 
-// )
+	try {
+		const user = req.user;
+		const teamMembers = await getAllTeamMembers(user._id);
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+
+		// Date filtering parameters
+		const { startDate, endDate, period } = req.query;
+
+		// Build date filter
+		let dateFilter = {};
+
+		if (startDate && endDate) {
+			// Custom date range
+			const start = new Date(startDate);
+			const end = new Date(endDate);
+			end.setHours(23, 59, 59, 999); // Include the entire end date
+			dateFilter.createdAt = { $gte: start, $lte: end };
+		} else if (period) {
+			// Predefined periods
+			const now = new Date();
+			const start = new Date();
+
+			switch (period) {
+				case 'today':
+					start.setHours(0, 0, 0, 0);
+					dateFilter.createdAt = {
+						$gte: start,
+						$lte: new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
+					};
+					break;
+				case 'yesterday':
+					start.setDate(start.getDate() - 1);
+					start.setHours(0, 0, 0, 0);
+					dateFilter.createdAt = {
+						$gte: start,
+						$lte: new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
+					};
+					break;
+				case 'last7':
+					start.setDate(start.getDate() - 6);
+					start.setHours(0, 0, 0, 0);
+					dateFilter.createdAt = { $gte: start, $lte: now };
+					break;
+				case 'last14':
+					start.setDate(start.getDate() - 13);
+					start.setHours(0, 0, 0, 0);
+					dateFilter.createdAt = { $gte: start, $lte: now };
+					break;
+				case 'last28':
+					start.setDate(start.getDate() - 27);
+					start.setHours(0, 0, 0, 0);
+					dateFilter.createdAt = { $gte: start, $lte: now };
+					break;
+				case 'last30':
+					start.setDate(start.getDate() - 29);
+					start.setHours(0, 0, 0, 0);
+					dateFilter.createdAt = { $gte: start, $lte: now };
+					break;
+				case 'thisWeek':
+					start.setDate(start.getDate() - start.getDay());
+					start.setHours(0, 0, 0, 0);
+					dateFilter.createdAt = { $gte: start, $lte: now };
+					break;
+				case 'lastWeek':
+					start.setDate(start.getDate() - start.getDay() - 7);
+					start.setHours(0, 0, 0, 0);
+					const lastWeekEnd = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
+					dateFilter.createdAt = { $gte: start, $lte: lastWeekEnd };
+					break;
+				case 'thisMonth':
+					start.setDate(1);
+					start.setHours(0, 0, 0, 0);
+					dateFilter.createdAt = { $gte: start, $lte: now };
+					break;
+				case 'lastMonth':
+					start.setMonth(start.getMonth() - 1);
+					start.setDate(1);
+					start.setHours(0, 0, 0, 0);
+					const lastMonthEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
+					dateFilter.createdAt = { $gte: start, $lte: lastMonthEnd };
+					break;
+				case 'maximum':
+					// No date filter - get all data
+					break;
+				default:
+					// No date filter for unknown periods
+					break;
+			}
+		}
+
+		let appliedCourses = [];
+
+		for (const member of teamMembers) {
+			const query = {
+				$or: [
+					// registeredBy field se match (single member ke liye)
+					{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
+
+					// leadAssignment ke last element ki _id se match
+					{
+						$expr: {
+							$eq: [
+								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								member
+							]
+						}
+					}
+				],
+				...dateFilter // Add date filter to the query
+			};
+
+			const response = await AppliedCourses.find(query)
+				.populate({
+					path: '_course',
+					populate: [
+						{
+							path: 'sectors',
+							select: 'name'
+						},
+						{
+							path: 'vertical',
+							select: 'name'  // Add the fields you want to populate from the `vertical` path
+						},
+						{
+							path: 'project',
+							select: 'name'  // Add the fields you want to populate from the `project` path
+						}
+					]
+				})
+				.populate('_leadStatus')
+				.populate('_center')
+				.populate('registeredBy')
+				.populate({
+					path: '_candidate',
+					populate: [
+						{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+					]
+				})
+				.populate({
+					path: 'logs',
+					populate: {
+						path: 'user',
+						select: 'name'
+					}
+				})
+				.sort({ createdAt: -1 })
+
+
+			response.forEach(doc => {
+				if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
+					appliedCourses.push(doc);
+				}
+			});
+		}
+
+		const filteredAppliedCourses = appliedCourses.filter(doc => {
+			// _course must be populated!
+			return doc._course && String(doc._course.college) === String(college._id);
+		});
+
+		const results = filteredAppliedCourses.map(doc => {
+			let selectedSubstatus = null;
+
+			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+				selectedSubstatus = doc._leadStatus.substatuses.find(
+					sub => sub._id.toString() === doc._leadSubStatus.toString()
+				);
+			}
+
+			const docObj = doc.toObject();
+
+			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+			if (docObj._course) {
+				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+			}
+
+			const requiredDocs = docObj._course?.docsRequired || [];
+			const uploadedDocs = docObj.uploadedDocs || [];
+
+			// Map uploaded docs by docsId for quick lookup
+			const uploadedDocsMap = {};
+			uploadedDocs.forEach(d => {
+				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+			});
+
+			// Prepare combined docs array
+			const allDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					// Agar uploaded hai to uploadedDoc details bhejo
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						mandatory: reqDoc.mandatory,
+						_id: reqDoc._id
+					};
+				} else {
+					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						mandatory: reqDoc.mandatory,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
+
+			if (requiredDocs) {
+				docsRequired = requiredDocs
+
+				// Create a merged array with both required docs and uploaded docs info
+				combinedDocs = docsRequired.map(reqDoc => {
+					// Convert Mongoose document to plain object
+					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+					// Find matching uploaded docs for this required doc
+					const matchingUploads = uploadedDocs.filter(
+						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+					);
+
+					return {
+						_id: docObj._id,
+						Name: docObj.Name || 'Document',
+						mandatory: docObj.mandatory,
+						description: docObj.description || '',
+						uploads: matchingUploads || []
+					};
+				});
+
+
+			} else {
+				console.log("Course not found or no docs required");
+			};
+
+			// Count calculations
+			let verifiedCount = 0;
+			let RejectedCount = 0;
+			let pendingVerificationCount = 0;
+			let notUploadedCount = 0;
+
+			allDocs.forEach(doc => {
+				if (doc.status === "Verified") verifiedCount++;
+				else if (doc.status === "Rejected") RejectedCount++;
+				else if (doc.status === "Pending") pendingVerificationCount++;
+				else if (doc.status === "Not Uploaded") notUploadedCount++;
+			});
+
+			const totalRequired = allDocs.length;
+			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
+			const uploadPercentage = totalRequired > 0
+				? Math.round((uploadedCount / totalRequired) * 100)
+				: 0;
+			return {
+				...docObj,
+				selectedSubstatus,
+				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				docCounts: {
+					totalRequired,
+					RejectedCount,
+					uploadedCount,
+					verifiedCount,
+					pendingVerificationCount,
+					notUploadedCount,
+					uploadPercentage
+				}
+			};
+		});
+
+
+
+		const totalCount = results.length
+
+		// Remove pagination - return all results
+		const result = results;
+
+
+
+
+		res.status(200).json({
+			success: true,
+			count: result.length,
+			totalCount,
+			data: result,
+			allData: results,
+			// Date filter info for debugging
+			dateFilter: {
+				startDate,
+				endDate,
+				period,
+				appliedFilter: Object.keys(dateFilter).length > 0 ? dateFilter : 'No date filter applied'
+			}
+		});
+
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+
+
+})
+
+// GET /college/filters-data
+router.get('/filters-data', [isCollege], async (req, res) => {
+	try {
+		const user = req.user;
+		// Find the college for the current user
+		const college = await College.findOne({ '_concernPerson._id': user._id });
+		if (!college) {
+			return res.status(404).json({ status: false, message: 'College not found' });
+		}
+
+		// Aggregation: Only applied courses for this college
+		const appliedCourses = await AppliedCourses.aggregate([
+			{
+				$lookup: {
+					from: 'courses',
+					localField: '_course',
+					foreignField: '_id',
+					as: '_course'
+				}
+			},
+			{ $unwind: '$_course' },
+			{
+				$match: {
+					'_course.college': college._id
+				}
+			},
+			{
+				$lookup: {
+					from: 'centers',
+					localField: '_center',
+					foreignField: '_id',
+					as: '_center'
+				}
+			},
+			{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+			{
+				$lookup: {
+					from: 'verticals',
+					localField: '_course.vertical',
+					foreignField: '_id',
+					as: 'verticals'
+				}
+			},
+			{
+				$lookup: {
+					from: 'projects',
+					localField: '_course.project',
+					foreignField: '_id',
+					as: 'projects'
+				}
+			}
+		]);
+
+		// Unique sets
+		const verticalSet = new Map();
+		const projectSet = new Map();
+		const courseSet = new Map();
+		const centerSet = new Map();
+		const counselorSet = new Map();
+
+		appliedCourses.forEach(ac => {
+			// Verticals
+			if (Array.isArray(ac.verticals)) {
+				ac.verticals.forEach(v => {
+					if (v && v._id && !verticalSet.has(v._id.toString())) {
+						verticalSet.set(v._id.toString(), { _id: v._id, name: v.name });
+					}
+				});
+			}
+			// Projects
+			if (Array.isArray(ac.projects)) {
+				ac.projects.forEach(p => {
+					if (p && p._id && !projectSet.has(p._id.toString())) {
+						projectSet.set(p._id.toString(), { _id: p._id, name: p.name });
+					}
+				});
+			}
+			// Courses
+			if (ac._course && ac._course._id && !courseSet.has(ac._course._id.toString())) {
+				courseSet.set(ac._course._id.toString(), { _id: ac._course._id, name: ac._course.name });
+			}
+			// Centers
+			if (ac._center && ac._center._id && !centerSet.has(ac._center._id.toString())) {
+				centerSet.set(ac._center._id.toString(), { _id: ac._center._id, name: ac._center.name });
+			}
+			// Counselors (last assignment)
+			if (Array.isArray(ac.leadAssignment) && ac.leadAssignment.length > 0) {
+				const last = ac.leadAssignment[ac.leadAssignment.length - 1];
+				if (last && last._id && last.counsellorName && !counselorSet.has(last._id.toString())) {
+					counselorSet.set(last._id.toString(), { _id: last._id, name: last.counsellorName });
+				}
+			}
+		});
+
+		res.json({
+			status: true,
+			verticals: Array.from(verticalSet.values()),
+			projects: Array.from(projectSet.values()),
+			courses: Array.from(courseSet.values()),
+			centers: Array.from(centerSet.values()),
+			counselors: Array.from(counselorSet.values())
+		});
+	} catch (err) {
+		console.error('Error in /filters-data:', err);
+		res.status(500).json({ status: false, message: err.message });
+	}
+});
+
+
+
 
 module.exports = router;

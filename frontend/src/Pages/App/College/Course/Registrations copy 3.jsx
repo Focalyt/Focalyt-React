@@ -214,36 +214,8 @@ const CRMDashboard = () => {
   // Loading state for fetchProfileData
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
 
-  // 1. State
-  const [verticalOptions, setVerticalOptions] = useState([]);
-  const [projectOptions, setProjectOptions] = useState([]);
-  const [courseOptions, setCourseOptions] = useState([]);
-  const [centerOptions, setCenterOptions] = useState([]);
-  const [counselorOptions, setCounselorOptions] = useState([]);
 
-  // Fetch filter options from backend API on mount
-  useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-        const token = userData.token;
-        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-        const res = await axios.get(`${backendUrl}/college/filters-data`, {
-          headers: { 'x-auth': token }
-        });
-        if (res.data.status) {
-          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
-          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
-          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
-        }
-      } catch (err) {
-        console.error('Failed to fetch filter options:', err);
-      }
-    };
-    fetchFilterOptions();
-  }, []);
+
 
   const handleCheckboxChange = (profile, checked) => {
     if (checked) {
@@ -559,7 +531,41 @@ const CRMDashboard = () => {
   });
 
 
+  // vertical checkboxes option 
 
+  const sectorOptions = [
+    { label: "Tourism and Hospitality", value: "Tourism and Hospitality" },
+    { label: "Information Technology", value: "Information Technology" },
+    { label: "Healthcare", value: "Healthcare" },
+    { label: "Finance", value: "Finance" }
+  ];
+  const verticalOptions = [
+    { label: "Vertical 1", value: "Vertical 1" },
+    { label: "Vertical 2", value: "Vertical 2" },
+    { label: "Vertical 3", value: "Vertical 3" },
+    { label: "Vertical 4", value: "Vertical 4" }
+  ];
+
+  const courseOptions = [
+    { label: "Course 1", value: "Course 1" },
+    { label: "Course 2", value: "Course 2" },
+    { label: "Course 3", value: "Course 3" },
+    { label: "Course 4", value: "Course 4" }
+  ];
+
+  const centerOptions = [
+    { label: "Center 1", value: "Center 1" },
+    { label: "Center 2", value: "Center 2" },
+    { label: "Center 3", value: "Center 3" },
+    { label: "Center 4", value: "Center 4" }
+  ];
+
+  const counselorOptions = [
+    { label: "Counselor 1", value: "Counselor 1" },
+    { label: "Counselor 2", value: "Counselor 2" },
+    { label: "Counselor 3", value: "Counselor 3" },
+    { label: "Counselor 4", value: "Counselor 4" }
+  ];
   // Form data state
   const [formData, setFormData] = useState({
     projects: {
@@ -1298,7 +1304,33 @@ const CRMDashboard = () => {
 
   //Advance filter
 
+  // Format date range for display
+  const formatDateRange = (fromDate, toDate) => {
+    if (!fromDate && !toDate) {
+      return 'Select Date Range';
+    }
 
+    if (fromDate && !toDate) {
+      return `From ${fromDate.toLocaleDateString('en-GB')}`;
+    }
+
+    if (!fromDate && toDate) {
+      return `Until ${toDate.toLocaleDateString('en-GB')}`;
+    }
+
+    if (fromDate && toDate) {
+      const from = fromDate.toLocaleDateString('en-GB');
+      const to = toDate.toLocaleDateString('en-GB');
+
+      if (from === to) {
+        return from;
+      }
+
+      return `${from} - ${to}`;
+    }
+
+    return 'Select Date Range';
+  };
 
 
   // Date range handlers
@@ -1345,7 +1377,34 @@ const CRMDashboard = () => {
     setFilterData(newFilterData);
     setTimeout(() => fetchProfileData(newFilterData), 100);
   };
+  const handleDateChange = (date, fieldName) => {
+    setFilterData(prev => ({
+      ...prev,
+      [fieldName]: date
+    }));
 
+    // Auto-apply filters after short delay
+    setTimeout(() => {
+      const newFilterData = {
+        ...filterData,
+        [fieldName]: date
+      };
+      fetchProfileData(newFilterData);
+    }, 100);
+  };
+
+
+  // Helper function for status icons
+  const getStatusIcon = (statusName) => {
+    const statusName_lower = statusName.toLowerCase();
+    if (statusName_lower.includes('hot') || statusName_lower.includes('urgent')) return '🔥';
+    if (statusName_lower.includes('warm') || statusName_lower.includes('interested')) return '⚡';
+    if (statusName_lower.includes('cold') || statusName_lower.includes('not')) return '❄️';
+    if (statusName_lower.includes('new') || statusName_lower.includes('fresh')) return '🆕';
+    if (statusName_lower.includes('follow') || statusName_lower.includes('pending')) return '⏳';
+    if (statusName_lower.includes('converted') || statusName_lower.includes('success')) return '✅';
+    return '🎯'; // default icon
+  };
 
 
   //
@@ -1375,7 +1434,6 @@ const CRMDashboard = () => {
     });
 
     setCurrentPage(1);
-    // Explicitly call fetchProfileData with cleared filters to ensure data is fetched
     fetchProfileData(clearedFilters, 1);
   };
 
@@ -1834,7 +1892,6 @@ const CRMDashboard = () => {
         ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
         ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
-      console.log('API counselor:', formData.counselor.values);
 
       const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
         headers: { 'x-auth': token }
@@ -1943,12 +2000,6 @@ const CRMDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    // Always fetch data when formData changes, regardless of whether filters have values
-    setCurrentPage(1);
-    fetchProfileData(filterData, 1);
-  }, [formData]);
-
   const handleCriteriaChange = (criteria, values) => {
     setFormData((prevState) => ({
       ...prevState,
@@ -1957,8 +2008,10 @@ const CRMDashboard = () => {
         values: values
       }
     }));
-    console.log('Selected verticals:', values);
+
     // Reset to first page and fetch with new filters
+    setCurrentPage(1);
+    setTimeout(() => fetchProfileData(filterData, 1), 100);
   };
 
   const handleCrmFilterClick = async (index) => {
@@ -3084,7 +3137,7 @@ const CRMDashboard = () => {
 
                 <div className="row g-4">
 
-                  <div className="col-md-3">
+                  <div className="col-md-2">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-graduation-cap me-1 text-success"></i>
                       Course Type
@@ -3103,11 +3156,28 @@ const CRMDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="col-md-3">
-                   
+                  <div className="col-md-2">
+                    {/* <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Sector
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Sectors</option>
+                        <option value="Tourism and Hospitality">🏨 Tourism & Hospitality</option>
+                        <option value="Information Technology">💻 Information Technology</option>
+                        <option value="Healthcare">🏥 Healthcare</option>
+                        <option value="Finance">💳 Finance</option>
+                      </select>
+                    </div> */}
                     <MultiSelectCheckbox
                       title="Project"
-                      options={projectOptions}
+                      options={sectorOptions}
                       selectedValues={formData.projects.values}
                       onChange={(values) => handleCriteriaChange('projects', values)}
                       icon="fas fa-sitemap"
@@ -3116,22 +3186,51 @@ const CRMDashboard = () => {
                     />
 
                   </div>
-                  <div className="col-md-3">
-                    
+                  <div className="col-md-2">
+                    {/* <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Verticals
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="vertical"
+                        value={filterData.vertical}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Verticals</option>
+                        <option value="Vertical 1">Vertical 1</option>
+                      </select>
+                  </div> */}
                     <MultiSelectCheckbox
                       title="Verticals"
                       options={verticalOptions}
                       selectedValues={formData.verticals.values}
+                      onChange={(values) => handleCriteriaChange('verticals', values)}
                       icon="fas fa-sitemap"
                       isOpen={dropdownStates.verticals}
                       onToggle={() => toggleDropdown('verticals')}
-                      onChange={(values) => handleCriteriaChange('verticals', values)}
                     />
 
 
                   </div>
-                  <div className="col-md-3">
-                    
+                  <div className="col-md-2">
+                    {/* <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Course
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All course</option>
+                        <option value="Course 1">Course 1</option>
+                        <option value="Course 2">Course 2</option>
+                      </select>
+                    </div> */}
                     <MultiSelectCheckbox
                       title="Course"
                       options={courseOptions}
@@ -3142,8 +3241,23 @@ const CRMDashboard = () => {
                       onToggle={() => toggleDropdown('course')}
                     />
                   </div>
-                  <div className="col-md-3">
-                    
+                  <div className="col-md-2">
+                    {/* <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Center
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All centers</option>
+                        <option value="center 1">center 1</option>
+                        <option value="center 2">center 2</option>
+                      </select>
+                    </div> */}
                     <MultiSelectCheckbox
                       title="Center"
                       options={centerOptions}
@@ -3154,8 +3268,23 @@ const CRMDashboard = () => {
                       onToggle={() => toggleDropdown('center')}
                     />
                   </div>
-                  <div className="col-md-3">
-                    
+                  <div className="col-md-2">
+                    {/* <label className="form-label small fw-bold text-dark">
+                      <i className="fas fa-industry me-1 text-primary"></i>
+                      Councellor Name
+                    </label>
+                    <div className="position-relative">
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={filterData.sector}
+                        onChange={handleFilterChange}
+                      >
+                        <option value="">All Sectors</option>
+                        <option value="Councellor 1">Councellor 1</option>
+                        <option value="Councellor 2">Councellor 2</option>
+                      </select>
+                    </div> */}
                     <MultiSelectCheckbox
                       title="Counselor"
                       options={counselorOptions}
@@ -3168,7 +3297,9 @@ const CRMDashboard = () => {
                   </div>
 
                   {/* Date Range */}
-                 
+                  {/* Date Filters Section */}
+                  {/* REPLACE your existing Date Filters Section with this */}
+                  {/* Date Filters Section - Facebook Style */}
                   <div className="col-12">
                     <div className="row g-4">
                       {/* Created Date Range */}
@@ -8262,7 +8393,7 @@ html body .content .content-wrapper {
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 1;
+  z-index: 1000;
   background: white;
   border: 1px solid #ced4da;
   border-top: none;

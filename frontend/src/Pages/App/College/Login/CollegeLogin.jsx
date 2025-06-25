@@ -37,6 +37,16 @@ const CollegeLogin = () => {
     // Logo URL
     const logoUrl = "/Assets/images/logo/logo.png";
 
+    useEffect(() => {
+        if (userData) {
+            if (returnUrl) {
+                window.location.href = returnUrl;
+            } else {
+                window.location.href = '/institute/dashboard';
+            }
+        }
+    }, [userData, returnUrl]);
+
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const loginBtnRef = useRef(null);
 

@@ -16,7 +16,6 @@ const CandidateLogin = () => {
     const user = sessionStorage.getItem('user');
     const returnUrl = queryParams.get('returnUrl');
     const refCode = queryParams.get("refCode");
-    console.log('returnUrl', returnUrl)
 
     const [mobileNumber, setMobileNumber] = useState('');
     const [otp, setOtp] = useState('');
@@ -367,7 +366,6 @@ const CandidateLogin = () => {
                 return;
             }
             try {
-                console.log('Verifing OTP')
                 // const verifyRes = await axios.post('/api/verifyOtp', { mobile: mobileNumber, otp });
                 const otpVerifyRes = await axios.post(`${backendUrl}/api/verifyOtp`, { mobile: mobileNumber, otp })
                 if (otpVerifyRes.data.status) {
