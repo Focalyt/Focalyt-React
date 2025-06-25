@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const router = express.Router();
 
-const { isCollege, auth1, authenti, logUserActivity } = require("../../../helpers");
+const { isCollege, auth1, authenti, logUserActivity, getAllTeamMembers } = require("../../../helpers");
 
 
 
@@ -71,6 +71,315 @@ const checkPermission = (permission) => {
  * 
  */
 
+// router.get('/', isCollege, async (req, res) => {
+//   try {
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 10;
+//     const user = req.user;
+
+//     const query = { '_concernPerson._id': user._id };
+//     const totalCount = await College.countDocuments(query);
+
+//     const colleges = await College.find(query)
+//       .populate({
+//         path: '_concernPerson._id',
+//         select: 'name email mobile designation permissions reporting_managers createdAt status'
+//       })
+//       .skip((page - 1) * limit)
+//       .limit(limit)
+//       .sort({ createdAt: -1 });
+
+//     // Helper to resolve verify permissions parent entities - Add this near other helper functions
+//     const resolveParentEntities = async (parentEntities) => {
+//       const resolved = [];
+//       for (const parentEntity of parentEntities) {
+//         try {
+//           const entities = await getEntityNames([parentEntity.entity_id], parentEntity.entity_type);
+//           if (entities.length > 0) {
+//             resolved.push({
+//               id: parentEntity.entity_id,
+//               name: entities[0].name,
+//               type: parentEntity.entity_type,
+//               originalName: parentEntity.entity_name
+//             });
+//           }
+//         } catch (error) {
+//           console.error('Error resolving parent entity:', parentEntity, error);
+//         }
+//       }
+//       return resolved;
+//     };
+
+//     // Helper function to get entity names with correct model names
+//     const getEntityNames = async (entityIds, entityType) => {
+//       try {
+//         let Model;
+//         switch (entityType) {
+//           case 'VERTICAL':
+//             Model = Vertical;
+//             break;
+//           case 'PROJECT':
+//             Model = Project;
+//             break;
+//           case 'CENTER':
+//             Model = Center;
+//             break;
+//           case 'COURSE':
+//             Model = Courses; // ← आपका correct model name
+//             break;
+//           case 'BATCH':
+//             Model = Batch;
+//             break;
+//           default:
+//             console.log(`Unknown entity type: ${entityType}`);
+//             return [];
+//         }
+
+//         const entities = await Model.find({
+//           _id: { $in: entityIds }
+//         }).select('name').lean();
+
+//         return entities.map(entity => ({
+//           id: entity._id.toString(),
+//           name: entity.name
+//         }));
+//       } catch (error) {
+//         console.error(`Error fetching ${entityType}:`, error);
+//         return [];
+//       }
+//     };
+
+//     // Helper to resolve entity_names format (like "CENTER_id")
+//     const resolveEntityNames = async (entityKeys) => {
+//       console.log('entityKeys', entityKeys); // Debug log
+//       const resolved = [];
+
+//       for (const key of entityKeys) {
+//         try {
+//           const [type, id] = key.split('_');
+//           console.log(`Resolving: ${type} with ID: ${id}`); // Debug log
+
+//           const entities = await getEntityNames([id], type);
+//           if (entities.length > 0) {
+//             resolved.push({
+//               id: id,
+//               name: entities[0].name,
+//               type: type
+//             });
+//             console.log(`Resolved: ${entities[0].name} (${type})`); // Debug log
+//           } else {
+//             console.log(`No entity found for ${type}_${id}`); // Debug log
+//           }
+//         } catch (error) {
+//           console.error('Error resolving entity:', key, error);
+//         }
+//       }
+//       return resolved;
+//     };
+
+//     // Process users (rest of the code remains same)
+//     const usersWithSimplifiedAccess = await Promise.all(
+//       colleges.flatMap(college =>
+//         college._concernPerson.map(async (concernPerson) => {
+//           const userData = concernPerson._id;
+//           const permissions = userData.permissions || {};
+
+//           // 1. VIEW PERMISSIONS
+//           let viewPermissions = {
+//             type: permissions.view_permissions?.global ? 'Global' : 'Specific',
+//             global: permissions.view_permissions?.global || false,
+//             entities: {
+//               verticals: [],
+//               projects: [],
+//               centers: [],
+//               courses: [],
+//               batches: []
+//             },
+//             summary: { verticals: 0, projects: 0, centers: 0, courses: 0, batches: 0 }
+//           };
+
+//           if (!permissions.view_permissions?.global && permissions.view_permissions?.hierarchical_selection) {
+//             const hs = permissions.view_permissions.hierarchical_selection;
+
+//             if (hs.selected_verticals?.length > 0) {
+//               viewPermissions.entities.verticals = await getEntityNames(hs.selected_verticals, 'VERTICAL');
+//               viewPermissions.summary.verticals = viewPermissions.entities.verticals.length;
+//             }
+//             if (hs.selected_projects?.length > 0) {
+//               viewPermissions.entities.projects = await getEntityNames(hs.selected_projects, 'PROJECT');
+//               viewPermissions.summary.projects = viewPermissions.entities.projects.length;
+//             }
+//             if (hs.selected_centers?.length > 0) {
+//               viewPermissions.entities.centers = await getEntityNames(hs.selected_centers, 'CENTER');
+//               viewPermissions.summary.centers = viewPermissions.entities.centers.length;
+//             }
+//             if (hs.selected_courses?.length > 0) {
+//               viewPermissions.entities.courses = await getEntityNames(hs.selected_courses, 'COURSE');
+//               viewPermissions.summary.courses = viewPermissions.entities.courses.length;
+//             }
+//             if (hs.selected_batches?.length > 0) {
+//               viewPermissions.entities.batches = await getEntityNames(hs.selected_batches, 'BATCH');
+//               viewPermissions.summary.batches = viewPermissions.entities.batches.length;
+//             }
+//           }
+
+//           // 2. ADD PERMISSIONS
+//           let addPermissions = {
+//             type: permissions.add_permissions?.global ? 'Global' : 'Specific',
+//             global: permissions.add_permissions?.global || false,
+//             permissions: [],
+//             count: 0
+//           };
+
+//           if (!permissions.add_permissions?.global && permissions.add_permissions?.specific_permissions) {
+//             for (const perm of permissions.add_permissions.specific_permissions) {
+//               let entities = [];
+//               if (perm.selected_entities?.length > 0) {
+//                 entities = await getEntityNames(perm.selected_entities, perm.permission_level);
+//               }
+
+//               addPermissions.permissions.push({
+//                 level: perm.permission_level,
+//                 entities: entities,
+//                 canAddTypes: perm.can_add_types || [],
+//                 summary: `Can add ${(perm.can_add_types || []).join(', ')} in ${entities.length} ${perm.permission_level?.toLowerCase()}(s)`
+//               });
+//             }
+//             addPermissions.count = addPermissions.permissions.length;
+//           }
+
+//           // 3. EDIT PERMISSIONS
+//           let editPermissions = {
+//             type: permissions.edit_permissions?.global ? 'Global' : 'Specific',
+//             global: permissions.edit_permissions?.global || false,
+//             permissions: [],
+//             count: 0
+//           };
+
+//           if (!permissions.edit_permissions?.global && permissions.edit_permissions?.specific_permissions) {
+//             for (const perm of permissions.edit_permissions.specific_permissions) {
+//               let entities = [];
+//               let summary = '';
+
+//               if (perm.edit_type === 'specific_entity_level') {
+//                 summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels`;
+//               } else if (perm.edit_type === 'specific_entity_with_children') {
+//                 summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels + children`;
+//               } else if (perm.entity_names?.length > 0) {
+//                 entities = await resolveEntityNames(perm.entity_names);
+//                 summary = `Can edit specific entities: ${entities.map(e => e.name).join(', ')}`;
+//               }
+
+//               editPermissions.permissions.push({
+//                 editType: perm.edit_type,
+//                 levels: perm.permission_levels || [],
+//                 entities: entities,
+//                 withChildren: perm.with_child_levels || false,
+//                 summary: summary
+//               });
+//             }
+//             editPermissions.count = editPermissions.permissions.length;
+//           }
+
+//           // 4. VERIFY PERMISSIONS - Add this after editPermissions
+//           let verifyPermissions = {
+//             type: permissions.verify_permissions?.type || 'Not set',
+//             global: permissions.verify_permissions?.global || false,
+//             permissions: [],
+//             count: 0,
+//             summary: 'No verify permissions set'
+//           };
+
+//           if (permissions.verify_permissions?.type) {
+//             if (permissions.verify_permissions.type === 'global') {
+//               verifyPermissions.summary = 'Can verify any content anywhere in the system';
+//               verifyPermissions.count = 1;
+//             }
+//             else if (permissions.verify_permissions.type === 'entity_children') {
+//               // Specific Entity's Children
+//               if (permissions.verify_permissions.parent_entities?.length > 0) {
+//                 const parentEntities = await resolveParentEntities(permissions.verify_permissions.parent_entities);
+//                 verifyPermissions.permissions = [{
+//                   type: 'entity_children',
+//                   parentEntities: parentEntities,
+//                   summary: `Can verify all children of: ${parentEntities.map(e => `${e.name} (${e.type})`).join(', ')}`
+//                 }];
+//                 verifyPermissions.count = parentEntities.length;
+//                 verifyPermissions.summary = `Can verify children of ${parentEntities.length} parent entities`;
+//               }
+//             }
+//             else if (permissions.verify_permissions.type === 'specific_levels_children') {
+//               // Specific Entity Levels' Children
+//               if (permissions.verify_permissions.selected_levels?.length > 0) {
+//                 const selectedLevels = permissions.verify_permissions.selected_levels;
+//                 verifyPermissions.permissions = [{
+//                   type: 'levels_children',
+//                   selectedLevels: selectedLevels,
+//                   summary: `Can verify children of entities at: ${selectedLevels.join(', ')} levels`
+//                 }];
+//                 verifyPermissions.count = selectedLevels.length;
+//                 verifyPermissions.summary = `Can verify children at ${selectedLevels.length} entity levels`;
+//               }
+//             }
+//           }
+
+//           // 4. LEAD PERMISSIONS
+//           const leadPermissions = {
+//             enabled: Object.values(permissions.lead_permissions || {}).filter(Boolean).length,
+//             details: permissions.lead_permissions || {}
+//           };
+
+//           return {
+//             _id: userData._id,
+//             name: userData.name,
+//             email: userData.email,
+//             mobile: userData.mobile,
+//             designation: userData.designation,
+//             my_team: userData.my_team,
+//             status: userData.status,
+//             createdAt: userData.createdAt,
+//             defaultAdmin: concernPerson.defaultAdmin,
+//             college: {
+//               _id: college._id,
+//               name: college.name,
+//               type: college.type
+//             },
+//             accessSummary: {
+//               permissionType: permissions.permission_type || 'Not set',
+//               viewPermissions,
+//               addPermissions,
+//               editPermissions,
+//               leadPermissions,
+//               verifyPermissions,
+//               reportingManagers: userData.reporting_managers?.length || 0
+//             }
+//           };
+//         })
+//       )
+//     );
+
+//     res.json({
+//       success: true,
+//       data: {
+//         users: usersWithSimplifiedAccess,
+//         pagination: {
+//           currentPage: page,
+//           totalPages: Math.ceil(totalCount / limit),
+//           totalUsers: totalCount,
+//           limit
+//         }
+//       }
+//     });
+
+//   } catch (err) {
+//     console.error('Error in GET /users:', err);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server Error"
+//     });
+//   }
+// });
+
 router.get('/', isCollege, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -78,289 +387,33 @@ router.get('/', isCollege, async (req, res) => {
     const user = req.user;
 
     const query = { '_concernPerson._id': user._id };
-    const totalCount = await College.countDocuments(query);
+    // const totalCount = await College.countDocuments(query);
 
     const colleges = await College.find(query)
       .populate({
         path: '_concernPerson._id',
-        select: 'name email mobile designation permissions reporting_managers createdAt status'
+        select: 'name email mobile designation permissions reporting_managers createdAt status my_team'
       })
       .skip((page - 1) * limit)
       .limit(limit)
       .sort({ createdAt: -1 });
 
-    // Helper to resolve verify permissions parent entities - Add this near other helper functions
-    const resolveParentEntities = async (parentEntities) => {
-      const resolved = [];
-      for (const parentEntity of parentEntities) {
-        try {
-          const entities = await getEntityNames([parentEntity.entity_id], parentEntity.entity_type);
-          if (entities.length > 0) {
-            resolved.push({
-              id: parentEntity.entity_id,
-              name: entities[0].name,
-              type: parentEntity.entity_type,
-              originalName: parentEntity.entity_name
-            });
-          }
-        } catch (error) {
-          console.error('Error resolving parent entity:', parentEntity, error);
-        }
-      }
-      return resolved;
-    };
+   let users = await Promise.all(colleges.flatMap(college => college._concernPerson.map(concernPerson => concernPerson._id)));
 
-    // Helper function to get entity names with correct model names
-    const getEntityNames = async (entityIds, entityType) => {
-      try {
-        let Model;
-        switch (entityType) {
-          case 'VERTICAL':
-            Model = Vertical;
-            break;
-          case 'PROJECT':
-            Model = Project;
-            break;
-          case 'CENTER':
-            Model = Center;
-            break;
-          case 'COURSE':
-            Model = Courses; // ← आपका correct model name
-            break;
-          case 'BATCH':
-            Model = Batch;
-            break;
-          default:
-            console.log(`Unknown entity type: ${entityType}`);
-            return [];
-        }
+   for (let user of users) {
+    user.my_team = await getAllTeamMembers(user._id)
+   }
 
-        const entities = await Model.find({
-          _id: { $in: entityIds }
-        }).select('name').lean();
-
-        return entities.map(entity => ({
-          id: entity._id.toString(),
-          name: entity.name
-        }));
-      } catch (error) {
-        console.error(`Error fetching ${entityType}:`, error);
-        return [];
-      }
-    };
-
-    // Helper to resolve entity_names format (like "CENTER_id")
-    const resolveEntityNames = async (entityKeys) => {
-      console.log('entityKeys', entityKeys); // Debug log
-      const resolved = [];
-
-      for (const key of entityKeys) {
-        try {
-          const [type, id] = key.split('_');
-          console.log(`Resolving: ${type} with ID: ${id}`); // Debug log
-
-          const entities = await getEntityNames([id], type);
-          if (entities.length > 0) {
-            resolved.push({
-              id: id,
-              name: entities[0].name,
-              type: type
-            });
-            console.log(`Resolved: ${entities[0].name} (${type})`); // Debug log
-          } else {
-            console.log(`No entity found for ${type}_${id}`); // Debug log
-          }
-        } catch (error) {
-          console.error('Error resolving entity:', key, error);
-        }
-      }
-      return resolved;
-    };
-
-    // Process users (rest of the code remains same)
-    const usersWithSimplifiedAccess = await Promise.all(
-      colleges.flatMap(college =>
-        college._concernPerson.map(async (concernPerson) => {
-          const userData = concernPerson._id;
-          const permissions = userData.permissions || {};
-
-          // 1. VIEW PERMISSIONS
-          let viewPermissions = {
-            type: permissions.view_permissions?.global ? 'Global' : 'Specific',
-            global: permissions.view_permissions?.global || false,
-            entities: {
-              verticals: [],
-              projects: [],
-              centers: [],
-              courses: [],
-              batches: []
-            },
-            summary: { verticals: 0, projects: 0, centers: 0, courses: 0, batches: 0 }
-          };
-
-          if (!permissions.view_permissions?.global && permissions.view_permissions?.hierarchical_selection) {
-            const hs = permissions.view_permissions.hierarchical_selection;
-
-            if (hs.selected_verticals?.length > 0) {
-              viewPermissions.entities.verticals = await getEntityNames(hs.selected_verticals, 'VERTICAL');
-              viewPermissions.summary.verticals = viewPermissions.entities.verticals.length;
-            }
-            if (hs.selected_projects?.length > 0) {
-              viewPermissions.entities.projects = await getEntityNames(hs.selected_projects, 'PROJECT');
-              viewPermissions.summary.projects = viewPermissions.entities.projects.length;
-            }
-            if (hs.selected_centers?.length > 0) {
-              viewPermissions.entities.centers = await getEntityNames(hs.selected_centers, 'CENTER');
-              viewPermissions.summary.centers = viewPermissions.entities.centers.length;
-            }
-            if (hs.selected_courses?.length > 0) {
-              viewPermissions.entities.courses = await getEntityNames(hs.selected_courses, 'COURSE');
-              viewPermissions.summary.courses = viewPermissions.entities.courses.length;
-            }
-            if (hs.selected_batches?.length > 0) {
-              viewPermissions.entities.batches = await getEntityNames(hs.selected_batches, 'BATCH');
-              viewPermissions.summary.batches = viewPermissions.entities.batches.length;
-            }
-          }
-
-          // 2. ADD PERMISSIONS
-          let addPermissions = {
-            type: permissions.add_permissions?.global ? 'Global' : 'Specific',
-            global: permissions.add_permissions?.global || false,
-            permissions: [],
-            count: 0
-          };
-
-          if (!permissions.add_permissions?.global && permissions.add_permissions?.specific_permissions) {
-            for (const perm of permissions.add_permissions.specific_permissions) {
-              let entities = [];
-              if (perm.selected_entities?.length > 0) {
-                entities = await getEntityNames(perm.selected_entities, perm.permission_level);
-              }
-
-              addPermissions.permissions.push({
-                level: perm.permission_level,
-                entities: entities,
-                canAddTypes: perm.can_add_types || [],
-                summary: `Can add ${(perm.can_add_types || []).join(', ')} in ${entities.length} ${perm.permission_level?.toLowerCase()}(s)`
-              });
-            }
-            addPermissions.count = addPermissions.permissions.length;
-          }
-
-          // 3. EDIT PERMISSIONS
-          let editPermissions = {
-            type: permissions.edit_permissions?.global ? 'Global' : 'Specific',
-            global: permissions.edit_permissions?.global || false,
-            permissions: [],
-            count: 0
-          };
-
-          if (!permissions.edit_permissions?.global && permissions.edit_permissions?.specific_permissions) {
-            for (const perm of permissions.edit_permissions.specific_permissions) {
-              let entities = [];
-              let summary = '';
-
-              if (perm.edit_type === 'specific_entity_level') {
-                summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels`;
-              } else if (perm.edit_type === 'specific_entity_with_children') {
-                summary = `Can edit all entities at: ${(perm.permission_levels || []).join(', ')} levels + children`;
-              } else if (perm.entity_names?.length > 0) {
-                entities = await resolveEntityNames(perm.entity_names);
-                summary = `Can edit specific entities: ${entities.map(e => e.name).join(', ')}`;
-              }
-
-              editPermissions.permissions.push({
-                editType: perm.edit_type,
-                levels: perm.permission_levels || [],
-                entities: entities,
-                withChildren: perm.with_child_levels || false,
-                summary: summary
-              });
-            }
-            editPermissions.count = editPermissions.permissions.length;
-          }
-
-          // 4. VERIFY PERMISSIONS - Add this after editPermissions
-          let verifyPermissions = {
-            type: permissions.verify_permissions?.type || 'Not set',
-            global: permissions.verify_permissions?.global || false,
-            permissions: [],
-            count: 0,
-            summary: 'No verify permissions set'
-          };
-
-          if (permissions.verify_permissions?.type) {
-            if (permissions.verify_permissions.type === 'global') {
-              verifyPermissions.summary = 'Can verify any content anywhere in the system';
-              verifyPermissions.count = 1;
-            }
-            else if (permissions.verify_permissions.type === 'entity_children') {
-              // Specific Entity's Children
-              if (permissions.verify_permissions.parent_entities?.length > 0) {
-                const parentEntities = await resolveParentEntities(permissions.verify_permissions.parent_entities);
-                verifyPermissions.permissions = [{
-                  type: 'entity_children',
-                  parentEntities: parentEntities,
-                  summary: `Can verify all children of: ${parentEntities.map(e => `${e.name} (${e.type})`).join(', ')}`
-                }];
-                verifyPermissions.count = parentEntities.length;
-                verifyPermissions.summary = `Can verify children of ${parentEntities.length} parent entities`;
-              }
-            }
-            else if (permissions.verify_permissions.type === 'specific_levels_children') {
-              // Specific Entity Levels' Children
-              if (permissions.verify_permissions.selected_levels?.length > 0) {
-                const selectedLevels = permissions.verify_permissions.selected_levels;
-                verifyPermissions.permissions = [{
-                  type: 'levels_children',
-                  selectedLevels: selectedLevels,
-                  summary: `Can verify children of entities at: ${selectedLevels.join(', ')} levels`
-                }];
-                verifyPermissions.count = selectedLevels.length;
-                verifyPermissions.summary = `Can verify children at ${selectedLevels.length} entity levels`;
-              }
-            }
-          }
-
-          // 4. LEAD PERMISSIONS
-          const leadPermissions = {
-            enabled: Object.values(permissions.lead_permissions || {}).filter(Boolean).length,
-            details: permissions.lead_permissions || {}
-          };
-
-          return {
-            _id: userData._id,
-            name: userData.name,
-            email: userData.email,
-            mobile: userData.mobile,
-            designation: userData.designation,
-            status: userData.status,
-            createdAt: userData.createdAt,
-            defaultAdmin: concernPerson.defaultAdmin,
-            college: {
-              _id: college._id,
-              name: college.name,
-              type: college.type
-            },
-            accessSummary: {
-              permissionType: permissions.permission_type || 'Not set',
-              viewPermissions,
-              addPermissions,
-              editPermissions,
-              leadPermissions,
-              verifyPermissions,
-              reportingManagers: userData.reporting_managers?.length || 0
-            }
-          };
-        })
-      )
-    );
+   totalCount = users.length
+  
+  // Fetch user details
+  console.log('users', users)
+ 
 
     res.json({
       success: true,
       data: {
-        users: usersWithSimplifiedAccess,
+        users,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(totalCount / limit),
@@ -378,6 +431,7 @@ router.get('/', isCollege, async (req, res) => {
     });
   }
 });
+
 router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivity((req) => `Add user: ${req.body.name}`)], async (req, res) => {
   console.log('api called add user')
   try {
@@ -1028,10 +1082,13 @@ router.get('/users-details/:userId', [isCollege, checkPermission('can_view_users
   try {
     const { userId } = req.params;
 
-    const user = await User.findOne({
+    let user = await User.findOne({
       _id: userId,
       isDeleted: false
     })
+    const my_team = await getAllTeamMembers(userId)
+    console.log('my_team', my_team)
+    user.my_team = my_team
     if (!user) {
       return res.status(404).json({
         success: false,

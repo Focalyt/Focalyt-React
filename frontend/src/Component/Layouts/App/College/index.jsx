@@ -32,7 +32,8 @@ function CollegeLayout({ children }) {
 
   useEffect(() => {
     const storedUser = sessionStorage.getItem('user');
-    if (storedUser) {
+    console.log('storedUser', storedUser)
+    if (storedUser.role === 2) {
       const parsed = JSON.parse(storedUser);
       setUser(parsed);
     } else {

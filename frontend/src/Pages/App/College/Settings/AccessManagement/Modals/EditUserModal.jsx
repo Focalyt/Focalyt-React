@@ -7,6 +7,10 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
   const token = userData.token;
   const [userDetails, setUserDetails] = useState(null);
 
+  useEffect(() => {
+    console.log(editUser, 'editUser')
+  }, [editUser])
+
   const user = JSON.parse(sessionStorage.getItem('user'));
   // useEffect(() => {
   //   setUserForm({
@@ -49,6 +53,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
       role_designation: response.data.data.designation,
       description: response.data.data.description,
       reporting_managers: response.data.data.reporting_managers,
+      my_team: response.data.data.my_team,
       centers_access: response.data.data.centers_access,
       permissions: response.data.data.permissions.custom_permissions,
       access_level: response.data.data.permissions.permission_type === 'Admin' ? 'admin' : response.data.data.permissions.permission_type === 'View Only' ? 'view_only' : 'custom',
@@ -72,6 +77,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
     mobile:  '',
     role_designation:  '',
     description:  '',
+    my_team: [],
     reporting_managers:  [],
     access_level: '', // New field for access level selection
     centers_access: '',
@@ -421,7 +427,12 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                       onClick={() => {
                         setUserForm(prev => ({
                           ...prev,
-                          reporting_managers: users.filter(user => user.user_id !== editUser?.user_id).map(u => u.user_id)
+                          reporting_managers: users
+                            .filter(user => 
+                              user.user_id !== editUser?.user_id &&
+                              !(editUser.my_team || []).includes(user.user_id.toString())
+                            )
+                            .map(u => u.user_id)
                         }));
                       }}
                     >
@@ -439,34 +450,39 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                   </div>
                 </div>
                 <div className="card-body" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                  {users.filter(user => user.user_id !== editUser?.user_id).map(user => {
-                    const isSelected = userForm.reporting_managers.includes(user.user_id);
+                  {users
+                    .filter(user => 
+                      user.user_id !== editUser?.user_id &&
+                      !(editUser.my_team || []).includes(user.user_id.toString())
+                    )
+                    .map(user => {
+                      const isSelected = userForm.reporting_managers.includes(user.user_id);
 
-                    return (
-                      <div key={user.user_id} className="form-check mb-3 p-2 border-bottom">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => handleReportingManagerChange(user.user_id, e.target.checked)}
-                          id={`manager_${user.user_id}`}
-                        />
-                        <label className="form-check-label w-100" htmlFor={`manager_${user.user_id}`}>
-                          <div className="d-flex justify-content-between align-items-start">
-                            <div>
-                              <div className="fw-bold text-dark">{user.name}</div>
-                              <div className="small text-primary">{user.designation || user.role_designation || 'No designation'}</div>
-                              {user.email && <div className="small text-muted">📧 {user.email}</div>}
-                              {user.mobile && <div className="small text-muted">📱 {user.mobile}</div>}
+                      return (
+                        <div key={user.user_id} className="form-check mb-3 p-2 border-bottom">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => handleReportingManagerChange(user.user_id, e.target.checked)}
+                            id={`manager_${user.user_id}`}
+                          />
+                          <label className="form-check-label w-100" htmlFor={`manager_${user.user_id}`}>
+                            <div className="d-flex justify-content-between align-items-start">
+                              <div>
+                                <div className="fw-bold text-dark">{user.name}</div>
+                                <div className="small text-primary">{user.designation || user.role_designation || 'No designation'}</div>
+                                {user.email && <div className="small text-muted">📧 {user.email}</div>}
+                                {user.mobile && <div className="small text-muted">📱 {user.mobile}</div>}
+                              </div>
+                              <div className="text-end">
+                                <span className="badge bg-success">Active</span>
+                              </div>
                             </div>
-                            <div className="text-end">
-                              <span className="badge bg-success">Active</span>
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-                    );
-                  })}
+                          </label>
+                        </div>
+                      );
+                    })}
                 </div>
 
                 {userForm.reporting_managers.length > 0 && (

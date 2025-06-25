@@ -163,7 +163,7 @@ const AccessManagement = () => {
       });
   
       if (response.data.success) {
-        console.log('response.data.data.users', response.data.data.users)
+        console.log('response.data.data.users', response.data.data)
         // Update users state with detailed access summary
         setUsers(response.data.data.users.map(user => ({
           user_id: user._id,
@@ -174,7 +174,10 @@ const AccessManagement = () => {
           status: user.status ? 'active' : 'inactive',
           reporting_managers: user.accessSummary?.reportingManagers || 0,
           role: user.role,
-          roleId: user.roleId,          
+          roleId: user.roleId,
+          access_level: user.access_level,
+          permissions: user.permissions,
+          my_team: user.my_team,
           // ✅ NEW: Add detailed access summary
           accessSummary: user.accessSummary || {},
           fullPermissions: user.fullPermissions || {},
@@ -434,8 +437,8 @@ const fetchBatches = async () => {
           users={users}
           allRoles={allRoles}
           onClose={() => setShowAddUser(false)}
-          onAddUser={(newUser) => {
-            fetchUsers();
+          onAddUser={async () => {
+            await fetchUsers();
             setShowAddUser(false);
           }}
           enhancedEntities={enhancedEntities}
@@ -449,8 +452,8 @@ const fetchBatches = async () => {
           editUser={editUser}
           allRoles={allRoles}
           onClose={() => setShowEditUser(false)}
-          onEditUser={(newUser) => {
-            fetchUsers();
+          onEditUser={async () => {
+            await fetchUsers();
             setShowEditUser(false);
           }}
           enhancedEntities={enhancedEntities}

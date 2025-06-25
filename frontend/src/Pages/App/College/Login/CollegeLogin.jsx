@@ -38,11 +38,11 @@ const CollegeLogin = () => {
     const logoUrl = "/Assets/images/logo/logo.png";
 
     useEffect(() => {
-        if (userData) {
+        if (userData.role === 2) {
             if (returnUrl) {
-                window.location.href = returnUrl;
+                navigate(returnUrl);
             } else {
-                window.location.href = '/institute/dashboard';
+                navigate('/institute/dashboard');
             }
         }
     }, [userData, returnUrl]);
