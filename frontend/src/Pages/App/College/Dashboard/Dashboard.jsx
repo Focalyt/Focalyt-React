@@ -400,7 +400,6 @@ const LeadAnalyticsDashboard = () => {
         setIsLoading(true);
   
         if (!token) {
-          console.warn('No token found in session storage.');
           setAppliedCoursesData([]);
           setIsLoading(false);
           return;
@@ -427,16 +426,13 @@ const LeadAnalyticsDashboard = () => {
           params: queryParams
         });
         
-        console.log('Backend dashboard data:', response.data);
         if (response.data.success && response.data.data) {
           setAppliedCoursesData(response.data.data || []);
         } else {
-          console.error('Failed to fetch dashboard data', response.data.message);
           setAppliedCoursesData([]);
         }
   
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
         setAppliedCoursesData([]);
       } finally {
         setIsLoading(false);
@@ -445,9 +441,7 @@ const LeadAnalyticsDashboard = () => {
     fetchProfileData();
   }, [token, backendUrl, startDate, endDate, selectedPeriod, useCustomDate]);
 
-  useEffect(() => {
-    console.log(appliedCoursesData, 'appliedCoursesData')
-  }, [appliedCoursesData])
+ 
   
   // After fetching data, add a fake substatus to the first lead for testing
   if (appliedCoursesData.length > 0) {
@@ -531,7 +525,6 @@ const LeadAnalyticsDashboard = () => {
           statuses.add(status);
           if (!substatusMap[status]) substatusMap[status] = new Set();
           if (Array.isArray(lead._leadStatus?.substatuses)) {
-            console.log('Lead:', lead, 'Substatuses:', lead._leadStatus.substatuses);
             lead._leadStatus.substatuses.forEach(sub => {
               if (sub?.title) substatusMap[status].add(sub.title);
             });
@@ -544,7 +537,6 @@ const LeadAnalyticsDashboard = () => {
       Object.keys(substatusMap).forEach(status => {
         subMap[status] = Array.from(substatusMap[status]);
       });
-      console.log('allSubstatuses', subMap);
       setAllSubstatuses(subMap);
     } else {
       setAllStatuses([]);
