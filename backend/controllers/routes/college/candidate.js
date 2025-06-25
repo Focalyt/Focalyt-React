@@ -1323,4 +1323,19 @@ router.post('/saveProfile', [isCollege], async (req, res) => {
 	
 	  } catch (err) { return req.errFunc(err); }
   })
+
+  router.post('/assign-batch', [isCollege], async (req, res) => {
+	try {
+		console.log('assign-batch')
+		const { batchId, appliedCourseId } = req.body
+		console.log('batchId',batchId)
+		console.log('appliedCourseId',appliedCourseId)
+		const appliedCourse = await AppliedCourses.findOneAndUpdate({_id:appliedCourseId},{$set:{batch:batchId,isBatchAssigned:true}},{new:true})
+		console.log('appliedCourse',appliedCourse)
+		return res.send({status:true,message:'Batch assigned successfully',data:appliedCourse})
+	} catch (err) {
+		console.error('Error assigning batch:', err);
+		return res.send({status:false,message:'Error assigning batch',error:err})
+	}
+  })
 module.exports = router;

@@ -13,9 +13,17 @@ const appliedCoursesSchema = new Schema(
       type: ObjectId,
       ref: "courses",
     },
-    _center: {
+      _center: {
+        type: ObjectId,
+        ref: "Center",
+      },
+    batch: {
       type: ObjectId,
-      ref: "Center",
+      ref: "Batch",
+    },
+    isBatchAssigned: {
+      type: Boolean,
+      default: false,
     },
     _leadStatus: {
       type: ObjectId,
