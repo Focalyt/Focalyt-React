@@ -5813,5 +5813,207 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 
 
 
+router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		let { courseId, centerId } = req.params;
+		if (!courseId || !centerId) {
+			return res.status(400).json({ status: false, message: 'Course ID and center ID are required' });
+		}
+		if (typeof courseId !== 'string' || typeof centerId !== 'string') {
+			courseId = new mongoose.Types.ObjectId(courseId);
+			centerId = new mongoose.Types.ObjectId(centerId);
+		}
+		const college = await College.findOne({
+			'_concernPerson._id': user._id
+		});
+
+		const page = parseInt(req.query.page) || 1;      // Default page 1
+		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+		const skip = (page - 1) * limit;
+
+		const appliedCourses = await AppliedCourses.find({	
+			admissionDone: { $in: [true] },
+			_course: courseId,
+			_center: centerId
+		})
+			.populate({
+				path: '_course',
+				select: 'name description docsRequired college', // Select the necessary fields
+				populate: {
+					path: 'sectors',
+					select: 'name'
+				}
+			})
+			.populate('_center')
+			.populate('_leadStatus')
+			.populate('registeredBy')
+			.populate({
+				path: '_candidate',
+				populate: [
+					{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+				]
+			})
+			.populate({
+				path: 'logs',
+				populate: {
+					path: 'user',
+					select: 'name'
+				}
+			})
+			.sort({ createdAt: -1 })
+			.skip(skip)
+			.limit(limit);
+
+		const filteredAppliedCourses = appliedCourses.filter(doc => {
+			// _course must be populated!
+			return doc._course && String(doc._course.college) === String(college._id);
+		});
+
+		const totalCount = filteredAppliedCourses.length
+		const pendingKycCount = filteredAppliedCourses.filter(doc =>
+			doc.kycStage === true && doc.kyc === false
+		).length;
+		const doneKycCount = totalCount - pendingKycCount
+
+
+		const result = filteredAppliedCourses.map(doc => {
+			let selectedSubstatus = null;
+
+
+
+			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+				selectedSubstatus = doc._leadStatus.substatuses.find(
+					sub => sub._id.toString() === doc._leadSubStatus.toString()
+				);
+			}
+
+			const docObj = doc.toObject();
+
+			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+			if (docObj._course) {
+				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+			}
+
+			const requiredDocs = docObj._course?.docsRequired || [];
+			const uploadedDocs = docObj.uploadedDocs || [];
+
+			// Map uploaded docs by docsId for quick lookup
+			const uploadedDocsMap = {};
+			uploadedDocs.forEach(d => {
+				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+			});
+			// Prepare combined docs array
+			const allDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					// Agar uploaded hai to uploadedDoc details bhejo
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						_id: reqDoc._id
+					};
+				} else {
+					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
+
+
+			// Prepare combined docs array
+			if (requiredDocs) {
+				docsRequired = requiredDocs
+
+				// Create a merged array with both required docs and uploaded docs info
+				combinedDocs = docsRequired.map(reqDoc => {
+					// Convert Mongoose document to plain object
+					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+					// Find matching uploaded docs for this required doc
+					const matchingUploads = uploadedDocs.filter(
+						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+					);
+
+					return {
+						_id: docObj._id,
+						Name: docObj.Name || 'Document',
+						description: docObj.description || '',
+						uploads: matchingUploads || []
+					};
+				});
+
+
+			} else {
+				console.log("Course not found or no docs required");
+			};
+
+			// Count calculations
+			let verifiedCount = 0;
+			let RejectedCount = 0;
+			let pendingVerificationCount = 0;
+			let notUploadedCount = 0;
+
+			allDocs.forEach(doc => {
+				if (doc.status === "Verified") verifiedCount++;
+				else if (doc.status === "Rejected") RejectedCount++;
+				else if (doc.status === "Pending") pendingVerificationCount++;
+				else if (doc.status === "Not Uploaded") notUploadedCount++;
+			});
+
+			const totalRequired = allDocs.length;
+			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
+			const uploadPercentage = totalRequired > 0
+				? Math.round((uploadedCount / totalRequired) * 100)
+				: 0;
+			return {
+				...docObj,
+				selectedSubstatus,
+				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				docCounts: {
+					totalRequired,
+					RejectedCount,
+					uploadedCount,
+					verifiedCount,
+					pendingVerificationCount,
+					notUploadedCount,
+					uploadPercentage
+				}
+			};
+		});
+
+
+
+		res.status(200).json({
+			success: true,
+			count: result.length,
+			page,
+			pendingKycCount,
+			doneKycCount,
+			limit,
+			totalCount,
+			totalPages: Math.ceil(totalCount / limit),
+			data: result,
+		});
+
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+});
+
+
+
 
 module.exports = router;
