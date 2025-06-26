@@ -55,13 +55,9 @@ const CandidateManagementPortal_copy = () => {
     const navigationContext = {
       stage,
       verticalId: urlParams.get('verticalId'),
-      verticalName: urlParams.get('verticalName'),
       projectId: urlParams.get('projectId'),
-      projectName: urlParams.get('projectName'),
       centerId: urlParams.get('centerId'),
-      centerName: urlParams.get('centerName'),
       courseId: urlParams.get('courseId'),
-      courseName: urlParams.get('courseName')
     };
     
     return { stage, savedVertical, navigationContext };
@@ -73,10 +69,8 @@ const CandidateManagementPortal_copy = () => {
     
     if (vertical) {
       url.searchParams.set('verticalId', vertical.id);
-      url.searchParams.set('verticalName', vertical.name);
     } else {
       url.searchParams.delete('verticalId');
-      url.searchParams.delete('verticalName');
     }
     
     // Handle additional parameters (project, center, course info)
@@ -289,8 +283,8 @@ const CandidateManagementPortal_copy = () => {
     setSelectedVerticalForProjects(vertical);
     setShowProjects(true);
     setShowVertical(false)
-    localStorage.setItem("cmsStage", "project");
-    localStorage.setItem("selectedVertical", JSON.stringify(vertical));
+    // localStorage.setItem("cmsStage", "project");
+    // localStorage.setItem("selectedVertical", JSON.stringify(vertical));
     updateURL('project', vertical);
   };
 
@@ -301,8 +295,8 @@ const CandidateManagementPortal_copy = () => {
 
     setSelectedVerticalForProjects(null);
 
-    localStorage.setItem("cmsStage", "vertical");
-    localStorage.removeItem("selectedVertical");
+    // localStorage.setItem("cmsStage", "vertical");
+    // localStorage.removeItem("selectedVertical");
     updateURL('vertical');
   };
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 
 import axios from 'axios'
 import DatePicker from 'react-date-picker';
@@ -7,9 +8,26 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 
-import Student from '../../../../Layouts/App/College/ProjectManagement/Student';
 
-const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter = null, onBackToCenters = null, selectedProject = null, onBackToProjects = null, selectedVertical = null, onBackToVerticals = null }) => {
+  const Batch = () => {
+
+    const { courseId, courseName, centerId, centerName, projectId, projectName, verticalId, verticalName } = useParams();
+    const selectedCourse = {
+      _id: courseId,
+      name: courseName
+    }
+    const selectedCenter = {
+      _id: centerId,
+      name: centerName
+    }
+    const selectedProject = {
+      _id: projectId,
+      name: projectName
+    }
+    const selectedVertical = {
+      id: verticalId,
+      name: verticalName
+    }
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -114,31 +132,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
-  // Function to handle batch click for students
-  const handleBatchClick = (batch) => {
-    setSelectedBatchForStudents(batch);
-    setShowStudents(true);
-
-    // updateURL({
-    //   stage: 'student',
-    //   batchId: batch._id,
-    //   batchName: batch.name,
-    // });
-  };
-
-  // Function to go back to batches view
-  const handleBackToBatches = () => {
-    setShowStudents(false);
-    setSelectedBatchForStudents(null);
-    // updateURL({
-    //   stage: 'batch',
-    //   courseId: selectedCourse?._id,
-    //   courseName: selectedCourse?.name,
-    //   centerId: selectedCenter?._id,
-    //   centerName: selectedCenter?.name,
-    // });
-  };
-
+  
   const [batches, setBatches] = useState([]);
 
   // Exact same tabs as CRM Dashboard
@@ -1814,19 +1808,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     );
   };
 
-  // If showing students, render the Student component
-  if (showStudents && selectedBatchForStudents) {
-    return (
-      <Student
-        selectedBatch={selectedBatchForStudents}
-        onBackToBatches={handleBackToBatches}
-        selectedCourse={selectedCourse}
-        onBackToCourses={onBackToCourses}
-        selectedCenter={selectedCenter}
-        onBackToCenters={onBackToCenters}
-      />
-    );
-  }
+
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>{error}</div>;
@@ -1837,19 +1819,29 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         <div>
           <div className="d-flex align-items-center gap-3">
             <div className='d-flex align-items-center'>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
+              <a href={`/institute/candidatemanagment`}>
+              <h5 style={{ cursor: 'pointer' }} className="me-2">{selectedVertical.name} Vertical</h5>
+              </a>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+              <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}`}>
+              <h5 style={{ cursor: 'pointer' }} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedProject.name} Project
               </h5>
+              </a>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
+              <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/project/${selectedProject.name}/${selectedProject._id}`}>
+              <h5 style={{ cursor: 'pointer' }} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedCenter.name} Centers
               </h5>
+              </a>
+             
+             
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCourses} className="breadcrumb-item mb-0" aria-current="page">
-                {selectedCourse.name} Centers
+              <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/${selectedProject.name}/${selectedProject._id}/center/${selectedCenter.name}/${selectedCenter._id}`}>
+              <h5 style={{ cursor: 'pointer' }} className="breadcrumb-item mb-0" aria-current="page">
+                {selectedCourse.name} Course
               </h5>
+              </a>
               <span className="mx-2"> &gt; </span>
               <h5 className="breadcrumb-item mb-0" aria-current="page">
                 All Batches
@@ -1859,11 +1851,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         </div>
 
         <div>
-          {onBackToCourses && (
-            <button className="btn btn-outline-secondary me-2" onClick={onBackToCourses}>
-              <i className="bi bi-arrow-left"></i> Back
-            </button>
-          )}
+          <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/${selectedProject.name}/${selectedProject._id}/center/${selectedCenter.name}/${selectedCenter._id}`} className="btn btn-outline-secondary me-2">
+            <i className="bi bi-arrow-left"></i> Back
+          </a>
           <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
@@ -1929,17 +1919,15 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         // Batches Content (existing code)
         <div className="row">
           {filteredBatches.map(batch => {
-            const enrollmentPercentage = getEnrollmentPercentage(batch.enrolledStudents, batch.maxStudents);
-            const progressPercentage = getProgressPercentage(batch.currentWeek, batch.totalWeeks);
-            const completionPercentage = getCompletionPercentage(batch.completedStudents, batch.enrolledStudents);
+            
             return (
               <div key={batch.id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`}>
-                <div className="card h-100 border rounded shadow-sm position-relative">
+                <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/${selectedProject.name}/${selectedProject._id}/${selectedCenter.name}/${selectedCenter._id}/${selectedCourse.name}/${selectedCourse._id}/batch/${batch.name}/${batch._id}`} className="card h-100 border rounded shadow-sm position-relative">
                   <div className="card-body">
                     <div className="d-flex justify-content-between align-items-start mb-2">
                       <div
                         className="flex-grow-1 cursor-pointer"
-                        onClick={() => handleBatchClick(batch)}
+                       
                         style={{ cursor: 'pointer' }}
                       >
                         <div className="d-flex align-items-center mb-2">
@@ -1985,21 +1973,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                       </div>
                     </div>
 
-                    {/* Enrollment Progress */}
-                    <div className="mb-2">
-                      <div className="d-flex justify-content-between small text-muted mb-1">
-                        <span>Enrollment</span>
-                        <span>{batch.enrolledStudents}/{batch.maxStudents} ({enrollmentPercentage}%)</span>
-                      </div>
-                      <div className="progress" style={{ height: '4px' }}>
-                        <div
-                          className="progress-bar bg-warning"
-                          role="progressbar"
-                          style={{ width: `${enrollmentPercentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
+                   
 
 
 
@@ -2024,7 +1998,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                       </div>
                     </div>
                   </div>
-                </div>
+                </a>
               </div>
             );
           })}

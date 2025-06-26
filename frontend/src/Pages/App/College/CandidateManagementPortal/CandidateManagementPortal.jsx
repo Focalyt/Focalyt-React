@@ -45,26 +45,11 @@ const CandidateManagementPortal = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   // URL-based state management
-  const getInitialState = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const stage = urlParams.get('stage') || localStorage.getItem("cmsStage") || 'vertical';
-    const savedVertical = JSON.parse(localStorage.getItem("selectedVertical") || "null");
-    
-    return { stage, savedVertical };
-  };
 
-  const updateURL = (stage, vertical = null) => {
-    const url = new URL(window.location);
-    url.searchParams.set('stage', stage);
-    if (vertical) {
-      url.searchParams.set('verticalId', vertical.id);
-      url.searchParams.set('verticalName', vertical.name);
-    } else {
-      url.searchParams.delete('verticalId');
-      url.searchParams.delete('verticalName');
-    }
-    window.history.replaceState({}, '', url);
-  };
+
+  
+
+
 
   useEffect(() => {
 
@@ -195,45 +180,14 @@ const CandidateManagementPortal = () => {
     setShowShareModal(true);
   };
 
-  useEffect(() => {
-    // Improved localStorage and URL-based restoration logic
-    const { stage, savedVertical } = getInitialState();
-  
-    console.log('Restoring state from localStorage and URL:', { stage, savedVertical });
-  
-    if (stage === "project" && savedVertical) {
-      // Ensure we have valid vertical data
-      if (savedVertical.id && savedVertical.name) {
-        setSelectedVerticalForProjects(savedVertical);
-        setShowProjects(true);
-        setShowVertical(false);
-        console.log('Restored to project view for vertical:', savedVertical.name);
-      } else {
-        // Invalid data, reset to vertical view
-        console.warn('Invalid saved vertical data, resetting to vertical view');
-        localStorage.setItem("cmsStage", "vertical");
-        localStorage.removeItem("selectedVertical");
-        updateURL('vertical');
-        setShowVertical(true);
-        setShowProjects(false);
-      }
-    } else {
-      // Default to vertical view
-      setShowVertical(true);
-      setShowProjects(false);
-      updateURL('vertical');
-      console.log('Restored to vertical view');
-    }
-  }, []);
+ 
 
   // New function to handle vertical click for projects
   const handleVerticalClick = (vertical) => {
     setSelectedVerticalForProjects(vertical);
     setShowProjects(true);
     setShowVertical(false);
-    localStorage.setItem("cmsStage", "project");
-    localStorage.setItem("selectedVertical", JSON.stringify(vertical));
-    updateURL('project', vertical);
+   
   };
 
   // Function to go back to verticals view
@@ -243,9 +197,7 @@ const CandidateManagementPortal = () => {
 
     setSelectedVerticalForProjects(null);
 
-    localStorage.setItem("cmsStage", "vertical");
-    localStorage.removeItem("selectedVertical");
-    updateURL('vertical');
+
   };
 
   const closeModal = () => {
@@ -284,28 +236,7 @@ const CandidateManagementPortal = () => {
     );
   };
 
-  // If showing projects, render the Project component
-  if (showProjects && selectedVerticalForProjects) {
-    return (
-      <div>
-        {/* Breadcrumb Navigation */}
-        {/* <div className="d-flex justify-content-between align-items-center mb-3">
-          
-          <div>
-            <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
-              <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
-            </button>
-            <button className="btn btn-danger" onClick={handleAdd}>Add Project</button>
-          </div>
-        </div> */}
-
-
-        {/* Project Component with filtered data */}
-       <Project selectedVertical={selectedVerticalForProjects} onBackToVerticals={handleBackToVerticals} />
-
-      </div>
-    );
-  }
+  
 
   // Default verticals view
   return (
@@ -346,8 +277,8 @@ const CandidateManagementPortal = () => {
 
       <div className="row">
         {filteredVerticals.map(vertical => (
-          <div key={vertical.id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`} onClick={() => handleVerticalClick(vertical)} style={{ cursor: 'pointer' }}>
-            <div className="card h-100 border rounded shadow-sm folder-card position-relative">
+          <div key={vertical.id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`} style={{ cursor: 'pointer' }}>
+            <a href={`/institute/candidatemanagment/${vertical.name}/${vertical.id}`} className="card h-100 border rounded shadow-sm folder-card position-relative">
               <div className="card-body">
                 <div className="d-flex justify-content-between align-items-start mb-2">
                   <div
@@ -384,7 +315,8 @@ const CandidateManagementPortal = () => {
                   </div> */}
                 </div>
               </div>
-            </div>
+            </a>
+           
           </div>
         ))}
       </div>

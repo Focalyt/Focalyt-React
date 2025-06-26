@@ -1,46 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import Course from '../../../../Layouts/App/College/ProjectManagement/Course';
+import { useParams } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 
-const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerticals = null, selectedVertical = null }) => {
+
+const Center = () => {
+    const { projectId, projectName } = useParams();
+    const { verticalId, verticalName } = useParams();
+
+    const selectedProject = {
+        _id: projectId,
+        name: projectName
+    }
+    
+    const selectedVertical = {
+        id: verticalId,
+        name: verticalName
+    }   
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
 
-    const getURLParams = () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        return {
-            stage: urlParams.get('stage') || 'center',
-            centerId: urlParams.get('centerId'),
-            centerName: urlParams.get('centerName'),
-            projectId: urlParams.get('projectId'),
-            projectName: urlParams.get('projectName'),
-            verticalId: urlParams.get('verticalId'),
-            verticalName: urlParams.get('verticalName'),
-            courseId: urlParams.get('courseId'),
-            courseName: urlParams.get('courseName')
-        };
-    };
-
-    const updateURL = (params) => {
-        const url = new URL(window.location);
-        
-        // Clear existing params
-        url.searchParams.delete('stage');
-        url.searchParams.delete('centerId');
-        url.searchParams.delete('centerName');
-        url.searchParams.delete('courseId');
-        url.searchParams.delete('courseName');
-        
-        // Set new params
-        Object.keys(params).forEach(key => {
-            if (params[key]) {
-                url.searchParams.set(key, params[key]);
-            }
-        });
-        
-        window.history.replaceState({}, '', url);
-    };
+   
 
 
     const [activeCenterTab, setActiveCenterTab] = useState('Active Centers');
@@ -184,88 +165,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
             alert(error.message || 'Error deleting center');
         }
     };
-    useEffect(() => {
-        // URL-based state restoration logic
-        const urlParams = getURLParams();
-        console.log('Center component - URL params:', urlParams);
-        
-        // Only restore state if centers are loaded
-        if (centers.length === 0) {
-            console.log('Centers not loaded yet, skipping state restoration');
-            return;
-        }
-        
-        if (urlParams.stage === "course" && urlParams.centerId) {
-            // Find center from current centers list
-            const center = centers.find(c => c._id === urlParams.centerId);
-            if (center) {
-                setSelectedCenterForCourses(center);
-                setShowCourses(true);
-                console.log('Restored to course view for center:', center.name);
-            } else {
-                // Center not found, reset to center view
-                console.warn('Center not found in current list, resetting to center view');
-                updateURL({ 
-                    stage: 'center',
-                    projectId: selectedProject?._id,
-                    projectName: selectedProject?.name,
-                    verticalId: selectedVertical?.id,
-                    verticalName: selectedVertical?.name
-                });
-                setShowCourses(false);
-            }
-        } else if (urlParams.stage === "batch") {
-            // For batch stage, we need to restore the full navigation context
-            if (urlParams.centerId) {
-                const center = centers.find(c => c._id === urlParams.centerId);
-                if (center) {
-                    setSelectedCenterForCourses(center);
-                    setShowCourses(true);
-                    console.log(`Restored to ${urlParams.stage} view with center:`, center.name);
-                } else {
-                    console.warn('Center not found, resetting to center view');
-                    updateURL({ 
-                        stage: 'center',
-                        projectId: selectedProject?._id,
-                        projectName: selectedProject?.name,
-                        verticalId: selectedVertical?.id,
-                        verticalName: selectedVertical?.name
-                    });
-                    setShowCourses(false);
-                }
-            } else {
-                console.warn('No center context found, resetting to center view');
-                updateURL({ 
-                    stage: 'center',
-                    projectId: selectedProject?._id,
-                    projectName: selectedProject?.name,
-                    verticalId: selectedVertical?.id,
-                    verticalName: selectedVertical?.name
-                });
-                setShowCourses(false);
-            }
-        } else {
-            // Default to center view
-            setShowCourses(false);
-            console.log('Restored to center view');
-        }
-    }, [centers, selectedProject, selectedVertical]); // Depend on centers, selectedProject, and selectedVertical
-
     
-    useEffect(() => {
-        const urlParams = getURLParams();
-        if (urlParams.stage === 'course' && urlParams.centerId) {
-            // If the URL shows 'course' stage and a centerId, go to courses
-            const center = centers.find(c => c._id === urlParams.centerId);
-            if (center) {
-                setSelectedCenterForCourses(center);
-                setShowCourses(true);
-            }
-        } else {
-            // Default to 'center' stage
-            setShowCourses(false);
-        }
-    }, [centers]);
 
     useEffect(() => {
 
@@ -424,33 +324,9 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
 
     // ======== ADD THESE NEW FUNCTIONS FOR COURSE NAVIGATION ========
     // Function to handle center click for courses
-    const handleCenterClick = (center) => {
-        setSelectedCenterForCourses(center);
-        setShowCourses(true);
-        updateURL({
-            stage: 'course',
-            centerId: center._id,
-            centerName: center.name,
-            projectId: selectedProject?._id,
-            projectName: selectedProject?.name,
-            verticalId: selectedVertical?.id,
-            verticalName: selectedVertical?.name
-        });
-    };
+   
 
-    // Function to go back to centers view
-    const handleBackToCenters = () => {
-        setShowCourses(false);
-        setSelectedCenterForCourses(null);
-
-        updateURL({
-            stage: 'center',
-            projectId: selectedProject?._id,
-            projectName: selectedProject?.name,
-            verticalId: selectedVertical?.id,
-            verticalName: selectedVertical?.name
-        });
-    };
+   
 
     const closeModal = () => {
         setShowAddForm(false);
@@ -511,47 +387,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         );
     };
 
-    // ======== ADD THIS: If showing courses, render the Course component ========
-    if (showCourses && selectedCenterForCourses) {
-        return (
-            <div>
-                {/* Breadcrumb Navigation */}
-                {/* <div className="container py-2">
-                    <nav aria-label="breadcrumb">
-                        <ol className="breadcrumb">
-                            {onBackToProjects && (
-                                <li className="breadcrumb-item d-none">
-                                    <button
-                                        className="btn btn-link p-0 text-decoration-none"
-                                        onClick={onBackToProjects}
-                                    >
-                                        {selectedProject ? `${selectedProject.name} Center` : 'Center'}
-                                    </button>
-                                </li>
-                            )}
-                            <li className="breadcrumb-item d-none">
-                                <button
-                                    className="btn btn-link p-0 text-decoration-none breadcrumb-h4"
-                                    onClick={handleBackToCenters}
-                                >
-                                    {selectedProject ? `${selectedProject.name} Centers` : 'Centers'}
-                                </button>
-                            </li>
-                            <li className="breadcrumb-item active" aria-current="page">
-                                {selectedCenterForCourses.name} Courses
-                            </li>
-                        </ol>
-
-                    </nav>
-
-                </div> */}
-
-                {/* Course Component with filtered data */}
-                <Course selectedCenter={selectedCenterForCourses} onBackToCenters={handleBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
-            </div>
-        );
-    }
-
+    
     return (
         <div className="container py-4">
             {/* ======== ADD THIS: Back Button and Header ======== */}
@@ -563,30 +399,36 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                     <div className="d-flex align-items-center gap-3">
 
                         <div className='d-flex align-items-center'>
-                            <h4 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h4>
+                            <a href={`/institute/candidatemanagment`}>
+                            <h4 style={{ cursor: 'pointer' }} className="me-2">{selectedVertical.name} Vertical</h4>
+                            </a>
                             <span className="mx-2"> &gt; </span>
-                            <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+                            <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}`}>
+                            <h5 style={{ cursor: 'pointer' }} className="breadcrumb-item mb-0" aria-current="page">
                                 {selectedProject.name} Project
                             </h5>
+                            </a>
                             <span className="mx-2"> &gt; </span>
+                            <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/project/${selectedProject.name}/${selectedProject.id}`}>
                             <h5 className="breadcrumb-item mb-0" aria-current="page">
                                 Centers
                             </h5>
+                            </a>
                         </div>
                     </div>
                 </div>
                 <div>
 
-                    {onBackToProjects && (
-                        <button
-                            onClick={onBackToProjects}
+                    
+                        <a
+                            href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}`}
                             className="btn btn-light me-2"
-                            title="Back to Verticals"
+                            title="Back to Projects"
                         >
                             <i className="bi bi-arrow-left"></i>
                             <span>Back</span>
-                        </button>
-                    )}
+                        </a>
+                    
 
 
 
@@ -623,16 +465,14 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
 
             <div className="row">
                 {filteredCenters.map(center => {
-                    const occupancyPercentage = getOccupancyPercentage(center.currentOccupancy, center.capacity);
                     return (
                         <div key={center.id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`}>
-                            <div className="card h-100 border rounded shadow-sm position-relative">
+                            <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/${selectedProject.name}/${selectedProject._id}/center/${center.name}/${center._id}`} className="card h-100 border rounded shadow-sm position-relative">
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between align-items-start mb-2">
                                         {/* ======== MODIFY THIS: Make center card clickable ======== */}
                                         <div
                                             className="flex-grow-1 cursor-pointer"
-                                            onClick={() => handleCenterClick(center)}
                                             style={{ cursor: 'pointer' }}
                                         >
                                             <div className="d-flex align-items-center mb-2">
@@ -724,7 +564,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                                         <i className="bi bi-calendar me-1"></i>Created: <strong>{center.createdAt}</strong>
                                     </div>
                                 </div>
-                            </div>
+                            </a>
                         </div>
                     );
                 })}

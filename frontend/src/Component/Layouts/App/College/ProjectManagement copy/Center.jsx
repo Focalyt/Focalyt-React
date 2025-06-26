@@ -13,13 +13,9 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         return {
             stage: urlParams.get('stage') || 'center',
             centerId: urlParams.get('centerId'),
-            centerName: urlParams.get('centerName'),
             projectId: urlParams.get('projectId'),
-            projectName: urlParams.get('projectName'),
             verticalId: urlParams.get('verticalId'),
-            verticalName: urlParams.get('verticalName'),
             courseId: urlParams.get('courseId'),
-            courseName: urlParams.get('courseName')
         };
     };
 
@@ -29,9 +25,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         // Clear existing params
         url.searchParams.delete('stage');
         url.searchParams.delete('centerId');
-        url.searchParams.delete('centerName');
         url.searchParams.delete('courseId');
-        url.searchParams.delete('courseName');
         
         // Set new params
         Object.keys(params).forEach(key => {
@@ -206,9 +200,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                 updateURL({ 
                     stage: 'center',
                     projectId: selectedProject?._id,
-                    projectName: selectedProject?.name,
                     verticalId: selectedVertical?.id,
-                    verticalName: selectedVertical?.name
                 });
                 setShowCourses(false);
             }
@@ -225,9 +217,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                     updateURL({ 
                         stage: 'center',
                         projectId: selectedProject?._id,
-                        projectName: selectedProject?.name,
                         verticalId: selectedVertical?.id,
-                        verticalName: selectedVertical?.name
                     });
                     setShowCourses(false);
                 }
@@ -236,9 +226,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                 updateURL({ 
                     stage: 'center',
                     projectId: selectedProject?._id,
-                    projectName: selectedProject?.name,
                     verticalId: selectedVertical?.id,
-                    verticalName: selectedVertical?.name
                 });
                 setShowCourses(false);
             }
@@ -430,11 +418,8 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         updateURL({
             stage: 'course',
             centerId: center._id,
-            centerName: center.name,
             projectId: selectedProject?._id,
-            projectName: selectedProject?.name,
             verticalId: selectedVertical?.id,
-            verticalName: selectedVertical?.name
         });
     };
 
@@ -447,9 +432,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         updateURL({
             stage: 'center',
             projectId: selectedProject?._id,
-            projectName: selectedProject?.name,
             verticalId: selectedVertical?.id,
-            verticalName: selectedVertical?.name
         });
     };
 

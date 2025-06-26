@@ -1,12 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import Batch from '../../../../Layouts/App/College/ProjectManagement/Batch';
-import qs from 'query-string';
-const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject = null, onBackToProjects = null, selectedVertical = null, onBackToVerticals = null }) => {
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
+
+const Course = () => {
+
+  const { centerId, centerName } = useParams();
+  const { projectId, projectName } = useParams();
+  const { verticalId, verticalName } = useParams();
+  const selectedCenter = {
+    _id: centerId,
+    name: centerName
+  }
+  const selectedProject = {
+    _id: projectId,
+    name: projectName
+  }
+  const selectedVertical = {
+    id: verticalId,
+    name: verticalName
+  }
+
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+
   const [activeCourseTab, setActiveCourseTab] = useState('Active Courses');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -53,25 +71,6 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   useEffect(() => {
     fetchCourses()
   }, []);
-
-  useEffect(() => {
-    const urlParams = getURLParams();
-    console.log('Course initial URL setup - current params:', urlParams);
-    
-    // If we're not in course or batch stage, set to course stage
-    if (urlParams.stage !== 'course' && urlParams.stage !== 'batch') {
-      console.log('Setting to course stage');
-      updateURL({ 
-        stage: 'course',
-        centerId: selectedCenter?._id,
-        centerName: selectedCenter?.name,
-        projectId: selectedProject?._id,
-        projectName: selectedProject?.name,
-        verticalId: selectedVertical?.id,
-        verticalName: selectedVertical?.name
-      });
-    }
-  }, [selectedCenter, selectedProject, selectedVertical]);
 
 
   const fetchCourses = async (params) => {
@@ -166,79 +165,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     setShowShareModal(true);
   };
 
-  // ======== ADD THESE NEW FUNCTIONS FOR BATCH NAVIGATION ========
-  // Function to handle course click for batches
-  const handleCourseClick = (course) => {
-    setSelectedCourseForBatches(course);
-    setShowBatches(true);
-    
-    updateURL({ 
-      stage: 'batch', 
-      courseId: course._id, 
-      courseName: course.name,
-      centerId: selectedCenter?._id,
-      centerName: selectedCenter?.name,
-      projectId: selectedProject?._id,
-      projectName: selectedProject?.name,
-      verticalId: selectedVertical?.id,
-      verticalName: selectedVertical?.name
-    });
-  };
 
-  useEffect(() => {
-    const urlParams = getURLParams();
-    console.log('Course component - URL params:', urlParams);
-    
-    // Only restore state if courses are loaded
-    if (courses.length === 0) {
-      console.log('Courses not loaded yet, skipping state restoration');
-      return;
-    }
-    
-    if (urlParams.stage === "batch" && urlParams.courseId) {
-      // Find course from current courses list
-      const course = courses.find(c => c._id === urlParams.courseId);
-      if (course) {
-        setSelectedCourseForBatches(course);
-        setShowBatches(true);
-        console.log('Restored to batch view for course:', course.name);
-      } else {
-        // Course not found, reset to course view
-        console.warn('Course not found in current list, resetting to course view');
-        updateURL({ 
-          stage: 'course',
-          centerId: selectedCenter?._id,
-          centerName: selectedCenter?.name,
-          projectId: selectedProject?._id,
-          projectName: selectedProject?.name,
-          verticalId: selectedVertical?.id,
-          verticalName: selectedVertical?.name
-        });
-        setShowBatches(false);
-      }
-    } else {
-      // Default to course view
-      setShowBatches(false);
-      console.log('Restored to course view');
-    }
-  }, [courses, selectedCenter, selectedProject, selectedVertical]);
-
-  // Function to go back to courses view
-  const handleBackToCourses = () => {
-    setShowBatches(false);
-    setSelectedCourseForBatches(null);
-    
-     // Update URL to course view while preserving navigation context
-     updateURL({ 
-      stage: 'course',
-      centerId: selectedCenter?._id,
-      centerName: selectedCenter?.name,
-      projectId: selectedProject?._id,
-      projectName: selectedProject?.name,
-      verticalId: selectedVertical?.id,
-      verticalName: selectedVertical?.name
-    });
-  };
 
   const closeModal = () => {
     setShowAddForm(false);
@@ -295,77 +222,8 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     );
   };
 
-  // ======== ADD THIS: If showing batches, render the Batch component ========
-  if (showBatches && selectedCourseForBatches) {
-    return (
-      <div>
-        {/* Breadcrumb Navigation */}
-        {/* <div className="container py-2">
-          <nav aria-label="breadcrumb">
-            <ol className="breadcrumb">
-              {onBackToCenters && (
-                <li className="breadcrumb-item">
-                  <button 
-                    className="btn btn-link p-0 text-decoration-none"
-                    onClick={onBackToCenters}
-                  >
-                    {selectedCenter ? `${selectedCenter.name} Centers` : 'Centers'}
-                  </button>
-                </li>
-              )}
-              <li className="breadcrumb-item">
-                <button 
-                  className="btn btn-link p-0 text-decoration-none"
-                  onClick={handleBackToCourses}
-                >
-                  {selectedCenter ? `${selectedCenter.name} Courses` : 'Courses'}
-                </button>
-              </li>
-              <li className="breadcrumb-item active" aria-current="page">
-                {selectedCourseForBatches.name} Batches
-              </li>
-            </ol>
-          </nav>
-        </div> */}
+  
 
-        {/* Batch Component with filtered data */}
-        <Batch selectedCourse={selectedCourseForBatches} onBackToCourses = {handleBackToCourses} selectedCenter={selectedCenter} onBackToCenters={onBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
-      </div>
-    );
-  }
-  // URL-based state management
-  const getURLParams = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return {
-      stage: urlParams.get('stage') || 'course',
-      courseId: urlParams.get('courseId'),
-      courseName: urlParams.get('courseName'),
-      centerId: urlParams.get('centerId'),
-      centerName: urlParams.get('centerName'),
-      projectId: urlParams.get('projectId'),
-      projectName: urlParams.get('projectName'),
-      verticalId: urlParams.get('verticalId'),
-      verticalName: urlParams.get('verticalName')
-    };
-  };
-
-  const updateURL = (params) => {
-    const url = new URL(window.location);
-    
-    // Clear existing params
-    url.searchParams.delete('stage');
-    url.searchParams.delete('courseId');
-    url.searchParams.delete('courseName');
-    
-    // Set new params
-    Object.keys(params).forEach(key => {
-      if (params[key]) {
-        url.searchParams.set(key, params[key]);
-      }
-    });
-    
-    window.history.replaceState({}, '', url);
-  };
   return (
     <div className="container py-4">
       {/* ======== ADD THIS: Back Button and Header ======== */}
@@ -374,15 +232,21 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
           <div className="d-flex align-items-center gap-3">
 
             <div className='d-flex align-items-center'>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
+              <a href={`/institute/candidatemanagment`}>
+              <h5 style={{ cursor: 'pointer' }} className="me-2">{selectedVertical.name} Vertical</h5>
+              </a>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+              <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}`}>
+              <h5 style={{ cursor: 'pointer' }} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedProject.name} Project
               </h5>
+              </a>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
+              <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/${selectedProject.name}/${selectedProject._id}/center/${selectedCenter.name}/${selectedCenter._id}`}>
+              <h5 style={{ cursor: 'pointer' }} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedCenter.name} Centers
               </h5>
+              </a>
               <span className="mx-2"> &gt; </span>
               <h5 className="breadcrumb-item mb-0" aria-current="page">
                 All Courses
@@ -393,16 +257,15 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
         <div>
 
-          {onBackToCenters && (
-            <button
-              onClick={onBackToCenters}
+          
+            <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/project/${selectedProject.name}/${selectedProject._id}`}
               className="btn btn-light"
-              title="Back to Verticals"
+              title="Back to Centers"
             >
               <i className="bi bi-arrow-left"></i>
               <span>Back</span>
-            </button>
-          )}
+            </a>
+          
 
           <button className="btn btn-outline-secondary me-2 border-0 bg-transparent" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
@@ -435,17 +298,15 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
       <div className="row">
         {filteredCourses.map(course => {
-          const enrollmentPercentage = getEnrollmentPercentage(course.enrolledStudents, course.maxStudents);
-          const completionPercentage = getCompletionPercentage(course.completedStudents, course.enrolledStudents);
           return (
             <div key={course._id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`}>
               <div className="card h-100 border rounded shadow-sm position-relative">
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-start mb-2">
                     {/* ======== MODIFY THIS: Make course card clickable ======== */}
-                    <div
+                    <a
                       className="flex-grow-1 cursor-pointer"
-                      onClick={() => handleCourseClick(course)}
+                      href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/${selectedProject.name}/${selectedProject._id}/${selectedCenter.name}/${selectedCenter._id}/course/${course.name}/${course._id}`}
                       style={{ cursor: 'pointer' }}
                     >
                       <div className="d-flex align-items-center mb-2">
@@ -474,7 +335,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                         <i className="bi bi-person-fill me-1"></i>
                         <strong>Instructor:</strong> {course.instructor}
                       </div> */}
-                    </div>
+                    </a>
                     {/* ======== MODIFY THIS: Add stopPropagation to action buttons ======== */}
                     <div className="text-end">
                       {/* <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(course); }}>
