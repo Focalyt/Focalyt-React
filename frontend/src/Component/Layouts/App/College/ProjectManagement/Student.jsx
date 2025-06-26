@@ -16,13 +16,19 @@ const Student = ({
   selectedCenter = null,
   onBackToCenters = null,
 }) => {
+
+  useEffect(() => {
+
+  }, [selectedBatch, selectedCourse, selectedCenter]);
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
+
+
   // State management
-  const [activeTab, setActiveTab] = useState("zeroPeriod");
+  const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -113,7 +119,6 @@ const Student = ({
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [allProfiles, setAllProfiles] = useState([]);
-  const [allProfilesData, setAllProfilesData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -121,7 +126,7 @@ const Student = ({
   const [filterData, setFilterData] = useState({
     course: "",
     batch: "",
-    status: "",
+    status: "all",
     fromDate: "",
     toDate: "",
     center: "",
@@ -230,14 +235,17 @@ const Student = ({
 
 
 
-  const getMonthlyAttendanceBreakdown = (student) => {
+  const getMonthlyAttendanceBreakdown = (profile) => {
+    const allSessions = [
+      ...(profile.attendance?.zeroPeriod?.sessions || []),
+      ...(profile.attendance?.regularPeriod?.sessions || [])
+    ];
+
     const monthlyData = {};
 
-    student.dailyAttendance.forEach((record) => {
+    allSessions.forEach((record) => {
       const date = new Date(record.date);
-      const monthKey = `${date.getFullYear()}-${String(
-        date.getMonth() + 1
-      ).padStart(2, "0")}`;
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       const monthName = date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
@@ -257,35 +265,36 @@ const Student = ({
         };
       }
 
-      monthlyData[monthKey][record.status] =
-        (monthlyData[monthKey][record.status] || 0) + 1;
+      const status = record.status?.toLowerCase() || 'absent';
+      monthlyData[monthKey][status] = (monthlyData[monthKey][status] || 0) + 1;
       monthlyData[monthKey].total++;
-      monthlyData[monthKey].records.push(record);
+      monthlyData[monthKey].records.push({
+        ...record,
+        status,
+        notes: record.remarks
+      });
     });
 
     // Calculate percentages for each month
     Object.keys(monthlyData).forEach((monthKey) => {
       const month = monthlyData[monthKey];
-      month.attendancePercentage =
-        month.total > 0
-          ? (
-            ((month.present +
-              month.late +
-              month.halfDay * 0.5 +
-              month.shortLeave * 0.5) /
-              month.total) *
-            100
-          ).toFixed(1)
-          : 0;
+      month.attendancePercentage = month.total > 0
+        ? (((month.present + month.late + month.halfDay * 0.5 + month.shortLeave * 0.5) / month.total) * 100).toFixed(1)
+        : 0;
     });
 
     return monthlyData;
   };
-  // Yearly attendance breakdown function
-  const getYearlyAttendanceBreakdown = (student) => {
+
+  const getYearlyAttendanceBreakdown = (profile) => {
+    const allSessions = [
+      ...(profile.attendance?.zeroPeriod?.sessions || []),
+      ...(profile.attendance?.regularPeriod?.sessions || [])
+    ];
+
     const yearlyData = {};
 
-    student.dailyAttendance.forEach((record) => {
+    allSessions.forEach((record) => {
       const date = new Date(record.date);
       const year = date.getFullYear();
 
@@ -320,45 +329,36 @@ const Student = ({
         };
       }
 
-      yearlyData[year][record.status] =
-        (yearlyData[year][record.status] || 0) + 1;
+      const status = record.status?.toLowerCase() || 'absent';
+      yearlyData[year][status] = (yearlyData[year][status] || 0) + 1;
       yearlyData[year].total++;
-      yearlyData[year].records.push(record);
+      yearlyData[year].records.push({
+        ...record,
+        status,
+        notes: record.remarks
+      });
 
-      yearlyData[year].months[month][record.status] =
-        (yearlyData[year].months[month][record.status] || 0) + 1;
+      yearlyData[year].months[month][status] = (yearlyData[year].months[month][status] || 0) + 1;
       yearlyData[year].months[month].total++;
-      yearlyData[year].months[month].records.push(record);
+      yearlyData[year].months[month].records.push({
+        ...record,
+        status,
+        notes: record.remarks
+      });
     });
 
     // Calculate percentages
     Object.keys(yearlyData).forEach((year) => {
       const yearData = yearlyData[year];
-      yearData.attendancePercentage =
-        yearData.total > 0
-          ? (
-            ((yearData.present +
-              yearData.late +
-              yearData.halfDay * 0.5 +
-              yearData.shortLeave * 0.5) /
-              yearData.total) *
-            100
-          ).toFixed(1)
-          : 0;
+      yearData.attendancePercentage = yearData.total > 0
+        ? (((yearData.present + yearData.late + yearData.halfDay * 0.5 + yearData.shortLeave * 0.5) / yearData.total) * 100).toFixed(1)
+        : 0;
 
       Object.keys(yearData.months).forEach((month) => {
         const monthData = yearData.months[month];
-        monthData.attendancePercentage =
-          monthData.total > 0
-            ? (
-              ((monthData.present +
-                monthData.late +
-                monthData.halfDay * 0.5 +
-                monthData.shortLeave * 0.5) /
-                monthData.total) *
-              100
-            ).toFixed(1)
-            : 0;
+        monthData.attendancePercentage = monthData.total > 0
+          ? (((monthData.present + monthData.late + monthData.halfDay * 0.5 + monthData.shortLeave * 0.5) / monthData.total) * 100).toFixed(1)
+          : 0;
       });
     });
 
@@ -738,7 +738,7 @@ const Student = ({
   };
 
   const EnhancedAttendanceTab = ({ student, studentIndex }) => {
-    const filteredStats = getFilteredAttendanceData(student);
+    const filteredStats = student?.attendance || {};
 
     return (
       <div className="card">
@@ -751,8 +751,8 @@ const Student = ({
                 <button
                   type="button"
                   className={`btn ${attendanceView === "daily"
-                      ? "btn-primary"
-                      : "btn-outline-primary"
+                    ? "btn-primary"
+                    : "btn-outline-primary"
                     }`}
                   onClick={() => setAttendanceView("daily")}
                 >
@@ -761,8 +761,8 @@ const Student = ({
                 <button
                   type="button"
                   className={`btn ${attendanceView === "monthly"
-                      ? "btn-primary"
-                      : "btn-outline-primary"
+                    ? "btn-primary"
+                    : "btn-outline-primary"
                     }`}
                   onClick={() => setAttendanceView("monthly")}
                 >
@@ -771,8 +771,8 @@ const Student = ({
                 <button
                   type="button"
                   className={`btn ${attendanceView === "yearly"
-                      ? "btn-primary"
-                      : "btn-outline-primary"
+                    ? "btn-primary"
+                    : "btn-outline-primary"
                     }`}
                   onClick={() => setAttendanceView("yearly")}
                 >
@@ -790,9 +790,6 @@ const Student = ({
                 </span>
                 <span className="badge bg-danger">
                   {filteredStats.absentDays} Absent
-                </span>
-                <span className="badge bg-warning text-dark">
-                  {filteredStats.lateDays} Late
                 </span>
               </div>
             </div>
@@ -842,32 +839,6 @@ const Student = ({
                 <div className="card-body p-2">
                   <div className="h5 mb-0">{filteredStats.absentDays}</div>
                   <div className="small">Absent Days</div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-2">
-              <div className="card bg-warning text-dark">
-                <div className="card-body p-2">
-                  <div className="h5 mb-0">{filteredStats.lateDays}</div>
-                  <div className="small">Late Days</div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-2">
-              <div className="card bg-info text-white">
-                <div className="card-body p-2">
-                  <div className="h5 mb-0">{filteredStats.leaveDays}</div>
-                  <div className="small">Leave Days</div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-2">
-              <div className="card bg-secondary text-white">
-                <div className="card-body p-2">
-                  <div className="h5 mb-0">
-                    {filteredStats.halfDays + filteredStats.shortLeaveDays}
-                  </div>
-                  <div className="small">Half/Short Days</div>
                 </div>
               </div>
             </div>
@@ -942,16 +913,12 @@ const Student = ({
                     <tr>
                       <th>Date</th>
                       <th>Day</th>
-                      <th>Status</th>
-                      <th>Time In</th>
-                      <th>Time Out</th>
-                      <th>Late Minutes</th>
+                      <th>Status</th>                      
                       <th>Notes/Reason</th>
-                      <th>Comments</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(filteredStats.filteredRecords || student.dailyAttendance)
+                    {(filteredStats?.filteredRecords || student?.dailyAttendance || [])
                       .length > 0 ? (
                       (filteredStats.filteredRecords || student.dailyAttendance)
                         .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -980,16 +947,16 @@ const Student = ({
                               >
                                 <i
                                   className={`fas ${record.status === "present"
-                                      ? "fa-check"
-                                      : record.status === "late"
-                                        ? "fa-clock"
-                                        : record.status === "halfDay"
-                                          ? "fa-clock-o"
-                                          : record.status === "shortLeave"
-                                            ? "fa-sign-out-alt"
-                                            : record.status === "leave"
-                                              ? "fa-calendar"
-                                              : "fa-times"
+                                    ? "fa-check"
+                                    : record.status === "late"
+                                      ? "fa-clock"
+                                      : record.status === "halfDay"
+                                        ? "fa-clock-o"
+                                        : record.status === "shortLeave"
+                                          ? "fa-sign-out-alt"
+                                          : record.status === "leave"
+                                            ? "fa-calendar"
+                                            : "fa-times"
                                     } me-1`}
                                 ></i>
                                 {record.status?.toUpperCase() || "NOT MARKED"}
@@ -1125,10 +1092,10 @@ const Student = ({
                           <td>
                             <span
                               className={`badge ${leave.leaveType === "full"
-                                  ? "bg-danger"
-                                  : leave.leaveType === "half"
-                                    ? "bg-warning text-dark"
-                                    : "bg-info"
+                                ? "bg-danger"
+                                : leave.leaveType === "half"
+                                  ? "bg-warning text-dark"
+                                  : "bg-info"
                                 }`}
                             >
                               {leave.leaveType === "full"
@@ -1142,18 +1109,18 @@ const Student = ({
                           <td>
                             <span
                               className={`badge bg-${leave.status === "approved"
-                                  ? "success"
-                                  : leave.status === "pending"
-                                    ? "warning text-dark"
-                                    : "danger"
+                                ? "success"
+                                : leave.status === "pending"
+                                  ? "warning text-dark"
+                                  : "danger"
                                 }`}
                             >
                               <i
                                 className={`fas ${leave.status === "approved"
-                                    ? "fa-check"
-                                    : leave.status === "pending"
-                                      ? "fa-clock"
-                                      : "fa-times"
+                                  ? "fa-check"
+                                  : leave.status === "pending"
+                                    ? "fa-clock"
+                                    : "fa-times"
                                   } me-1`}
                               ></i>
                               {leave.status?.toUpperCase()}
@@ -1344,21 +1311,77 @@ const Student = ({
         return;
       }
 
-      // Replace with your actual profile API endpoint
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '50',
+        tab: activeTab,
+      });
+
+      // Add search query
+      if (searchQuery.trim()) {
+        queryParams.append('search', searchQuery.trim());
+      }
+
+      // Add filter data
+      if (filterData.status && filterData.status !== 'all') {
+        queryParams.append('status', filterData.status);
+      }
+      if (filterData.fromDate) {
+        queryParams.append('fromDate', filterData.fromDate);
+      }
+      if (filterData.toDate) {
+        queryParams.append('toDate', filterData.toDate);
+      }
+      if (filterData.courseType) {
+        queryParams.append('courseType', filterData.courseType);
+      }
+      if (filterData.leadStatus) {
+        queryParams.append('leadStatus', filterData.leadStatus);
+      }
+      if (filterData.sector) {
+        queryParams.append('sector', filterData.sector);
+      }
+      if (filterData.createdFromDate) {
+        queryParams.append('createdFromDate', filterData.createdFromDate);
+      }
+      if (filterData.createdToDate) {
+        queryParams.append('createdToDate', filterData.createdToDate);
+      }
+      if (filterData.modifiedFromDate) {
+        queryParams.append('modifiedFromDate', filterData.modifiedFromDate);
+      }
+      if (filterData.modifiedToDate) {
+        queryParams.append('modifiedToDate', filterData.modifiedToDate);
+      }
+      if (filterData.nextActionFromDate) {
+        queryParams.append('nextActionFromDate', filterData.nextActionFromDate);
+      }
+      if (filterData.nextActionToDate) {
+        queryParams.append('nextActionToDate', filterData.nextActionToDate);
+      }
+
       const response = await axios.get(
-        `${backendUrl}/college/appliedCandidates?page=${currentPage}`,
+        `${backendUrl}/college/admission-list/${selectedCourse?._id}/${selectedCenter?._id}?${queryParams.toString()}`,
         {
           headers: {
             "x-auth": token,
           },
         }
       );
+
       console.log("Backend profile data:", response.data);
+
       if (response.data.success && response.data.data) {
-        const data = response.data.data; // create array
         setAllProfiles(response.data.data);
-        setAllProfilesData(response.data.data);
         setTotalPages(response.data.totalPages);
+
+        // Update tab counts if available
+        if (response.data.filterCounts) {
+          // You can store tab counts in state and use them
+          console.log("Tab counts:", response.data.filterCounts);
+          setTabCounts(response.data.filterCounts);
+        }
       } else {
         console.error("Failed to fetch profile data", response.data.message);
       }
@@ -1368,210 +1391,15 @@ const Student = ({
   };
 
   const handleSearch = (searchTerm) => {
-    if (!searchTerm.trim()) {
-      applyFilters();
-      return;
-    }
-
-    const searchFiltered = allProfilesData.filter((profile) => {
-      try {
-        const name = profile._candidate?.name
-          ? String(profile._candidate.name).toLowerCase()
-          : "";
-        const mobile = profile._candidate?.mobile
-          ? String(profile._candidate.mobile).toLowerCase()
-          : "";
-        const email = profile._candidate?.email
-          ? String(profile._candidate.email).toLowerCase()
-          : "";
-        const searchLower = searchTerm.toLowerCase();
-
-        return (
-          name.includes(searchLower) ||
-          mobile.includes(searchLower) ||
-          email.includes(searchLower)
-        );
-      } catch (error) {
-        console.error("Search filter error for profile:", profile, error);
-        return false;
-      }
-    });
-
-    setAllProfiles(searchFiltered);
+    setSearchQuery(searchTerm);
+    setCurrentPage(1); // Reset to first page on search
+    // fetchProfileData will be called automatically due to useEffect dependency
   };
 
   const applyFilters = (filters = filterData) => {
-    console.log("Applying filters with data:", filters);
-
-    let filtered = [...allProfilesData];
-
-    try {
-      // Search filter
-      if (filters.name && filters.name.trim()) {
-        const searchTerm = filters.name.toLowerCase();
-        filtered = filtered.filter((profile) => {
-          try {
-            const name = profile._candidate?.name
-              ? String(profile._candidate.name).toLowerCase()
-              : "";
-            const mobile = profile._candidate?.mobile
-              ? String(profile._candidate.mobile).toLowerCase()
-              : "";
-            const email = profile._candidate?.email
-              ? String(profile._candidate.email).toLowerCase()
-              : "";
-
-            return (
-              name.includes(searchTerm) ||
-              mobile.includes(searchTerm) ||
-              email.includes(searchTerm)
-            );
-          } catch (error) {
-            return false;
-          }
-        });
-      }
-
-      // Course type filter
-      if (filters.courseType) {
-        filtered = filtered.filter((profile) => {
-          try {
-            const courseType = profile._course?.courseType
-              ? String(profile._course.courseType).toLowerCase()
-              : "";
-            return courseType === filters.courseType.toLowerCase();
-          } catch (error) {
-            return false;
-          }
-        });
-      }
-
-      // Lead status filter
-      if (filters.leadStatus) {
-        filtered = filtered.filter(
-          (profile) => profile._leadStatus?._id === filters.leadStatus
-        );
-      }
-
-      // Status filter
-      if (filters.status && filters.status !== "true") {
-        filtered = filtered.filter(
-          (profile) => profile._leadStatus?._id === filters.status
-        );
-      }
-
-      // Sector filter
-      if (filters.sector) {
-        filtered = filtered.filter((profile) => {
-          try {
-            const sectors = profile._course?.sectors
-              ? String(profile._course.sectors).toLowerCase()
-              : "";
-            return sectors === filters.sector.toLowerCase();
-          } catch (error) {
-            return false;
-          }
-        });
-      }
-
-      // CREATED DATE filter
-      if (filters.createdFromDate || filters.createdToDate) {
-        filtered = filtered.filter((profile) => {
-          try {
-            if (!profile.createdAt) return false;
-
-            const profileDate = new Date(profile.createdAt);
-
-            // From date check
-            if (filters.createdFromDate) {
-              const fromDate = new Date(filters.createdFromDate);
-              fromDate.setHours(0, 0, 0, 0);
-              if (profileDate < fromDate) return false;
-            }
-
-            // To date check
-            if (filters.createdToDate) {
-              const toDate = new Date(filters.createdToDate);
-              toDate.setHours(23, 59, 59, 999);
-              if (profileDate > toDate) return false;
-            }
-
-            return true;
-          } catch (error) {
-            return false;
-          }
-        });
-      }
-
-      // MODIFIED DATE filter
-      if (filters.modifiedFromDate || filters.modifiedToDate) {
-        filtered = filtered.filter((profile) => {
-          try {
-            if (!profile.updatedAt) return false;
-
-            const profileDate = new Date(profile.updatedAt);
-
-            // From date check
-            if (filters.modifiedFromDate) {
-              const fromDate = new Date(filters.modifiedFromDate);
-              fromDate.setHours(0, 0, 0, 0);
-              if (profileDate < fromDate) return false;
-            }
-
-            // To date check
-            if (filters.modifiedToDate) {
-              const toDate = new Date(filters.modifiedToDate);
-              toDate.setHours(23, 59, 59, 999);
-              if (profileDate > toDate) return false;
-            }
-
-            return true;
-          } catch (error) {
-            return false;
-          }
-        });
-      }
-
-      // NEXT ACTION DATE filter
-      if (filters.nextActionFromDate || filters.nextActionToDate) {
-        filtered = filtered.filter((profile) => {
-          try {
-            if (!profile.followupDate) return false;
-
-            const profileDate = new Date(profile.followupDate);
-
-            // From date check
-            if (filters.nextActionFromDate) {
-              const fromDate = new Date(filters.nextActionFromDate);
-              fromDate.setHours(0, 0, 0, 0);
-              if (profileDate < fromDate) return false;
-            }
-
-            // To date check
-            if (filters.nextActionToDate) {
-              const toDate = new Date(filters.nextActionToDate);
-              toDate.setHours(23, 59, 59, 999);
-              if (profileDate > toDate) return false;
-            }
-
-            return true;
-          } catch (error) {
-            return false;
-          }
-        });
-      }
-
-      console.log(
-        "Filter results:",
-        filtered.length,
-        "out of",
-        allProfilesData.length
-      );
-      setAllProfiles(filtered);
-    } catch (error) {
-      console.error("Filter error:", error);
-      setAllProfiles(allProfilesData);
-    }
+    setFilterData(filters);
+    setCurrentPage(1); // Reset to first page on filter change
+    // fetchProfileData will be called automatically due to useEffect dependency
   };
 
   const [experiences, setExperiences] = useState([
@@ -1734,27 +1562,35 @@ const Student = ({
     return dates;
   };
 
-  const getAttendanceStatus = (student, date) => {
-    const attendanceRecord = student.dailyAttendance?.find(record => record.date === date);
-    if (!attendanceRecord) return { status: 'not-marked', symbol: '-', class: 'not-marked' };
+  const getAttendanceStatus = (profile, date) => {
+    const allSessions = [
+      ...(profile.attendance?.zeroPeriod?.sessions || []),
+      ...(profile.attendance?.regularPeriod?.sessions || [])
+    ];
 
+    const attendanceRecord = allSessions.find(record => {
+      const recordDate = new Date(record.date).toISOString().split('T')[0];
+      return recordDate === date;
+    });
+
+    if (!attendanceRecord) {
+      return { status: 'not-marked', symbol: '-', class: 'not-marked' };
+    }
+
+    const status = attendanceRecord.status?.toLowerCase() || 'absent';
     const statusMap = {
       'present': { symbol: 'P', class: 'present', title: 'Present' },
       'absent': { symbol: 'A', class: 'absent', title: 'Absent' },
-      'late': { symbol: 'L', class: 'late', title: 'Late' },
-      'leave': { symbol: 'Lv', class: 'leave', title: 'Leave' },
-      'halfDay': { symbol: 'HD', class: 'half-day', title: 'Half Day' },
-      'shortLeave': { symbol: 'SL', class: 'short-leave', title: 'Short Leave' },
-      'not-marked': { symbol: '-', class: 'not-marked', title: 'Not Marked' }
+
     };
 
-    const statusInfo = statusMap[attendanceRecord.status] || statusMap['not-marked'];
+    const statusInfo = statusMap[status] || statusMap['not-marked'];
     return {
       ...statusInfo,
       timeIn: attendanceRecord.timeIn,
       timeOut: attendanceRecord.timeOut,
       lateMinutes: attendanceRecord.lateMinutes,
-      notes: attendanceRecord.notes
+      notes: attendanceRecord.remarks
     };
   };
 
@@ -2285,8 +2121,8 @@ const Student = ({
                       <button
                         type="button"
                         className={`btn ${attendanceManagementView === "register"
-                            ? "btn-primary"
-                            : "btn-outline-primary"
+                          ? "btn-primary"
+                          : "btn-outline-primary"
                           }`}
                         onClick={() => setAttendanceManagementView("register")}
                       >
@@ -2296,8 +2132,8 @@ const Student = ({
                       <button
                         type="button"
                         className={`btn ${attendanceManagementView === "daily"
-                            ? "btn-primary"
-                            : "btn-outline-primary"
+                          ? "btn-primary"
+                          : "btn-outline-primary"
                           }`}
                         onClick={() => setAttendanceManagementView("daily")}
                       >
@@ -2960,8 +2796,8 @@ const Student = ({
                       <div className="file-icon">
                         <i
                           className={`fas ${selectedFile.type.startsWith("image/")
-                              ? "fa-image"
-                              : "fa-file-pdf"
+                            ? "fa-image"
+                            : "fa-file-pdf"
                             }`}
                         ></i>
                       </div>
@@ -3061,513 +2897,19 @@ const Student = ({
   };
 
   // Enhanced students data with comprehensive tracking
-  const [profile, setProfile] = useState([
-    {
-      id: 1,
-      enrollmentNumber: "STU001",
-      name: "John Doe",
-      email: "john.doe@example.com",
-      mobile: "+91 9876543210",
-      batchId: 1,
-      batchName: "CS101 Morning Batch",
-      admissionDate: "2024-02-01",
-      status: "active",
-      admissionStatus: "admitted",
-      parentName: "Robert Doe",
-      parentMobile: "+91 9876543211",
-      address: "123 Main Street, Mumbai",
-      feeStatus: "paid",
-      profileImage: null,
-      dateOfBirth: "2000-05-15",
-      bloodGroup: "O+",
-      emergencyContact: "+91 9876543212",
+  useEffect(() => {
+    if (selectedCourse && selectedCenter) {
+      fetchProfileData();
+    }
+  }, [selectedCourse, selectedCenter, currentPage, activeTab, searchQuery, filterData]);
 
-      // Course Information
-      courseStartDate: "2024-02-01",
-      courseEndDate: "2024-08-01",
-      totalCourseDays: 180,
-      courseDuration: "6 months",
-
-      // Job History
-      jobHistory: [
-        {
-          id: 1,
-          company: "TechCorp Solutions",
-          position: "Junior Developer",
-          startDate: "2023-06-01",
-          endDate: "2024-01-31",
-          salary: "₹25,000",
-          reason: "Career Growth",
-          status: "completed",
-        },
-        {
-          id: 2,
-          company: "WebTech Agency",
-          position: "Intern",
-          startDate: "2023-01-01",
-          endDate: "2023-05-31",
-          salary: "₹8,000",
-          reason: "Internship Completion",
-          status: "completed",
-        },
-      ],
-
-      // Course History
-      courseHistory: [
-        {
-          id: 1,
-          courseName: "Full Stack Web Development",
-          institution: "Code Academy",
-          startDate: "2024-02-01",
-          endDate: "2024-08-01",
-          status: "ongoing",
-          grade: "",
-          percentage: 85,
-        },
-        {
-          id: 2,
-          courseName: "Basic Computer Applications",
-          institution: "Tech Institute",
-          startDate: "2023-06-01",
-          endDate: "2023-12-01",
-          status: "completed",
-          grade: "A",
-          percentage: 92,
-        },
-      ],
-
-      // Enhanced attendance tracking
-      attendanceStats: {
-        presentDays: 152,
-        absentDays: 8,
-        lateDays: 12,
-        leaveDays: 4,
-        halfDays: 2,
-        shortLeaveDays: 6,
-        totalWorkingDays: 180,
-        attendancePercentage: 92.2,
-        punctualityScore: 89.5,
-      },
-
-      // Leave records
-      leaves: [
-        {
-          id: 1,
-          date: "2024-03-05",
-          type: "sick",
-          leaveType: "full",
-          reason: "Fever and cold",
-          status: "approved",
-          appliedDate: "2024-03-04",
-          approvedBy: "Teacher Name",
-          duration: 1,
-        },
-      ],
-
-      // Daily attendance records
-      dailyAttendance: [
-        {
-          date: "2024-06-20",
-          status: "present",
-          timeIn: "09:00",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-19",
-          status: "late",
-          timeIn: "09:15",
-          timeOut: "17:00",
-          notes: "Traffic jam",
-          lateMinutes: 15,
-        },
-        {
-          date: "2024-06-18",
-          status: "present",
-          timeIn: "08:55",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-17",
-          status: "absent",
-          reason: "Sick leave",
-          notes: "Fever",
-        },
-        {
-          date: "2024-06-16",
-          status: "late",
-          timeIn: "09:25",
-          timeOut: "17:00",
-          notes: "Bus delay",
-          lateMinutes: 25,
-        },
-        {
-          date: "2024-06-15",
-          status: "present",
-          timeIn: "08:58",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-14",
-          status: "present",
-          timeIn: "09:02",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 2,
-        },
-        {
-          date: "2024-06-13",
-          status: "halfDay",
-          timeIn: "09:00",
-          timeOut: "13:00",
-          notes: "Medical appointment",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-12",
-          status: "present",
-          timeIn: "08:55",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-11",
-          status: "late",
-          timeIn: "09:30",
-          timeOut: "17:00",
-          notes: "Personal work",
-          lateMinutes: 30,
-        },
-      ],
-    },
-    {
-      id: 2,
-      enrollmentNumber: "STU002",
-      name: "Jane Smith",
-      email: "jane.smith@example.com",
-      mobile: "+91 9876543220",
-      batchId: 1,
-      batchName: "CS101 Morning Batch",
-      admissionDate: "2024-02-01",
-      status: "active",
-      admissionStatus: "admitted",
-      parentName: "Mary Smith",
-      parentMobile: "+91 9876543221",
-      address: "456 Park Avenue, Mumbai",
-      feeStatus: "paid",
-      profileImage: null,
-      dateOfBirth: "2001-08-22",
-      bloodGroup: "A+",
-      emergencyContact: "+91 9876543222",
-
-      courseStartDate: "2024-02-01",
-      courseEndDate: "2024-08-01",
-      totalCourseDays: 180,
-      courseDuration: "6 months",
-
-      // Job History
-      jobHistory: [
-        {
-          id: 1,
-          company: "Digital Marketing Co.",
-          position: "Content Writer",
-          startDate: "2023-09-01",
-          endDate: "2024-01-15",
-          salary: "₹20,000",
-          reason: "Career Change",
-          status: "completed",
-        },
-      ],
-
-      // Course History
-      courseHistory: [
-        {
-          id: 1,
-          courseName: "Full Stack Web Development",
-          institution: "Code Academy",
-          startDate: "2024-02-01",
-          endDate: "2024-08-01",
-          status: "ongoing",
-          grade: "",
-          percentage: 78,
-        },
-      ],
-
-      attendanceStats: {
-        presentDays: 140,
-        absentDays: 15,
-        lateDays: 18,
-        leaveDays: 3,
-        halfDays: 1,
-        shortLeaveDays: 4,
-        totalWorkingDays: 180,
-        attendancePercentage: 85.8,
-        punctualityScore: 82.3,
-      },
-
-      leaves: [
-        {
-          id: 2,
-          date: "2024-04-10",
-          type: "personal",
-          leaveType: "half",
-          reason: "Family function",
-          status: "approved",
-          appliedDate: "2024-04-08",
-          approvedBy: "Principal",
-          duration: 0.5,
-        },
-      ],
-
-      dailyAttendance: [
-        {
-          date: "2024-06-20",
-          status: "present",
-          timeIn: "09:02",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 2,
-        },
-        {
-          date: "2024-06-19",
-          status: "absent",
-          reason: "Sick leave",
-          notes: "Fever",
-        },
-        {
-          date: "2024-06-18",
-          status: "late",
-          timeIn: "09:20",
-          timeOut: "17:00",
-          notes: "Bus delay",
-          lateMinutes: 20,
-        },
-        {
-          date: "2024-06-17",
-          status: "present",
-          timeIn: "09:05",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 5,
-        },
-        {
-          date: "2024-06-16",
-          status: "present",
-          timeIn: "08:58",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-15",
-          status: "late",
-          timeIn: "09:18",
-          timeOut: "17:00",
-          notes: "Traffic",
-          lateMinutes: 18,
-        },
-        {
-          date: "2024-06-14",
-          status: "present",
-          timeIn: "09:00",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-13",
-          status: "absent",
-          reason: "Personal work",
-          notes: "Family emergency",
-        },
-        {
-          date: "2024-06-12",
-          status: "present",
-          timeIn: "09:10",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 10,
-        },
-        {
-          date: "2024-06-11",
-          status: "present",
-          timeIn: "08:55",
-          timeOut: "17:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-      ],
-    },
-    // Adding Zero Period Students
-    {
-      id: 4,
-      enrollmentNumber: "STU004",
-      name: "Sarah Williams",
-      email: "sarah.williams@example.com",
-      mobile: "+91 9876543240",
-      batchId: 1,
-      batchName: "CS101 Morning Batch",
-      admissionDate: "2024-02-15",
-      status: "active",
-      admissionStatus: "zeroPeriod",
-      parentName: "Tom Williams",
-      parentMobile: "+91 9876543241",
-      address: "321 Garden Street, Mumbai",
-      feeStatus: "pending",
-      profileImage: null,
-      dateOfBirth: "2000-11-08",
-      bloodGroup: "AB+",
-      emergencyContact: "+91 9876543242",
-
-      courseStartDate: "2024-03-01",
-      courseEndDate: "2024-03-31",
-      totalCourseDays: 30,
-      courseDuration: "1 month trial",
-      zeroPeriodDays: 25,
-      trialStartDate: "2024-03-01",
-      trialEndDate: "2024-03-31",
-      totalTrialDays: 30,
-
-      // Job History
-      jobHistory: [],
-
-      // Course History
-      courseHistory: [
-        {
-          id: 1,
-          courseName: "Web Development Trial",
-          institution: "Code Academy",
-          startDate: "2024-03-01",
-          endDate: "2024-03-31",
-          status: "trial",
-          grade: "",
-          percentage: 60,
-        },
-      ],
-
-      attendanceStats: {
-        presentDays: 18,
-        absentDays: 4,
-        lateDays: 2,
-        leaveDays: 1,
-        halfDays: 0,
-        shortLeaveDays: 2,
-        totalWorkingDays: 25,
-        attendancePercentage: 75.0,
-        punctualityScore: 85.2,
-      },
-
-      leaves: [
-        {
-          id: 3,
-          date: "2024-03-15",
-          type: "emergency",
-          leaveType: "short",
-          reason: "Medical appointment",
-          status: "approved",
-          appliedDate: "2024-03-15",
-          approvedBy: "Principal",
-          timeOut: "10:30",
-          timeIn: "12:00",
-          duration: 1.5,
-        },
-      ],
-
-      dailyAttendance: [
-        {
-          date: "2024-06-20",
-          status: "present",
-          timeIn: "09:00",
-          timeOut: "13:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-19",
-          status: "late",
-          timeIn: "09:15",
-          timeOut: "13:00",
-          notes: "Traffic",
-          lateMinutes: 15,
-        },
-        {
-          date: "2024-06-18",
-          status: "present",
-          timeIn: "08:58",
-          timeOut: "13:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-17",
-          status: "absent",
-          reason: "Personal work",
-          notes: "Family function",
-        },
-        {
-          date: "2024-06-16",
-          status: "present",
-          timeIn: "09:05",
-          timeOut: "13:00",
-          notes: "",
-          lateMinutes: 5,
-        },
-        {
-          date: "2024-06-15",
-          status: "late",
-          timeIn: "09:20",
-          timeOut: "13:00",
-          notes: "Bus delay",
-          lateMinutes: 20,
-        },
-        {
-          date: "2024-06-14",
-          status: "present",
-          timeIn: "09:00",
-          timeOut: "13:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-13",
-          status: "present",
-          timeIn: "08:55",
-          timeOut: "13:00",
-          notes: "",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-12",
-          status: "halfDay",
-          timeIn: "09:00",
-          timeOut: "11:30",
-          notes: "Medical appointment",
-          lateMinutes: 0,
-        },
-        {
-          date: "2024-06-11",
-          status: "present",
-          timeIn: "09:10",
-          timeOut: "13:00",
-          notes: "",
-          lateMinutes: 10,
-        },
-      ],
-    },
-  ]);
 
   // ===== ATTENDANCE FUNCTIONS =====
 
   // Initialize today's attendance
   useEffect(() => {
     const initialAttendance = {};
-    profile.forEach((student) => {
+    allProfiles.forEach((student) => {
       initialAttendance[student.id] = {
         status: "",
         timeIn: "",
@@ -3591,7 +2933,13 @@ const Student = ({
   }, []);
 
   // Get filtered attendance data based on time filter
-  const getFilteredAttendanceData = (student) => {
+  const getFilteredAttendanceData = (profile) => {
+    // Combine zeroPeriod and regularPeriod sessions into a single array
+    const allSessions = [
+      ...(profile.attendance?.zeroPeriod?.sessions || []),
+      ...(profile.attendance?.regularPeriod?.sessions || [])
+    ];
+
     const today = new Date();
     let startDate, endDate;
     let filteredRecords = [];
@@ -3599,7 +2947,7 @@ const Student = ({
     switch (timeFilter) {
       case "today":
         startDate = endDate = selectedDate;
-        filteredRecords = student.dailyAttendance.filter((record) => {
+        filteredRecords = allSessions.filter((record) => {
           const recordDate = new Date(record.date).toISOString().split("T")[0];
           return recordDate === selectedDate;
         });
@@ -3614,7 +2962,7 @@ const Student = ({
         startDate = weekStart.toISOString().split("T")[0];
         endDate = weekEnd.toISOString().split("T")[0];
 
-        filteredRecords = student.dailyAttendance.filter((record) => {
+        filteredRecords = allSessions.filter((record) => {
           const recordDate = new Date(record.date);
           return recordDate >= weekStart && recordDate <= weekEnd;
         });
@@ -3627,7 +2975,7 @@ const Student = ({
         startDate = monthStart.toISOString().split("T")[0];
         endDate = monthEnd.toISOString().split("T")[0];
 
-        filteredRecords = student.dailyAttendance.filter((record) => {
+        filteredRecords = allSessions.filter((record) => {
           const recordDate = new Date(record.date);
           return recordDate >= monthStart && recordDate <= monthEnd;
         });
@@ -3640,7 +2988,7 @@ const Student = ({
         startDate = yearStart.toISOString().split("T")[0];
         endDate = yearEnd.toISOString().split("T")[0];
 
-        filteredRecords = student.dailyAttendance.filter((record) => {
+        filteredRecords = allSessions.filter((record) => {
           const recordDate = new Date(record.date);
           return recordDate >= yearStart && recordDate <= yearEnd;
         });
@@ -3651,49 +2999,46 @@ const Student = ({
           const customStart = new Date(dateRange.fromDate);
           const customEnd = new Date(dateRange.toDate);
 
-          filteredRecords = student.dailyAttendance.filter((record) => {
+          filteredRecords = allSessions.filter((record) => {
             const recordDate = new Date(record.date);
             return recordDate >= customStart && recordDate <= customEnd;
           });
         } else {
-          filteredRecords = student.dailyAttendance;
+          filteredRecords = allSessions;
         }
         break;
 
       default:
-        filteredRecords = student.dailyAttendance;
+        filteredRecords = allSessions;
     }
-    const presentDays = filteredRecords.filter(
-      (r) => r.status === "present"
-    ).length;
-    const absentDays = filteredRecords.filter(
-      (r) => r.status === "absent"
-    ).length;
-    const lateDays = filteredRecords.filter((r) => r.status === "late").length;
-    const leaveDays = filteredRecords.filter(
-      (r) => r.status === "leave"
-    ).length;
-    const halfDays = filteredRecords.filter(
-      (r) => r.status === "halfDay"
-    ).length;
-    const shortLeaveDays = filteredRecords.filter(
-      (r) => r.status === "shortLeave"
-    ).length;
-    const totalWorkingDays = filteredRecords.length;
 
-    const attendancePercentage =
-      totalWorkingDays > 0
-        ? (
-          ((presentDays + lateDays + halfDays * 0.5 + shortLeaveDays * 0.5) /
-            totalWorkingDays) *
-          100
-        ).toFixed(1)
-        : 0;
+    // Convert status values to match frontend expectations
+    const convertedRecords = filteredRecords.map(record => ({
+      ...record,
+      status: record.status?.toLowerCase() || 'absent',
+      date: record.date,
+      timeIn: record.timeIn || '',
+      timeOut: record.timeOut || '',
+      lateMinutes: record.lateMinutes || 0,
+      notes: record.remarks || ''
+    }));
 
-    const punctualityScore =
-      presentDays + lateDays > 0
-        ? ((presentDays / (presentDays + lateDays)) * 100).toFixed(1)
-        : 0;
+    // Calculate statistics
+    const presentDays = convertedRecords.filter(r => r.status === "present").length;
+    const absentDays = convertedRecords.filter(r => r.status === "absent").length;
+    const lateDays = convertedRecords.filter(r => r.status === "late").length;
+    const leaveDays = convertedRecords.filter(r => r.status === "leave").length;
+    const halfDays = convertedRecords.filter(r => r.status === "halfday").length;
+    const shortLeaveDays = convertedRecords.filter(r => r.status === "shortleave").length;
+    const totalWorkingDays = convertedRecords.length;
+
+    const attendancePercentage = totalWorkingDays > 0
+      ? (((presentDays + lateDays + halfDays * 0.5 + shortLeaveDays * 0.5) / totalWorkingDays) * 100).toFixed(1)
+      : 0;
+
+    const punctualityScore = (presentDays + lateDays) > 0
+      ? ((presentDays / (presentDays + lateDays)) * 100).toFixed(1)
+      : 0;
 
     return {
       presentDays,
@@ -3705,84 +3050,26 @@ const Student = ({
       totalWorkingDays,
       attendancePercentage: parseFloat(attendancePercentage),
       punctualityScore: parseFloat(punctualityScore),
-      filteredRecords,
+      filteredRecords: convertedRecords,
     };
   };
 
   // Calculate tab counts
   const getTabCounts = () => {
-    const counts = {
-      all: profile.length,
-      admission: profile.filter(
-        (s) => s.admissionStatus === "admitted" && s.status === "active"
-      ).length,
-      zeroPeriod: profile.filter((s) => s.admissionStatus === "zeroPeriod")
-        .length,
-      batchFreeze: profile.filter((s) => s.admissionStatus === "batchFreeze")
-        .length,
-      dropout: profile.filter((s) => s.admissionStatus === "dropped").length,
+
+    return {
+      all: allProfiles.length,
+      admission: allProfiles.filter(s => s.admissionDone && !s.dropout && !s.isBatchFreeze).length,
+      zeroPeriod: allProfiles.filter(s => s.isZeroPeriodAssigned && !s.admissionDone).length,
+      batchFreeze: allProfiles.filter(s => s.isBatchFreeze).length,
+      dropout: allProfiles.filter(s => s.dropout).length,
     };
-    return counts;
   };
 
   // Filter students based on selected tab and search query
   const getFilteredStudents = () => {
-    let filtered = profile;
-
-    if (selectedBatch && selectedBatch.id) {
-      filtered = filtered.filter(
-        (student) => student.batchId === selectedBatch.id
-      );
-    }
-
-    switch (activeTab) {
-      case "admission":
-        filtered = filtered.filter(
-          (s) => s.admissionStatus === "admitted" && s.status === "active"
-        );
-        break;
-      case "zeroPeriod":
-        filtered = filtered.filter((s) => s.admissionStatus === "zeroPeriod");
-        break;
-      case "batchFreeze":
-        filtered = filtered.filter((s) => s.admissionStatus === "batchFreeze");
-        break;
-      case "dropout":
-        filtered = filtered.filter((s) => s.admissionStatus === "dropped");
-        break;
-      default:
-        break;
-    }
-
-    if (!isFilterCollapsed) {
-      if (filterData.status) {
-        filtered = filtered.filter((s) => s.status === filterData.status);
-      }
-      if (filterData.fromDate) {
-        filtered = filtered.filter(
-          (s) => new Date(s.admissionDate) >= new Date(filterData.fromDate)
-        );
-      }
-      if (filterData.toDate) {
-        filtered = filtered.filter(
-          (s) => new Date(s.admissionDate) <= new Date(filterData.toDate)
-        );
-      }
-    }
-
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (student) =>
-          student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          student.enrollmentNumber
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          student.mobile.includes(searchQuery)
-      );
-    }
-
-    return filtered;
+    // Since backend handles filtering, just return the data from API
+    return allProfiles;
   };
 
   // Mark individual attendance
@@ -3867,7 +3154,7 @@ const Student = ({
   };
 
   const filteredStudents = getFilteredStudents();
-  const tabCounts = getTabCounts();
+  const [tabCounts, setTabCounts] = useState({});
 
   const togglePopup = (studentIndex) => {
     setShowPopup((prev) => (prev === studentIndex ? null : studentIndex));
@@ -3879,12 +3166,16 @@ const Student = ({
     );
   };
 
+
   const handleTabClick = (studentIndex, tabIndex) => {
-    setStudentTabsActive((prevTabs) => ({
-      ...prevTabs,
+    setStudentTabsActive((prev) => ({
+      ...prev,
       [studentIndex]: tabIndex,
     }));
   };
+  useEffect(() => {
+    console.log("studentTabsActive", studentTabsActive);
+  }, [studentTabsActive]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -4037,8 +3328,8 @@ const Student = ({
                                 setShowAttendanceMode(!showAttendanceMode)
                               }
                               className={`btn btn-sm ${showAttendanceMode
-                                  ? "btn-success"
-                                  : "btn-outline-success"
+                                ? "btn-success"
+                                : "btn-outline-success"
                                 }`}
                             >
                               <i className="fas fa-check-circle me-1"></i>
@@ -4054,8 +3345,8 @@ const Student = ({
                                   setShowBulkControls(!showBulkControls)
                                 }
                                 className={`btn btn-sm ${showBulkControls
-                                    ? "btn-primary"
-                                    : "btn-outline-primary"
+                                  ? "btn-primary"
+                                  : "btn-outline-primary"
                                   }`}
                               >
                                 <i className="fas fa-users me-1"></i>
@@ -4108,8 +3399,8 @@ const Student = ({
                       <button
                         onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
                         className={`btn ${!isFilterCollapsed
-                            ? "btn-primary"
-                            : "btn-outline-primary"
+                          ? "btn-primary"
+                          : "btn-outline-primary"
                           }`}
                         style={{ whiteSpace: "nowrap" }}
                       >
@@ -4124,8 +3415,8 @@ const Student = ({
                         <button
                           onClick={() => setViewMode("grid")}
                           className={`btn ${viewMode === "grid"
-                              ? "btn-primary"
-                              : "btn-outline-secondary"
+                            ? "btn-primary"
+                            : "btn-outline-secondary"
                             }`}
                         >
                           <i className="fas fa-th"></i>
@@ -4133,8 +3424,8 @@ const Student = ({
                         <button
                           onClick={() => setViewMode("list")}
                           className={`btn ${viewMode === "list"
-                              ? "btn-primary"
-                              : "btn-outline-secondary"
+                            ? "btn-primary"
+                            : "btn-outline-secondary"
                             }`}
                         >
                           <i className="fas fa-list"></i>
@@ -4162,17 +3453,21 @@ const Student = ({
                         >
                           <button
                             className={`btn btn-sm ${activeTab === tab.key
-                                ? "btn-primary"
-                                : "btn-outline-secondary"
+                              ? "btn-primary"
+                              : "btn-outline-secondary"
                               }`}
-                            onClick={() => setActiveTab(tab.key)}
+                            onClick={() => {
+                              setActiveTab(tab.key);
+                              setFilterData({ ...filterData, status: tab.key });
+                              setCurrentPage(1);
+                            }}
                           >
                             <i className={`${tab.icon} me-1`}></i>
                             {tab.label}
                             <span
                               className={`ms-1 ${activeTab === tab.key
-                                  ? "text-white"
-                                  : "text-dark"
+                                ? "text-white"
+                                : "text-dark"
                                 }`}
                             >
                               ({tabCounts[tab.key] || 0})
@@ -4181,12 +3476,12 @@ const Student = ({
                         </div>
                       ))}
                       <div className="ms-auto">
-                        <button
+                        {/* <button
                           className="btn btn-sm btn-outline-primary me-2"
                           onClick={() => setShowBulkUpload(true)}
                         >
                           <i className="fas fa-upload"></i> Bulk Upload
-                        </button>
+                        </button> */}
                         <button
                           onClick={handleAttendanceManagement}
                           className="btn btn-sm btn-primary me-2"
@@ -4379,13 +3674,13 @@ const Student = ({
                 <div className="col-12 rounded equal-height-2 coloumn-2">
                   <div className="card px-3">
                     <div className="row" id="students-main-row">
-                      {filteredStudents.map((student, studentIndex) => {
-                        const courseInfo = formatDuration(student);
+                      {allProfiles.map((profile, studentIndex) => {
+                        const courseInfo = formatDuration(profile);
                         const filteredStats =
-                          getFilteredAttendanceData(student);
+                          getFilteredAttendanceData(profile);
                         const isEligibleForAttendance =
-                          student.admissionStatus === "zeroPeriod" ||
-                          student.admissionStatus === "admitted";
+                          profile.isZeroPeriodAssigned ||
+                          profile.isBatchFreeze;
 
                         return (
                           <div
@@ -4415,11 +3710,11 @@ const Student = ({
                                               className="form-check-input"
                                               type="checkbox"
                                               checked={selectedStudents.has(
-                                                student.id
+                                                profile.id
                                               )}
                                               onChange={() =>
                                                 toggleStudentSelection(
-                                                  student.id
+                                                  profile.id
                                                 )
                                               }
                                             />
@@ -4445,47 +3740,35 @@ const Student = ({
                                       </div>
                                       <div>
                                         <h6 className="mb-0 fw-bold">
-                                          {student.name}
+                                          {profile._candidate.name}
                                         </h6>
                                         <small className="text-muted">
-                                          {student.enrollmentNumber}
+                                          {profile._candidate.mobile}
                                         </small>
                                         <div className="mt-1">
-                                          {getAdmissionStatusBadge(student)}
+                                          {getAdmissionStatusBadge(profile)}
                                           {/* Show today's attendance status if marked */}
-                                          {todayAttendance[student.id]
+                                          {todayAttendance[profile.id]
                                             ?.isMarked && (
                                               <span
                                                 className={`badge bg-${getStatusColor(
-                                                  todayAttendance[student.id]
+                                                  todayAttendance[profile.id]
                                                     ?.status
                                                 )} ms-1`}
                                               >
                                                 <i
-                                                  className={`fas ${todayAttendance[student.id]
-                                                      ?.status === "present"
-                                                      ? "fa-check"
-                                                      : todayAttendance[
-                                                        student.id
-                                                      ]?.status === "late"
-                                                        ? "fa-clock"
-                                                        : todayAttendance[
-                                                          student.id
-                                                        ]?.status === "halfDay"
-                                                          ? "fa-clock-o"
-                                                          : todayAttendance[
-                                                            student.id
-                                                          ]?.status === "shortLeave"
-                                                            ? "fa-sign-out-alt"
-                                                            : todayAttendance[
-                                                              student.id
-                                                            ]?.status === "leave"
-                                                              ? "fa-calendar"
-                                                              : "fa-times"
+                                                  className={`fas ${todayAttendance[profile.id]
+                                                    ?.status === "present"
+                                                    ? "fa-check"
+                                                    : todayAttendance[
+                                                      profile.id
+                                                    ]?.status === "absent"
+                                                      ? "fa-calendar"
+                                                      : "fa-times"
                                                     } me-1`}
                                                 ></i>
                                                 {todayAttendance[
-                                                  student.id
+                                                  profile.id
                                                 ]?.status?.toUpperCase()}
                                               </span>
                                             )}
@@ -4528,14 +3811,14 @@ const Student = ({
                                               >
                                                 <button
                                                   type="button"
-                                                  className={`btn ${todayAttendance[student.id]
-                                                      ?.status === "present"
-                                                      ? "btn-success"
-                                                      : "btn-outline-success"
+                                                  className={`btn ${todayAttendance[profile.id]
+                                                    ?.status === "present"
+                                                    ? "btn-success"
+                                                    : "btn-outline-success"
                                                     }`}
                                                   onClick={() =>
                                                     markIndividualAttendance(
-                                                      student.id,
+                                                      profile.id,
                                                       "present"
                                                     )
                                                   }
@@ -4546,14 +3829,14 @@ const Student = ({
 
                                                 <button
                                                   type="button"
-                                                  className={`btn ${todayAttendance[student.id]
-                                                      ?.status === "absent"
-                                                      ? "btn-danger"
-                                                      : "btn-outline-danger"
+                                                  className={`btn ${todayAttendance[profile.id]
+                                                    ?.status === "absent"
+                                                    ? "btn-danger"
+                                                    : "btn-outline-danger"
                                                     }`}
                                                   onClick={() =>
                                                     markIndividualAttendance(
-                                                      student.id,
+                                                      profile.id,
                                                       "absent"
                                                     )
                                                   }
@@ -4566,12 +3849,11 @@ const Student = ({
                                           </div>
 
                                           {/* Time Fields */}
-                                          {todayAttendance[student.id]
+                                          {todayAttendance[profile.id]
                                             ?.status &&
-                                            todayAttendance[student.id]
+                                            todayAttendance[profile.id]
                                               ?.status !== "absent" &&
-                                            todayAttendance[student.id]
-                                              ?.status !== "leave" && (
+                                            (
                                               <div className="row">
                                                 <div className="col-6">
                                                   <label className="form-label small mb-1">
@@ -4582,15 +3864,15 @@ const Student = ({
                                                     className="form-control form-control-sm"
                                                     value={
                                                       todayAttendance[
-                                                        student.id
+                                                        profile.id
                                                       ]?.timeIn || ""
                                                     }
                                                     onChange={(e) =>
                                                       setTodayAttendance(
                                                         (prev) => ({
                                                           ...prev,
-                                                          [student.id]: {
-                                                            ...prev[student.id],
+                                                          [profile.id]: {
+                                                            ...prev[profile.id],
                                                             timeIn:
                                                               e.target.value,
                                                           },
@@ -4608,15 +3890,15 @@ const Student = ({
                                                     className="form-control form-control-sm"
                                                     value={
                                                       todayAttendance[
-                                                        student.id
+                                                        profile.id
                                                       ]?.timeOut || ""
                                                     }
                                                     onChange={(e) =>
                                                       setTodayAttendance(
                                                         (prev) => ({
                                                           ...prev,
-                                                          [student.id]: {
-                                                            ...prev[student.id],
+                                                          [profile.id]: {
+                                                            ...prev[profile.id],
                                                             timeOut:
                                                               e.target.value,
                                                           },
@@ -4629,16 +3911,16 @@ const Student = ({
                                             )}
 
                                           {/* Late Minutes Display */}
-                                          {todayAttendance[student.id]
+                                          {todayAttendance[profile.id]
                                             ?.status === "late" &&
-                                            todayAttendance[student.id]
+                                            todayAttendance[profile.id]
                                               ?.lateMinutes > 0 && (
                                               <div className="mt-2">
                                                 <small className="text-warning">
                                                   <i className="fas fa-exclamation-triangle me-1"></i>
                                                   Late by{" "}
                                                   {Math.round(
-                                                    todayAttendance[student.id]
+                                                    todayAttendance[profile.id]
                                                       .lateMinutes
                                                   )}{" "}
                                                   minutes
@@ -4725,7 +4007,7 @@ const Student = ({
                                               fontWeight: "600",
                                             }}
                                             onClick={() => {
-                                              setSelectedStudent(student);
+                                              setSelectedStudent(profile);
                                               setShowDetailsModal(true);
                                               setShowPopup(null);
                                             }}
@@ -4745,7 +4027,7 @@ const Student = ({
                                               fontWeight: "600",
                                             }}
                                             onClick={() => {
-                                              setEditingStudent(student);
+                                              setEditingStudent(profile);
                                               setShowEditForm(true);
                                               setShowPopup(null);
                                             }}
@@ -4765,7 +4047,7 @@ const Student = ({
                                               fontWeight: "600",
                                             }}
                                             onClick={() => {
-                                              setStudentToDelete(student);
+                                              setStudentToDelete(profile);
                                               setShowDeleteModal(true);
                                               setShowPopup(null);
                                             }}
@@ -4794,7 +4076,7 @@ const Student = ({
                                 {/* Notes Section for Attendance */}
                                 {showAttendanceMode &&
                                   isEligibleForAttendance &&
-                                  todayAttendance[student.id]?.isMarked && (
+                                  todayAttendance[profile.id]?.isMarked && (
                                     <div className="row mt-3">
                                       <div className="col-12">
                                         <label className="form-label small mb-1">
@@ -4805,14 +4087,14 @@ const Student = ({
                                           className="form-control form-control-sm"
                                           placeholder="Add notes for today's attendance..."
                                           value={
-                                            todayAttendance[student.id]
+                                            todayAttendance[profile.id]
                                               ?.notes || ""
                                           }
                                           onChange={(e) =>
                                             setTodayAttendance((prev) => ({
                                               ...prev,
-                                              [student.id]: {
-                                                ...prev[student.id],
+                                              [profile.id]: {
+                                                ...prev[profile.id],
                                                 notes: e.target.value,
                                               },
                                             }))
@@ -4834,10 +4116,10 @@ const Student = ({
                                         <li className="nav-item" key={tabIndex}>
                                           <button
                                             className={`nav-link ${(studentTabsActive[
-                                                studentIndex
-                                              ] || 0) === tabIndex
-                                                ? "active"
-                                                : ""
+                                              studentIndex
+                                            ] || 0) === tabIndex
+                                              ? "active"
+                                              : ""
                                               }`}
                                             onClick={() =>
                                               handleTabClick(
@@ -4848,14 +4130,14 @@ const Student = ({
                                           >
                                             <i
                                               className={`fas ${tabIndex === 0
-                                                  ? "fa-user"
-                                                  : tabIndex === 1
-                                                    ? "fa-briefcase"
-                                                    : tabIndex === 2
-                                                      ? "fa-graduation-cap"
-                                                      : tabIndex === 3
-                                                        ? "fa-file-alt"
-                                                        : "fa-calendar-check"
+                                                ? "fa-user"
+                                                : tabIndex === 1
+                                                  ? "fa-briefcase"
+                                                  : tabIndex === 2
+                                                    ? "fa-graduation-cap"
+                                                    : tabIndex === 3
+                                                      ? "fa-file-alt"
+                                                      : "fa-calendar-check"
                                                 } me-1`}
                                             ></i>
                                             {tab}
@@ -4867,7 +4149,7 @@ const Student = ({
                                 </div>
 
                                 <div className="card-body">
-                                {(studentTabsActive[studentIndex] || 0) === 0 && (
+                                  {(studentTabsActive[studentIndex] || 0) === 0 && (
                                     <div className="tab-pane active" id="lead-details">
                                       {/* Your lead details content here */}
                                       <div className="scrollable-container">
@@ -5528,10 +4810,10 @@ const Student = ({
                                                                     <span
                                                                       key={`resume-lang-dot-${index}-${dot}`}
                                                                       className={`resume-level-dot ${dot <=
-                                                                          (lang.level ||
-                                                                            0)
-                                                                          ? "filled"
-                                                                          : ""
+                                                                        (lang.level ||
+                                                                          0)
+                                                                        ? "filled"
+                                                                        : ""
                                                                         }`}
                                                                     ></span>
                                                                   ))}
@@ -5668,63 +4950,9 @@ const Student = ({
                                       </div>
                                     )}
 
-                                  {/* Job History Tab */}
-                                  {/* {(studentTabsActive[studentIndex] || 0) ===
-                                    1 && (
-                                      <div
-                                        className="tab-pane active"
-                                        id="job-history"
-                                      >
-                                        <div className="section-card">
-                                          <div className="table-responsive">
-                                            <table className="table table-hover table-bordered job-history-table">
-                                              <thead className="table-light">
-                                                <tr>
-                                                  <th>S.No</th>
-                                                  <th>Company Name</th>
-                                                  <th>Position</th>
-                                                  <th>Duration</th>
-                                                  <th>Location</th>
-                                                  <th>Status</th>
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-                                                {experiences.map((job, index) => (
-                                                  <tr key={index}>
-                                                    <td>{index + 1}</td>
-                                                    <td>{job.companyName}</td>
-                                                    <td>{job.jobTitle}</td>
-                                                    <td>
-                                                      {job.from
-                                                        ? moment(job.from).format(
-                                                          "MMM YYYY"
-                                                        )
-                                                        : "N/A"}{" "}
-                                                      -
-                                                      {job.currentlyWorking
-                                                        ? "Present"
-                                                        : job.to
-                                                          ? moment(job.to).format(
-                                                            "MMM YYYY"
-                                                          )
-                                                          : "N/A"}
-                                                    </td>
-                                                    <td>Remote</td>
-                                                    <td>
-                                                      <span className="text-success">
-                                                        Completed
-                                                      </span>
-                                                    </td>
-                                                  </tr>
-                                                ))}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )} */}
 
-                                 
+
+
                                   {/* Course History Tab */}
                                   {(studentTabsActive[studentIndex] || 0) ===
                                     2 && (
@@ -5942,9 +5170,9 @@ const Student = ({
                                                         <>
                                                           <button
                                                             className={`filter-btn ${statusFilter ===
-                                                                "all"
-                                                                ? "active"
-                                                                : ""
+                                                              "all"
+                                                              ? "active"
+                                                              : ""
                                                               }`}
                                                             onClick={() =>
                                                               setStatusFilter(
@@ -5961,9 +5189,9 @@ const Student = ({
                                                           </button>
                                                           <button
                                                             className={`filter-btn pending ${statusFilter ===
-                                                                "pending"
-                                                                ? "active"
-                                                                : ""
+                                                              "pending"
+                                                              ? "active"
+                                                              : ""
                                                               }`}
                                                             onClick={() =>
                                                               setStatusFilter(
@@ -5980,9 +5208,9 @@ const Student = ({
                                                           </button>
                                                           <button
                                                             className={`filter-btn verified ${statusFilter ===
-                                                                "verified"
-                                                                ? "active"
-                                                                : ""
+                                                              "verified"
+                                                              ? "active"
+                                                              : ""
                                                               }`}
                                                             onClick={() =>
                                                               setStatusFilter(
@@ -5999,9 +5227,9 @@ const Student = ({
                                                           </button>
                                                           <button
                                                             className={`filter-btn rejected ${statusFilter ===
-                                                                "rejected"
-                                                                ? "active"
-                                                                : ""
+                                                              "rejected"
+                                                              ? "active"
+                                                              : ""
                                                               }`}
                                                             onClick={() =>
                                                               setStatusFilter(
@@ -6132,12 +5360,12 @@ const Student = ({
                                                                       <div className="document-preview-icon">
                                                                         <i
                                                                           className={`fas ${fileType ===
-                                                                              "pdf"
-                                                                              ? "fa-file-word"
-                                                                              : fileType ===
-                                                                                "spreadsheet"
-                                                                                ? "fa-file-excel"
-                                                                                : "fa-file"
+                                                                            "pdf"
+                                                                            ? "fa-file-word"
+                                                                            : fileType ===
+                                                                              "spreadsheet"
+                                                                              ? "fa-file-excel"
+                                                                              : "fa-file"
                                                                             }`}
                                                                           style={{
                                                                             fontSize:
@@ -6325,13 +5553,25 @@ const Student = ({
                                     )}
 
                                   {/* Attendance Tab - Table Format Only */}
-                                  {(studentTabsActive[studentIndex] || 0) ===
-                                    4 && (
-                                      <EnhancedAttendanceTab
-                                        student={student}
-                                        studentIndex={studentIndex}
-                                      />
-                                    )}
+                                  {/* Attendance Tab - Table Format Only */}
+                                  {(studentTabsActive[studentIndex] || 0) === 4 && (
+                                    <EnhancedAttendanceTab
+                                      student={{
+                                        ...profile,
+                                        // Create a dailyAttendance array for backward compatibility
+                                        dailyAttendance: [
+                                          ...(profile.attendance?.zeroPeriod?.sessions || []),
+                                          ...(profile.attendance?.regularPeriod?.sessions || [])
+                                        ].map(session => ({
+                                          ...session,
+                                          status: session.status?.toLowerCase() || 'absent',
+                                          notes: session.remarks,
+                                          date: session.date
+                                        }))
+                                      }}
+                                      studentIndex={studentIndex}
+                                    />
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -6345,7 +5585,7 @@ const Student = ({
             </section>
           </div>
           {/* Empty State */}
-          {filteredStudents.length === 0 && (
+          {allProfiles.length === 0 && (
             <div className="text-center py-5">
               <i className="bi bi-person fs-1 text-muted"></i>
               <h5 className="text-muted mt-3">No students found</h5>

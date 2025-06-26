@@ -21,9 +21,38 @@ const appliedCoursesSchema = new Schema(
       type: ObjectId,
       ref: "Batch",
     },
+    batchAssignedBy: {
+      type: ObjectId,
+      ref: "User",
+    },
+    batchAssignedAt: {
+      type: Date,
+    },
     isBatchAssigned: {
       type: Boolean,
       default: false,
+    },
+    isZeroPeriodAssigned: {
+      type: Boolean,
+      default: false,
+    },
+    zeroPeriodAssignedBy: {
+      type: ObjectId,
+      ref: "User",
+    },
+    zeroPeriodAssignedAt: {
+      type: Date,
+    },
+    isBatchFreeze: {
+      type: Boolean,
+      default: false,
+    },
+    batchFreezeBy: {
+      type: ObjectId,
+      ref: "User",
+    },
+    batchFreezeAt: {
+      type: Date,
     },
     _leadStatus: {
       type: ObjectId,
@@ -54,6 +83,46 @@ const appliedCoursesSchema = new Schema(
     admissionDone: { type: Boolean, default: false },
     admissionDate: { type: Date },
     dropout: { type: Boolean, default: false },
+    dropoutDate: { type: Date },
+    dropoutReason: { type: String },
+    dropoutBy: { type: ObjectId, ref: "User" },
+    
+    // Attendance Tracking
+    attendance: {
+      zeroPeriod: {
+        totalSessions: { type: Number, default: 0 },
+        attendedSessions: { type: Number, default: 0 },
+        attendancePercentage: { type: Number, default: 0 },
+        sessions: [{
+          date: { type: Date, required: true },
+          status: { 
+            type: String, 
+            enum: ['Present', 'Absent'], 
+            default: 'Absent' 
+          },
+          markedBy: { type: ObjectId, ref: "User" },
+          markedAt: { type: Date, default: Date.now },
+          remarks: { type: String }
+        }]
+      },
+      regularPeriod: {
+        totalSessions: { type: Number, default: 0 },
+        attendedSessions: { type: Number, default: 0 },
+        attendancePercentage: { type: Number, default: 0 },
+        sessions: [{
+          date: { type: Date, required: true },
+          status: { 
+            type: String, 
+            enum: ['Present', 'Absent'], 
+            default: 'Absent' 
+          },
+          markedBy: { type: ObjectId, ref: "User" },
+          markedAt: { type: Date, default: Date.now },
+          remarks: { type: String }
+        }]
+      }
+    },
+    
     // Followup info (optional, alag se track karenge)
     followupDate: {
       type: Date,
@@ -339,6 +408,168 @@ appliedCoursesSchema.methods.manualAssignCounselor = async function() {
     return result;
   } catch (error) {
     console.error('Error in manual assign counselor:', error);
+    throw error;
+  }
+};
+
+// Attendance Tracking Methods
+appliedCoursesSchema.methods.markAttendance = async function(date, status, period = 'regularPeriod', markedBy = null, remarks = '') {
+  try {
+    const Batch = mongoose.model('Batch');
+    
+    // Validate period
+    if (!['zeroPeriod', 'regularPeriod'].includes(period)) {
+      throw new Error('Invalid period. Must be "zeroPeriod" or "regularPeriod"');
+    }
+    
+    // Validate status
+    if (!['Present', 'Absent'].includes(status)) {
+      throw new Error('Invalid status. Must be "Present" or "Absent"');
+    }
+    
+    // Check if batch is assigned
+    if (!this.batch) {
+      throw new Error('No batch assigned to this course application');
+    }
+    
+    // Get batch details to validate date ranges
+    const batch = await Batch.findById(this.batch);
+    if (!batch) {
+      throw new Error('Batch not found');
+    }
+    
+    const attendanceDate = new Date(date);
+    
+    // Validate date based on period
+    if (period === 'zeroPeriod') {
+      if (attendanceDate < batch.zeroPeriodStartDate || attendanceDate > batch.zeroPeriodEndDate) {
+        throw new Error('Date is outside zero period range');
+      }
+    } else {
+      // For regular period, allow dates after zero period ends
+      if (attendanceDate < batch.zeroPeriodEndDate) {
+        throw new Error('Date must be after zero period ends');
+      }
+      // Optional: You can also add an upper limit if needed
+      // if (attendanceDate > batch.endDate) {
+      //   throw new Error('Date is after batch end date');
+      // }
+    }
+    
+    // Check if attendance for this date already exists
+    const existingSessionIndex = this.attendance[period].sessions.findIndex(
+      session => session.date.toDateString() === attendanceDate.toDateString()
+    );
+    
+    if (existingSessionIndex !== -1) {
+      // Update existing session
+      this.attendance[period].sessions[existingSessionIndex] = {
+        date: attendanceDate,
+        status: status,
+        markedBy: markedBy || this.registeredBy,
+        markedAt: new Date(),
+        remarks: remarks
+      };
+    } else {
+      // Add new session
+      this.attendance[period].sessions.push({
+        date: attendanceDate,
+        status: status,
+        markedBy: markedBy || this.registeredBy,
+        markedAt: new Date(),
+        remarks: remarks
+      });
+    }
+    
+    // Recalculate attendance statistics
+    this.calculateAttendanceStats(period);
+    
+    await this.save();
+    return this;
+  } catch (error) {
+    console.error('Error marking attendance:', error);
+    throw error;
+  }
+};
+
+appliedCoursesSchema.methods.calculateAttendanceStats = function(period = null) {
+  try {
+    const periods = period ? [period] : ['zeroPeriod', 'regularPeriod'];
+    
+    periods.forEach(p => {
+      const sessions = this.attendance[p].sessions;
+      const totalSessions = sessions.length;
+      const attendedSessions = sessions.filter(session => 
+        ['Present'].includes(session.status)
+      ).length;
+      
+      this.attendance[p].totalSessions = totalSessions;
+      this.attendance[p].attendedSessions = attendedSessions;
+      this.attendance[p].attendancePercentage = totalSessions > 0 
+        ? Math.round((attendedSessions / totalSessions) * 100) 
+        : 0;
+    });
+  } catch (error) {
+    console.error('Error calculating attendance stats:', error);
+    throw error;
+  }
+};
+
+appliedCoursesSchema.methods.getAttendanceReport = function(startDate = null, endDate = null, period = null) {
+  try {
+    const periods = period ? [period] : ['zeroPeriod', 'regularPeriod'];
+    const report = {};
+    
+    periods.forEach(p => {
+      let sessions = this.attendance[p].sessions;
+      
+      // Filter by date range if provided
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        sessions = sessions.filter(session => 
+          session.date >= start && session.date <= end
+        );
+      }
+      
+      const totalSessions = sessions.length;
+      const presentSessions = sessions.filter(s => s.status === 'Present').length;
+      const absentSessions = sessions.filter(s => s.status === 'Absent').length;
+      
+      report[p] = {
+        totalSessions,
+        presentSessions,
+        absentSessions,
+        attendancePercentage: totalSessions > 0 
+          ? Math.round((presentSessions / totalSessions) * 100) 
+          : 0,
+        sessions: sessions.sort((a, b) => new Date(a.date) - new Date(b.date))
+      };
+    });
+    
+    return report;
+  } catch (error) {
+    console.error('Error generating attendance report:', error);
+    throw error;
+  }
+};
+
+appliedCoursesSchema.methods.bulkMarkAttendance = async function(attendanceData) {
+  try {
+    // attendanceData should be an array of objects with: date, status, period, remarks
+    for (const record of attendanceData) {
+      await this.markAttendance(
+        record.date, 
+        record.status, 
+        record.period || 'regularPeriod',
+        record.markedBy,
+        record.remarks
+      );
+    }
+    
+    return this;
+  } catch (error) {
+    console.error('Error in bulk marking attendance:', error);
     throw error;
   }
 };

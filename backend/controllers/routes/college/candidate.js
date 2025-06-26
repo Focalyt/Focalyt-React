@@ -1326,16 +1326,283 @@ router.post('/saveProfile', [isCollege], async (req, res) => {
 
   router.post('/assign-batch', [isCollege], async (req, res) => {
 	try {
-		console.log('assign-batch')
 		const { batchId, appliedCourseId } = req.body
-		console.log('batchId',batchId)
-		console.log('appliedCourseId',appliedCourseId)
 		const appliedCourse = await AppliedCourses.findOneAndUpdate({_id:appliedCourseId},{$set:{batch:batchId,isBatchAssigned:true}},{new:true})
-		console.log('appliedCourse',appliedCourse)
 		return res.send({status:true,message:'Batch assigned successfully',data:appliedCourse})
 	} catch (err) {
 		console.error('Error assigning batch:', err);
 		return res.send({status:false,message:'Error assigning batch',error:err})
 	}
   })
+
+// Attendance Management Routes
+router.post('/mark-attendance', [isCollege], async (req, res) => {
+  try {
+    const { appliedCourseIds, date, status, period = 'regularPeriod', remarks = '' } = req.body;
+    const markedBy = req.user._id;
+
+    if (!appliedCourseIds || !Array.isArray(appliedCourseIds) || appliedCourseIds.length === 0) {
+      return res.status(400).json({ 
+        status: false, 
+        message: 'appliedCourseIds array is required and must not be empty' 
+      });
+    }
+
+    if (!date || !status) {
+      return res.status(400).json({
+        status: false,
+        message: 'date and status are required'
+      });
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Mark attendance for each student
+    for (const courseId of appliedCourseIds) {
+      try {
+        const appliedCourse = await AppliedCourses.findById(courseId);
+        if (!appliedCourse) {
+          errors.push({
+            appliedCourseId: courseId,
+            error: 'Applied course not found'
+          });
+          continue;
+        }
+
+        await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
+        
+        results.push({
+          appliedCourseId: courseId,
+          status: 'success',
+          data: {
+            candidateId: appliedCourse._candidate,
+            attendance: appliedCourse.attendance[period]
+          }
+        });
+      } catch (error) {
+        errors.push({
+          appliedCourseId: courseId,
+          error: error.message
+        });
+      }
+    }
+
+    const isSingle = appliedCourseIds.length === 1;
+    const message = isSingle 
+      ? (results.length > 0 ? 'Attendance marked successfully' : 'Failed to mark attendance')
+      : `Bulk attendance marked successfully. ${results.length} successful, ${errors.length} failed`;
+
+    return res.status(200).json({
+      status: true,
+      message: message,
+      data: isSingle ? results[0]?.data : {
+        successful: results,
+        failed: errors,
+        totalProcessed: appliedCourseIds.length,
+        successCount: results.length,
+        errorCount: errors.length
+      }
+    });
+  } catch (error) {
+    console.error('Error marking attendance:', error);
+    return res.status(500).json({
+      status: false,
+      message: error.message || 'Error marking attendance'
+    });
+  }
+});
+
+router.get('/attendance-report/:appliedCourseId', [isCollege], async (req, res) => {
+  try {
+    const { appliedCourseId } = req.params;
+    const { startDate, endDate, period } = req.query;
+
+    const appliedCourse = await AppliedCourses.findById(appliedCourseId);
+    if (!appliedCourse) {
+      return res.status(404).json({
+        status: false,
+        message: 'Applied course not found'
+      });
+    }
+
+    const report = appliedCourse.getAttendanceReport(startDate, endDate, period);
+
+    return res.status(200).json({
+      status: true,
+      message: 'Attendance report generated successfully',
+      data: report
+    });
+  } catch (error) {
+    console.error('Error generating attendance report:', error);
+    return res.status(500).json({
+      status: false,
+      message: error.message || 'Error generating attendance report'
+    });
+  }
+});
+
+router.get('/batch-attendance/:batchId', [isCollege], async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { date, period = 'regularPeriod' } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        status: false,
+        message: 'Date parameter is required'
+      });
+    }
+
+    // Find all applied courses for this batch
+    const appliedCourses = await AppliedCourses.find({ 
+      batch: batchId,
+      isBatchAssigned: true 
+    }).populate('_candidate', 'name mobile email');
+
+    const attendanceData = [];
+
+    for (const appliedCourse of appliedCourses) {
+      const attendanceDate = new Date(date);
+      const session = appliedCourse.attendance[period].sessions.find(
+        s => s.date.toDateString() === attendanceDate.toDateString()
+      );
+
+      attendanceData.push({
+        appliedCourseId: appliedCourse._id,
+        candidate: appliedCourse._candidate,
+        attendance: session ? session.status : 'Not Marked',
+        remarks: session ? session.remarks : '',
+        markedAt: session ? session.markedAt : null
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Batch attendance retrieved successfully',
+      data: {
+        batchId,
+        date,
+        period,
+        totalStudents: attendanceData.length,
+        attendanceData
+      }
+    });
+  } catch (error) {
+    console.error('Error retrieving batch attendance:', error);
+    return res.status(500).json({
+      status: false,
+      message: error.message || 'Error retrieving batch attendance'
+    });
+  }
+});
+
+router.put('/update-attendance/:appliedCourseId', [isCollege], async (req, res) => {
+  try {
+    const { appliedCourseId } = req.params;
+    const { date, status, period = 'regularPeriod', remarks = '' } = req.body;
+    const markedBy = req.user._id;
+
+    if (!date || !status) {
+      return res.status(400).json({
+        status: false,
+        message: 'Date and status are required'
+      });
+    }
+
+    const appliedCourse = await AppliedCourses.findById(appliedCourseId);
+    if (!appliedCourse) {
+      return res.status(404).json({
+        status: false,
+        message: 'Applied course not found'
+      });
+    }
+
+    await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
+
+    return res.status(200).json({
+      status: true,
+      message: 'Attendance updated successfully',
+      data: appliedCourse
+    });
+  } catch (error) {
+    console.error('Error updating attendance:', error);
+    return res.status(500).json({
+      status: false,
+      message: error.message || 'Error updating attendance'
+    });
+  }
+});
+
+// Mark attendance for entire batch
+router.post('/batch-mark-attendance', [isCollege], async (req, res) => {
+  try {
+    const { batchId, date, status, period = 'regularPeriod', remarks = '' } = req.body;
+    const markedBy = req.user._id;
+
+    if (!batchId || !date || !status) {
+      return res.status(400).json({
+        status: false,
+        message: 'batchId, date, and status are required'
+      });
+    }
+
+    // Find all applied courses for this batch
+    const appliedCourses = await AppliedCourses.find({ 
+      batch: batchId,
+      isBatchAssigned: true 
+    });
+
+    if (appliedCourses.length === 0) {
+      return res.status(404).json({
+        status: false,
+        message: 'No students found for this batch'
+      });
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Mark attendance for each student in the batch
+    for (const appliedCourse of appliedCourses) {
+      try {
+        await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
+        
+        results.push({
+          appliedCourseId: appliedCourse._id,
+          candidateId: appliedCourse._candidate,
+          status: 'success'
+        });
+      } catch (error) {
+        errors.push({
+          appliedCourseId: appliedCourse._id,
+          candidateId: appliedCourse._candidate,
+          error: error.message
+        });
+      }
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: `Batch attendance marked successfully. ${results.length} successful, ${errors.length} failed`,
+      data: {
+        batchId,
+        date,
+        period,
+        successful: results,
+        failed: errors,
+        totalStudents: appliedCourses.length,
+        successCount: results.length,
+        errorCount: errors.length
+      }
+    });
+  } catch (error) {
+    console.error('Error marking batch attendance:', error);
+    return res.status(500).json({
+      status: false,
+      message: error.message || 'Error marking batch attendance'
+    });
+  }
+});
+
 module.exports = router;

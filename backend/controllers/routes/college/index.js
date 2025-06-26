@@ -911,7 +911,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 			// Sort by creation date
 			aggregationPipeline.push({
-				$sort: { createdAt: -1 }
+				$sort: { updatedAt: 1 }
 			});
 
 			// Execute aggregation
@@ -4504,10 +4504,19 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		const page = parseInt(req.query.page) || 1;      // Default page 1
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;
+		const batchId = req.query.batch; // Get batch ID from query parameter
 
-		const appliedCourses = await AppliedCourses.find({
+		// Build query object
+		let query = {
 			admissionDone: { $in: [true] }
-		})
+		};
+
+		// Add batch filter if batchId is provided
+		if (batchId) {
+			query.batchId = batchId;
+		}
+
+		const appliedCourses = await AppliedCourses.find(query)
 			.populate({
 				path: '_course',
 				select: 'name description docsRequired college', // Select the necessary fields
@@ -5832,11 +5841,171 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
 		const skip = (page - 1) * limit;
 
-		const appliedCourses = await AppliedCourses.find({	
+		// Build query object
+		let query = {
 			admissionDone: { $in: [true] },
 			_course: courseId,
 			_center: centerId
-		})
+		};
+
+		// Add search filter
+		if (req.query.search) {
+			query.$or = [
+				{ 'candidateName': { $regex: req.query.search, $options: 'i' } },
+				{ 'candidateEmail': { $regex: req.query.search, $options: 'i' } },
+				{ 'candidatePhone': { $regex: req.query.search, $options: 'i' } }
+			];
+		}
+
+		// Add status filter
+		if (req.query.status && req.query.status !== 'all' && req.query.status !== 'admission') {
+			console.log("req.query.status", req.query.status);
+			if (req.query.status === "dropout") {
+				query.dropout = { $in: [true] };
+			} 
+			if (req.query.status === "zeroPeriod") {
+				query.isZeroPeriodAssigned = true;
+			}
+			if (req.query.status === "batchFreeze") {
+				query.isBatchFreeze = { $in: [true] };
+			} 
+			
+		}
+
+		// Add date range filters
+		if (req.query.fromDate) {
+			query.createdAt = { $gte: new Date(req.query.fromDate) };
+		}
+		if (req.query.toDate) {
+			query.createdAt = { ...query.createdAt, $lte: new Date(req.query.toDate) };
+		}
+
+		// Add course type filter
+		if (req.query.courseType) {
+			query.courseType = req.query.courseType;
+		}
+
+		// Add lead status filter
+		if (req.query.leadStatus) {
+			query._leadStatus = req.query.leadStatus;
+		}
+
+		// Add sector filter
+		if (req.query.sector) {
+			query.sector = req.query.sector;
+		}
+
+		// Add created date range filters
+		if (req.query.createdFromDate) {
+			query.createdAt = { ...query.createdAt, $gte: new Date(req.query.createdFromDate) };
+		}
+		if (req.query.createdToDate) {
+			query.createdAt = { ...query.createdAt, $lte: new Date(req.query.createdToDate) };
+		}
+
+		// Add modified date range filters
+		if (req.query.modifiedFromDate) {
+			query.updatedAt = { $gte: new Date(req.query.modifiedFromDate) };
+		}
+		if (req.query.modifiedToDate) {
+			query.updatedAt = { ...query.updatedAt, $lte: new Date(req.query.modifiedToDate) };
+		}
+
+		// Add next action date range filters
+		if (req.query.nextActionFromDate) {
+			query.nextActionDate = { $gte: new Date(req.query.nextActionFromDate) };
+		}
+		if (req.query.nextActionToDate) {
+			query.nextActionDate = { ...query.nextActionDate, $lte: new Date(req.query.nextActionToDate) };
+		}
+
+		// Calculate filter counts before applying pagination
+		const calculateFilterCounts = async () => {
+			// Base query without status filter for counting all statuses
+			const baseQuery = {
+				admissionDone: { $in: [true] },
+				_course: courseId,
+				_center: centerId
+			};
+
+			// Add search filter to base query
+			if (req.query.search) {
+				baseQuery.$or = [
+					{ 'candidateName': { $regex: req.query.search, $options: 'i' } },
+					{ 'candidateEmail': { $regex: req.query.search, $options: 'i' } },
+					{ 'candidatePhone': { $regex: req.query.search, $options: 'i' } }
+				];
+			}
+
+			// Add other filters to base query (excluding status)
+			if (req.query.fromDate) {
+				baseQuery.createdAt = { $gte: new Date(req.query.fromDate) };
+			}
+			if (req.query.toDate) {
+				baseQuery.createdAt = { ...baseQuery.createdAt, $lte: new Date(req.query.toDate) };
+			}
+			if (req.query.courseType) {
+				baseQuery.courseType = req.query.courseType;
+			}
+			if (req.query.leadStatus) {
+				baseQuery._leadStatus = req.query.leadStatus;
+			}
+			if (req.query.sector) {
+				baseQuery.sector = req.query.sector;
+			}
+			if (req.query.createdFromDate) {
+				baseQuery.createdAt = { ...baseQuery.createdAt, $gte: new Date(req.query.createdFromDate) };
+			}
+			if (req.query.createdToDate) {
+				baseQuery.createdAt = { ...baseQuery.createdAt, $lte: new Date(req.query.createdToDate) };
+			}
+			if (req.query.modifiedFromDate) {
+				baseQuery.updatedAt = { $gte: new Date(req.query.modifiedFromDate) };
+			}
+			if (req.query.modifiedToDate) {
+				baseQuery.updatedAt = { ...baseQuery.updatedAt, $lte: new Date(req.query.modifiedToDate) };
+			}
+			if (req.query.nextActionFromDate) {
+				baseQuery.nextActionDate = { $gte: new Date(req.query.nextActionFromDate) };
+			}
+			if (req.query.nextActionToDate) {
+				baseQuery.nextActionDate = { ...baseQuery.nextActionDate, $lte: new Date(req.query.nextActionToDate) };
+			}
+
+			console.log("baseQuery", baseQuery);
+			
+			// Get all records for this college (without pagination)
+			const allAppliedCourses = await AppliedCourses.find(baseQuery)
+				.populate({
+					path: '_course',
+					select: 'name description docsRequired college',
+					populate: {
+						path: 'sectors',
+						select: 'name'
+					}
+				})
+				.sort({ createdAt: -1 });
+
+			const allFilteredAppliedCourses = allAppliedCourses.filter(doc => {
+				return doc._course && String(doc._course.college) === String(college._id);
+			});
+
+			// Calculate counts for different statuses
+			const counts = {
+				all: allFilteredAppliedCourses.length,
+				dropout: allFilteredAppliedCourses.filter(doc => doc.dropout === true).length,
+				zeroPeriod: allFilteredAppliedCourses.filter(doc => doc.isZeroPeriodAssigned === true).length,
+				batchFreeze: allFilteredAppliedCourses.filter(doc => doc.isBatchFreeze === true).length,
+				admission: allFilteredAppliedCourses.filter(doc => doc.admissionDone === true).length,
+			};
+			console.log("counts", counts);
+
+			return counts;
+		};
+
+		const filterCounts = await calculateFilterCounts();
+
+		const appliedCourses = await AppliedCourses.find(query)
 			.populate({
 				path: '_course',
 				select: 'name description docsRequired college', // Select the necessary fields
@@ -5994,10 +6163,9 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 
 		res.status(200).json({
 			success: true,
+			filterCounts,
 			count: result.length,
 			page,
-			pendingKycCount,
-			doneKycCount,
 			limit,
 			totalCount,
 			totalPages: Math.ceil(totalCount / limit),
