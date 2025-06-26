@@ -149,7 +149,8 @@ const checkPermission = (permission) => {
 module.exports.isCompany = async (req, res, next) => {
   try {
     const error = req.ykError("You are not authorized");
-    const token = req.header('x-auth');
+    const token = req.header('x-auth')|| req.session.user.token;
+    console.log("token", token);
     if (!token) throw error;
     const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
     const user = await User.findById(decoded.id);

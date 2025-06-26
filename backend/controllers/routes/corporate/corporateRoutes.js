@@ -119,7 +119,7 @@ router.route("/dashboard").get(isCompany, async (req, res) => {
     const company = await Company.findOne({
       _concernPerson: req.session.user._id,
     }).select('_id availableCredit unmasked name creditLeft');
-    console.log('company route hit')
+
     const vacancyCount = await Vacancy.find({
       _company: company._id,
       status: true,
@@ -639,7 +639,6 @@ router.get("/login", async (req, res) => {
     res.redirect("/company/dashboard");
   }
   res.render(`${req.vPath}/app/corporate/login`);
-  console.log('login route hit')
 });
 router.get("/get-all-candidates", [isCompany], async (req, res) => {
   const candidates = await CandidateRegister.find({});
