@@ -1980,20 +1980,20 @@ import moment from 'moment';
                     <div className="small text-muted mt-3">
                       <div className="row">
                         <div className="col-6">
-                          <i className="bi bi-calendar-event me-1"></i>Start: <strong>{batch.startDate}</strong>
+                          <i className="bi bi-calendar-event me-1"></i>Start: <strong>{new Date(batch.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
                         </div>
                         <div className="col-6">
-                          <i className="bi bi-calendar-check me-1"></i>End: <strong>{batch.endDate}</strong>
+                          <i className="bi bi-calendar-check me-1"></i>End: <strong>{new Date(batch.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
                         </div>
                       </div>
                     </div>
                     <div className="small text-muted mt-3">
                       <div className="row">
                         <div className="col-6">
-                          <i className="bi bi-calendar-event me-1"></i>Start: <strong>{new Date(batch.zeroPeriodStartDate).toLocaleDateString()}</strong>
+                          <i className="bi bi-calendar-event me-1"></i>Start: <strong>{new Date(batch.zeroPeriodStartDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
                         </div>
                         <div className="col-6">
-                          <i className="bi bi-calendar-check me-1"></i>End: <strong>{new Date(batch.zeroPeriodEndDate).toLocaleDateString()}</strong>
+                          <i className="bi bi-calendar-check me-1"></i>End: <strong>{new Date(batch.zeroPeriodEndDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
                         </div>
                       </div>
                     </div>
