@@ -61,11 +61,6 @@ import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
-import ProjectManagement from './Component/Layouts/App/College/ProjectManagement/Project';
-import CenterManagement from './Component/Layouts/App/College/ProjectManagement/Center';
-import CourseManagement from './Component/Layouts/App/College/ProjectManagement/Course';
-import BatchManagement from './Component/Layouts/App/College/ProjectManagement/Batch';
-import StudentManagement from './Component/Layouts/App/College/ProjectManagement copy/Student';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
 import AddCourse from './Pages/App/College/Course/AddCourse';
 import ViewCourses from './Pages/App/College/Course/ViewCourse';
@@ -100,7 +95,6 @@ import Batch from './Component/Layouts/App/College/ProjectManagement/Student';
 import RegistrationCards from './Component/Layouts/App/College/RegistrationCards/RegistrationCards';
 import ResumeTest from './Pages/Front/Resume/Resume';
 import AttendanceManagement from './Component/Layouts/App/College/ProjectManagement/AttendanceManagement'
-import Student from './Component/Layouts/App/College/ProjectManagement copy/Student';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -200,11 +194,6 @@ const Layout = () => {
           <Route path="myStudents" element={<MyStudents/>}/>
           <Route path="availablejobs" element={<AvailableJobs/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
-          <Route path="candidatemanagment/:verticalName/:verticalId" element={<ProjectManagement/>}/>
-          <Route path="candidatemanagment/:verticalName/:verticalId/project/:projectName/:projectId" element={<CenterManagement/>}/>
-          <Route path="candidatemanagment/:verticalName/:verticalId/:projectName/:projectId/center/:centerName/:centerId" element={<CourseManagement/>}/>
-          <Route path="candidatemanagment/:verticalName/:verticalId/:projectName/:projectId/:centerName/:centerId/course/:courseName/:courseId" element={<BatchManagement/>}/>
-          <Route path="candidatemanagment/:verticalName/:verticalId/:projectName/:projectId/:centerName/:centerId/:courseName/:courseId/batch/:batchName/:batchId" element={<StudentManagement/>}/>
           <Route path='addcourse' element={<AddCourse/>}/>
           <Route path='viewcourse' element={<ViewCourses/>}/>
           <Route path='registration' element={<Registrations/>}/>
@@ -213,6 +202,7 @@ const Layout = () => {
           <Route path="institute/courses/edit/:id" element={<EditCourse />} />
           <Route path="courses/edit/:id" element={<EditCourse />} />
           <Route path='accessManagement' element={<AccessManagement/>}/>
+          <Route path='projectmanagment' element={<CandidateManagementPortal/>}/>
           <Route path='candidatemanagment_old' element={<CandidateManagementPortal_old/>}/>
           <Route path='approvalManagement' element={<ApprovalManagement/>}/>
           <Route path='statusdesign' element={<Status/>}/>
