@@ -314,11 +314,11 @@ function CollegeLayout({ children }) {
 
                 </ul>
               </li>  
-              <li className={`nav-item ${location.pathname === '/institute/projectmanagment' ? 'active' : ''}`}>
-                <Link to="/institute/projectmanagment" onClick={() => handleSidebarClose()}>
+              <li className={`nav-item ${location.pathname === '/institute/candidatemanagment' ? 'active' : ''}`}>
+                <a href="/institute/candidatemanagment" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faTasks} />
                   <span className="menu-title">Training management</span>
-                </Link>
+                </a>
               </li>
 
               <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>

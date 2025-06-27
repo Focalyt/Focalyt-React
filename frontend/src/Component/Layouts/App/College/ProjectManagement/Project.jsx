@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import Center from '../../../../Layouts/App/College/ProjectManagement/Center';
 
-const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
+const Project = ({  onBackToVerticals = null }) => {
+  const { verticalId, verticalName } = useParams();
+  const  selectedVertical = {
+    id: verticalId,
+    name: verticalName
+  }
+
+  console.log('selectedVertical', selectedVertical)
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   
   // Safe session storage access with fallback
@@ -347,21 +355,6 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     }
   }, []);
 
-  // New function to handle project click for centers
-  const handleProjectClick = (project) => {
-    setSelectedProjectForCenters(project);
-    setShowCenters(true);
-    localStorage.setItem("cmsStage", "center");
-    localStorage.setItem("selectedProject", JSON.stringify(project));
-  };
-
-  // Function to go back to projects view
-  const handleBackToProjects = () => {
-    setShowCenters(false);
-    setSelectedProjectForCenters(null);localStorage.setItem("cmsStage", "project");
-    localStorage.removeItem("selectedProject");
-  };
-
   const closeModal = () => {
     setShowAddForm(false);
     setShowEditForm(false);
@@ -456,19 +449,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     </div>
   );
 
-  // If showing centers, render the Center component
-  if (showCenters && selectedProjectForCenters) {
-    return (
-      <div>
-        <Center 
-          selectedProject={selectedProjectForCenters} 
-          onBackToProjects={handleBackToProjects} 
-          onBackToVerticals={onBackToVerticals} 
-          selectedVertical={selectedVertical} 
-        />
-      </div>
-    );
-  }
+
 
   return (
     <div className="container py-4">
@@ -536,9 +517,8 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
               <div className="card h-100 border rounded shadow-sm position-relative">
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-start mb-2">
-                    <div
+                    <a href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/project/${project.name}/${project._id}`}
                       className="flex-grow-1 cursor-pointer"
-                      onClick={() => handleProjectClick(project)}
                       style={{ cursor: 'pointer' }}
                     >
                       <div className="d-flex align-items-center mb-2">
@@ -553,7 +533,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                           {project.status || 'unknown'}
                         </span>
                       </div>
-                    </div>
+                    </a>
                     <div className="text-end">
                       <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(project); }}>
                         <i className="bi bi-share-fill"></i>
@@ -576,13 +556,13 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                         <i className="bi bi-calendar-check me-1"></i>Due: <strong>{project.dueDate || 'N/A'}</strong>
                       </div>
                       <div className="col-4">
-                        <span
+                        <a
                           className="text-primary"
                           style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                          onClick={() => handleProjectClick(project)}
+                          href={`/institute/candidatemanagment/${selectedVertical.name}/${selectedVertical.id}/project/${project.name}/${project._id}`}
                         >
                           <i className="bi bi-building me-1"></i>{project.centers || 0} Centers
-                        </span>
+                        </a>
                       </div>
                     </div>
                   </div>

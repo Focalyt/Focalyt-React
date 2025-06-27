@@ -370,13 +370,9 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     return {
       stage: urlParams.get('stage') || 'project',
       projectId: urlParams.get('projectId'),
-      projectName: urlParams.get('projectName'),
       centerId: urlParams.get('centerId'),
-      centerName: urlParams.get('centerName'),
       courseId: urlParams.get('courseId'),
-      courseName: urlParams.get('courseName'),
       verticalId: urlParams.get('verticalId'),
-      verticalName: urlParams.get('verticalName')
     };
   };
 
@@ -386,11 +382,8 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     // Clear existing params
     url.searchParams.delete('stage');
     url.searchParams.delete('projectId');
-    url.searchParams.delete('projectName');
     url.searchParams.delete('centerId');
-    url.searchParams.delete('centerName');
     url.searchParams.delete('courseId');
-    url.searchParams.delete('courseName');
     
     // Set new params
     Object.keys(params).forEach(key => {
@@ -411,9 +404,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     updateURL({
       stage: 'center',
       projectId: project._id,
-      projectName: project.name,
       verticalId: selectedVertical?.id,
-      verticalName: selectedVertical?.name
     });
   };
 
@@ -426,7 +417,6 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     updateURL({
       stage: 'project',
       verticalId: selectedVertical?.id,
-      verticalName: selectedVertical?.name
     });
   };
 
