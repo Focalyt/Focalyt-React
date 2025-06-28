@@ -1904,25 +1904,57 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       <div className="d-flex justify-content-between align-items-center mb-3">
         <div>
           <div className="d-flex align-items-center gap-3">
-            <div className='d-flex align-items-center'>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
-              <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
-                {selectedProject.name} Project
-              </h5>
-              <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
-                {selectedCenter.name} Centers
-              </h5>
-              <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCourses} className="breadcrumb-item mb-0" aria-current="page">
-                {selectedCourse.name} Centers
-              </h5>
-              <span className="mx-2"> &gt; </span>
-              <h5 className="breadcrumb-item mb-0" aria-current="page">
-                All Batches
-              </h5>
-            </div>
+
+            <ol className="breadcrumb border-0 mb-0 small">
+            {onBackToVerticals && selectedVertical && (
+                <li className="breadcrumb-item">
+                  <button
+                    className="btn btn-link p-0 text-decoration-none"
+                    onClick={onBackToVerticals}
+                  >
+                    Verticals
+                  </button>
+                </li>
+              )}
+            {onBackToProjects && selectedProject && (
+                <li className="breadcrumb-item">
+                  <button
+                    className="btn btn-link p-0 text-decoration-none"
+                    onClick={onBackToProjects}
+                  >
+                    Projects
+                  </button>
+                </li>
+              )}
+              {onBackToCenters && selectedCenter && (
+                <li className="breadcrumb-item">
+                  <button
+                    className="btn btn-link p-0 text-decoration-none"
+                    onClick={onBackToCenters}
+                  >
+                    Centers
+                  </button>
+                </li>
+              )}
+              {onBackToCourses && selectedCourse && (
+                <li className="breadcrumb-item">
+                  <button
+                    className="btn btn-link p-0 text-decoration-none"
+                    onClick={onBackToCourses}
+                  >
+                    Courses
+                  </button>
+                </li>
+              )}
+
+              <li
+                className="breadcrumb-item active"
+                aria-current="page"
+              >
+                Batches{" "}
+                {selectedCourse && `- ${selectedCourse.name}`}
+              </li>
+            </ol>
           </div>
         </div>
 
@@ -1932,9 +1964,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
               <i className="bi bi-arrow-left"></i> Back
             </button>
           )}
-          <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+          {/* <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
-          </button>
+          </button> */}
           {mainTab === 'Batches' && (
             <button className="btn btn-warning" onClick={handleAdd}>Add Batch</button>
           )}

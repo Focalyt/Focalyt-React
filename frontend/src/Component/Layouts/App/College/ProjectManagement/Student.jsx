@@ -156,7 +156,6 @@ const Student = ({
   const [studentToDelete, setStudentToDelete] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
   const [showPopup, setShowPopup] = useState(null);
   const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
@@ -3504,13 +3503,11 @@ const Student = ({
             <div className="site-header--sticky--register">
               <div className="container-fluid">
                 <div className="row align-items-center">
-                  <div className="col-md-4 d-md-block d-sm-none">
+                  <div className="col-md-5 d-md-block d-sm-none">
                     <div className="d-flex align-items-center">
-                      <h4 className="fw-bold text-dark mb-0 me-3">
-                        Students Management
-                      </h4>
-                      <nav aria-label="breadcrumb">
-                        <ol className="breadcrumb mb-0 small">
+                     
+                      
+                        <ol className="breadcrumb border-0 mb-0 small">
                           {onBackToCenters && selectedCenter && (
                             <li className="breadcrumb-item">
                               <button
@@ -3549,11 +3546,11 @@ const Student = ({
                             {selectedBatch && `- ${selectedBatch.name}`}
                           </li>
                         </ol>
-                      </nav>
+                     
                     </div>
                   </div>
 
-                  <div className="col-md-8">
+                  <div className="col-md-7">
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       {/* ===== ENHANCED ATTENDANCE CONTROLS ===== */}
                       {showAttendanceControls &&
@@ -3651,26 +3648,6 @@ const Student = ({
                         Filters
                       </button>
 
-                      <div className="btn-group">
-                        <button
-                          onClick={() => setViewMode("grid")}
-                          className={`btn ${viewMode === "grid"
-                            ? "btn-primary"
-                            : "btn-outline-secondary"
-                            }`}
-                        >
-                          <i className="fas fa-th"></i>
-                        </button>
-                        <button
-                          onClick={() => setViewMode("list")}
-                          className={`btn ${viewMode === "list"
-                            ? "btn-primary"
-                            : "btn-outline-secondary"
-                            }`}
-                        >
-                          <i className="fas fa-list"></i>
-                        </button>
-                      </div>
 
                       {onBackToBatches && (
                         <button
@@ -3770,11 +3747,8 @@ const Student = ({
                               >
                                 <option value="">Select Status</option>
                                 <option value="present">Present</option>
-                                <option value="late">Late</option>
                                 <option value="absent">Absent</option>
-                                <option value="leave">Leave</option>
-                                <option value="halfDay">Half Day</option>
-                                <option value="shortLeave">Short Leave</option>
+                               
                               </select>
                             </div>
 
@@ -4348,9 +4322,9 @@ const Student = ({
                                   </div>
 
                                   {/* ===== ENHANCED ATTENDANCE CONTROLS ===== */}
-                                  {showAttendanceMode &&
-                                    isEligibleForAttendance && (
-                                      <div className="col-md-5">
+                                  {/* {showAttendanceMode &&
+                                    isEligibleForAttendance && ( */}
+                                      <div className="col-md-4">
                                         <div className="attendance-controls">
                                           <h6 className="text-dark mb-2 small fw-bold">
                                             <i className="fas fa-calendar-check me-1"></i>
@@ -4485,7 +4459,7 @@ const Student = ({
                                             )}
                                         </div>
                                       </div>
-                                    )}
+                                    {/* )} */}
 
                                   {/* Action Buttons */}
                                   <div className="col-md-2 text-end mt-2">

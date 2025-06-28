@@ -1518,8 +1518,8 @@ const CRMDashboard = () => {
     }
   };
 
-  const handleUpdateStatus = async () => {
-    console.log('Function called');
+  const handleUpdateStatus = async (e) => {
+    e.preventDefault();
 
     try {
       if (showPanel === 'bulkstatuschange') {
@@ -1568,7 +1568,6 @@ const CRMDashboard = () => {
           }
         );
 
-        console.log('API response:', response.data);
 
         if (response.data.success) {
           alert('Status updated successfully!');
@@ -1651,7 +1650,6 @@ const CRMDashboard = () => {
           }
         );
 
-        console.log('API response:', response.data);
 
         if (response.data.success) {
           alert('Status updated successfully!');
@@ -2368,7 +2366,7 @@ const CRMDashboard = () => {
                 CLOSE
               </button>
               <button
-                type="submit"
+              
                 className="btn text-white"
                 onClick={handleUpdateStatus}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
