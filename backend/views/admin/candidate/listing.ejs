@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Bulk Listing</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Bulk Listing</li>
 						</ol>
 					</div>
@@ -168,7 +168,7 @@
 				}
 				$.ajax({
 					type: "POST",
-					url: "/changestatus",
+					url: "<%= process.env.MIPIE_BACKEND_URL %>/changestatus",
 					data: {
 						id,
 						status: myStatus,
@@ -187,13 +187,13 @@
 				if (x) {
 					$.ajax({
 						type: "POST",
-						url: "/deleteRecord",
+						url: "<%= process.env.MIPIE_BACKEND_URL %>/deleteRecord",
 						data: {
 							id,
 							status: myStatus,
 							model,
 						},
-						success: () => (window.location.href = "/college/candidate"),
+						success: () => (window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/college/candidate"),
 					});
 				}
 			}

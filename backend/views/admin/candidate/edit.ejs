@@ -15,9 +15,9 @@
                     <h3 class="content-header-title float-left mb-0">Edit Candidate</h3>
                     <div class="breadcrumb-wrapper col-12">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/admin">Home</a>
+                            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a>
                             </li>
-                            <li class="breadcrumb-item"><a href="/admin/candidate">Candidates</a>
+                            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate">Candidates</a>
                             </li>
                             <li class="breadcrumb-item active">Edit Candidates
                             </li>
@@ -636,7 +636,7 @@
 
                                                         <div
                                                             class="col-xl-12 text-xl-right text-lg-right text-md-right text-sm-center text-center">
-                                                            <!-- <a type="reset" href="/admin/candidate/add" class="btn btn-danger"
+                                                            <!-- <a type="reset" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/add" class="btn btn-danger"
                                                     value="Reset">Reset</a> -->
                                                             <!-- <a type="reset" onclick="reset()" class="btn btn-danger"
                                                     value="Reset">Reset</a> -->
@@ -785,7 +785,7 @@
                     }
                     header = { headers: { 'x-auth': localStorage.getItem('token') } }
 
-                    axios.post(`/admin/candidate/editProfile/${candidateId}`, body, header)
+                    axios.post(`<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/editProfile/${candidateId}`, body, header)
                         .then(res => {
                             setTimeout(() => {
                                 window.location.reload();
@@ -818,7 +818,7 @@
                     if(!($('#state').val())) {
                         return 
                     }
-                    axios.get('/admin/candidate/getcitiesbyId', { params: { stateId: $('#state').val() } })
+                    axios.get('<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/getcitiesbyId', { params: { stateId: $('#state').val() } })
                         .then(({
                             data
                         }) => {
@@ -845,7 +845,7 @@
                         .remove()
                         .end()
                         .append('<option disabled selected value="">Select Option</option>');
-                    axios.post('/panel/helper/getsubQual', {
+                    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/panel/helper/getsubQual', {
                         _qualification: $('#qual').val()
                     })
                         .then(({
@@ -872,10 +872,10 @@
                     let data = {
                         key: $('#logo').val(),
                     }
-                    axios.post('/api/deleteSingleFile', data, header)
+                    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deleteSingleFile', data, header)
                         .then(result => {
                             if (result.status) {
-                                axios.post("/admin/candidate/removelogo", data, { params: { mobile: $('#mobile').val() } }).then(() => console.log('deleted'))
+                                axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/removelogo", data, { params: { mobile: $('#mobile').val() } }).then(() => console.log('deleted'))
                                 console.log('File deleted')
                             }
                         })
@@ -929,7 +929,7 @@
                         if (!Array.isArray(filesData) || filesData.length <= 0) throw new Error('No image found!');
                         const data = await Promise.all(filesData.map(async (file) => {
                             const ext = file.name.split('.').pop();
-                            const res = await axios.get('/admin/s3upload', { params: { type: file.type, ext } });
+                            const res = await axios.get('<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload', { params: { type: file.type, ext } });
                             if (!res || !res.data || !res.data.data) return null;
                             const { url, key } = res.data.data;
                             if (!url || !key) return null;
@@ -1051,7 +1051,7 @@
                         alert("You need to upload the video either in mp4,mov or avi format");
                         inputField.value = ''
                     } else {
-                        axios.post('/admin/uploadVideo', body, header)
+                        axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/uploadVideo', body, header)
                             .then(result => {
                                 if (result.data.status) {
                                     localStorage.setItem(`${section}Video${id}`, result.data.data.Key);
@@ -1099,7 +1099,7 @@
                     const subQualificationCombo = $(row).find('select.subqualification')
                     let body = { qualificationId };
                     let options = ''
-                    $.get('/admin/candidate/getSubQualification', body).done((res) => {
+                    $.get('<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/getSubQualification', body).done((res) => {
                         if (res.status) {
                             for (let i = 0; i < res.subQualification.length; i++) {
                                 options = options + `<option value="${res.subQualification[i]._id}" class="text-capitalize">${res.subQualification[i].name}</option>`
