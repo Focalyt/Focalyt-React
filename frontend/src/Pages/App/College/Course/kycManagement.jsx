@@ -3378,12 +3378,12 @@ const KYCManagement = () => {
                                           <img
                                             src="/Assets/public_assets/images/ekyc_done.png"
                                             alt="ekyc done"
-                                            style={{ width: 100, height: 'auto', display: profile.kyc === true ? 'inline-block' : 'none' }}
+                                            style={{ width: 100, height: 'auto', display: profile.kyc === true || profile?.docCounts?.totalRequired === 0 ? 'inline-block' : 'none' }}
                                           />
                                           <img
                                             src="/Assets/public_assets/images/ekyc_pending.png"
                                             alt="ekyc pending"
-                                            style={{ width: 100, height: 'auto', display: profile.kyc === false ? 'inline-block' : 'none' }}
+                                            style={{ width: 100, height: 'auto', display: profile.kyc === false && profile?.docCounts?.totalRequired > 0 ? 'inline-block' : 'none' }}
                                           />
                                         </div>
                                       </div>
@@ -3433,7 +3433,7 @@ const KYCManagement = () => {
                                               display: showPopup === profileIndex ? "block" : "none"
                                             }}
                                           >
-                                            {Boolean(profile.kyc) && (
+                                            {Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0 && (
                                               <button
                                                 className="dropdown-item"
                                                 style={{
@@ -3564,7 +3564,7 @@ const KYCManagement = () => {
                                               display: showPopup === profileIndex ? "block" : "none"
                                             }}
                                           >
-                                            {Boolean(profile.kyc) && (
+                                            {Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0 && (
                                               <button
                                                 className="dropdown-item"
                                                 style={{

@@ -15,35 +15,35 @@ const AWS = require('aws-sdk');
 
 const {
 	accessKeyId,
-	
+
 	secretAccessKey,
 	region,
 	bucketName,
 	mimetypes,
-  } = require('../../../config');
-  
-  
-  AWS.config.update({
+} = require('../../../config');
+
+
+AWS.config.update({
 	accessKeyId,
 	secretAccessKey,
 	region,
-  });
-  
-  const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
-  
-  const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
-  if (!fs.existsSync(destination)) fs.mkdirSync(destination);
-  
-  const storage = multer.diskStorage({
+});
+
+const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+
+const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
+if (!fs.existsSync(destination)) fs.mkdirSync(destination);
+
+const storage = multer.diskStorage({
 	destination,
 	filename: (req, file, cb) => {
-	  const ext = path.extname(file.originalname);
-	  const basename = path.basename(file.originalname, ext);
-	  cb(null, `${basename}-${Date.now()}${ext}`);
+		const ext = path.extname(file.originalname);
+		const basename = path.basename(file.originalname, ext);
+		cb(null, `${basename}-${Date.now()}${ext}`);
 	},
-  });
-  
-  const upload = multer({ storage }).single('file');
+});
+
+const upload = multer({ storage }).single('file');
 
 
 
@@ -1074,7 +1074,7 @@ router.get('/getCandidateProfile/:id', [isCollege], async (req, res) => {
 	try {
 		const user = req.user;
 		let { id } = req.params
-		console.log('id',id)
+		console.log('id', id)
 
 		const educations = await Qualification.find({ status: true });
 
@@ -1104,505 +1104,709 @@ router.get('/getCandidateProfile/:id', [isCollege], async (req, res) => {
 router.post('/saveProfile', [isCollege], async (req, res) => {
 	try {
 		console.log("save profile...")
-	  const user = req.user;
-  
-	  const {
-		name,
-		email,
-		mobile,
-		sex,
-		dob,
-		whatsapp,
-		personalInfo,
-		experiences,
-		qualifications,
-		declaration,
-		isExperienced,showProfileForm
-	  } = req.body;
-  
-	  console.log('experiences from frontend',experiences)
-  
-	  // Build dynamic update object
-	  const updatePayload = {
-		
-	  };
-  
-	  // Root level fields (only if present)
-	  if (showProfileForm) updatePayload.showProfileForm = showProfileForm;
-	  if (name) updatePayload.name = name;
-	  if (email) updatePayload.email = email;
-	  if (typeof isExperienced !== 'undefined') {
-		updatePayload.isExperienced = isExperienced;
-	  }
-	  
-	  if (sex) updatePayload.sex = sex;
-	  if (dob) updatePayload.dob = dob;
-	  if (whatsapp) updatePayload.whatsapp = whatsapp;
-  
-	  // personalInfo: Only non-empty fields
-	  if (personalInfo) {
-		updatePayload.personalInfo = {};
-  
-		if (personalInfo.professionalTitle) updatePayload.personalInfo.professionalTitle = personalInfo.professionalTitle;
-		if (personalInfo.declaration) updatePayload.personalInfo.declaration = personalInfo.declaration;
-		if (personalInfo.totalExperience) updatePayload.personalInfo.totalExperience = personalInfo.totalExperience;
-		if (personalInfo.professionalSummary) updatePayload.personalInfo.professionalSummary = personalInfo.professionalSummary;
-		if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
-		if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;
-		if (personalInfo.permanentAddress) updatePayload.personalInfo.permanentAddress = personalInfo.permanentAddress;
-		if (personalInfo.currentAddress) updatePayload.personalInfo.currentAddress = personalInfo.currentAddress;
-  
-		if (Array.isArray(personalInfo.voiceIntro) && personalInfo.voiceIntro.length > 0) {
-		  updatePayload.personalInfo.voiceIntro = personalInfo.voiceIntro;
+		const user = req.user;
+
+		const {
+			name,
+			email,
+			mobile,
+			sex,
+			dob,
+			whatsapp,
+			personalInfo,
+			experiences,
+			qualifications,
+			declaration,
+			isExperienced, showProfileForm
+		} = req.body;
+
+		console.log('experiences from frontend', experiences)
+
+		// Build dynamic update object
+		const updatePayload = {
+
+		};
+
+		// Root level fields (only if present)
+		if (showProfileForm) updatePayload.showProfileForm = showProfileForm;
+		if (name) updatePayload.name = name;
+		if (email) updatePayload.email = email;
+		if (typeof isExperienced !== 'undefined') {
+			updatePayload.isExperienced = isExperienced;
 		}
-		if (Array.isArray(personalInfo.skills) && personalInfo.skills.length > 0) updatePayload.personalInfo.skills = personalInfo.skills;
-		if (Array.isArray(personalInfo.certifications) && personalInfo.certifications.length > 0) updatePayload.personalInfo.certifications = personalInfo.certifications;
-		if (Array.isArray(personalInfo.languages) && personalInfo.languages.length > 0) {
-		  updatePayload.personalInfo.languages = personalInfo.languages
-			.filter(lang => lang.name && typeof lang.level === 'number')
-			.map(lang => ({
-			  name: lang.name,
-			  level: lang.level
+
+		if (sex) updatePayload.sex = sex;
+		if (dob) updatePayload.dob = dob;
+		if (whatsapp) updatePayload.whatsapp = whatsapp;
+
+		// personalInfo: Only non-empty fields
+		if (personalInfo) {
+			updatePayload.personalInfo = {};
+
+			if (personalInfo.professionalTitle) updatePayload.personalInfo.professionalTitle = personalInfo.professionalTitle;
+			if (personalInfo.declaration) updatePayload.personalInfo.declaration = personalInfo.declaration;
+			if (personalInfo.totalExperience) updatePayload.personalInfo.totalExperience = personalInfo.totalExperience;
+			if (personalInfo.professionalSummary) updatePayload.personalInfo.professionalSummary = personalInfo.professionalSummary;
+			if (personalInfo.image) updatePayload.personalInfo.image = personalInfo.image;
+			if (personalInfo.resume) updatePayload.personalInfo.resume = personalInfo.resume;
+			if (personalInfo.permanentAddress) updatePayload.personalInfo.permanentAddress = personalInfo.permanentAddress;
+			if (personalInfo.currentAddress) updatePayload.personalInfo.currentAddress = personalInfo.currentAddress;
+
+			if (Array.isArray(personalInfo.voiceIntro) && personalInfo.voiceIntro.length > 0) {
+				updatePayload.personalInfo.voiceIntro = personalInfo.voiceIntro;
+			}
+			if (Array.isArray(personalInfo.skills) && personalInfo.skills.length > 0) updatePayload.personalInfo.skills = personalInfo.skills;
+			if (Array.isArray(personalInfo.certifications) && personalInfo.certifications.length > 0) updatePayload.personalInfo.certifications = personalInfo.certifications;
+			if (Array.isArray(personalInfo.languages) && personalInfo.languages.length > 0) {
+				updatePayload.personalInfo.languages = personalInfo.languages
+					.filter(lang => lang.name && typeof lang.level === 'number')
+					.map(lang => ({
+						name: lang.name,
+						level: lang.level
+					}));
+			}
+
+			if (Array.isArray(personalInfo.projects) && personalInfo.projects.length > 0) updatePayload.personalInfo.projects = personalInfo.projects;
+			if (Array.isArray(personalInfo.interest) && personalInfo.interest.length > 0) updatePayload.personalInfo.interest = personalInfo.interest;
+
+		}
+
+
+		// Work experience
+		if (Array.isArray(experiences) && experiences.length > 0) {
+			updatePayload.experiences = experiences.map(exp => ({
+				jobTitle: exp.jobTitle || '',
+				companyName: exp.companyName || '',
+				jobDescription: exp.jobDescription || '',
+				currentlyWorking: exp.currentlyWorking || false,
+				from: exp.from ? new Date(exp.from) : null,
+				to: exp.to ? new Date(exp.to) : null,
+				location: exp.location || {
+					type: 'Point',
+					coordinates: [0, 0],
+					city: '',
+					state: '',
+					fullAddress: ''
+				}
 			}));
 		}
-  
-		if (Array.isArray(personalInfo.projects) && personalInfo.projects.length > 0) updatePayload.personalInfo.projects = personalInfo.projects;
-		if (Array.isArray(personalInfo.interest) && personalInfo.interest.length > 0) updatePayload.personalInfo.interest = personalInfo.interest;
-  
-	  }
-  
-	 
-	  // Work experience
-  if (Array.isArray(experiences) && experiences.length > 0) {
-	updatePayload.experiences = experiences.map(exp => ({
-	  jobTitle: exp.jobTitle || '',
-	  companyName: exp.companyName || '',
-	  jobDescription: exp.jobDescription || '',
-	  currentlyWorking: exp.currentlyWorking || false,
-	  from: exp.from ? new Date(exp.from) : null,
-	  to: exp.to ? new Date(exp.to) : null,
-	  location: exp.location || {
-		type: 'Point',
-		coordinates: [0, 0],
-		city: '',
-		state: '',
-		fullAddress: ''
-	  }
-	}));
-  }
-  
-  
-	  // Qualifications (sanitize and only if non-empty)
-	  if (Array.isArray(qualifications) && qualifications.length > 0) {
-		updatePayload.qualifications = qualifications
-		  .filter(q => q.education)
-		  .map(q => ({
-			education: q.education,
-			boardName: q.boardName || '',
-			schoolName: q.schoolName || '',
-			collegeName: q.collegeName || '',
-			universityName: q.universityName || '',
-			passingYear: q.passingYear || '',
-			marks: q.marks || '',
-			course: q.course || undefined,
-			specialization: q.specialization || '',
-			universityLocation: q.universityLocation || {
-			  type: 'Point',
-			  coordinates: [0, 0],
-			  city: '',
-			  state: '',
-			  fullAddress: ''
-			},
-			collegeLocation: q.collegeLocation || {
-			  type: 'Point',
-			  coordinates: [0, 0],
-			  city: '',
-			  state: '',
-			  fullAddress: ''
-			},
-			schoolLocation: q.schoolLocation || {
-			  type: 'Point',
-			  coordinates: [0, 0],
-			  city: '',
-			  state: '',
-			  fullAddress: ''
-			}
-		  }));
-	  }
-	  console.log('updatePayload', updatePayload)
-	  console.log('Incoming Data:', req.body);
-	
-	  // Final DB Update
-	  const updatedProfile = await Candidate.findOneAndUpdate(
-		{ mobile: mobile },
-		{ $set: updatePayload },
-		{ new: true, runValidators: true }
-	  );
-  
-	  console.log('updatedProfile', updatedProfile)
-  
-  
-	  return res.status(200).json({ status: true, message: 'Profile updated successfully', data: updatedProfile });
+
+
+		// Qualifications (sanitize and only if non-empty)
+		if (Array.isArray(qualifications) && qualifications.length > 0) {
+			updatePayload.qualifications = qualifications
+				.filter(q => q.education)
+				.map(q => ({
+					education: q.education,
+					boardName: q.boardName || '',
+					schoolName: q.schoolName || '',
+					collegeName: q.collegeName || '',
+					universityName: q.universityName || '',
+					passingYear: q.passingYear || '',
+					marks: q.marks || '',
+					course: q.course || undefined,
+					specialization: q.specialization || '',
+					universityLocation: q.universityLocation || {
+						type: 'Point',
+						coordinates: [0, 0],
+						city: '',
+						state: '',
+						fullAddress: ''
+					},
+					collegeLocation: q.collegeLocation || {
+						type: 'Point',
+						coordinates: [0, 0],
+						city: '',
+						state: '',
+						fullAddress: ''
+					},
+					schoolLocation: q.schoolLocation || {
+						type: 'Point',
+						coordinates: [0, 0],
+						city: '',
+						state: '',
+						fullAddress: ''
+					}
+				}));
+		}
+		console.log('updatePayload', updatePayload)
+		console.log('Incoming Data:', req.body);
+
+		// Final DB Update
+		const updatedProfile = await Candidate.findOneAndUpdate(
+			{ mobile: mobile },
+			{ $set: updatePayload },
+			{ new: true, runValidators: true }
+		);
+
+		console.log('updatedProfile', updatedProfile)
+
+
+		return res.status(200).json({ status: true, message: 'Profile updated successfully', data: updatedProfile });
 	} catch (error) {
-	  console.error('Error saving profile data:', error);
-	  return res.status(500).json({ status: false, message: 'Error saving profile data', error: error.message });
+		console.error('Error saving profile data:', error);
+		return res.status(500).json({ status: false, message: 'Error saving profile data', error: error.message });
 	}
-  });
+});
 
-  router.patch('/updatefiles', [isCollege], async (req, res) => {
+router.patch('/updatefiles', [isCollege], async (req, res) => {
 	try {
-	  // Step 1: Find dynamic key (should be only 1 key in body)
-  
-	  console.log('updatefiles')
-	  const keys = Object.keys(req.body);
-	  if (keys.length !== 1) {
-		return res.send({ status: false, message: 'Invalid request structure' });
-	  }
-  
-	  const fieldName = keys[0];
-	  const fileData = req.body[fieldName];
-  
-	  console.log('fieldName',fieldName,'fileData',fileData)
-  
-	  // Step 2: Validate allowed fields
-	  const arrayFields = ['resume', 'voiceIntro'];
-	  const singleFields = ['profilevideo', 'image','focalytProfile'];
-  
-	  if (![...arrayFields, ...singleFields].includes(fieldName)) {
-		return res.send({ status: false, message: 'Unauthorized field update' });
-	  }
-  
-	  // Step 3: Create update object
-	  const updateQuery = arrayFields.includes(fieldName)
-		? { $push: { [`personalInfo.${fieldName}`]: fileData } }
-		: { [`personalInfo.${fieldName}`]: fileData.url }; // Assuming single fields hold only URL
-  console.log('updateQuery',updateQuery)
-	  // Step 4: Execute update
-	  const candidate = await Candidate.findOneAndUpdate(
-		{ mobile: req.user.mobile },
-		updateQuery
-	  );
-  
-  
-	  return res.send({ status: true, message: `${fieldName} updated successfully` });
-  
-	} catch (err) {
-	  console.error("❌ Error updating file in profile:", err);
-	  return res.send({ status: false, message: 'Error updating file in profile' });
-	}
-  });
+		// Step 1: Find dynamic key (should be only 1 key in body)
 
-  router.post('/upload-profile-pic/:filename',[isCollege],async(req,res)=>{
+		console.log('updatefiles')
+		const keys = Object.keys(req.body);
+		if (keys.length !== 1) {
+			return res.send({ status: false, message: 'Invalid request structure' });
+		}
+
+		const fieldName = keys[0];
+		const fileData = req.body[fieldName];
+
+		console.log('fieldName', fieldName, 'fileData', fileData)
+
+		// Step 2: Validate allowed fields
+		const arrayFields = ['resume', 'voiceIntro'];
+		const singleFields = ['profilevideo', 'image', 'focalytProfile'];
+
+		if (![...arrayFields, ...singleFields].includes(fieldName)) {
+			return res.send({ status: false, message: 'Unauthorized field update' });
+		}
+
+		// Step 3: Create update object
+		const updateQuery = arrayFields.includes(fieldName)
+			? { $push: { [`personalInfo.${fieldName}`]: fileData } }
+			: { [`personalInfo.${fieldName}`]: fileData.url }; // Assuming single fields hold only URL
+		console.log('updateQuery', updateQuery)
+		// Step 4: Execute update
+		const candidate = await Candidate.findOneAndUpdate(
+			{ mobile: req.user.mobile },
+			updateQuery
+		);
+
+
+		return res.send({ status: true, message: `${fieldName} updated successfully` });
+
+	} catch (err) {
+		console.error("❌ Error updating file in profile:", err);
+		return res.send({ status: false, message: 'Error updating file in profile' });
+	}
+});
+
+router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 	try {
 		console.log('api hiting upload file')
 		const { name, mimetype: ContentType } = req.files.file;
-		const {mobile} = req.body
-		console.log('body',req.body)
+		const { mobile } = req.body
+		console.log('body', req.body)
 		const ext = name.split('.').pop();
 		const { filename } = req.params
-		let userId = await Candidate.findOne({mobile:mobile}).select('_id')
-		console.log('userId',userId)
+		let userId = await Candidate.findOne({ mobile: mobile }).select('_id')
+		console.log('userId', userId)
 		const key = `uploads/${userId}/${filename}/${uuid()}.${ext}`;
-		console.log('key',key)
+		console.log('key', key)
 		if (!mimetypes.includes(ext.toLowerCase())) throw new InvalidParameterError('File type not supported!');
-	
+
 		const data = req.files.file.data
 		const params = {
-		  Bucket: bucketName, Body: data, Key: key, ContentType,
+			Bucket: bucketName, Body: data, Key: key, ContentType,
 		};
 
-		console.log('params',params)
-	
+		console.log('params', params)
+
 		const url = await s3.upload(params).promise()
-		console.log('url',url)
-		
+		console.log('url', url)
 
-		const updatedProfile = await Candidate.findOneAndUpdate({mobile:mobile},{$set:{personalInfo:{image:url.Location}}},{new:true})
-		console.log('updatedProfile',updatedProfile)
-		return res.send({status:true,message:'Profile picture updated successfully',data:updatedProfile})
-	
-	  } catch (err) { return req.errFunc(err); }
-  })
 
-  router.post('/assign-batch', [isCollege], async (req, res) => {
+		const updatedProfile = await Candidate.findOneAndUpdate({ mobile: mobile }, { $set: { personalInfo: { image: url.Location } } }, { new: true })
+		console.log('updatedProfile', updatedProfile)
+		return res.send({ status: true, message: 'Profile picture updated successfully', data: updatedProfile })
+
+	} catch (err) { return req.errFunc(err); }
+})
+
+router.post('/assign-batch', [isCollege], async (req, res) => {
 	try {
 		const { batchId, appliedCourseId } = req.body
-		const appliedCourse = await AppliedCourses.findOneAndUpdate({_id:appliedCourseId},{$set:{batch:batchId,isBatchAssigned:true}},{new:true})
-		return res.send({status:true,message:'Batch assigned successfully',data:appliedCourse})
+		const appliedCourse = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, { $set: { batch: batchId, isBatchAssigned: true } }, { new: true })
+		return res.send({ status: true, message: 'Batch assigned successfully', data: appliedCourse })
 	} catch (err) {
 		console.error('Error assigning batch:', err);
-		return res.send({status:false,message:'Error assigning batch',error:err})
+		return res.send({ status: false, message: 'Error assigning batch', error: err })
 	}
-  })
+})
 
 // Attendance Management Routes
 router.post('/mark-attendance', [isCollege], async (req, res) => {
-  try {
-    const { appliedCourseIds, date, status, period = 'regularPeriod', remarks = '' } = req.body;
-    const markedBy = req.user._id;
+	try {
+		const { appliedCourseIds, date, status, period = 'regularPeriod', remarks = '' } = req.body;
+		const markedBy = req.user._id;
 
-    if (!appliedCourseIds || !Array.isArray(appliedCourseIds) || appliedCourseIds.length === 0) {
-      return res.status(400).json({ 
-        status: false, 
-        message: 'appliedCourseIds array is required and must not be empty' 
-      });
-    }
+		if (!appliedCourseIds || !Array.isArray(appliedCourseIds) || appliedCourseIds.length === 0) {
+			return res.status(400).json({
+				status: false,
+				message: 'appliedCourseIds array is required and must not be empty'
+			});
+		}
 
-    if (!date || !status) {
-      return res.status(400).json({
-        status: false,
-        message: 'date and status are required'
-      });
-    }
+		if (!date || !status) {
+			return res.status(400).json({
+				status: false,
+				message: 'date and status are required'
+			});
+		}
 
-    const results = [];
-    const errors = [];
+		const results = [];
+		const errors = [];
 
-    // Mark attendance for each student
-    for (const courseId of appliedCourseIds) {
-      try {
-        const appliedCourse = await AppliedCourses.findById(courseId);
-        if (!appliedCourse) {
-          errors.push({
-            appliedCourseId: courseId,
-            error: 'Applied course not found'
-          });
-          continue;
-        }
+		// Mark attendance for each student
+		for (const courseId of appliedCourseIds) {
+			try {
+				const appliedCourse = await AppliedCourses.findById(courseId);
+				if (!appliedCourse) {
+					errors.push({
+						appliedCourseId: courseId,
+						error: 'Applied course not found'
+					});
+					continue;
+				}
 
-        await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
-        
-        results.push({
-          appliedCourseId: courseId,
-          status: 'success',
-          data: {
-            candidateId: appliedCourse._candidate,
-            attendance: appliedCourse.attendance[period]
-          }
-        });
-      } catch (error) {
-        errors.push({
-          appliedCourseId: courseId,
-          error: error.message
-        });
-      }
-    }
+				await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
 
-    const isSingle = appliedCourseIds.length === 1;
-    const message = isSingle 
-      ? (results.length > 0 ? 'Attendance marked successfully' : 'Failed to mark attendance')
-      : `Bulk attendance marked successfully. ${results.length} successful, ${errors.length} failed`;
+				results.push({
+					appliedCourseId: courseId,
+					status: 'success',
+					data: {
+						candidateId: appliedCourse._candidate,
+						attendance: appliedCourse.attendance[period]
+					}
+				});
+			} catch (error) {
+				errors.push({
+					appliedCourseId: courseId,
+					error: error.message
+				});
+			}
+		}
 
-    return res.status(200).json({
-      status: true,
-      message: message,
-      data: isSingle ? results[0]?.data : {
-        successful: results,
-        failed: errors,
-        totalProcessed: appliedCourseIds.length,
-        successCount: results.length,
-        errorCount: errors.length
-      }
-    });
-  } catch (error) {
-    console.error('Error marking attendance:', error);
-    return res.status(500).json({
-      status: false,
-      message: error.message || 'Error marking attendance'
-    });
-  }
+		const isSingle = appliedCourseIds.length === 1;
+		const message = isSingle
+			? (results.length > 0 ? 'Attendance marked successfully' : 'Failed to mark attendance')
+			: `Bulk attendance marked successfully. ${results.length} successful, ${errors.length} failed`;
+
+		return res.status(200).json({
+			status: true,
+			message: message,
+			data: isSingle ? results[0]?.data : {
+				successful: results,
+				failed: errors,
+				totalProcessed: appliedCourseIds.length,
+				successCount: results.length,
+				errorCount: errors.length
+			}
+		});
+	} catch (error) {
+		console.error('Error marking attendance:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error marking attendance'
+		});
+	}
 });
 
 router.get('/attendance-report/:appliedCourseId', [isCollege], async (req, res) => {
-  try {
-    const { appliedCourseId } = req.params;
-    const { startDate, endDate, period } = req.query;
+	try {
+		const { appliedCourseId } = req.params;
+		const { startDate, endDate, period } = req.query;
 
-    const appliedCourse = await AppliedCourses.findById(appliedCourseId);
-    if (!appliedCourse) {
-      return res.status(404).json({
-        status: false,
-        message: 'Applied course not found'
-      });
-    }
+		const appliedCourse = await AppliedCourses.findById(appliedCourseId);
+		if (!appliedCourse) {
+			return res.status(404).json({
+				status: false,
+				message: 'Applied course not found'
+			});
+		}
 
-    const report = appliedCourse.getAttendanceReport(startDate, endDate, period);
+		const report = appliedCourse.getAttendanceReport(startDate, endDate, period);
 
-    return res.status(200).json({
-      status: true,
-      message: 'Attendance report generated successfully',
-      data: report
-    });
-  } catch (error) {
-    console.error('Error generating attendance report:', error);
-    return res.status(500).json({
-      status: false,
-      message: error.message || 'Error generating attendance report'
-    });
-  }
+		return res.status(200).json({
+			status: true,
+			message: 'Attendance report generated successfully',
+			data: report
+		});
+	} catch (error) {
+		console.error('Error generating attendance report:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error generating attendance report'
+		});
+	}
 });
 
 router.get('/batch-attendance/:batchId', [isCollege], async (req, res) => {
-  try {
-    const { batchId } = req.params;
-    const { date, period = 'regularPeriod' } = req.query;
+	try {
+		const { batchId } = req.params;
+		const { date, period = 'regularPeriod' } = req.query;
 
-    if (!date) {
-      return res.status(400).json({
-        status: false,
-        message: 'Date parameter is required'
-      });
-    }
+		if (!date) {
+			return res.status(400).json({
+				status: false,
+				message: 'Date parameter is required'
+			});
+		}
 
-    // Find all applied courses for this batch
-    const appliedCourses = await AppliedCourses.find({ 
-      batch: batchId,
-      isBatchAssigned: true 
-    }).populate('_candidate', 'name mobile email');
+		// Find all applied courses for this batch
+		const appliedCourses = await AppliedCourses.find({
+			batch: batchId,
+			isBatchAssigned: true
+		}).populate('_candidate', 'name mobile email');
 
-    const attendanceData = [];
+		const attendanceData = [];
 
-    for (const appliedCourse of appliedCourses) {
-      const attendanceDate = new Date(date);
-      const session = appliedCourse.attendance[period].sessions.find(
-        s => s.date.toDateString() === attendanceDate.toDateString()
-      );
+		for (const appliedCourse of appliedCourses) {
+			const attendanceDate = new Date(date);
+			const session = appliedCourse.attendance[period].sessions.find(
+				s => s.date.toDateString() === attendanceDate.toDateString()
+			);
 
-      attendanceData.push({
-        appliedCourseId: appliedCourse._id,
-        candidate: appliedCourse._candidate,
-        attendance: session ? session.status : 'Not Marked',
-        remarks: session ? session.remarks : '',
-        markedAt: session ? session.markedAt : null
-      });
-    }
+			attendanceData.push({
+				appliedCourseId: appliedCourse._id,
+				candidate: appliedCourse._candidate,
+				attendance: session ? session.status : 'Not Marked',
+				remarks: session ? session.remarks : '',
+				markedAt: session ? session.markedAt : null
+			});
+		}
 
-    return res.status(200).json({
-      status: true,
-      message: 'Batch attendance retrieved successfully',
-      data: {
-        batchId,
-        date,
-        period,
-        totalStudents: attendanceData.length,
-        attendanceData
-      }
-    });
-  } catch (error) {
-    console.error('Error retrieving batch attendance:', error);
-    return res.status(500).json({
-      status: false,
-      message: error.message || 'Error retrieving batch attendance'
-    });
-  }
+		return res.status(200).json({
+			status: true,
+			message: 'Batch attendance retrieved successfully',
+			data: {
+				batchId,
+				date,
+				period,
+				totalStudents: attendanceData.length,
+				attendanceData
+			}
+		});
+	} catch (error) {
+		console.error('Error retrieving batch attendance:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error retrieving batch attendance'
+		});
+	}
 });
 
 router.put('/update-attendance/:appliedCourseId', [isCollege], async (req, res) => {
-  try {
-    const { appliedCourseId } = req.params;
-    const { date, status, period = 'regularPeriod', remarks = '' } = req.body;
-    const markedBy = req.user._id;
+	try {
+		const { appliedCourseId } = req.params;
+		const { date, status, period = 'regularPeriod', remarks = '' } = req.body;
+		const markedBy = req.user._id;
 
-    if (!date || !status) {
-      return res.status(400).json({
-        status: false,
-        message: 'Date and status are required'
-      });
-    }
+		if (!date || !status) {
+			return res.status(400).json({
+				status: false,
+				message: 'Date and status are required'
+			});
+		}
 
-    const appliedCourse = await AppliedCourses.findById(appliedCourseId);
-    if (!appliedCourse) {
-      return res.status(404).json({
-        status: false,
-        message: 'Applied course not found'
-      });
-    }
+		const appliedCourse = await AppliedCourses.findById(appliedCourseId);
+		if (!appliedCourse) {
+			return res.status(404).json({
+				status: false,
+				message: 'Applied course not found'
+			});
+		}
 
-    await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
+		await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
 
-    return res.status(200).json({
-      status: true,
-      message: 'Attendance updated successfully',
-      data: appliedCourse
-    });
-  } catch (error) {
-    console.error('Error updating attendance:', error);
-    return res.status(500).json({
-      status: false,
-      message: error.message || 'Error updating attendance'
-    });
-  }
+		return res.status(200).json({
+			status: true,
+			message: 'Attendance updated successfully',
+			data: appliedCourse
+		});
+	} catch (error) {
+		console.error('Error updating attendance:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error updating attendance'
+		});
+	}
 });
 
 // Mark attendance for entire batch
 router.post('/batch-mark-attendance', [isCollege], async (req, res) => {
-  try {
-    const { batchId, date, status, period = 'regularPeriod', remarks = '' } = req.body;
-    const markedBy = req.user._id;
+	try {
+		const { batchId, date, status, period = 'regularPeriod', remarks = '' } = req.body;
+		const markedBy = req.user._id;
 
-    if (!batchId || !date || !status) {
-      return res.status(400).json({
-        status: false,
-        message: 'batchId, date, and status are required'
-      });
-    }
+		if (!batchId || !date || !status) {
+			return res.status(400).json({
+				status: false,
+				message: 'batchId, date, and status are required'
+			});
+		}
 
-    // Find all applied courses for this batch
-    const appliedCourses = await AppliedCourses.find({ 
-      batch: batchId,
-      isBatchAssigned: true 
-    });
+		// Find all applied courses for this batch
+		const appliedCourses = await AppliedCourses.find({
+			batch: batchId,
+			isBatchAssigned: true
+		});
 
-    if (appliedCourses.length === 0) {
-      return res.status(404).json({
-        status: false,
-        message: 'No students found for this batch'
-      });
-    }
+		if (appliedCourses.length === 0) {
+			return res.status(404).json({
+				status: false,
+				message: 'No students found for this batch'
+			});
+		}
 
-    const results = [];
-    const errors = [];
+		const results = [];
+		const errors = [];
 
-    // Mark attendance for each student in the batch
-    for (const appliedCourse of appliedCourses) {
-      try {
-        await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
-        
-        results.push({
-          appliedCourseId: appliedCourse._id,
-          candidateId: appliedCourse._candidate,
-          status: 'success'
-        });
-      } catch (error) {
-        errors.push({
-          appliedCourseId: appliedCourse._id,
-          candidateId: appliedCourse._candidate,
-          error: error.message
-        });
-      }
-    }
+		// Mark attendance for each student in the batch
+		for (const appliedCourse of appliedCourses) {
+			try {
+				await appliedCourse.markAttendance(date, status, period, markedBy, remarks);
 
-    return res.status(200).json({
-      status: true,
-      message: `Batch attendance marked successfully. ${results.length} successful, ${errors.length} failed`,
-      data: {
-        batchId,
-        date,
-        period,
-        successful: results,
-        failed: errors,
-        totalStudents: appliedCourses.length,
-        successCount: results.length,
-        errorCount: errors.length
-      }
-    });
-  } catch (error) {
-    console.error('Error marking batch attendance:', error);
-    return res.status(500).json({
-      status: false,
-      message: error.message || 'Error marking batch attendance'
-    });
-  }
+				results.push({
+					appliedCourseId: appliedCourse._id,
+					candidateId: appliedCourse._candidate,
+					status: 'success'
+				});
+			} catch (error) {
+				errors.push({
+					appliedCourseId: appliedCourse._id,
+					candidateId: appliedCourse._candidate,
+					error: error.message
+				});
+			}
+		}
+
+		return res.status(200).json({
+			status: true,
+			message: `Batch attendance marked successfully. ${results.length} successful, ${errors.length} failed`,
+			data: {
+				batchId,
+				date,
+				period,
+				successful: results,
+				failed: errors,
+				totalStudents: appliedCourses.length,
+				successCount: results.length,
+				errorCount: errors.length
+			}
+		});
+	} catch (error) {
+		console.error('Error marking batch attendance:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error marking batch attendance'
+		});
+	}
 });
+
+
+// API to move student to zero period
+router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, res) => {
+	try {
+		let { appliedCourseId } = req.params;
+		const { status } = req.body;
+
+		const markedBy = req.user._id;
+		console.log('appliedCourseId', appliedCourseId)
+
+		if (typeof appliedCourseId === 'string') {
+			appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
+		}
+
+		// Find the applied course
+		const appliedCourse = await AppliedCourses.findById(appliedCourseId);
+		if (!appliedCourse) {
+			return res.status(404).json({
+				status: false,
+				message: 'Applied course not found'
+			});
+		}
+		if (status === 'Move in Zero Period') {
+
+			// Check if student is already in zero period
+			if (appliedCourse.isZeroPeriodAssigned) {
+				return res.status(400).json({
+					status: false,
+					message: 'Student is already in zero period'
+				});
+			}
+
+			// Move student to zero period
+			appliedCourse.isZeroPeriodAssigned = true;
+			appliedCourse.zeroPeriodAssignedBy = markedBy;
+			appliedCourse.zeroPeriodAssignedAt = new Date();
+
+
+			await appliedCourse.save();
+
+			return res.status(200).json({
+				status: true,
+				message: 'Student moved to zero period successfully',
+
+			});
+		}
+		else if (status === 'Move in Batch Freeze') {
+			// Check if student is already in batch freeze
+			if (appliedCourse.isBatchFreeze) {
+				return res.status(400).json({
+					status: false,
+					message: 'Student is already in batch freeze'
+				});
+			}
+
+			// Move student to batch freeze
+			appliedCourse.isBatchFreeze = true;
+			appliedCourse.batchFreezeBy = markedBy;
+			appliedCourse.batchFreezeAt = new Date();
+
+
+			await appliedCourse.save();
+
+			return res.status(200).json({
+				status: true,
+				message: 'Student moved to batch freeze successfully',
+
+			});
+
+
+
+		}
+
+	} catch (error) {
+		console.error('Error moving student:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error moving student'
+		});
+	}
+
+});
+
+// API to remove student from zero period
+router.post('/remove-from-zero-period/:appliedCourseId', [isCollege], async (req, res) => {
+	try {
+		let { appliedCourseId } = req.params;
+		const { remarks } = req.body;
+		const markedBy = req.user._id;
+		if (typeof appliedCourseId === 'string') {
+			appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
+		}
+
+		// Find the applied course
+		const appliedCourse = await AppliedCourses.findById(appliedCourseId);
+		if (!appliedCourse) {
+			return res.status(404).json({
+				status: false,
+				message: 'Applied course not found'
+			});
+		}
+
+		// Check if student is not in zero period
+		if (!appliedCourse.isZeroPeriodAssigned) {
+			return res.status(400).json({
+				status: false,
+				message: 'Student is not in zero period'
+			});
+		}
+
+		// Remove student from zero period
+		appliedCourse.isZeroPeriodAssigned = false;
+		appliedCourse.zeroPeriodAssignedBy = null;
+		appliedCourse.zeroPeriodAssignedAt = null;
+
+		// Add to attendance record if remarks provided
+		if (remarks && remarks.trim()) {
+			const today = new Date();
+			const todayString = today.toDateString();
+
+			// Initialize zero period attendance if not exists
+			if (!appliedCourse.attendance.zeroPeriod) {
+				appliedCourse.attendance.zeroPeriod = {
+					sessions: []
+				};
+			}
+
+			// Find today's session or create new one
+			let todaySession = appliedCourse.attendance.zeroPeriod.sessions.find(
+				session => session.date.toDateString() === todayString
+			);
+
+			if (!todaySession) {
+				todaySession = {
+					date: today,
+					status: 'absent',
+					markedBy: markedBy,
+					remarks: remarks.trim()
+				};
+				appliedCourse.attendance.zeroPeriod.sessions.push(todaySession);
+			} else {
+				todaySession.status = 'absent';
+				todaySession.markedBy = markedBy;
+				todaySession.remarks = remarks.trim();
+			}
+		}
+
+		await appliedCourse.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Student removed from zero period successfully',
+			data: {
+				appliedCourseId: appliedCourse._id,
+				candidateId: appliedCourse._candidate,
+				isZeroPeriodAssigned: appliedCourse.isZeroPeriodAssigned
+			}
+		});
+
+	} catch (error) {
+		console.error('Error removing student from zero period:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error removing student from zero period'
+		});
+	}
+});
+
+// API to get zero period students for a batch
+router.get('/zero-period-students/:batchId', [isCollege], async (req, res) => {
+	try {
+		const { batchId } = req.params;
+
+		// Find all students in zero period for this batch
+		const zeroPeriodStudents = await AppliedCourses.find({
+			batch: batchId,
+			isBatchAssigned: true,
+			isZeroPeriodAssigned: true
+		}).populate('_candidate', 'name mobile email')
+			.populate('zeroPeriodAssignedBy', 'name')
+			.select('_candidate zeroPeriodAssignedBy zeroPeriodAssignedAt attendance.zeroPeriod');
+
+		return res.status(200).json({
+			status: true,
+			message: 'Zero period students retrieved successfully',
+			data: {
+				batchId,
+				students: zeroPeriodStudents,
+				count: zeroPeriodStudents.length
+			}
+		});
+
+	} catch (error) {
+		console.error('Error fetching zero period students:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Error fetching zero period students'
+		});
+	}
+});
+
+
+
 
 module.exports = router;

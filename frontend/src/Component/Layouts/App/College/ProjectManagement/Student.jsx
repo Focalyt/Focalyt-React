@@ -18,6 +18,26 @@ const Student = ({
 }) => {
 
   useEffect(() => {
+    // Define the event handler function
+    const handleClick = (event) => {
+      const className = event.target?.__reactProps$qsrhagrkar?.className || event.target.className || "";
+      if ((!className.includes('popup-button')) && (!className.includes('popup-icon')) && (!className.includes('ignore-click'))) {
+        setShowPopup(null);
+        console.log('Clicked outside the popup button!');
+      }
+
+    };
+
+    // Add event listener on mount
+    document.addEventListener('click', handleClick);
+
+    // Cleanup the event listener on unmount
+    return () => {
+      document.removeEventListener('click', handleClick);
+    };
+  }, []);
+
+  useEffect(() => {
 
   }, [selectedBatch, selectedCourse, selectedCenter]);
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -131,21 +151,6 @@ const Student = ({
     center: "",
   });
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    mobile: "",
-    enrollmentNumber: "",
-    batchId: selectedBatch?.id || "",
-    admissionDate: "",
-    address: "",
-    parentName: "",
-    parentMobile: "",
-    status: "active",
-    password: "",
-    confirmPassword: "",
-  });
 
   // Tab definitions for each student card - Updated with 5 required tabs
   const tabs = [
@@ -175,7 +180,7 @@ const Student = ({
     { key: "all", label: "All", count: 0, icon: "bi-people-fill" },
     {
       key: "admission",
-      label: "Admission List",
+      label: "Pending for Zero Period",
       count: 0,
       icon: "bi-person-check",
     },
@@ -208,7 +213,38 @@ const Student = ({
   const handleAttendanceManagement = () => {
     console.log("Attendance Dashboard clicked!");
     setShowAttendanceModal(true);
+
   };
+
+
+
+  const handleMoveCandidate = async (profile, e) => {
+
+    const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : 'Dropout'}`)
+
+    if (confirmed) {
+      console.log('selectedStudent._id', profile._id);
+      try {
+        const response = await axios.post(`${backendUrl}/college/candidate/move-candidate-status/${profile._id}`, {
+          status: e,
+        }, {
+          headers: {
+            "x-auth": token,
+          },
+        });
+        console.log(response, "response");
+        if (response.status === 200) {
+          window.alert("Student moved to zero period successfully");
+          await fetchProfileData();
+        }
+      } catch (error) {
+        console.error("Error moving student to zero period:", error);
+        window.alert("Failed to move student to zero period. Please try again.");
+      }
+    }
+  };
+
+
 
   const handleBackFromAttendance = () => {
     setShowAttendanceModal(false);
@@ -490,8 +526,6 @@ const Student = ({
                 <th>Total Days</th>
                 <th>Present</th>
                 <th>Absent</th>
-                <th>Late</th>
-                <th>Leave</th>
                 <th>Half Day</th>
                 <th>Attendance %</th>
                 <th>Actions</th>
@@ -514,19 +548,7 @@ const Student = ({
                         {data.absent || 0}
                       </span>
                     </td>
-                    <td>
-                      <span className="badge bg-warning text-dark">
-                        {data.late || 0}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="badge bg-info">{data.leave || 0}</span>
-                    </td>
-                    <td>
-                      <span className="badge bg-secondary">
-                        {(data.halfDay || 0) + (data.shortLeave || 0)}
-                      </span>
-                    </td>
+
                     <td>
                       <div className="d-flex align-items-center">
                         <div
@@ -614,32 +636,7 @@ const Student = ({
                       </div>
                     </div>
                   </div>
-                  <div className="col-2">
-                    <div className="card bg-warning text-dark">
-                      <div className="card-body p-2">
-                        <div className="h6 mb-0">{data.late || 0}</div>
-                        <div className="small">Late</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-2">
-                    <div className="card bg-info text-white">
-                      <div className="card-body p-2">
-                        <div className="h6 mb-0">{data.leave || 0}</div>
-                        <div className="small">Leave</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-2">
-                    <div className="card bg-secondary text-white">
-                      <div className="card-body p-2">
-                        <div className="h6 mb-0">
-                          {(data.halfDay || 0) + (data.shortLeave || 0)}
-                        </div>
-                        <div className="small">Half Days</div>
-                      </div>
-                    </div>
-                  </div>
+
                   <div className="col-2">
                     <div className="card bg-primary text-white">
                       <div className="card-body p-2">
@@ -659,8 +656,6 @@ const Student = ({
                         <th>Month</th>
                         <th>Present</th>
                         <th>Absent</th>
-                        <th>Late</th>
-                        <th>Leave</th>
                         <th>Attendance %</th>
                         <th>Actions</th>
                       </tr>
@@ -679,16 +674,6 @@ const Student = ({
                             <td>
                               <span className="badge bg-danger">
                                 {monthData.absent || 0}
-                              </span>
-                            </td>
-                            <td>
-                              <span className="badge bg-warning text-dark">
-                                {monthData.late || 0}
-                              </span>
-                            </td>
-                            <td>
-                              <span className="badge bg-info">
-                                {monthData.leave || 0}
                               </span>
                             </td>
                             <td>
@@ -912,7 +897,7 @@ const Student = ({
                     <tr>
                       <th>Date</th>
                       <th>Day</th>
-                      <th>Status</th>                      
+                      <th>Status</th>
                       <th>Notes/Reason</th>
                     </tr>
                   </thead>
@@ -1597,7 +1582,7 @@ const Student = ({
     if (!show) return null;
 
     // Get all students data for attendance management
-    const allStudentsAttendanceData = getFilteredStudents().map((student) => {
+    const allStudentsAttendanceData = allProfiles.map((student) => {
       const filteredStats = getFilteredAttendanceData(student);
       const monthlyData = getMonthlyAttendanceBreakdown(student);
       const yearlyData = getYearlyAttendanceBreakdown(student);
@@ -1609,6 +1594,7 @@ const Student = ({
         yearlyData,
       };
     });
+    console.log(allStudentsAttendanceData,'allStudentsAttendanceData')
 
     // ===== STEP 5: Attendance Register View Component =====
     const renderAttendanceRegisterView = () => {
@@ -1748,7 +1734,7 @@ const Student = ({
 
                 <tbody>
                   {allStudentsAttendanceData.map((student, studentIndex) => (
-                    <tr key={student.id} className="student-row">
+                    <tr key={student._id} className="student-row">
                       {/* Student Information Column */}
                       <td className="student-info-cell">
                         <div className="student-info-content">
@@ -1760,7 +1746,7 @@ const Student = ({
                               </div>
                             </div>
                             <div className="student-details">
-                              <h6 className="mb-1 fw-bold student-name">{student.name}</h6>
+                              <h6 className="mb-1 fw-bold student-name">{student._candidate.name}</h6>
                               <small className="text-muted enrollment-number">
                                 {student.enrollmentNumber}
                               </small>
@@ -1770,7 +1756,7 @@ const Student = ({
                               <div className="student-contact mt-1">
                                 <small className="text-muted">
                                   <i className="fas fa-phone me-1"></i>
-                                  {student.mobile}
+                                  {student._candidate.mobile}
                                 </small>
                               </div>
                             </div>
@@ -1816,14 +1802,7 @@ const Student = ({
                               <span className="stat-label">A:</span>
                               <span className="stat-value">{student.filteredStats.absentDays}</span>
                             </div>
-                            <div className="stat-item late">
-                              <span className="stat-label">L:</span>
-                              <span className="stat-value">{student.filteredStats.lateDays}</span>
-                            </div>
-                            <div className="stat-item leave">
-                              <span className="stat-label">Lv:</span>
-                              <span className="stat-value">{student.filteredStats.leaveDays}</span>
-                            </div>
+                            
                           </div>
                           <div className="attendance-percentage mt-2">
                             <div className="percentage-bar">
@@ -1832,9 +1811,9 @@ const Student = ({
                                 style={{ width: `${student.filteredStats.attendancePercentage}%` }}
                               ></div>
                             </div>
-                            <small className="percentage-text fw-bold">
+                            {/* <small className="percentage-text fw-bold">
                               {student.filteredStats.attendancePercentage}%
-                            </small>
+                            </small> */}
                           </div>
                         </div>
                       </td>
@@ -1908,22 +1887,7 @@ const Student = ({
                 <span className="legend-symbol absent">A</span>
                 <span className="legend-text">Absent</span>
               </div>
-              <div className="legend-item">
-                <span className="legend-symbol late">L</span>
-                <span className="legend-text">Late</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-symbol leave">Lv</span>
-                <span className="legend-text">Leave</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-symbol half-day">HD</span>
-                <span className="legend-text">Half Day</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-symbol short-leave">SL</span>
-                <span className="legend-text">Short Leave</span>
-              </div>
+
               <div className="legend-item">
                 <span className="legend-symbol not-marked">-</span>
                 <span className="legend-text">Not Marked</span>
@@ -1943,14 +1907,10 @@ const Student = ({
               <thead className="table-dark">
                 <tr>
                   <th style={{ minWidth: "200px" }}>Student Details</th>
-                  <th>Enrollment No.</th>
                   <th>Total Days</th>
                   <th>Present</th>
                   <th>Absent</th>
-                  <th>Late</th>
-                  <th>Leave</th>
                   <th>Attendance %</th>
-                  <th>Punctuality %</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1966,8 +1926,8 @@ const Student = ({
                           <i className="bi bi-person-fill text-primary"></i>
                         </div>
                         <div>
-                          <h6 className="mb-0 fw-bold">{student.name}</h6>
-                          <small className="text-muted">{student.email}</small>
+                          <h6 className="mb-0 fw-bold">{student._candidate.name}</h6>
+                          <small className="text-muted">{student._candidate.mobile}</small>
                           <div className="mt-1">
                             {getAdmissionStatusBadge(student)}
                           </div>
@@ -3072,34 +3032,32 @@ const Student = ({
   };
 
   // Mark individual attendance
-  const markIndividualAttendance = (studentId, status) => {
-    const currentTime = new Date().toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const markIndividualAttendance = async (studentId, status) => {
+    console.log("studentId", studentId);
 
-    let lateMinutes = 0;
-    if (status === "late") {
-      const standardTime = new Date(`2024-01-01 09:00`);
-      const currentFullTime = new Date(`2024-01-01 ${currentTime}`);
-      lateMinutes = Math.max(0, (currentFullTime - standardTime) / (1000 * 60));
+    try {
+      const result = await axios.post(`${backendUrl}/college/attendance/mark-attendance`, {
+        appliedCourseId: studentId,
+        date: selectedDate,
+        status: status,
+        period: activeTab === 'zeroPeriod' ? 'zeroPeriod' : 'regularPeriod',
+        remarks: ''
+      }, {
+        headers: {
+          "x-auth": token
+        }
+      });
+      if(result.status){
+        alert(result.message)
+      }
+      else{
+        alert(result.message)
+      }
+      
+    } catch (error) {
+      console.error("Error marking attendance:", error);
     }
 
-    setTodayAttendance((prev) => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        status: status,
-        timeIn:
-          status !== "absent" && status !== "leave"
-            ? prev[studentId]?.timeIn || currentTime
-            : "",
-        timeOut: prev[studentId]?.timeOut || "",
-        isMarked: true,
-        lateMinutes: lateMinutes,
-      },
-    }));
   };
 
   // Bulk attendance functions
@@ -3202,24 +3160,25 @@ const Student = ({
   };
 
   const getAdmissionStatusBadge = (student) => {
-    switch (student.admissionStatus) {
-      case "admitted":
-        return <span className="badge bg-success">Admitted</span>;
-      case "zeroPeriod":
-        return (
-          <span className="badge bg-warning">
-            Zero Period (
-            {student.zeroPeriodDays || student.attendanceStats.totalWorkingDays}{" "}
-            days)
-          </span>
-        );
-      case "batchFreeze":
-        return <span className="badge bg-info">Batch Freeze</span>;
-      case "dropped":
-        return <span className="badge bg-danger">Dropout</span>;
-      default:
-        return null;
+    // Check in priority order
+    if (student.dropout) {
+      return <span className="badge bg-danger">Dropout</span>;
     }
+    
+    if (student.isBatchFreeze) {
+      return <span className="badge bg-info">Batch Freeze</span>;
+    }
+    
+    if (student.isZeroPeriodAssigned) {
+      return (
+        <span className="badge bg-warning">
+          Zero Period ({student.attendance?.zeroPeriod?.totalSessions || 0} days)
+        </span>
+      );
+    }
+    
+    // Default case - pending/applied
+    return <span className="badge bg-secondary">Pending</span>;
   };
 
   const getProgressColor = (progress) => {
@@ -3248,10 +3207,10 @@ const Student = ({
 
   // Check if current tab shows attendance controls
   const showAttendanceControls =
-    activeTab === "zeroPeriod" || activeTab === "all";
-  const attendanceEligibleStudents = filteredStudents.filter(
+    activeTab === "zeroPeriod" || activeTab === "all" || activeTab === "batchFreeze";
+  const attendanceEligibleStudents = allProfiles.filter(
     (s) =>
-      s.admissionStatus === "zeroPeriod" || s.admissionStatus === "admitted"
+      s.isZeroPeriodAssigned === true || s.isBatchFreeze === true
   );
 
   return (
@@ -3265,48 +3224,48 @@ const Student = ({
                 <div className="row align-items-center">
                   <div className="col-md-5 d-md-block d-sm-none">
                     <div className="d-flex align-items-center">
-                     
-                      
-                        <ol className="breadcrumb border-0 mb-0 small">
-                          {onBackToCenters && selectedCenter && (
-                            <li className="breadcrumb-item">
-                              <button
-                                className="btn btn-link p-0 text-decoration-none"
-                                onClick={onBackToCenters}
-                              >
-                                Centers
-                              </button>
-                            </li>
-                          )}
-                          {onBackToCourses && selectedCourse && (
-                            <li className="breadcrumb-item">
-                              <button
-                                className="btn btn-link p-0 text-decoration-none"
-                                onClick={onBackToCourses}
-                              >
-                                Courses
-                              </button>
-                            </li>
-                          )}
-                          {onBackToBatches && selectedBatch && (
-                            <li className="breadcrumb-item">
-                              <button
-                                className="btn btn-link p-0 text-decoration-none"
-                                onClick={onBackToBatches}
-                              >
-                                Batches
-                              </button>
-                            </li>
-                          )}
-                          <li
-                            className="breadcrumb-item active"
-                            aria-current="page"
-                          >
-                            Students{" "}
-                            {selectedBatch && `- ${selectedBatch.name}`}
+
+
+                      <ol className="breadcrumb border-0 mb-0 small">
+                        {onBackToCenters && selectedCenter && (
+                          <li className="breadcrumb-item">
+                            <button
+                              className="btn btn-link p-0 text-decoration-none"
+                              onClick={onBackToCenters}
+                            >
+                              Centers
+                            </button>
                           </li>
-                        </ol>
-                     
+                        )}
+                        {onBackToCourses && selectedCourse && (
+                          <li className="breadcrumb-item">
+                            <button
+                              className="btn btn-link p-0 text-decoration-none"
+                              onClick={onBackToCourses}
+                            >
+                              Courses
+                            </button>
+                          </li>
+                        )}
+                        {onBackToBatches && selectedBatch && (
+                          <li className="breadcrumb-item">
+                            <button
+                              className="btn btn-link p-0 text-decoration-none"
+                              onClick={onBackToBatches}
+                            >
+                              Batches
+                            </button>
+                          </li>
+                        )}
+                        <li
+                          className="breadcrumb-item active"
+                          aria-current="page"
+                        >
+                          Students{" "}
+                          {selectedBatch && `- ${selectedBatch.name}`}
+                        </li>
+                      </ol>
+
                     </div>
                   </div>
 
@@ -3508,7 +3467,7 @@ const Student = ({
                                 <option value="">Select Status</option>
                                 <option value="present">Present</option>
                                 <option value="absent">Absent</option>
-                               
+
                               </select>
                             </div>
 
@@ -3650,11 +3609,17 @@ const Student = ({
                     <div className="row" id="students-main-row">
                       {allProfiles.map((profile, studentIndex) => {
                         const courseInfo = formatDuration(profile);
-                        const filteredStats =
-                          getFilteredAttendanceData(profile);
+                        const filteredStats = getFilteredAttendanceData(profile);
                         const isEligibleForAttendance =
-                          profile.isZeroPeriodAssigned ||
-                          profile.isBatchFreeze;
+                          (profile.isZeroPeriodAssigned || profile.isBatchAssigned) &&
+                          !profile.attendance?.regularPeriod?.sessions?.some(session =>
+                            new Date(session.date).toDateString() === new Date().toDateString()
+                          ) &&
+                          !profile.attendance?.zeroPeriod?.sessions?.some(session =>
+                            new Date(session.date).toDateString() === new Date().toDateString()
+                          );
+
+                        console.log(isEligibleForAttendance, 'isEligibleForAttendance')
 
                         return (
                           <div
@@ -3664,7 +3629,7 @@ const Student = ({
                             {/* Enhanced Student Header Card */}
                             <div className="card border-0 shadow-sm mb-0 mt-2">
                               <div className="card-body px-3 py-3">
-                                <div className="row align-items-center">
+                                <div className="row align-items-center justify-content-between">
                                   {/* Student Info */}
                                   <div
                                     className={
@@ -3766,9 +3731,9 @@ const Student = ({
                                   </div>
 
                                   {/* ===== ENHANCED ATTENDANCE CONTROLS ===== */}
-                                  {/* {showAttendanceMode &&
-                                    isEligibleForAttendance && ( */}
-                                      <div className="col-md-4">
+                                  {showAttendanceMode &&
+                                    isEligibleForAttendance && (
+                                      <div className="col-md-5">
                                         <div className="attendance-controls">
                                           <h6 className="text-dark mb-2 small fw-bold">
                                             <i className="fas fa-calendar-check me-1"></i>
@@ -3785,15 +3750,15 @@ const Student = ({
                                               >
                                                 <button
                                                   type="button"
-                                                  className={`btn ${todayAttendance[profile.id]
+                                                  className={`btn ${todayAttendance[profile._id]
                                                     ?.status === "present"
                                                     ? "btn-success"
                                                     : "btn-outline-success"
                                                     }`}
                                                   onClick={() =>
                                                     markIndividualAttendance(
-                                                      profile.id,
-                                                      "present"
+                                                      profile._id,
+                                                      "Present"
                                                     )
                                                   }
                                                 >
@@ -3803,15 +3768,15 @@ const Student = ({
 
                                                 <button
                                                   type="button"
-                                                  className={`btn ${todayAttendance[profile.id]
+                                                  className={`btn ${todayAttendance[profile._id]
                                                     ?.status === "absent"
                                                     ? "btn-danger"
                                                     : "btn-outline-danger"
                                                     }`}
                                                   onClick={() =>
                                                     markIndividualAttendance(
-                                                      profile.id,
-                                                      "absent"
+                                                      profile._id,
+                                                      "bsent"
                                                     )
                                                   }
                                                 >
@@ -3822,88 +3787,10 @@ const Student = ({
                                             </div>
                                           </div>
 
-                                          {/* Time Fields */}
-                                          {todayAttendance[profile.id]
-                                            ?.status &&
-                                            todayAttendance[profile.id]
-                                              ?.status !== "absent" &&
-                                            (
-                                              <div className="row">
-                                                <div className="col-6">
-                                                  <label className="form-label small mb-1">
-                                                    Time In
-                                                  </label>
-                                                  <input
-                                                    type="time"
-                                                    className="form-control form-control-sm"
-                                                    value={
-                                                      todayAttendance[
-                                                        profile.id
-                                                      ]?.timeIn || ""
-                                                    }
-                                                    onChange={(e) =>
-                                                      setTodayAttendance(
-                                                        (prev) => ({
-                                                          ...prev,
-                                                          [profile.id]: {
-                                                            ...prev[profile.id],
-                                                            timeIn:
-                                                              e.target.value,
-                                                          },
-                                                        })
-                                                      )
-                                                    }
-                                                  />
-                                                </div>
-                                                <div className="col-6">
-                                                  <label className="form-label small mb-1">
-                                                    Time Out
-                                                  </label>
-                                                  <input
-                                                    type="time"
-                                                    className="form-control form-control-sm"
-                                                    value={
-                                                      todayAttendance[
-                                                        profile.id
-                                                      ]?.timeOut || ""
-                                                    }
-                                                    onChange={(e) =>
-                                                      setTodayAttendance(
-                                                        (prev) => ({
-                                                          ...prev,
-                                                          [profile.id]: {
-                                                            ...prev[profile.id],
-                                                            timeOut:
-                                                              e.target.value,
-                                                          },
-                                                        })
-                                                      )
-                                                    }
-                                                  />
-                                                </div>
-                                              </div>
-                                            )}
 
-                                          {/* Late Minutes Display */}
-                                          {todayAttendance[profile.id]
-                                            ?.status === "late" &&
-                                            todayAttendance[profile.id]
-                                              ?.lateMinutes > 0 && (
-                                              <div className="mt-2">
-                                                <small className="text-warning">
-                                                  <i className="fas fa-exclamation-triangle me-1"></i>
-                                                  Late by{" "}
-                                                  {Math.round(
-                                                    todayAttendance[profile.id]
-                                                      .lateMinutes
-                                                  )}{" "}
-                                                  minutes
-                                                </small>
-                                              </div>
-                                            )}
                                         </div>
                                       </div>
-                                    {/* )} */}
+                                    )}
 
                                   {/* Action Buttons */}
                                   <div className="col-md-2 text-end mt-2">
@@ -3915,120 +3802,91 @@ const Student = ({
                                         }}
                                       >
                                         <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
+                                          className="btn btn-sm btn-outline-secondary border-0 popup-button"
                                           onClick={() =>
                                             togglePopup(studentIndex)
                                           }
                                           aria-label="Options"
                                         >
-                                          <i className="fas fa-ellipsis-v"></i>
+                                          <i className="fas fa-ellipsis-v popup-icon"></i>
                                         </button>
 
                                         {showPopup === studentIndex && (
                                           <div
-                                            onClick={() => setShowPopup(null)}
                                             style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 999,
+                                              position: "absolute",
+                                              top: "100%", // Card के नीचे position करें
+                                              right: "0",
+                                              width: "170px",
+                                              backgroundColor: "white",
+                                              border: "1px solid #ddd",
+                                              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                              borderRadius: "8px",
+                                              padding: "8px 0",
+                                              zIndex: 9,
+                                              opacity: showPopup === studentIndex ? 1 : 0,
+                                              visibility: showPopup === studentIndex ? "visible" : "hidden",
+                                              transform: showPopup === studentIndex
+                                                ? "translateY(8px) scale(1)"
+                                                : "translateY(0) scale(0.95)",
+                                              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                                              transformOrigin: "top right",
+                                              // Card को protect करने के लिए
+                                              willChange: "transform, opacity",
                                             }}
-                                          ></div>
+                                          >
+                                            {(filterData.status === "admission" || filterData.status === "zeroPeriod") && (profile.isZeroPeriodAssigned === false || profile.isBatchFreeze === false) && (
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "10px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  fontSize: "14px",
+                                                  fontWeight: "500",
+                                                  transition: "background-color 0.2s ease",
+                                                  cursor: "pointer",
+                                                }}
+
+                                                onClick={(e) => {
+                                                  setShowPopup(null);
+                                                  setSelectedStudent(profile);
+                                                  handleMoveCandidate(profile, e.target.innerText);
+                                                }}
+                                              >
+                                                {filterData.status === "admission" ? "Move in Zero Period" : "Move in Batch Freeze"}
+                                              </button>)}
+
+                                            {(filterData.status !== "dropout" || profile.dropout === false) && (
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "10px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  fontSize: "14px",
+                                                  fontWeight: "500",
+                                                  transition: "background-color 0.2s ease",
+                                                  cursor: "pointer",
+                                                }}
+
+                                                onClick={(e) => {
+                                                  setShowPopup(null);
+                                                  setSelectedStudent(profile);
+                                                  handleMoveCandidate(profile, e.target.innerText);
+                                                }}
+                                              >
+                                                Dropout
+                                              </button>)}
+
+                                          </div>
                                         )}
 
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px",
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow:
-                                              "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 1000,
-                                            transform:
-                                              showPopup === studentIndex
-                                                ? "translateX(-70px)"
-                                                : "translateX(100%)",
-                                            transition:
-                                              "transform 0.3s ease-in-out",
-                                            pointerEvents:
-                                              showPopup === studentIndex
-                                                ? "auto"
-                                                : "none",
-                                            display:
-                                              showPopup === studentIndex
-                                                ? "block"
-                                                : "none",
-                                          }}
-                                        >
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600",
-                                            }}
-                                            onClick={() => {
-                                              setSelectedStudent(profile);
-                                              setShowDetailsModal(true);
-                                              setShowPopup(null);
-                                            }}
-                                          >
-                                            View Profile
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600",
-                                            }}
-                                            onClick={() => {
-                                              setEditingStudent(profile);
-                                              setShowEditForm(true);
-                                              setShowPopup(null);
-                                            }}
-                                          >
-                                            Edit Student
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600",
-                                            }}
-                                            onClick={() => {
-                                              setStudentToDelete(profile);
-                                              setShowDeleteModal(true);
-                                              setShowPopup(null);
-                                            }}
-                                          >
-                                            Delete Student
-                                          </button>
-                                        </div>
+
                                       </div>
 
                                       <button
@@ -4936,7 +4794,7 @@ const Student = ({
                                       >
                                         <div className="section-card">
                                           <div className="table-responsive">
-                                            <table className="table table-hover table-bordered course-history-table">
+                                            <table className="table  table-bordered course-history-table">
                                               <thead className="table-light">
                                                 <tr>
                                                   <th>S.No</th>
@@ -5620,10 +5478,10 @@ const Student = ({
             border-radius: 12px;
           }
 
-          .card:hover {
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            transform: translateY(-2px);
-          }
+          // .card:hover {
+          //   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+          //   transform: translateY(-2px);
+          // }
 
           .card-header {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -8263,7 +8121,7 @@ background: #fd2b5a;
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 9999;
+    z-index: 10;
     backdrop-filter: blur(5px);
 }
 
@@ -10148,7 +10006,7 @@ html body .content .content-wrapper {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 999;
+  z-index: 7;
 }
 
 /* Responsive adjustments */
