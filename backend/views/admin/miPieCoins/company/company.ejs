@@ -8,7 +8,7 @@
         </h3>
         <div class="breadcrumb-wrapper col-12">
           <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
             <li class="breadcrumb-item active">Coins - Companies</li>
           </ol>
         </div>
@@ -41,7 +41,7 @@
             <% if (view === false) { %>
             <div class="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-12 text-right">
               <a
-                href="/admin/Coins/company/addEditOffer"
+                href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/company/addEditOffer"
                 class="btn btn-primary"
                 >+ Add Offer</a
               >
@@ -83,7 +83,7 @@
                     </td>
                     <% if(offer.availedCount){%>
                       <td class="text-capitalize">
-                      <a href="/admin/Coins/availedCompanies/<%= offer._id %>">
+                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/availedCompanies/<%= offer._id %>">
                       <%= offer.availedCount %>
                       </a>
                       </td>
@@ -115,11 +115,11 @@
 
                     <td valign="middle">
                       <% if(isChecked=='false' && view === false) {%>
-                      <a href="/admin/Coins/company/addEditOffer/<%= offer._id%>">
+                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/company/addEditOffer/<%= offer._id%>">
                         <i class="feather icon-edit fa-lg primary"></i>
                       </a>
                       <% } %>
-                      <a style="padding-left: 7px" href="/admin/Coins/company/viewOffer/<%= offer._id%>">
+                      <a style="padding-left: 7px" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/company/viewOffer/<%= offer._id%>">
                         <i class="feather icon-eye fa-lg primary"></i>
                       </a>
                     </td>
@@ -214,7 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       $.ajax({
         type: "PUT",
-        url: "/admin/Coins/updateOffer",
+        url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/updateOffer",
         data: {
           id,
           status: myStatus,
@@ -228,16 +228,16 @@ document.addEventListener("DOMContentLoaded", () => {
       if (checkbox.checked) {
         $.ajax({
           type: "GET",
-          url: "/admin/Coins/company?status=false",
+          url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/company?status=false",
           success: () =>
-            (window.location.href = "/admin/Coins/company?status=false"),
+            (window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/company?status=false"),
         });
       } else {
         $.ajax({
           type: "GET",
-          url: "/admin/Coins/company?status=true",
+          url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/company?status=true",
           success: () =>
-            (window.location.href = "/admin/Coins/company?status=true"),
+            (window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/company?status=true"),
         });
       }
     }

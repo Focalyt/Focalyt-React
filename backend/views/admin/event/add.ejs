@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Add Event</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Add Event</li>
 						</ol>
 					</div>
@@ -371,7 +371,7 @@
 								const data = await Promise.all(
 									filesData.map(async (file) => {
 										const ext = file.name.split(".").pop();
-										const res = await axios.get("/admin/s3upload", {
+										const res = await axios.get("<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload", {
 											params: { type: file.type, ext },
 										});
 										if (!res || !res.data || !res.data.data) return null;
@@ -464,7 +464,7 @@
 								const data = await Promise.all(
 									filesData.map(async (file) => {
 										const ext = file.name.split(".").pop();
-										const res = await axios.get("/admin/s3upload", {
+										const res = await axios.get("<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload", {
 											params: { type: file.type, ext },
 										});
 										if (!res || !res.data || !res.data.data) return null;
@@ -557,7 +557,7 @@
 								const data = await Promise.all(
 									filesData.map(async (file) => {
 										const ext = file.name.split(".").pop();
-										const res = await axios.get("/admin/s3upload", {
+										const res = await axios.get("<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload", {
 											params: { type: file.type, ext },
 										});
 										if (!res || !res.data || !res.data.data) return null;
@@ -649,7 +649,7 @@
 								const data = await Promise.all(
 									filesData.map(async (file) => {
 										const ext = file.name.split(".").pop();
-										const res = await axios.get("/admin/s3upload", {
+										const res = await axios.get("<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload", {
 											params: { type: file.type, ext },
 										});
 										if (!res || !res.data || !res.data.data) return null;
@@ -737,7 +737,7 @@
 								'<option disabled selected value="">Select Option</option>'
 							);
 						axios
-							.post("/admin/helper/getstate", {
+							.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/helper/getstate", {
 								countryId: $("#country").val(),
 							})
 							.then(({ data }) => {
@@ -759,7 +759,7 @@
 								'<option disabled selected value="">Select Option</option>'
 							);
 						axios
-							.post("/admin/helper/getcity", {
+							.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/helper/getcity", {
 								stateId: $("#state").val(),
 							})
 							.then(({ data }) => {
@@ -841,7 +841,7 @@
 					// }
 
 					function reset() {
-						window.location.href = "/admin/college/add";
+						window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/college/add";
 					}
 
 				</script>

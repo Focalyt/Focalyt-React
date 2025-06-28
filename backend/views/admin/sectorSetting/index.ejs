@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Type of Sectors</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Type of Sectors</li>
 						</ol>
 					</div>
@@ -45,7 +45,7 @@
 															class="col-xl-12 col-md-12 col-sm-12 col-12 mt-1 firstImage <%= clas %>">
 															<div class="image-upload">
 																<label for="filestwo" style="cursor: pointer;">
-																	<img src="/images/add_receipt.png" width="80"
+																	<img src="<%= process.env.MIPIE_BACKEND_URL %>/images/add_receipt.png" width="80"
 																		height="80" id="outputtwo" />
 																	<p class="mt-1">
 																		Click to upload image
@@ -152,7 +152,7 @@
 															<% } %>
 															<% if (view === false) { %>
 															<td valign="middle">
-																<a href="/admin/courseSectors/edit/<%= l._id %>">
+																<a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/courseSectors/edit/<%= l._id %>">
 																	<i class="feather icon-edit fa-lg primary"></i>
 																</a>
 															</td>
@@ -234,7 +234,7 @@
 						}
 						$.ajax({
 							type: "POST",
-							url: "/admin/changestatus",
+							url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/changestatus",
 							data: {
 								id,
 								status: myStatus,
@@ -319,7 +319,7 @@
 				const data = await Promise.all(
 					filesData.map(async (file) => {
 						const ext = file.name.split(".").pop();
-						const res = await axios.get("/admin/s3upload", {
+						const res = await axios.get("<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload", {
 							params: { type: file.type, ext },
 						});
 						if (!res || !res.data || !res.data.data) return null;

@@ -10,7 +10,7 @@
         </h3>
         <div class="breadcrumb-wrapper col-12">
           <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
             <li class="breadcrumb-item active">Vouchers - Candidates</li>
           </ol>
         </div>
@@ -38,7 +38,7 @@
             <% if (view === false) { %>
             <div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 text-right">
               <a
-                href="/admin/Vouchers/candidate/addEditVoucher"
+                href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/candidate/addEditVoucher"
                 class="btn btn-primary"
                 >+ Add Voucher</a
               >
@@ -101,11 +101,11 @@
                     <% } %>
                     <td valign="middle">
                       <% if(isChecked=='false' && view === false) {%>
-                      <a href="/admin/Vouchers/candidate/addEditVoucher/<%= voucher._id%>">
+                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/candidate/addEditVoucher/<%= voucher._id%>">
                         <i class="feather icon-edit fa-lg primary"></i>
                       </a>
                       <% } %>
-                      <a style="padding-left: 7px" href="/admin/Vouchers/candidate/viewVoucher/<%= voucher._id%>">
+                      <a style="padding-left: 7px" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/candidate/viewVoucher/<%= voucher._id%>">
                         <i class="feather icon-eye fa-lg primary"></i>
                       </a>
                     </td>
@@ -196,7 +196,7 @@
       }
       $.ajax({
         type: "PUT",
-        url: "/admin/Vouchers/updateVoucher",
+        url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/updateVoucher",
         data: {
           id,
           status: myStatus,
@@ -210,17 +210,17 @@
       if (checkbox.checked) {
         $.ajax({
           type: "GET",
-          url: "/admin/Vouchers/candidate?status=false",
+          url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/candidate?status=false",
           success: () =>
-            (window.location.href = "/admin/Vouchers/candidate?status=false"),
+            (window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/candidate?status=false"),
         });
       } else {
         $.ajax({
           type: "GET",
-          url: "/admin/Vouchers/candidate?status=true",
+          url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/candidate?status=true",
           success: () =>
             (window.location.href =
-              "/admin/Vouchers/candidate?status=true"),
+              "<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/candidate?status=true"),
         });
       }
     }

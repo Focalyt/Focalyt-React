@@ -6,7 +6,7 @@
           <h3 class="content-header-title float-left mb-0">Type Of Event</h3>
           <div class="breadcrumb-wrapper col-12">
             <ol class="breadcrumb">
-              <li class="breadcrumb-item"><a href="/admin">Home</a>
+              <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a>
               </li>
               <li class="breadcrumb-item active">Type Of Event
               </li>
@@ -141,7 +141,7 @@
                                 
                                 <td valign="middle">
                                   <% if (l.basic !== true) { %>
-                                  <a href="/admin/eventType/edit/<%= l._id %>">
+                                  <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/eventType/edit/<%= l._id %>">
                                     <i class="feather icon-edit fa-lg primary"></i>
                                   </a>
                                   <% }%>
@@ -204,7 +204,7 @@
             }
             $.ajax({
               type: 'POST',
-              url: '/admin/changestatus',
+              url: '<%= process.env.MIPIE_BACKEND_URL %>/admin/changestatus',
               data: {
                 id,
                 status: myStatus,

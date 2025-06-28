@@ -39,16 +39,16 @@
                 </span></div><span><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/portrait/small/loader.png" alt="avatar" height="40" width="40"></span>
               </a>
             <div class="dropdown-menu dropdown-menu-right">
-              <a class="dropdown-item" href="/admin/editprofile">
+              <a class="dropdown-item" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/editprofile">
                 <i class="feather icon-user"></i> Edit Profile</a>
-              <a class="dropdown-item" href="/admin/changepassword">
+              <a class="dropdown-item" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/changepassword">
                 <i class="feather icon-lock"></i> Change Password</a>
               <!-- <a class="dropdown-item" href="#">
                       <i  class="feather icon-mail"></i> My Inbox</a>
                   <a class="dropdown-  item" href="#"> -->
               <!-- <i  class="feather icon-check-square"></i> Task</a><a class="dropdown-item" href="#">
                       <i  class="feather icon-message-square"></i> Chats</a> -->
-              <div class="dropdown-divider"></div><a class="dropdown-item" href="/admin/logout"><i
+              <div class="dropdown-divider"></div><a class="dropdown-item" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/logout"><i
                   class="feather icon-power"></i>
                 Logout</a>
             </div>

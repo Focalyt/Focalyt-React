@@ -14,7 +14,7 @@
                     <h3 class="content-header-title float-left mb-0">List Candidates</h3>
                     <div class="breadcrumb-wrapper col-12">
                       <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="/company/dashboard">Home</a>
+                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                         </li>
                         <li class="breadcrumb-item active">List Candidates</li>
                       </ol>
@@ -163,7 +163,7 @@
                                   class="btn btn-success  waves-effect waves-light  text-white d-inline px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
                                   id="submit-btn">Go</button>
                                   <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-sm-1 mx-0 px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
-                                  href="/company/list-candidates">RESET</a>
+                                  href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates">RESET</a>
                                 
                                   <a href="#" class="btn btn-primary  waves-effect waves-light  text-white d-inline  ml-xl-1 px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
                                   data-toggle="modal" data-target="#promote">Promote</a>
@@ -227,7 +227,7 @@
                                       
                                                                                
                                         <td class="actions">
-                                          <a href="/company/newcandidate/<%=candidate._id%>?src=list"><i
+                                          <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%=candidate._id%>?src=list"><i
                                               class="fa-regular fa-user"></i></a>
                                         </td>
                                         <td>
@@ -315,7 +315,7 @@
                 </button>
               </div>
               <div class="modal-body pt-1" id="popup-body">
-                <form method="post" action="/company/promote">
+                <form method="post" action="<%= process.env.MIPIE_BACKEND_URL %>/company/promote">
                 <div class="row">
                   <div class="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-1 text-left">
                     <label>Select JD</label>
@@ -562,14 +562,14 @@
                 offerId: offerId,
                 amount: amount
               }
-              axios({method: 'post', url: '/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') }}).then((res) => {
+              axios({method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') }}).then((res) => {
               let options = {
              "key": '<%= process.env.MIPIE_RAZORPAY_KEY %>',
              "amount": res.data.order.amount, 
              "currency": res.data.order.currency,
              "name": "MiPie",
              "description": "",
-             "image": "/images/logo/logo.png",
+             "image": "<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png",
              "order_id": res.data.order.id, 
              "handler": function (response){
                   let data = {
@@ -580,7 +580,7 @@
                      amount:amount,
                      code:code
                   }
-                  axios({method: 'post', url: '/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') }}).then(res=>{
+                  axios({method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') }}).then(res=>{
                    window.location.reload()
                   }).catch(
                      (error) => {
@@ -615,7 +615,7 @@
               code,
             }
             document.getElementById('codevalue').value=code
-            axios({method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
+            axios({method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
               .then((res) => {
                 if(res.data.status){
                   $('#error-message').text('')
@@ -649,7 +649,7 @@
               code,
             }
             document.getElementById('codevalue').value=code
-            axios({method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
+            axios({method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
               .then((res) => {
                 if(res.data.status){
                   $('#error-message').text('')
@@ -700,7 +700,7 @@
 
             header = { headers: { 'x-auth': localStorage.getItem('token') } }
 
-            axios.get('/company/getcities', { params: { stateId } }, header)
+            axios.get('<%= process.env.MIPIE_BACKEND_URL %>/company/getcities', { params: { stateId } }, header)
               .then(result => {
                 if (result.data.cities.length > 0) {
                   $('option.cityclass').remove();
@@ -720,7 +720,7 @@
             if (!stateId) {
               $(`select#${cityId} option.companycitylist`).remove();
             } else {
-              $.get('/company/getcitiesbyId', body).done((res) => {
+              $.get('<%= process.env.MIPIE_BACKEND_URL %>/company/getcitiesbyId', body).done((res) => {
                 $(`select#${cityId} option.companycitylist`).remove();
                 let options;
                 for (let i = 0; i < res.cityValues.length; i++) {
@@ -742,7 +742,7 @@
             let value = event.target.value;
         if (value.length == 0) document.getElementById("template").innerHTML = "<option.categorieList>Select Templates</option>";
         else {
-            axios.get('/company/getTemplateByCategory', { params: { value} })
+            axios.get('<%= process.env.MIPIE_BACKEND_URL %>/company/getTemplateByCategory', { params: { value} })
             .then((res) => {
                 $(`#template option.categorieList`).remove();
                 let options = '';
@@ -766,7 +766,7 @@
               template: template,
               messages:count
             }
-            axios({ method: 'post', url: `/company/promote`, data: body, headers: { 'x-auth': localStorage.getItem('token') } })
+            axios({ method: 'post', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/promote`, data: body, headers: { 'x-auth': localStorage.getItem('token') } })
             .then(result => {
                 console.log("template send sucessfully");
               })
@@ -807,7 +807,7 @@
               $('#update').addClass('d-none')
               $('#buyCoins').removeClass('d-none')
             }else{
-            axios({ method: 'post', url: `/company/candidate/bulkStatusUpdate`, data: body, headers: { 'x-auth': localStorage.getItem('token') } })
+            axios({ method: 'post', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/bulkStatusUpdate`, data: body, headers: { 'x-auth': localStorage.getItem('token') } })
               .then(result => {
                 $('#msg').show();
                 $('#msg').text(result.data.message);
@@ -818,7 +818,7 @@
         }
 
           function getOffers(){
-              axios({ method: 'get', url: `/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
+              axios({ method: 'get', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
                 .then(res => {
                   let offers = document.getElementById('offers');
                   let html =''

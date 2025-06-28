@@ -19,7 +19,7 @@
                 
                   <div class="card mb-2 ">
                     <div class="card-header border border-top-0 border-left-0 border-right-0 py-1 px-1">
-                      <h4 class="card-title"><img src="/images/icons/hiring.png"
+                      <h4 class="card-title"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/hiring.png"
                           class="img-fluid pr-1">Hiring Status</h4>
                     </div>
                     <div class="card-content">
@@ -75,7 +75,7 @@
                               <img class="img-fluid rounded mb-2 mt-2" height="60" width="80"
                                 src="<%= process.env.MIPIE_BUCKET_URL +'/' + candidate.image %>" alt="User avatar">
                               <% } else { %>
-                                <img class="img-fluid rounded mb-2 mt-2" src="/images/elements/1.png" alt="User avatar">
+                                <img class="img-fluid rounded mb-2 mt-2" src="<%= process.env.MIPIE_BACKEND_URL %>/images/elements/1.png" alt="User avatar">
                                 <% } %>
                                   <div class="user-info text-center">
                                     <h4 class="text-capitalize">
@@ -158,7 +158,7 @@
                       <div class="col-xl-12" id="mipie_profile">
                         <div class="row">
                           <div class="col-xl-2 col-lg-2 col-md-2 col-sm-2 col-2 bg-cs-one px-0 text-center">
-                            <img src="/images/icons/profile.png" class="img-fluid pt-1">
+                            <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/profile.png" class="img-fluid pt-1">
                           </div>
                           <div class="col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 py-1 my-auto">
                             <h5 class="p-0 m-0">Focalyt Profile</h5>
@@ -176,7 +176,7 @@
                         <div class="col-xl-12 mt-2 mb-xl-0 mb-lg-0 mb-md-3 mb-sm-3 mb-3" id="candidate_resume">
                           <div class="row">
                             <div class="col-xl-2 col-lg-2 col-md-2 col-sm-2 col-2 bg-cs-two px-0 text-center">
-                              <img src="/images/icons/resume.png" class="img-fluid pt-1">
+                              <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/resume.png" class="img-fluid pt-1">
                             </div>
                             <div class="col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 py-1 my-auto">
                               <h5 class="p-0 m-0">Resume</h5>
@@ -191,7 +191,7 @@
                         <% } else if(candidate.resume) {%>
                           <!-- <div class="col-xl-12 mt-2 mb-xl-0 mb-lg-0 mb-md-3 mb-sm-3 mb-3" id="candidate_resume"> -->
                             <div class="row pt-1">
-                          <img src="/images/disable_button.jpg" class="img-fluid"/>
+                          <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/disable_button.jpg" class="img-fluid"/>
                             </div>
                           <!-- </div> -->
                           <% }%>
@@ -226,7 +226,7 @@
                               <div class="col-12">
                                 <div class="card mb-0 mb-sm-0 mb-md-2 mb-lg-2 mb-xl-2 mt-xl-0 mt-lg-0 mt-md-0 mt-sm-4 mt-4">
                                   <div class="card-header border border-top-0 border-left-0 border-right-0 py-1 px-1">
-                                    <h4 class="card-title"><img src="/images/icons/qualification.png"
+                                    <h4 class="card-title"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/qualification.png"
                                         class="img-fluid pr-1">Qualification</h4>
                                   </div>
                                   <div class="card-content">
@@ -278,7 +278,7 @@
                               <div class=" col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 ">
                                 <div class="card mt-1 mb-0 mb-sm-0 mb-md-2 mb-lg-2 mb-xl-2">
                                   <div class="card-header border border-top-0 border-left-0 border-right-0 py-1 px-1">
-                                    <h4 class="card-title"><img src="/images/icons/technicalskill.png"
+                                    <h4 class="card-title"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/technicalskill.png"
                                         class="img-fluid pr-1">Technical Skills</h4>
                                   </div>
                                   <div class="card-content">
@@ -317,7 +317,7 @@
                               <div class="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12">
                                 <div class="card mt-1 mb-0 mb-sm-0 mb-md-2 mb-lg-2 mb-xl-2">
                                   <div class="card-header border border-top-0 border-left-0 border-right-0 py-1 px-1">
-                                    <h4 class="card-title"><img src="/images/icons/technicalskill.png"
+                                    <h4 class="card-title"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/technicalskill.png"
                                         class="img-fluid pr-1">Non Technical Skills</h4>
                                   </div>
                                   <div class="card-content">
@@ -356,7 +356,7 @@
                               <div class="col-12">
                                 <div class="card mt-1 mb-0 mb-sm-0 mb-md-2 mb-lg-2 mb-xl-2">
                                   <div class="card-header border border-top-0 border-left-0 border-right-0 py-1 px-1">
-                                    <h4 class="card-title"><img src="/images/icons/experince.png"
+                                    <h4 class="card-title"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/experince.png"
                                         class="img-fluid pr-1">Experience</h4>
                                   </div>
                                   <div class="card-content">
@@ -401,7 +401,7 @@
                               <div class="col-12">
                                 <div class="card mt-1 mb-5">
                                   <div class="card-header border border-top-0 border-left-0 border-right-0 py-1 px-1">
-                                    <h4 class="card-title"><img src="/images/icons/location.png"
+                                    <h4 class="card-title"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/location.png"
                                         class="img-fluid pr-1">Location Preferences</h4>
                                   </div>
                                   <div class="card-content">
@@ -647,14 +647,14 @@
                 offerId: offerId,
                 amount: amount
               }
-              axios({method: 'post', url: '/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') }}).then((res) => {
+              axios({method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') }}).then((res) => {
               let options = {
              "key": '<%= process.env.MIPIE_RAZORPAY_KEY %>',
              "amount": res.data.order.amount, 
              "currency": res.data.order.currency,
              "name": "MiPie",
              "description": "",
-             "image": "/images/logo/logo.png",
+             "image": "<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png",
              "order_id": res.data.order.id, 
              "handler": function (response){
                   let data = {
@@ -665,7 +665,7 @@
                      amount:amount,
                      code:code
                   }
-                  axios({method: 'post', url: '/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') }}).then(res=>{
+                  axios({method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') }}).then(res=>{
                    window.location.reload()
                   }).catch(
                      (error) => {
@@ -702,7 +702,7 @@
             offerId:offer
           }
             document.getElementById('codevalue').value=code
-            axios({method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
+            axios({method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
               .then((res) => {
                 if(res.data.status&&res.data.amount>0){
                   $('#error-message').text('')
@@ -737,7 +737,7 @@
             offerId:offer
           }
             document.getElementById('codevalue').value=code
-            axios({method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
+            axios({method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
               .then((res) => {
                 if(res.data.status){
                   $('#error-message').text('')
@@ -773,14 +773,14 @@
           function maskUnmask(id) {
             const body = { userId: id };
             if ($('#maskunmask').hasClass('masked')) {
-              axios({ method: 'get', url: "/company/get-candidate-details", params: { userId: id }, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
+              axios({ method: 'get', url: "<%= process.env.MIPIE_BACKEND_URL %>/company/get-candidate-details", params: { userId: id }, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
                   $('.mobile').html(res.data.mobile)
                   $('.email').html(res.data.email)
                   $('#maskunmask').hide()
                   $('#loader').removeClass('disabled')
                   $('#loader').removeAttr('disabled')
                   axios({
-                    method: 'get', url: '/company/getCreditCount', headers: { 'x-auth': localStorage.getItem('token') }
+                    method: 'get', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/getCreditCount', headers: { 'x-auth': localStorage.getItem('token') }
                   }).then((res) => {
                     let credit = res.data.credit
                     if (!credit) { credit = 0 }
@@ -807,7 +807,7 @@
           preloader.hide();
           function addTextContent(id) {
             preloader.show();
-            axios.get(`/company/createResume/${id}`, {
+            axios.get(`<%= process.env.MIPIE_BACKEND_URL %>/company/createResume/${id}`, {
               headers: { 'x-auth': localStorage.getItem('token') }
             }).then(res => {
               preloader.hide();
@@ -837,7 +837,7 @@
               concernedPerson: concernedPerson
             }
 
-            axios({ method: 'post', url: `/company/candidate/statusUpdate`, data: body, headers: { 'x-auth': localStorage.getItem('token') } })
+            axios({ method: 'post', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/statusUpdate`, data: body, headers: { 'x-auth': localStorage.getItem('token') } })
               .then(result => {
                 window.location.reload()
               })
@@ -878,7 +878,7 @@
             document.getElementById('apply').innerHTML = `Pay ₹ ${amount}`
           }
           function getOffers(){
-              axios({ method: 'get', url: `/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
+              axios({ method: 'get', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
                 .then(res => {
                   let offers = document.getElementById('offers');
                   let html =''

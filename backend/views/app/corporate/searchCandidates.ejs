@@ -108,7 +108,7 @@
     const setCities=(stateId)=>{
       const body={stateid:stateId};
       const citySelectField=document.getElementById('city-field');
-      $.get('/app/candidate/getcities',(body)).done((res)=>{
+      $.get('<%= process.env.MIPIE_BACKEND_URL %>/app/candidate/getcities',(body)).done((res)=>{
         citySelectField.innerHTML=''
          for(let i=0;i<res.length;i++){
            const city=new Option(res[i].name,res[i].value);
@@ -139,7 +139,7 @@
       cityToSearch:city,
       stateToSearch:state
     };
-      $.post("/app/corporate/get-candidates",body).then((res)=>{
+      $.post("<%= process.env.MIPIE_BACKEND_URL %>/app/corporate/get-candidates",body).then((res)=>{
         if(res.status===200&&res.candidates.length!==0){
           parentDiv.innerHTML=''
           const table=displayTheResults(res.candidates);

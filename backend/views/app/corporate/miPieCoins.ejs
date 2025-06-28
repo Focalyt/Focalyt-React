@@ -18,7 +18,7 @@
                 <h3 class="content-header-title float-left mb-0">Coins</h3>
                 <div class="breadcrumb-wrapper col-12">
                   <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="/company/dashboard">Home</a>
+                    <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                     </li>
                     <li class="breadcrumb-item active">Coins</li>
                   </ol>
@@ -187,14 +187,14 @@
                 offerId: offerId,
                 amount: amount
             }
-              axios({method: 'post', url: '/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') }}).then((res) => {
+              axios({method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') }}).then((res) => {
               let options = {
              "key": '<%= process.env.MIPIE_RAZORPAY_KEY %>',
              "amount": res.data.order.amount, 
              "currency": res.data.order.currency,
              "name": "MiPie",
              "description": "",
-             "image": "/images/logo/logo.png",
+             "image": "<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png",
              "order_id": res.data.order.id, 
              "handler": function (response){
                   let data = {
@@ -205,7 +205,7 @@
                      amount:amount,
                      code:code
                   }
-                  axios({method: 'post', url: '/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') }}).then(res=>{
+                  axios({method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') }}).then(res=>{
                    window.location.reload()
                   }).catch(
                      (error) => {
@@ -242,7 +242,7 @@
             offerId:offer
           }
             document.getElementById('codevalue').value=code
-            axios({method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
+            axios({method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
               .then((res) => {
                 if(res.data.status){
                   $('#error-message').text('')
@@ -280,7 +280,7 @@
             offerId:offer
           }
             document.getElementById('codevalue').value=code
-            axios({method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
+            axios({method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') }})
               .then((res) => {
                 if(res.data.status&&res.data.amount>0){
                   $('#error-message').text('')

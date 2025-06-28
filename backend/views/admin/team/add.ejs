@@ -152,7 +152,7 @@
     $("button[type=submit]").text("Posting...").attr("disabled", true);
 
     $.ajax({
-      url: "/admin/team/add", // ✅ Backend API का सही endpoint
+      url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/team/add", // ✅ Backend API का सही endpoint
       type: "POST",
       data: formData,
       processData: false,  // ⚠️ इसे `false` रखें ताकि jQuery डेटा को ऑटोमैटिक प्रोसेस न करे

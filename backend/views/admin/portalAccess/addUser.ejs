@@ -7,7 +7,7 @@
                     <h3 class="content-header-title float-left mb-0">Access </h3>
                     <div class="breadcrumb-wrapper col-12">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+                            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
                             <li class="breadcrumb-item active">Access </li>
                         </ol>
                     </div>
@@ -229,7 +229,7 @@
                                                         </td>
 
                                                         <td valign="middle">
-                                                            <a href="/admin/portalaccess/editaccess/<%= user._id %>">
+                                                            <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/portalaccess/editaccess/<%= user._id %>">
 
                                                                 <i class="feather icon-edit fa-lg primary"></i>
                                                             </a>
@@ -387,7 +387,7 @@
 
 
     <script>
-        const selectedCourseIds = <%- JSON.stringify((editUser?.access?.courseAccess || []).map(id => id.toString())) %>;
+        const selectedCourseIds = '<%- JSON.stringify((editUser?.access?.courseAccess || []).map(id => id.toString())) %>';
         console.log("Selected course ids from backend:", selectedCourseIds);
     </script>
 
@@ -420,10 +420,10 @@ function fetchCourses(centerIds) {
     // courseDropdownMenu.classList.add('open');
     // document.querySelector('.course-section').style.paddingBottom = '90px';
 
-    axios.post('/admin/portalaccess/getCoursesByCenter', { centerIds: centerIdsParam })
+    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/portalaccess/getCoursesByCenter', { centerIds: centerIdsParam })
         .then((response) => {
             const courses = response.data.courses;
-            const selectedCourseIds = <%- JSON.stringify((editUser?.access?.courseAccess || []).map(id => id.toString())) %>;
+            const selectedCourseIds = '<%- JSON.stringify((editUser?.access?.courseAccess || []).map(id => id.toString())) %>';
 
             console.log('Course IDs from backend:', selectedCourseIds);
             console.log('Courses received:', courses);
@@ -678,7 +678,7 @@ function fetchCourses(centerIds) {
             console.log("Data", body);
 
             let header = { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" };
-            axios.post('/admin/portalaccess/addaccess', body, header)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/portalaccess/addaccess', body, header)
                 .then(res => {
                     alert("Role Added");
                     window.location.reload();
@@ -723,10 +723,10 @@ function fetchCourses(centerIds) {
             console.log("Update Data", body);
 
             let header = { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" };
-            axios.post(`/admin/portalaccess/editaccess/${userId}`, body, header)
+            axios.post(`<%= process.env.MIPIE_BACKEND_URL %>/admin/portalaccess/editaccess/${userId}`, body, header)
                 .then(res => {
                     alert("Role Updated");
-                    window.location.href = '/admin/portalaccess/addaccess';
+                    window.location.href = '<%= process.env.MIPIE_BACKEND_URL %>/admin/portalaccess/addaccess';
                 })
                 .catch(err => {
                     console.error("Error updating user:", err);
@@ -741,7 +741,7 @@ function fetchCourses(centerIds) {
             }
             $.ajax({
                 type: "POST",
-                url: "/admin/changestatus",
+                url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/changestatus",
                 data: {
                     id,
                     status: myStatus,

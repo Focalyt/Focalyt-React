@@ -45,7 +45,7 @@
               <section id="Concerned-Person ">
                 <div class="row">
                   <div class="col-xl-12 px-3 text-right">
-                    <a href="/company/list/jobs" class="btn btn-outline-primary">All Job Details</a>
+                    <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs" class="btn btn-outline-primary">All Job Details</a>
                   </div>
                   <div class="col-xl-12 col-lg-12 px-3">
                     <div class="card mt-2">
@@ -260,7 +260,7 @@
                                 <label for="work-loc">Work Location<span class="mandatory"> *</span>
                                   <div class="input-group mb-2">
                                     <div class="input-group-prepend bg-locat">
-                                      <div class="input-group-text bg-intext"><img src="/images/isist.png"
+                                      <div class="input-group-text bg-intext"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/isist.png"
                                           id="siteforcomp">
                                       </div>
                                     </div>
@@ -992,14 +992,14 @@
                 offerId: offerId,
                 amount: amount
               }
-              axios({ method: 'post', url: '/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
+              axios({ method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
                 let options = {
                   "key": '<%= process.env.MIPIE_RAZORPAY_KEY %>',
                   "amount": res.data.order.amount,
                   "currency": res.data.order.currency,
                   "name": "MiPie",
                   "description": "",
-                  "image": "/images/logo/logo.png",
+                  "image": "<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png",
                   "order_id": res.data.order.id,
                   "handler": function (response) {
                     let data = {
@@ -1010,7 +1010,7 @@
                       amount: amount,
                       code: code
                     }
-                    axios({ method: 'post', url: '/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') } }).then(res => {
+                    axios({ method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') } }).then(res => {
                       window.location.reload()
                     }).catch(
                       (error) => {
@@ -1047,7 +1047,7 @@
                   offerId: offer
                 }
                 document.getElementById('codevalue').value = code
-                axios({ method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
+                axios({ method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
                   .then((res) => {
                     if (res.data.status && res.data.amount > 0) {
                       $('#error-message').text('')
@@ -1089,7 +1089,7 @@
                 offerId: offer
               }
               document.getElementById('codevalue').value = code
-              axios({ method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
+              axios({ method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
                 .then((res) => {
                   if (res.data.status && res.data.amount > 0) {
                     $('#error-message').text('')
@@ -1115,7 +1115,7 @@
             }
 
             function getOffers() {
-              axios({ method: 'get', url: `/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
+              axios({ method: 'get', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
                 .then(res => {
                   let offers = document.getElementById('offers');
                   let html = ''
@@ -1180,7 +1180,7 @@
               const stateId = event.target.value;
               let body = { stateId: stateId };
               const selectCase = document.getElementById(cityId);
-              $.get('/company/getcitiesbyId', body).done((res) => {
+              $.get('<%= process.env.MIPIE_BACKEND_URL %>/company/getcitiesbyId', body).done((res) => {
                 $(`select#${cityId} option.companycitylist`).remove();
                 let options;
                 for (let i = 0; i < res.cityValues.length; i++) {
@@ -1431,13 +1431,13 @@
 
               console.log(formData, 'body>>>>>>>>>>>>>')
               if (!lessCoins) {
-                axios.post('/company/addjd', formData, {
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/company/addjd', formData, {
                   headers: { 'Content-Type': 'multipart/form-data' }
                 })
                   .then(response => {
                     console.log(response);
                     if (response.data.status) {
-                      window.location.href = "/company/list/jobs"; // Success पर redirect करें
+                      window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs"; // Success पर redirect करें
                     }
                   })
                   .catch(error => {
@@ -1646,7 +1646,7 @@
               let data = {
                 key: $('#jobvideo').val(),
               }
-              axios.post('/api/deleteSingleFile', data, header)
+              axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deleteSingleFile', data, header)
                 .then(res => {
                   $('.uploadedvideo').hide()
                   $('#jobvideo').val('')

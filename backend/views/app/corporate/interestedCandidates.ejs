@@ -15,7 +15,7 @@
                     <h3 class="content-header-title float-left mb-0">Interested Candidates</h3>
                     <div class="breadcrumb-wrapper col-12">
                       <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="/company/dashboard">Home</a>
+                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                         </li>
                         <li class="breadcrumb-item active">Interested Candidates</li>
                       </ol>
@@ -134,7 +134,7 @@
 
                                         <td>
                                           <% if (candidate._candidate && candidate._candidate._id) { %>
-                                            <a href="/company/newcandidate/<%= candidate._candidate._id %>">
+                                            <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%= candidate._candidate._id %>">
                                               <i class="feather icon-eye fa-lg primary"></i>
                                             </a>
                                             <% } else { %>
@@ -277,10 +277,10 @@
             const body = { userId: id };
             console.log('unmask hitting')
 
-            axios({ method: 'get', url: "/company/get-candidate-details", params: { userId: id }, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
+            axios({ method: 'get', url: "<%= process.env.MIPIE_BACKEND_URL %>/company/get-candidate-details", params: { userId: id }, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
 
               axios({
-                method: 'get', url: '/company/getCreditCount', headers: { 'x-auth': localStorage.getItem('token') }
+                method: 'get', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/getCreditCount', headers: { 'x-auth': localStorage.getItem('token') }
               }).then((res) => {
                 let credit = res.data.credit
                 if (!credit) { credit = 0 }

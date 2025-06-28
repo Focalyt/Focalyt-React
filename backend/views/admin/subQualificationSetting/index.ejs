@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Stream</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Stream</li>
 						</ol>
 					</div>
@@ -31,7 +31,7 @@
 								<div class="card-body">
 									<!--  -->
 
-									<form class="form-horizontal" action="" method="post">
+									<form class="form-horizontal" action="<%= process.env.MIPIE_BACKEND_URL %>/admin/subQualification" method="post">
 										<div class="row">
 											<% if (!subQua) { %>
 												<div class="col-xl-4 mb-1">
@@ -244,7 +244,7 @@
 																				<% if (view===false) { %>
 																					<td valign="middle">
 																						<a
-																							href="/admin/subQualification/edit/<%= l._id %>">
+																							href="<%= process.env.MIPIE_BACKEND_URL %>/admin/subQualification/edit/<%= l._id %>">
 																							<i
 																								class="feather icon-edit fa-lg primary"></i>
 																						</a>
@@ -326,7 +326,7 @@
 						}
 						$.ajax({
 							type: "POST",
-							url: "/admin/changestatus",
+							url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/changestatus",
 							data: {
 								id,
 								status: myStatus,
@@ -400,7 +400,7 @@
 								'<option disabled selected value="">Select Option</option>'
 							);
 						axios
-							.post("/panel/helper/getsubQual", {
+							.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/helper/getsubQual", {
 								_qualification: $("#qual").val(),
 							})
 							.then(({ data }) => {

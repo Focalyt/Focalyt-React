@@ -17,7 +17,7 @@
                     <h3 class="content-header-title float-left mb-0">JD</h3>
                     <div class="breadcrumb-wrapper col-12">
                       <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="/company/dashboard">Home</a>
+                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                         </li>
                         <li class="breadcrumb-item active">JD</li>
                       </ol>
@@ -36,7 +36,7 @@
                       <h4 class="card-title">JOB Brief</h4>
                     </div>
                     <div class="col-xl-6 text-right">
-                      <a href="/company/list/jobs" class="btn btn-primary">All JDs</a>
+                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs" class="btn btn-primary">All JDs</a>
                     </div>
                   </div>
                     <div class="card-content">
@@ -252,17 +252,17 @@
                               <td><%= moment(candidate._candidate?.createdAt).format('MMM DD YYYY')%></td>
                               <td class="actions" id="socail-iconw">
                                 <% if (candidate && candidate._candidate) { %>
-                                  <a href="/company/newcandidate/<%= candidate._candidate._id %>">
+                                  <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%= candidate._candidate._id %>">
                                     <i class="fa-regular fa-user fa-lg"></i>
                                   </a>
                                   <% if (candidate._candidate.whatsapp) { %>
                                     <a href="https://wa.me/91<%= candidate._candidate.whatsapp %>" target="_blank">
-                                      <img src="/public_assets/images/whatsappicon.png" width="18%" class="mx-1">
+                                      <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/whatsappicon.png" width="18%" class="mx-1">
                                     </a>
                                   <% } %>
                                   <% if (candidate._candidate.mobile) { %>
                                     <a href="tel:<%= candidate._candidate.mobile %>">
-                                      <img src="/public_assets/images/telephone.png" width="18.5%">
+                                      <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/telephone.png" width="18.5%">
                                     </a>
                                   <% } %>
                                 <% } else { %>

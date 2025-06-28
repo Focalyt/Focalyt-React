@@ -11,7 +11,7 @@
           <h3 class="content-header-title float-left mb-0">Job Listings</h3>
           <div class="breadcrumb-wrapper col-12">
             <ol class="breadcrumb">
-              <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+              <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
               <li class="breadcrumb-item active">Job Listings</li>
             </ol>
           </div>
@@ -41,7 +41,7 @@
                   <div class="col-6 ">
                     <div class="text-right d-inline " style="float: right
                     ;">
-                      <img src="/images/filtern.png" class="btn btn-link collapsed py-0 mx-0  "  data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne" width="90px" id="filter-img"    >
+                      <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/filtern.png" class="btn btn-link collapsed py-0 mx-0  "  data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne" width="90px" id="filter-img"    >
                     </div>
                   </div>
               </div>
@@ -89,7 +89,7 @@
                               <button class="btn btn-success  waves-effect waves-light  text-white d-inline mx-1 px-xl-2 px-lg-1 px-md-1 px-sm-2 px-2 "
                                 id="submit-btn">Go</button>
                               <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mt-2 px-xl-2 px-lg-1 px-md-1 px-sm-2 px-2 text-white"
-                                href="/admin/joblisting">RESET</a>
+                                href="<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting">RESET</a>
                             </div>
                           </div>
 
@@ -126,7 +126,7 @@
                             class="form-control w-50" data-id="<%= curr._id %>">
                         </td>
                         <td>
-                          <a href="/admin/company/View/<%= curr._company._id %>">
+                          <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/company/View/<%= curr._company._id %>">
                             <%= (curr&&curr.displayCompanyName||curr&&curr._company.name)  %>
                           </a>
                         </td>
@@ -167,7 +167,7 @@
                                 <% } %>
                           </div>
                         </td>
-                        <td><a href="/admin/joblisting/<%= jd[i]._id %>" class="btn btn-primary btn-sm">View</a>
+                        <td><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/<%= jd[i]._id %>" class="btn btn-primary btn-sm">View</a>
                         </td>
                       </tr>
                       <% });} else { %>
@@ -270,7 +270,7 @@
       }
       let data = { id: id, status: myStatus }
       let headers = { 'x-auth': localStorage.getItem('token') }
-      axios.patch(`/admin/joblisting/changeStatus`, data, { headers: headers })
+      axios.patch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/changeStatus`, data, { headers: headers })
         .then((res) => {
           location.reload()
         }).catch((err) => {
@@ -279,7 +279,7 @@
     }
     function updateSequence(e, id) {
       const val = e.target.value;
-      axios.patch("/admin/joblisting/updatesequence", { jobId: id, val }).then((res) => {
+      axios.patch("<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/updatesequence", { jobId: id, val }).then((res) => {
         if (res.data.status === true) {
           e.target.value = res.data.sequence
         }
@@ -287,7 +287,7 @@
     }
     function archived() {
       let checkbox = document.getElementById('checkbox1');
-      window.location.href = `/admin/joblisting?status=${!checkbox.checked}`
+      window.location.href = `<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting?status=${!checkbox.checked}`
     }
 
     function validate(){

@@ -84,7 +84,7 @@
             </ul>
           </li>
           <div class="bell my-auto">
-            <a href="/company/notifications"><i class="fa-solid fa-bell " style="color: #fff; font-size: 22px;"></i>
+            <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/notifications"><i class="fa-solid fa-bell " style="color: #fff; font-size: 22px;"></i>
             <span class="badge notification-badge text-bg-secondary" id="notification"></span></a>
             </div>
           <li class="dropdown dropdown-user nav-item"><a class="dropdown-toggle nav-link dropdown-user-link" href="#"
@@ -103,7 +103,7 @@
             </div><span><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/logo/loader.png" id="logout-block" alt="avatar" height="40" width="40"></span>
           </a>
          <div class="dropdown-menu dropdown-menu-right" id="logout-div" style="display:none">
-              <a class="dropdown-item" href="/company/myProfile"><i class="feather icon-user"></i> Edit Profile</a>
+              <a class="dropdown-item" href="<%= process.env.MIPIE_BACKEND_URL %>/company/myProfile"><i class="feather icon-user"></i> Edit Profile</a>
             <div class="dropdown-divider"></div><a class="dropdown-item" onclick="logout()" href="#"><i
                 class="feather icon-power"></i>
               Logout</a>
@@ -117,7 +117,7 @@
 <script src="https://kit.fontawesome.com/9f033fe1e6.js" crossorigin="anonymous"></script>
 <script>
     $('.bell').on('click', function() {
-  window.location.href = '/company/notifications';
+  window.location.href = '<%= process.env.MIPIE_BACKEND_URL %>/company/notifications';
 });
   $('#user-name').text(localStorage.getItem('company'))
   const logoutBlock = document.getElementById('logout-block');
@@ -127,12 +127,12 @@
   const logout = e => {
     $.ajax({
       type: 'GET',
-      url: '/api/logout',
+      url: '<%= process.env.MIPIE_BACKEND_URL %>/api/logout',
       headers: { 'x-auth': localStorage.getItem('token') },
       success: (res) => {
         localStorage.clear()
         sessionStorage.clear();
-        window.location.href = '/company/login'
+        window.location.href = '<%= process.env.MIPIE_BACKEND_URL %>/company/login'
       }
     });
   }
@@ -140,7 +140,7 @@
   $(document).ready(function(){
     $.ajax({
     type: 'GET',
-    url: '/company/getCreditCount',
+    url: '<%= process.env.MIPIE_BACKEND_URL %>/company/getCreditCount',
     headers: { 'x-auth': localStorage.getItem('token') },
     success: function(data){
       let credit = data.credit
@@ -151,7 +151,7 @@
   })
   $.ajax({
     type: 'GET',
-    url: '/company/notificationCount',
+    url: '<%= process.env.MIPIE_BACKEND_URL %>/company/notificationCount',
     headers: { 'x-auth': localStorage.getItem('token')},
     success: function(data){
       let count = data?.count ? data.count : 0

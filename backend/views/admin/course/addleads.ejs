@@ -6,7 +6,7 @@
                     <h3 class="content-header-title float-left mb-0">Add Leads</h3>
                     <div class="breadcrumb-wrapper col-12">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+                            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
                             <li class="breadcrumb-item active">Add Leads</li>
                         </ol>
                     </div>
@@ -355,7 +355,7 @@ window.initMap = initMap;
                     formData.append("mobile", candidateMobile);
                     console.log(formData)
 
-                    axios.post(`/admin/courses/${courseId}/candidate/upload-docs`, formData, {
+                    axios.post(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/${courseId}/candidate/upload-docs`, formData, {
                         headers: {
                             'x-auth': localStorage.getItem('token'),
                             'Content-Type': 'multipart/form-data'
@@ -431,13 +431,13 @@ window.initMap = initMap;
 
                     console.log("Final Form Data Object:", data); // ✅ Pura data object format me
 
-                    axios.post("/admin/candidate/addleaddandcourseapply", data).then((response) => {
+                    axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/addleaddandcourseapply", data).then((response) => {
                         alert("Candidate added and Course applied")
                         $('#candidateDetails').addClass('d-none');
                         '<% if (course.docsRequired && course.docsRequired.length> 0) { %>'
 
                         $('#add-docs').removeClass('d-none');
-                        '<% } else { %> window.location.href = "/admin/courses/<%=courseId%>/candidate/addleads" <% }%>'
+                        '<% } else { %> window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/<%=courseId%>/candidate/addleads" <% }%>'
                         
                         
 
@@ -532,7 +532,7 @@ window.initMap = initMap;
                    '<% } %>'
 
                     console.log("body", body)
-                    axios.post("/admin/candidate/course/<%=courseId%>/apply", body).then((response) => {
+                    axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/course/<%=courseId%>/apply", body).then((response) => {
                         alert("Course applied successfully")
                         document.getElementById('add__centers').setAttribute('disabled', 'true');
                          '<% if(course.center?.length>0) { %>'
@@ -541,7 +541,7 @@ window.initMap = initMap;
             '<% if (course.docsRequired && course.docsRequired.length> 0) { %>'
 
                         $('#add-docs').removeClass('d-none');
-                        '<% } else { %> window.location.href = "/admin/courses/<%=courseId%>/candidate/addleads" <% }%>'
+                        '<% } else { %> window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/<%=courseId%>/candidate/addleads" <% }%>'
                         
                     }).catch((error) => {
 
@@ -562,7 +562,7 @@ window.initMap = initMap;
                     }
 
                     const body = { mobile: mobileNumber };
-                    axios.post("/api/sendOtptoAddLead", body).then((response) => {
+                    axios.post("<%= process.env.MIPIE_BACKEND_URL %>/api/sendOtptoAddLead", body).then((response) => {
                         if (response.data.status === true) {
                             otpField.classList.remove('d-none');
                             $('#otp-actions').removeClass('d-none')
@@ -595,17 +595,17 @@ window.initMap = initMap;
                     }
 
                     const body = { mobile: mobileNumber, otp };
-                    axios.post("/api/verifyOtp", body).then((response) => {
+                    axios.post("<%= process.env.MIPIE_BACKEND_URL %>/api/verifyOtp", body).then((response) => {
                         if (response.data.status === true) {
                             $('#otp-field').addClass('d-none');
                             $('#otp-actions').addClass('d-none');
                             body.courseId = '<%=courseId%>';
                             alert("Candidate OTP verified successfully.");
-                            axios.post("/admin/candidate/verifyuser", body).then((response) => {
+                            axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/verifyuser", body).then((response) => {
                                 if (response.data.status === true && response.data.appliedStatus === true) {
 
                                     alert("Course already applied");
-                                    window.location.href = "/admin/courses/<%=courseId%>/candidate/addleads";
+                                    window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/<%=courseId%>/candidate/addleads";
 
 
 
@@ -665,7 +665,7 @@ window.initMap = initMap;
                     }
 
                     const body = { mobile: mobileNumber };
-                    axios.post("/api/sendOtptoAddLead", body).then((response) => {
+                    axios.post("<%= process.env.MIPIE_BACKEND_URL %>/api/sendOtptoAddLead", body).then((response) => {
                         if (response.data.status === true) {
                             alert("OTP resent successfully.");
                         } else {

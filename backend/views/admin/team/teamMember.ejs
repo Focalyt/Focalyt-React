@@ -94,7 +94,7 @@
 <script>
      function updateSequence(e, id) {
       const val = e.target.value;
-      axios.patch("/admin/team/teamsequence", { id, val }).then((res) => {
+      axios.patch("<%= process.env.MIPIE_BACKEND_URL %>/admin/team/teamsequence", { id, val }).then((res) => {
         if (res.data.status === true) {
           e.target.value = res.data.sequence
         }
@@ -108,7 +108,7 @@
       }
       let data = { id: id, status: myStatus }
       let headers = { 'x-auth': localStorage.getItem('token') }
-      axios.patch(`/admin/team/changeStatus`, data, { headers: headers })
+      axios.patch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/team/changeStatus`, data, { headers: headers })
         .then((res) => {
           location.reload()
         }).catch((err) => {

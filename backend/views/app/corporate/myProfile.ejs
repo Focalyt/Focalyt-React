@@ -16,7 +16,7 @@
                     <h3 class="content-header-title float-left mb-0">Company Profile</h3>
                     <div class="breadcrumb-wrapper col-12">
                       <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="/company/dashboard">Home</a>
+                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                         </li>
                         <li class="breadcrumb-item active">Company Profile</li>
                       </ol>
@@ -251,7 +251,7 @@
                             <label for="work-loc">Current Location<span class="mandatory"> *</span></label>
                             <div class="input-group mb-2">
                             <div class="input-group-prepend bg-locat">
-                            <div class="input-group-text bg-intext"><img src="/images/isist.png" id="siteforcomp" ></div>
+                            <div class="input-group-text bg-intext"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/isist.png" id="siteforcomp" ></div>
                             </div>
                              <input type="text" class="form-control" id="work-loc" value="<%= company.place %>">
                               <input type="hidden" id="place" name="place" value="" class="form-control" />
@@ -279,12 +279,12 @@
                                 <img src="<%= process.env.MIPIE_BUCKET_URL +'/' + company.logo %>"
                                   class="pointer companylogo" height="auto" width="60%">
                                 <img style="display:none" class="custom-cursor-pointer default"
-                                  src="/images/add_receipt.png" width="60%" height="auto" id="logopic" /></label>
+                                  src="<%= process.env.MIPIE_BACKEND_URL %>/images/add_receipt.png" width="60%" height="auto" id="logopic" /></label>
                               <i class="feather icon-x remove_uploaded_pic" style="color:red;" id="removelogo"></i>
                               Company Logo
                               <% } else { %>
                                 <label for="uploadlogo" style="cursor: pointer; align-self: center;">
-                                  <img class="custom-cursor-pointer default" src="/images/add_receipt.png" width="80"
+                                  <img class="custom-cursor-pointer default" src="<%= process.env.MIPIE_BACKEND_URL %>/images/add_receipt.png" width="80"
                                     height="auto" id="logopic" /></label>
                                 <i style="display:none" id="removelogo" class="feather  icon-x remove_uploaded_pic"
                                   style="color:red;"></i>
@@ -317,7 +317,7 @@
                                   <div class="col-xl-1 col-lg-1 col-md-1 col-sm-2 col-3 mb-1" id="uploadgallery" style="align-self: center;">
                                     <div class="image-upload">
                                       <label for="media-group">
-                                        <img src="/images/icons/jd_one.png" class="pointer img-fluid">
+                                        <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/jd_one.png" class="pointer img-fluid">
                                       </label>
                                       <!-- <i class="feather  icon-x remove_uploaded_pic"></i>
                                       <i class="feather  icon-plus add_multiple_gal"></i> -->
@@ -343,7 +343,7 @@
                                       <% } else { %>
                                         <div class="image-upload videoupload">
                                           <label for="workspace-video">
-                                            <img id="uplvideo" src="/images/icons/jd_two.png" class="pointer img-fluid">
+                                            <img id="uplvideo" src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/jd_two.png" class="pointer img-fluid">
                                           </label>
                                           <input type="file" id="workspace-video" />
                                           <input type="hidden" class="form-control hiddenvideo" name="mediaGalaryVideo"
@@ -565,7 +565,7 @@
                   file: e.target.files[0]
                 }
                 header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
-                axios.post('/api/uploadSingleFile', body, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadSingleFile', body, header)
                   .then(result => {
                     if (result.data.status) {
                       $('#logo').val(result.data.data.Key)
@@ -583,12 +583,12 @@
               let data = {
                 key: $('#logo').val()
               }
-              axios.post('/api/deleteSingleFile', data, header)
+              axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deleteSingleFile', data, header)
                 .then(result => {
                   $('.companylogo').hide()
                   $('#logopic').show()
                   if (result.status) {
-                    axios.post("/company/removelogo", data).then(() => console.log('deleted'))
+                    axios.post("<%= process.env.MIPIE_BACKEND_URL %>/company/removelogo", data).then(() => console.log('deleted'))
                   }
                 })
               return false;
@@ -621,7 +621,7 @@
                 }
 
                 header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
-                axios.post('/api/uploadMultipleFiles', formData, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadMultipleFiles', formData, header)
                   .then(result => {
                     if (result.data.status) {
                       let combinedKeys = ''
@@ -653,7 +653,7 @@
 
                 header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
 
-                axios.post('/api/uploadVideo', body, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadVideo', body, header)
                   .then(result => {
                     $('#save-button').removeAttr("disabled");
                     if (result.data.status) {
@@ -678,7 +678,7 @@
 
               header = { headers: { 'x-auth': localStorage.getItem('token') } }
 
-              axios.get('/company/getcitiesbyId', { params: { stateId } }, header)
+              axios.get('<%= process.env.MIPIE_BACKEND_URL %>/company/getcitiesbyId', { params: { stateId } }, header)
                 .then(result => {
                   if (result.data.cityValues.length > 0) {
                     $('select#city option.cityclass').remove();
@@ -727,14 +727,14 @@
                 }
                 header = { headers: { 'x-auth': localStorage.getItem('token') } }
 
-                axios.post('/company/myprofile', body, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/company/myprofile', body, header)
                   .then(result => {
-                    window.location.href = "/company/myprofile";
+                    window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/company/myprofile";
                   })
               }
             })
             $('#reset-btn').bind('click', () => {
-              window.location.href = "/company/myprofile";
+              window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/company/myprofile";
             })
 
             function validateForm() {
@@ -894,7 +894,7 @@
 
             header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
             if (checkImageValidation(type) && checkImageSize(size) === false) {
-              axios.post('/api/uploadSingleFile', body, header)
+              axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadSingleFile', body, header)
                 .then(result => {
                   if (result.data.status) {
                     let ctrl = $(e.target).next('input.hiddenimg');
@@ -911,12 +911,12 @@
             let data = {
               key: e.attributes.value.textContent
             }
-            axios.post('/api/deleteSingleFile', data, header)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deleteSingleFile', data, header)
               .then(result => {
                 if (result.status) {
                   let parentdiv = $(e).closest('div.galleryImage')
                   $(parentdiv).remove();
-                  axios.post("/company/removeimage", data).then(() => console.log('deleted'))
+                  axios.post("<%= process.env.MIPIE_BACKEND_URL %>/company/removeimage", data).then(() => console.log('deleted'))
                 }
               })
             return false;
@@ -928,12 +928,12 @@
               let data = {
               key: e.attributes.value.textContent
             }
-            axios.post('/api/deleteSingleFile', data, header)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deleteSingleFile', data, header)
               .then(result => {
                 if (result.status) {
                   let videosection = $('videosection')
                   $(videosection).remove();
-                  axios.post("/company/removevideo", data).then(() => console.log('deleted'))
+                  axios.post("<%= process.env.MIPIE_BACKEND_URL %>/company/removevideo", data).then(() => console.log('deleted'))
                 }
                 location.reload()
               })

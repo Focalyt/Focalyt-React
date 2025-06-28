@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Contacts</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Contacts</li>
 						</ol>
 					</div>
@@ -36,7 +36,7 @@
 
                                 <% if (view===false) { %>
                                     <div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 text-right">
-                                      <a href="/admin/contact/addOrEdit" class="btn btn-primary">+ Add Contact</a>
+                                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/contact/addOrEdit" class="btn btn-primary">+ Add Contact</a>
                                     </div>
                                     <% } %>
                                 </div>
@@ -82,13 +82,13 @@
                                                         <% } %>
                                                           <td valign="middle">
                                                             <% if(isChecked=='false' && view===false) {%>
-                                                              <a href="/admin/contact/addOrEdit/<%= contact._id%>">
+                                                              <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/contact/addOrEdit/<%= contact._id%>">
                                                                 <i class="feather icon-edit fa-lg primary"></i>
                                                               </a>
                                                               <i style="padding-left: 7px" class="feather icon-trash fa-lg primary" onclick="deleteContact('<%= contact._id%>')"></i>
                                                               <% } %>
                                                                 <a style="padding-left: 7px"
-                                                                  href="/admin/contact/viewContact/<%= contact._id%>">
+                                                                  href="<%= process.env.MIPIE_BACKEND_URL %>/admin/contact/viewContact/<%= contact._id%>">
                                                                   <i class="feather icon-eye fa-lg primary"></i>
                                                                 </a>
                                                           </td>
@@ -179,7 +179,7 @@
                               }
                               $.ajax({
                                 type: "PUT",
-                                url: "/admin/contact/updateContact",
+                                url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/contact/updateContact",
                                 data: {
                                   id,
                                   status: myStatus,
@@ -193,24 +193,24 @@
                               if (checkbox.checked) {
                                 $.ajax({
                                   type: "GET",
-                                  url: "/admin/contact?status=false",
+                                  url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/contact?status=false",
                                   success: () =>
-                                    (window.location.href = "/admin/contact?status=false"),
+                                    (window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/contact?status=false"),
                                 });
                               } else {
                                 $.ajax({
                                   type: "GET",
-                                  url: "/admin/contact?status=true",
+                                  url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/contact?status=true",
                                   success: () =>
                                   (window.location.href =
-                                    "/admin/contact?status=true"),
+                                    "<%= process.env.MIPIE_BACKEND_URL %>/admin/contact?status=true"),
                                 });
                               }
                             }
                             function deleteContact(id){
                                 $.ajax({
                                   type: "DELETE",
-                                  url: `/admin/contact/deleteContact/${id}`,
+                                  url: `<%= process.env.MIPIE_BACKEND_URL %>/admin/contact/deleteContact/${id}`,
                                   success:(data)=>{
                                     if(data.status){
                                         window.location.reload()

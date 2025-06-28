@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Add Company Voucher</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Add Company Voucher</li>
 						</ol>
 					</div>
@@ -16,7 +16,7 @@
 	</div>
 	<div class="content-body">
 		<% include ../../partials/flash %>
-			<form class="form-horizontal" action="/admin/Vouchers/addVoucher?voucherId=<%= voucher?._id %>" method="post" id="formData">
+			<form class="form-horizontal" action="<%= process.env.MIPIE_BACKEND_URL %>/admin/Vouchers/addVoucher?voucherId=<%= voucher?._id %>" method="post" id="formData">
 				<section>
 					<div class="row">
 						<div class="col-xl-12 col-lg-12">

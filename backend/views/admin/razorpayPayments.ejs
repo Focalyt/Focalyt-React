@@ -16,7 +16,7 @@
         <h3 class="content-header-title float-left mb-0">Razorpay Payments</h3>
         <div class="breadcrumb-wrapper col-12">
           <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
             <li class="breadcrumb-item active">Razorpay Payments</li>
           </ol>
         </div>
@@ -122,7 +122,7 @@
             courseId
         }
       axios
-        .post(`/admin/razorpayPayments/allocateCoins`, body)
+        .post(`<%= process.env.MIPIE_BACKEND_URL %>/admin/razorpayPayments/allocateCoins`, body)
         .then((res) => {
             window.location.reload()
         }).catch((err) => {
@@ -132,7 +132,7 @@
 
     function getStatus(id, i) {
       axios
-        .get(`/admin/razorpayPayments/checkCoinsAllocation/${id}`, {
+        .get(`<%= process.env.MIPIE_BACKEND_URL %>/admin/razorpayPayments/checkCoinsAllocation/${id}`, {
           headers: { "x-auth": localStorage.getItem("token") },
         })
         .then((res) => {

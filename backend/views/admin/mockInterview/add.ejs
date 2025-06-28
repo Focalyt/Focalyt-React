@@ -6,7 +6,7 @@
                 <h3 class="content-header-title float-left mb-0">Add Mock Interview</h3>
                 <div class="breadcrumb-wrapper col-12">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="/admin">Home</a>
+                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a>
                         </li>
                         <li class="breadcrumb-item active">Add Mock Interview
                         </li>
@@ -125,7 +125,7 @@
                     <div class="card-body">
                         <div class="row">
                         <div class="col-xl-12 text-right">
-                            <a type="reset" href="/admin/mockInterview/add" class="btn btn-danger" value="Reset">Reset</a>
+                            <a type="reset" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/mockInterview/add" class="btn btn-danger" value="Reset">Reset</a>
                             <button type="submit" class="btn btn-success">Save</button>
                         </div>
                         </div>

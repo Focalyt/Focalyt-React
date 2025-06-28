@@ -8,7 +8,7 @@
 					</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Job Sub Category</li>
 						</ol>
 					</div>
@@ -144,7 +144,7 @@
 															<% } %>
 															<% if (view === false) { %>
 															<td valign="middle">
-																<a href="/admin/jobSubCategory/edit/<%= l._id %>">
+																<a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/jobSubCategory/edit/<%= l._id %>">
 																	<i class="feather icon-edit fa-lg primary" style="margin-left: -15px;"></i>
 																</a>
 															</td>
@@ -225,7 +225,7 @@
 						}
 						$.ajax({
 							type: "POST",
-							url: "/admin/changestatus",
+							url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/changestatus",
 							data: {
 								id,
 								status: myStatus,

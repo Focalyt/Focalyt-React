@@ -19,7 +19,7 @@
           <div class="row">
             <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-2 mb-2 mx-auto">
               <div class="col-xl-12 Company_card text-center py-1 one">
-                <img src="/images/icons/user_avatar.png" class="img-fluid">
+                <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/user_avatar.png" class="img-fluid">
                 <h5 class="text-white pt-2 mb-0" id="company-name">Welcome <%= company?.name %></h5>
               </div>
             </div>
@@ -27,12 +27,12 @@
               <div class="col-xl-12 Company_card py-2 two">
                 <div class="row">
                   <div class="col-xl-4 col-lg-4 col-md-4 col-sm-6 col-6 text-center px-0">
-                    <img src="/images/icons/white_suitcase.png" class="img-fluid">
+                    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/white_suitcase.png" class="img-fluid">
                   </div>
                   <div class="col-xl-8 col-lg-8 col-md-8 col-sm-6 col-6">
                     <h2 class="text-white"><%= vacancyCount %></h2>
                     <p class="text-white">Total Job Post</p>
-                    <a class="btn btn-outline-cs" href="/company/list/jobs">View<i class="fa fa-chevron-right text-white fa-view"></i></a>
+                    <a class="btn btn-outline-cs" href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs">View<i class="fa fa-chevron-right text-white fa-view"></i></a>
                   </div>
                 </div>
               </div>
@@ -41,7 +41,7 @@
               <div class="col-xl-12 Company_card py-2 three">
                 <div class="row">
                   <div class="col-xl-4 col-lg-4 col-md-4 col-sm-6 col-6 text-center px-0">
-                    <img src="/images/icons/shortlist.png" class="img-fluid">
+                    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/shortlist.png" class="img-fluid">
                   </div>
                   <div class="col-xl-8 col-lg-8 col-md-8 col-sm-6 col-6">
                     <h2 class="text-white"><%= shortlistedCandidates %></h2>
@@ -55,7 +55,7 @@
               <div class="col-xl-12 Company_card py-2 four">
                 <div class="row">
                   <div class="col-xl-4 col-lg-4 col-md-4 col-sm-6 col-6 text-center px-0">
-                    <img src="/images/icons/credits.png" class="img-fluid">
+                    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/credits.png" class="img-fluid">
                   </div>
                   <div class="col-xl-8 col-lg-8 col-md-8 col-sm-6 col-6">
                     <h2 class="text-white"><%= company?.creditLeft %></h2>
@@ -69,7 +69,7 @@
               <div class="col-xl-12 Company_card py-2 five">
                 <div class="row">
                   <div class="col-xl-4 col-lg-4 col-md-4 col-sm-6 col-6 text-center px-0">
-                    <img src="/images/icons/bag.png" class="img-fluid">
+                    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/bag.png" class="img-fluid">
                   </div>
                   <div class="col-xl-8 col-lg-8 col-md-8 col-sm-6 col-6">
                     <h2 class="text-primary">02</h2>
@@ -131,7 +131,7 @@
                         </h2>
                       </div>
                       <div class="col">
-                        <a href="/company/list/jobs" class="btn btn-primary btn-sm text-right">View</a>
+                        <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs" class="btn btn-primary btn-sm text-right">View</a>
                       </div>
                     </div>
                   </div>
@@ -151,7 +151,7 @@
                     <div class="col"><h2 class="text-bold-700">
                       <%= shortlistedCandidates %>
                     </h2></div>
-                    <div class="col"> <a href="candidate/shortlisted" class="btn btn-primary btn-sm text-right">View</a></div>
+                    <div class="col"> <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/shortlisted" class="btn btn-primary btn-sm text-right">View</a></div>
                   </div>
                 </div>                
                 </div>
@@ -174,7 +174,7 @@
                     <h4 class="card-title text-capitalize">Ongoing Interviews</h4>
                   </div>
                   <div class="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 text-right">
-                    <a href="/company/onGoingHiring" class="btn btn-outline-primary btn-sm text-capitalize">View All</a>
+                    <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/onGoingHiring" class="btn btn-outline-primary btn-sm text-capitalize">View All</a>
                   </div>
                  </div>
                 </div>
@@ -199,12 +199,12 @@
                             <td><%= can.status ? can.status : 'NA' %></td>
                             <td><%= !can.candidate?.isExperienced ? 'Fresher' : can.candidate?.totalExperience ? can.candidate?.totalExperience  + ' Years': 'NA' %></td>
                             <td class="actions">
-                              <a href="/company/newcandidate/<%=can.candidate._id%>"><i
+                              <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%=can.candidate._id%>"><i
                                 class="fa-regular fa-user"></i></a>
                             </td>
                           </tr>
                           <% }) } else {%>
-                            <tr><td colspan="5"><a href="/company/list-candidates"><img src="/images/pages/shortlist.jpg" class="img-fluid"/></a></td></tr>
+                            <tr><td colspan="5"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/pages/shortlist.jpg" class="img-fluid"/></a></td></tr>
                             <%}%>
                       </tbody>
                     </table>
@@ -246,7 +246,7 @@
                             <td><%= candidate._candidate?.totalExperience ? candidate._candidate.totalExperience : 'Fresher' %></td>
                             <td class="actions">
                               <% if (candidate._candidate && candidate._candidate._id) { %>
-                                <a href="/company/newcandidate/<%= candidate._candidate._id %>">
+                                <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%= candidate._candidate._id %>">
                                   <i class="fa-regular fa-user"></i>
                                 </a>
                               <% } else { %>
@@ -255,7 +255,7 @@
                             </td>
                           </tr>
                           <% }) } else {%>
-                            <tr><td colspan="5"><a href="/company/list/jobs"><img src="/images/pages/add_job.jpg" class="img-fluid"/></a></td></tr>
+                            <tr><td colspan="5"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/pages/add_job.jpg" class="img-fluid"/></a></td></tr>
                             <%}%>
                       </tbody>
                     </table>

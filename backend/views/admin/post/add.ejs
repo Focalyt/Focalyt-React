@@ -6,7 +6,7 @@
           <h3 class="content-header-title float-left mb-0">Add Post</h3>
           <div class="breadcrumb-wrapper col-12">
             <ol class="breadcrumb">
-              <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+              <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
               <li class="breadcrumb-item active">Add Post</li>
             </ol>
           </div>
@@ -748,7 +748,7 @@ $(document).on("click", ".remove-btn", function () {
           candidateIsLoading = true;
 
           $.ajax({
-            url: "/admin/post/candidateslist?page=" + candidatePage,
+            url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/post/candidateslist?page=" + candidatePage,
             type: "GET",
             success: function (response) {
               console.log('candidate data', response)
@@ -811,7 +811,7 @@ $(document).on("click", ".remove-btn", function () {
           companiesIsLoading = true;
 
           $.ajax({
-            url: "/admin/post/companylist?page=" + companiesPage,
+            url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/post/companylist?page=" + companiesPage,
             type: "GET",
             success: function (response) {
               console.log('company data', response)
@@ -872,7 +872,7 @@ $(document).on("click", ".remove-btn", function () {
           institutesIsLoading = true;
 
           $.ajax({
-            url: "/admin/post/institutelist?page=" + institutesPage,
+            url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/post/institutelist?page=" + institutesPage,
             type: "GET",
             success: function (response) {
               console.log('Institutes data', response)
@@ -1104,7 +1104,7 @@ $(document).on("click", ".remove-btn", function () {
 
         // ✅ API Call करें
         $.ajax({
-            url: "/api/postfiles", // API Endpoint
+            url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/post/postfiles", // API Endpoint
             type: "POST",
             data: formData,
             processData: false,  // Required for FormData
