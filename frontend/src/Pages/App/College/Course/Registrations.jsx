@@ -138,9 +138,9 @@ const CRMDashboard = () => {
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
-      console.log(result,'result')
+      console.log(result, 'result')
       if (result === true) {
-        setOpenModalId(null) ; setSelectedProfile(null)
+        setOpenModalId(null); setSelectedProfile(null)
       }
     }
   };
@@ -161,6 +161,7 @@ const CRMDashboard = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+
   const [viewMode, setViewMode] = useState('grid');
   const [isMobile, setIsMobile] = useState(false);
   const [allProfiles, setAllProfiles] = useState([]);
@@ -1784,22 +1785,22 @@ const CRMDashboard = () => {
   // Add this function in your component:
   const updateCrmFiltersFromBackend = (backendCounts) => {
     console.log('Backend counts received:', backendCounts);
-    
+
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
         if (filter._id === 'all') {
           return { ...filter, count: backendCounts.all || 0 };
         }
-        
+
         const backendFilter = backendCounts[filter._id];
         if (backendFilter) {
-          return { 
-            ...filter, 
+          return {
+            ...filter,
             count: backendFilter.count || 0,
-            milestone: backendFilter.milestone 
+            milestone: backendFilter.milestone
           };
         }
-        
+
         return { ...filter, count: 0 };
       });
     });
@@ -2804,122 +2805,6 @@ const CRMDashboard = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
 
-          {/* Header */}
-          {/* <div className="bg-white shadow-sm border-bottom mb-3 sticky-header-container" >
-            <div className="container-fluid py-2 " >
-              <div className="row align-items-center">
-                <div className="col-md-6 d-md-block d-sm-none">
-                  <div className="d-flex align-items-center">
-                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
-                      </ol>
-                    </nav>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="d-flex justify-content-end align-items-center gap-2">
-                    <div className="input-group" style={{ maxWidth: '300px' }}>
-                      <span className="input-group-text bg-white border-end-0 input-height">
-                        <i className="fas fa-search text-muted"></i>
-                      </span>
-                      <input
-                        type="text"
-                        name="name"
-                        className="form-control border-start-0 m-0"
-                        placeholder="Quick search..."
-                        value={filterData.name}
-                        onChange={handleFilterChange}
-                      />
-                      {filterData.name && (
-                        <button
-                          className="btn btn-outline-secondary border-start-0"
-                          type="button"
-                          onClick={() => {
-                            setFilterData(prev => ({ ...prev, name: '' }));
-                            setAllProfiles(allProfilesData);
-                          }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                      className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                      style={{ whiteSpace: 'nowrap' }}
-                    >
-                      <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                      Filters
-                      {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                        <span className="bg-light text-dark ms-1">
-                          {Object.values(filterData).filter(val => val && val !== 'true').length}
-                        </span>
-                      )}
-                    </button>
-                    <div className="btn-group">
-                      <button
-                        onClick={() => setViewMode('grid')}
-                        className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-th"></i>
-                      </button>
-                      <button
-                        onClick={() => setViewMode('list')}
-                        className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-list"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-
-                <div className="card-body p-3">
-                  <div className="d-flex flex-wrap gap-2 align-items-center">
-                    {crmFilters.map((filter, index) => (
-                      <div key={index} className="d-flex align-items-center gap-1">
-                        <div className='d-flex'>
-                          <button
-                            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                            onClick={() => handleCrmFilterClick(filter._id, index)}
-                          >
-                            {filter.name}
-                            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                              ({filter.count})
-                            </span>
-                          </button>
-
-                        
-                          {filter.milestone && (
-                            <span
-                              className="bg-success d-flex align-items-center"
-                              style={{
-                                fontSize: '0.75rem', color: 'white', verticalAlign: 'middle', padding: '0.25em 0.5em', transform: 'translate(15%, -100%)',
-                                position: 'absolute'
-                              }}
-                              title={`Milestone: ${filter.milestone}`}
-                            >
-                              🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                </div>
-
-              </div>
-            </div>
-          </div> */}
-
-
-
           <div className="position-relative">
             <div className="site-header--sticky--register">
               <div className="container-fluid">
@@ -3037,403 +2922,415 @@ const CRMDashboard = () => {
             </div>
           </div>
 
+  {/* Advanced Filters */}
+  {!isFilterCollapsed && (
+                          <div
+                            className="modal show fade d-block"
+                            style={{
+                              backgroundColor: 'rgba(0,0,0,0.5)',
+                              zIndex: 1050
+                            }}
+                            onClick={(e) => {
+                              if (e.target === e.currentTarget) setIsFilterCollapsed(true);
+                            }}
+                          >
+                            <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
+                              <div className="modal-content">
+                                {/* Modal Header - Fixed at top */}
+                                <div className="modal-header bg-white border-bottom">
+                                  <div className="d-flex justify-content-between align-items-center w-100">
+                                    <div className="d-flex align-items-center">
+                                      <i className="fas fa-filter text-primary me-2"></i>
+                                      <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                                      {totalSelected > 0 && (
+                                        <span className="badge bg-primary ms-2">
+                                          {totalSelected} Active
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="d-flex align-items-center gap-2">
+                                      <button
+                                        className="btn btn-sm btn-outline-danger"
+                                        onClick={clearAllFilters}
+                                      >
+                                        <i className="fas fa-times-circle me-1"></i>
+                                        Clear All
+                                      </button>
+                                      <button
+                                        className="btn-close"
+                                        onClick={() => setIsFilterCollapsed(true)}
+                                        aria-label="Close"
+                                      ></button>
+                                    </div>
+                                  </div>
+                                </div>
 
+                                {/* Modal Body - Scrollable content */}
+                                <div className="modal-body p-4">
+                                  <div className="row g-4">
+                                    {/* Course Type Filter */}
+                                    <div className="col-md-3">
+                                      <label className="form-label small fw-bold text-dark">
+                                        <i className="fas fa-graduation-cap me-1 text-success"></i>
+                                        Course Type
+                                      </label>
+                                      <div className="position-relative">
+                                        <select
+                                          className="form-select"
+                                          name="courseType"
+                                          value={filterData.courseType}
+                                          onChange={handleFilterChange}
+                                        >
+                                          <option value="">All Types</option>
+                                          <option value="Free">🆓 Free</option>
+                                          <option value="Paid">💰 Paid</option>
+                                        </select>
+                                      </div>
+                                    </div>
 
-          {/* Advanced Filters */}
-          {/* Advanced Filters - Improved Design */}
-          {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm" style={{ marginTop: '130px', transition: '0.4s ease' }}>
-              <div className="container-fluid py-4">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <div className="d-flex align-items-center">
-                    <i className="fas fa-filter text-primary me-2"></i>
-                    <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                    <span className="bg-light text-dark ms-2">
-                      {Object.values(filterData).filter(val => val && val !== 'true').length} Active
-                    </span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => {
-                        setFilterData({
-                          name: '',
-                          courseType: '',
-                          status: 'true',
-                          leadStatus: '',
-                          sector: '',
-                          createdFromDate: null,
-                          createdToDate: null,
-                          modifiedFromDate: null,
-                          modifiedToDate: null,
-                          nextActionFromDate: null,
-                          nextActionToDate: null,
-                        });
-                        fetchProfileData();
-                      }}
-                    >
-                      <i className="fas fa-times-circle me-1"></i>
-                      Clear All
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-chevron-up"></i>
-                    </button>
-                  </div>
-                </div>
+                                    {/* Project Filter */}
+                                    <div className="col-md-3">
+                                      <MultiSelectCheckbox
+                                        title="Project"
+                                        options={projectOptions}
+                                        selectedValues={formData.projects.values}
+                                        onChange={(values) => handleCriteriaChange('projects', values)}
+                                        icon="fas fa-sitemap"
+                                        isOpen={dropdownStates.projects}
+                                        onToggle={() => toggleDropdown('projects')}
+                                      />
+                                    </div>
 
-                <div className="row g-4">
+                                    {/* Verticals Filter */}
+                                    <div className="col-md-3">
+                                      <MultiSelectCheckbox
+                                        title="Verticals"
+                                        options={verticalOptions}
+                                        selectedValues={formData.verticals.values}
+                                        icon="fas fa-sitemap"
+                                        isOpen={dropdownStates.verticals}
+                                        onToggle={() => toggleDropdown('verticals')}
+                                        onChange={(values) => handleCriteriaChange('verticals', values)}
+                                      />
+                                    </div>
 
-                  <div className="col-md-3">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-graduation-cap me-1 text-success"></i>
-                      Course Type
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="courseType"
-                        value={filterData.courseType}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Types</option>
-                        <option value="Free">🆓 Free</option>
-                        <option value="Paid">💰 Paid</option>
-                      </select>
-                    </div>
-                  </div>
+                                    {/* Course Filter */}
+                                    <div className="col-md-3">
+                                      <MultiSelectCheckbox
+                                        title="Course"
+                                        options={courseOptions}
+                                        selectedValues={formData.course.values}
+                                        onChange={(values) => handleCriteriaChange('course', values)}
+                                        icon="fas fa-graduation-cap"
+                                        isOpen={dropdownStates.course}
+                                        onToggle={() => toggleDropdown('course')}
+                                      />
+                                    </div>
 
-                  <div className="col-md-3">
-                   
-                    <MultiSelectCheckbox
-                      title="Project"
-                      options={projectOptions}
-                      selectedValues={formData.projects.values}
-                      onChange={(values) => handleCriteriaChange('projects', values)}
-                      icon="fas fa-sitemap"
-                      isOpen={dropdownStates.projects}
-                      onToggle={() => toggleDropdown('projects')}
-                    />
+                                    {/* Center Filter */}
+                                    <div className="col-md-3">
+                                      <MultiSelectCheckbox
+                                        title="Center"
+                                        options={centerOptions}
+                                        selectedValues={formData.center.values}
+                                        onChange={(values) => handleCriteriaChange('center', values)}
+                                        icon="fas fa-building"
+                                        isOpen={dropdownStates.center}
+                                        onToggle={() => toggleDropdown('center')}
+                                      />
+                                    </div>
 
-                  </div>
-                  <div className="col-md-3">
-                    
-                    <MultiSelectCheckbox
-                      title="Verticals"
-                      options={verticalOptions}
-                      selectedValues={formData.verticals.values}
-                      icon="fas fa-sitemap"
-                      isOpen={dropdownStates.verticals}
-                      onToggle={() => toggleDropdown('verticals')}
-                      onChange={(values) => handleCriteriaChange('verticals', values)}
-                    />
+                                    {/* Counselor Filter */}
+                                    <div className="col-md-3">
+                                      <MultiSelectCheckbox
+                                        title="Counselor"
+                                        options={counselorOptions}
+                                        selectedValues={formData.counselor.values}
+                                        onChange={(values) => handleCriteriaChange('counselor', values)}
+                                        icon="fas fa-user-tie"
+                                        isOpen={dropdownStates.counselor}
+                                        onToggle={() => toggleDropdown('counselor')}
+                                      />
+                                    </div>
+                                  </div>
 
+                                  {/* Date Filters Section */}
+                                  <div className="row g-4 mt-3">
+                                    <div className="col-12">
+                                      <h6 className="text-dark fw-bold mb-3">
+                                        <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                                        Date Range Filters
+                                      </h6>
+                                    </div>
 
-                  </div>
-                  <div className="col-md-3">
-                    
-                    <MultiSelectCheckbox
-                      title="Course"
-                      options={courseOptions}
-                      selectedValues={formData.course.values}
-                      onChange={(values) => handleCriteriaChange('course', values)}
-                      icon="fas fa-graduation-cap"
-                      isOpen={dropdownStates.course}
-                      onToggle={() => toggleDropdown('course')}
-                    />
-                  </div>
-                  <div className="col-md-3">
-                    
-                    <MultiSelectCheckbox
-                      title="Center"
-                      options={centerOptions}
-                      selectedValues={formData.center.values}
-                      onChange={(values) => handleCriteriaChange('center', values)}
-                      icon="fas fa-building"
-                      isOpen={dropdownStates.center}
-                      onToggle={() => toggleDropdown('center')}
-                    />
-                  </div>
-                  <div className="col-md-3">
-                    
-                    <MultiSelectCheckbox
-                      title="Counselor"
-                      options={counselorOptions}
-                      selectedValues={formData.counselor.values}
-                      onChange={(values) => handleCriteriaChange('counselor', values)}
-                      icon="fas fa-user-tie"
-                      isOpen={dropdownStates.counselor}
-                      onToggle={() => toggleDropdown('counselor')}
-                    />
-                  </div>
+                                    {/* Created Date Range */}
+                                    <div className="col-md-4">
+                                      <label className="form-label small fw-bold text-dark">
+                                        <i className="fas fa-calendar-plus me-1 text-success"></i>
+                                        Lead Creation Date Range
+                                      </label>
+                                      <div className="card border-0 bg-light p-3">
+                                        <div className="row g-2">
+                                          <div className="col-6">
+                                            <label className="form-label small">From Date</label>
+                                            <DatePicker
+                                              onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
+                                              value={filterData.createdFromDate}
+                                              format="dd/MM/yyyy"
+                                              className="form-control p-0"
+                                              clearIcon={null}
+                                              calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                              maxDate={filterData.createdToDate || new Date()}
+                                            />
+                                          </div>
+                                          <div className="col-6">
+                                            <label className="form-label small">To Date</label>
+                                            <DatePicker
+                                              onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
+                                              value={filterData.createdToDate}
+                                              format="dd/MM/yyyy"
+                                              className="form-control p-0"
+                                              clearIcon={null}
+                                              calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                              minDate={filterData.createdFromDate}
+                                              maxDate={new Date()}
+                                            />
+                                          </div>
+                                        </div>
 
-                  {/* Date Range */}
-                 
-                  <div className="col-12">
-                    <div className="row g-4">
-                      {/* Created Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-plus me-1 text-success"></i>
-                          Lead Creation Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
-                                value={filterData.createdFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                maxDate={filterData.createdToDate || new Date()}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
-                                value={filterData.createdToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                minDate={filterData.createdFromDate}
-                                maxDate={new Date()}
-                              />
+                                        {/* Show selected dates */}
+                                        {(filterData.createdFromDate || filterData.createdToDate) && (
+                                          <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
+                                            <small className="text-success">
+                                              <i className="fas fa-info-circle me-1"></i>
+                                              <strong>Selected:</strong>
+                                              {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                                              {filterData.createdFromDate && filterData.createdToDate && ' |'}
+                                              {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
+                                            </small>
+                                          </div>
+                                        )}
+
+                                        {/* Clear button */}
+                                        <div className="mt-2">
+                                          <button
+                                            className="btn btn-sm btn-outline-danger w-100"
+                                            onClick={() => clearDateFilter('created')}
+                                            disabled={!filterData.createdFromDate && !filterData.createdToDate}
+                                          >
+                                            <i className="fas fa-times me-1"></i>
+                                            Clear Created Date
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Modified Date Range */}
+                                    <div className="col-md-4">
+                                      <label className="form-label small fw-bold text-dark">
+                                        <i className="fas fa-calendar-edit me-1 text-warning"></i>
+                                        Lead Modification Date Range
+                                      </label>
+                                      <div className="card border-0 bg-light p-3">
+                                        <div className="row g-2">
+                                          <div className="col-6">
+                                            <label className="form-label small">From Date</label>
+                                            <DatePicker
+                                              onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
+                                              value={filterData.modifiedFromDate}
+                                              format="dd/MM/yyyy"
+                                              className="form-control p-0"
+                                              clearIcon={null}
+                                              calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                              maxDate={filterData.modifiedToDate || new Date()}
+                                            />
+                                          </div>
+                                          <div className="col-6">
+                                            <label className="form-label small">To Date</label>
+                                            <DatePicker
+                                              onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
+                                              value={filterData.modifiedToDate}
+                                              format="dd/MM/yyyy"
+                                              className="form-control p-0"
+                                              clearIcon={null}
+                                              calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                              minDate={filterData.modifiedFromDate}
+                                              maxDate={new Date()}
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {/* Show selected dates */}
+                                        {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                                          <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
+                                            <small className="text-warning">
+                                              <i className="fas fa-info-circle me-1"></i>
+                                              <strong>Selected:</strong>
+                                              {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
+                                              {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
+                                              {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
+                                            </small>
+                                          </div>
+                                        )}
+
+                                        {/* Clear button */}
+                                        <div className="mt-2">
+                                          <button
+                                            className="btn btn-sm btn-outline-danger w-100"
+                                            onClick={() => clearDateFilter('modified')}
+                                            disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
+                                          >
+                                            <i className="fas fa-times me-1"></i>
+                                            Clear Modified Date
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Next Action Date Range */}
+                                    <div className="col-md-4">
+                                      <label className="form-label small fw-bold text-dark">
+                                        <i className="fas fa-calendar-check me-1 text-info"></i>
+                                        Next Action Date Range
+                                      </label>
+                                      <div className="card border-0 bg-light p-3">
+                                        <div className="row g-2">
+                                          <div className="col-6">
+                                            <label className="form-label small">From Date</label>
+                                            <DatePicker
+                                              onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
+                                              value={filterData.nextActionFromDate}
+                                              format="dd/MM/yyyy"
+                                              className="form-control p-0"
+                                              clearIcon={null}
+                                              calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                              maxDate={filterData.nextActionToDate}
+                                            />
+                                          </div>
+                                          <div className="col-6">
+                                            <label className="form-label small">To Date</label>
+                                            <DatePicker
+                                              onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
+                                              value={filterData.nextActionToDate}
+                                              format="dd/MM/yyyy"
+                                              className="form-control p-0"
+                                              clearIcon={null}
+                                              calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                              minDate={filterData.nextActionFromDate}
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {/* Show selected dates */}
+                                        {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                                          <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
+                                            <small className="text-info">
+                                              <i className="fas fa-info-circle me-1"></i>
+                                              <strong>Selected:</strong>
+                                              {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                                              {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
+                                              {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
+                                            </small>
+                                          </div>
+                                        )}
+
+                                        {/* Clear button */}
+                                        <div className="mt-2">
+                                          <button
+                                            className="btn btn-sm btn-outline-danger w-100"
+                                            onClick={() => clearDateFilter('nextAction')}
+                                            disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
+                                          >
+                                            <i className="fas fa-times me-1"></i>
+                                            Clear Next Action Date
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Results Summary */}
+                                  <div className="row mt-4">
+                                    <div className="col-12">
+                                      <div className="alert alert-info">
+                                        <div className="d-flex align-items-center">
+                                          <i className="fas fa-info-circle me-2"></i>
+                                          <div>
+                                            <strong>Results Summary:</strong> Showing {allProfiles.length} results on page {currentPage} of {totalPages}
+
+                                            {/* Active filter indicators */}
+                                            <div className="mt-2">
+                                              {(filterData.createdFromDate || filterData.createdToDate) && (
+                                                <span className="badge bg-success me-2">
+                                                  <i className="fas fa-calendar-plus me-1"></i>
+                                                  Created Date Filter Active
+                                                </span>
+                                              )}
+
+                                              {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                                                <span className="badge bg-warning me-2">
+                                                  <i className="fas fa-calendar-edit me-1"></i>
+                                                  Modified Date Filter Active
+                                                </span>
+                                              )}
+
+                                              {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                                                <span className="badge bg-info me-2">
+                                                  <i className="fas fa-calendar-check me-1"></i>
+                                                  Next Action Date Filter Active
+                                                </span>
+                                              )}
+
+                                              {totalSelected > 0 && (
+                                                <span className="badge bg-primary me-2">
+                                                  <i className="fas fa-filter me-1"></i>
+                                                  {totalSelected} Multi-Select Filters Active
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Modal Footer - Fixed at bottom */}
+                                <div className="modal-footer bg-light border-top">
+                                  <div className="d-flex justify-content-between align-items-center w-100">
+                                    <div className="text-muted small">
+                                      <i className="fas fa-filter me-1"></i>
+                                      {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
+                                    </div>
+                                    <div className="d-flex gap-2">
+                                      <button
+                                        className="btn btn-outline-secondary"
+                                        onClick={() => setIsFilterCollapsed(true)}
+                                      >
+                                        <i className="fas fa-eye-slash me-1"></i>
+                                        Hide Filters
+                                      </button>
+                                      <button
+                                        className="btn btn-primary"
+                                        onClick={() => {
+                                          fetchProfileData(filterData);
+                                          setIsFilterCollapsed(true);
+                                        }}
+                                      >
+                                        <i className="fas fa-search me-1"></i>
+                                        Apply Filters
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
+                        )}
 
-                          {/* Show selected dates */}
-                          {(filterData.createdFromDate || filterData.createdToDate) && (
-                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
-                              <small className="text-success">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
-                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('created')}
-                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Created Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Modified Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
-                          Lead Modification Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
-                                value={filterData.modifiedFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                maxDate={filterData.modifiedToDate || new Date()}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
-                                value={filterData.modifiedToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                minDate={filterData.modifiedFromDate}
-                                maxDate={new Date()}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
-                              <small className="text-warning">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
-                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('modified')}
-                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Next Action Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-check me-1 text-info"></i>
-                          Next Action Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
-                                value={filterData.nextActionFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                maxDate={filterData.nextActionToDate}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
-                                value={filterData.nextActionToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                minDate={filterData.nextActionFromDate}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
-                              <small className="text-info">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
-                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('nextAction')}
-                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Update the Clear All button in your existing filters section */}
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={clearAllFilters}
-                  >
-                    <i className="fas fa-times-circle me-1"></i>
-                    Clear All Filters
-                  </button>
-
-                  {/* Update the results summary section */}
-                  <div className="text-muted small">
-                    <i className="fas fa-info-circle me-1"></i>
-                    Showing {allProfiles.length} results on page {currentPage} of {totalPages}
-
-                    {/* Active filter indicators */}
-                    {(filterData.createdFromDate || filterData.createdToDate) && (
-                      <div className="mt-1">
-                        <span className="badge bg-success me-2">
-                          <i className="fas fa-calendar-plus me-1"></i>
-                          Created:
-                          {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                          {filterData.createdFromDate && filterData.createdToDate && ' to '}
-                          {filterData.createdToDate && formatDate(filterData.createdToDate)}
-                        </span>
-                      </div>
-                    )}
-
-                    {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-warning me-2">
-                          <i className="fas fa-calendar-edit me-1"></i>
-                          Modified:
-                          {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                          {filterData.modifiedFromDate && filterData.modifiedToDate && ' to '}
-                          {filterData.modifiedToDate && formatDate(filterData.modifiedToDate)}
-                        </span>
-                      </div>
-                    )}
-
-                    {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-info me-2">
-                          <i className="fas fa-calendar-check me-1"></i>
-                          Next Action:
-                          {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                          {filterData.nextActionFromDate && filterData.nextActionToDate && ' to '}
-                          {filterData.nextActionToDate && formatDate(filterData.nextActionToDate)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-eye-slash me-1"></i>
-                      Hide Filters
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => fetchProfileData(filterData)}
-                    >
-                      <i className="fas fa-search me-1"></i>
-                      Apply Filters
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: '185px' }}>
+          <div className="content-body marginTopMobile" style={{ marginTop: '185px' }}>
             <section className="list-view">
               <div className="row">
                 <div className="d-flex justify-content-end gap-2">
@@ -5034,6 +4931,8 @@ const CRMDashboard = () => {
                         ))}
 
 
+
+                        
                       </div>
 
 
@@ -5355,64 +5254,6 @@ html body .content .content-wrapper {
           align-items: center;
           justify-content: center;
           height: 100%;
-        }
-        @media (max-width: 767px) {
-          .scrollable-container {
-            display: block;
-            width: 100%;
-            overflow: hidden;
-            padding: 10px 0;
-          }
-
-          .desktop-view {
-            display: none;
-          }
-
-          .scrollable-content {
-            display: flex;
-            overflow-x: auto;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: thin;
-            scroll-behavior: smooth;
-            padding: 10px 0;
-          }
-
-          .info-card {
-            flex: 0 0 auto;
-            scroll-snap-align: start;
-            margin-right: 15px;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #eaeaea;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-            background: #fff;
-          }
-
-          .scroll-arrow {
-            display: flex;
-          }
-
-          .scrollable-content::-webkit-scrollbar {
-            height: 4px;
-          }
-
-          .scrollable-content::-webkit-scrollbar-track {
-            background: #f1f1f1;
-          }
-
-          .scrollable-content::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 10px;
-          }
-
-          .btn-group {
-            flex-wrap: wrap;
-          }
-          
-          .btn-group .btn {
-            margin-bottom: 0.25rem;
-          }
         }
 
         .whatsapp-chat {
@@ -5952,39 +5793,6 @@ background: #fd2b5a;
           color: #007bff;
           font-weight: bold;
         }
-
-        @media (max-width: 768px) {
-          .resume-document-body {
-            flex-direction: column;
-          }
-          
-          .resume-profile-section {
-            flex-direction: column;
-            text-align: center;
-          }
-          
-          .resume-contact-details {
-            justify-content: center;
-          }
-            .info-group{
-            border: none;
-            }
-              .info-card {
-
-                    flex: 0 0 auto;
-                    scroll-snap-align: start;
-                    margin-right: 15px;
-                    padding: 15px;
-                    border-radius: 8px;
-                    border: 1px solid #eaeaea;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-                    background: #fff;
-                }
-                    .input-height{
-                    height: 40px;
-                    }
-                }
-
                 
 /* Mobile Modal Styles */
 .modal {
@@ -6206,59 +6014,6 @@ background: #fd2b5a;
 
 .info-group {
     padding: 8px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .modal-dialog {
-        margin: 0.5rem;
-    }
-
-    .whatsapp-chat .modal-content {
-        height: 90vh;
-    }
-
-    .col-md-6,
-    .col-md-5,
-    .col-md-1 {
-        flex: 0 0 100%;
-        max-width: 100%;
-        margin-bottom: 1rem;
-    }
-
-    .nav-pills {
-        flex-wrap: wrap;
-    }
-
-    .nav-pills .nav-link {
-        font-size: 0.9rem;
-        padding: 0.5rem 0.75rem;
-    }
-}
-
-/* Additional mobile optimizations */
-@media (max-width: 576px) {
-    .container-fluid.py-2 {
-        padding: 0.5rem !important;
-    }
-
-    .card-body.px-1.py-0.my-2 {
-        padding: 0.5rem !important;
-    }
-
-    .d-flex.align-items-center {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
-    .btn-group {
-        flex-wrap: wrap;
-    }
-
-    .input-group {
-        max-width: 100% !important;
-        margin-bottom: 0.5rem;
-    }
 }
 
 /* Add this to your existing style tag or CSS file */
@@ -6780,37 +6535,6 @@ background: #fd2b5a;
     font-weight: 500;
     position: absolute;
     top:10px
-}
-
-/* Mobile Responsive */
-@media (max-width: 768px) {
-.modal-content{
-width:100%;
-}
-    .document-modal-content {
-        width: 98%;
-        margin: 1rem;
-        max-height: 95vh;
-    }
-
-    .document-modal-content .modal-body {
-        flex-direction: column;
-        padding: 1rem;
-        gap: 1rem;
-    }
-
-    .document-preview-section {
-        min-width: auto;
-        overflow-y: auto;
-    }
-
-    .document-preview-container {
-        height: 300px;
-    }
-
-    .document-info-section {
-        min-width: auto;
-    }
 }
 
 .m-c {
@@ -7569,110 +7293,6 @@ width:100%;
 .meta-text {
     color: #333;
 }
-  /* Responsive Design */
-  @media (max-width: 1200px) {
-    .document-history .history-preview iframe.pdf-thumbnail {
-      height: auto !important;
-      max-height: 600px;
-    }
-  }
-
-@media (max-width: 768px) {
-    .enhanced-documents-panel {
-        padding: 1rem;
-    }
-
-    .candidate-info-card {
-        flex-direction: column;
-        text-align: center;
-        gap: 1rem;
-    }
-
-    .completion-ring {
-        margin-left: 0;
-    }
-
-    .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    }
-
-    .documents-grid-enhanced {
-        grid-template-columns: 1fr;
-    }
-
-    .filter-tabs {
-        justify-content: center;
-    }
-
-    .document-header {
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .document-actions {
-        margin-left: 0;
-        align-self: stretch;
-    }
-
-    .action-btn {
-        width: 100%;
-        justify-content: center;
-    }
-}
-
-@media (max-width: 768px) {
-    .document-history .history-preview iframe.pdf-thumbnail {
-      height: 50vh !important;
-      min-height: 300px;
-      max-height: 500px;
-    }
-    
-    .document-history .history-item {
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-  }
-
-@media (max-width: 768px) {
-    .panel-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .m-b {
-        flex-direction: column;
-    }
-
-    .candidate-info {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    .candidate-avatar {
-        margin: 0 0 15px 0;
-    }
-
-    .filter-bar {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .filter-select {
-        width: 100%;
-    }
-}
-@media (max-width: 480px) {
-    .document-history .history-preview iframe,
-    .document-history .history-preview img {
-      max-height: 300px;
-      min-height: 150px;
-    }
-    
-    .document-history .history-preview iframe.pdf-thumbnail {
-      height: 40vh !important;
-      min-height: 200px;
-    }
-  }
 
 /* Sticky Header Container */
 .sticky-header-container {
@@ -7876,41 +7496,6 @@ width:100%;
     inset: 0 !important;
     width: 300px !important;
 }
-/* Responsive Design */
-@media (max-width: 1920px) {
-    .stickyBreakpoints {
-        top: 120px !important;
-    }
-}
-
-@media (max-width: 1400px) {
-    .stickyBreakpoints {
-        top: 110px !important;
-    }
-}
-
-@media (max-width: 768px) {
-    .sticky-header-container {
-        position: sticky !important;
-        top: 0 !important;
-    }
-    
-    .stickyBreakpoints {
-        position: relative !important;
-    }
-    
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
-}
-
-@media (max-width: 576px) {
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
-}
-
-    /* Final Complete CSS - Replace entire <style> section with this */
 
 html body .content .content-wrapper {
     padding: calc(0.9rem - 0.1rem) 1.2rem;
@@ -7941,46 +7526,6 @@ html body .content .content-wrapper {
      top: 258px;
     z-index: 10;
     }
-
-@media (min-width: 992px) {
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        /* position: absolute !important; */
-        /* min-height: 200px; */
-        background: white;
-    }
-    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        /* position: absolute !important; */
-        /* min-height: 200px; */
-        background: white;
-    }
-}
-    @media (max-width: 767px) {
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-        width: 100%;
-        left: 0;
-        right: 0;
-    }
-    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-        width: 100%;
-        left: 0;
-        right: 0;
-    }
-    
-    /* Adjust content margin to avoid overlap */
-    .content-body {
-        margin-top: 120px; /* Adjust based on your header height */
-    }
-}
 
 .stickyBreakpoints {
     position: sticky !important;
@@ -8170,8 +7715,6 @@ html body .content .content-wrapper {
     scrollbar-width: thin; /* For Firefox */
     scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
 }
-
-/* ========== RESPONSIVE DESIGN ========== */
 @media (max-width: 1920px) {
     .stickyBreakpoints {
         top: 120px !important;
@@ -8184,16 +7727,290 @@ html body .content .content-wrapper {
     }
 }
 
+@media (max-width: 1200px) {
+    .document-history .history-preview iframe.pdf-thumbnail {
+        height: auto !important;
+        max-height: 600px;
+    }
+}
+
+@media (min-width: 992px) {
+    .site-header--sticky--register:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        background: white;
+    }
+
+    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        background: white;
+    }
+}
+
 @media (max-width: 768px) {
+    .scrollable-container {
+        display: block;
+        width: 100%;
+        overflow: hidden;
+        padding: 10px 0;
+    }
+
+    .desktop-view {
+        display: none;
+    }
+
+    .scrollable-content {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scroll-behavior: smooth;
+        padding: 10px 0;
+    }
+
+    .info-card {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+        margin-right: 15px;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #eaeaea;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        background: #fff;
+    }
+
+    .scroll-arrow {
+        display: flex;
+    }
+
+    .scrollable-content::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    .scrollable-content::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .scrollable-content::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 10px;
+    }
+
+    .btn-group {
+        flex-wrap: wrap;
+    }
+
+    .btn-group .btn {
+        margin-bottom: 0.25rem;
+    }
+
+    .resume-document-body {
+        flex-direction: column;
+    }
+
+    .resume-profile-section {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .resume-contact-details {
+        justify-content: center;
+    }
+
+    .info-group {
+        border: none;
+    }
+
+    .info-card {
+
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+        margin-right: 15px;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #eaeaea;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        background: #fff;
+    }
+
+    .input-height {
+        height: 40px;
+    }
+
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+
+    .whatsapp-chat .modal-content {
+        height: 90vh;
+    }
+
+
+    .nav-pills {
+        flex-wrap: wrap;
+    }
+
+    .nav-pills .nav-link {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .modal-content {
+        width: 100%;
+    }
+
+    .document-modal-content {
+        width: 98%;
+        margin: 1rem;
+        max-height: 95vh;
+    }
+
+    .document-modal-content .modal-body {
+        flex-direction: column;
+        padding: 1rem;
+        gap: 1rem;
+    }
+
+    .document-preview-section {
+        min-width: auto;
+        overflow-y: auto;
+    }
+
+    .document-preview-container {
+        height: 300px;
+    }
+
+    .document-info-section {
+        min-width: auto;
+    }
+
+    .enhanced-documents-panel {
+        padding: 1rem;
+    }
+
+    .candidate-info-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .completion-ring {
+        margin-left: 0;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    .documents-grid-enhanced {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-tabs {
+        justify-content: center;
+    }
+
+    .document-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .document-actions {
+        margin-left: 0;
+        align-self: stretch;
+    }
+
+    .action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .document-history .history-preview iframe.pdf-thumbnail {
+        height: 50vh !important;
+        min-height: 300px;
+        max-height: 500px;
+    }
+
+    .document-history .history-item {
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+
+    .panel-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .m-b {
+        flex-direction: column;
+    }
+
+    .candidate-info {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .candidate-avatar {
+        margin: 0 0 15px 0;
+    }
+
+    .filter-bar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .filter-select {
+        width: 100%;
+    }
+
     .sticky-header-container {
         position: sticky !important;
         top: 0 !important;
     }
-    
+
     .stickyBreakpoints {
         position: relative !important;
     }
-    
+
+    .sticky-header-container .container-fluid {
+        padding: 0.5rem 1rem !important;
+    }
+
+    .site-header--sticky--register:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        background: white;
+        width: 100%;
+        left: 0;
+        right: 0;
+    }
+
+    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        background: white;
+        width: 100%;
+        left: 0;
+        right: 0;
+    }
+
+    /* Adjust content margin to avoid overlap */
+    .content-body {
+        margin-top: 120px;
+        /* Adjust based on your header height */
+    }
+
+    .sticky-header-container {
+        position: sticky !important;
+        top: 0 !important;
+    }
+
+    .stickyBreakpoints {
+        position: relative !important;
+    }
+
     .sticky-header-container .container-fluid {
         padding: 0.5rem 1rem !important;
     }
@@ -8203,7 +8020,34 @@ html body .content .content-wrapper {
     .sticky-header-container .container-fluid {
         padding: 0.25rem 0.5rem !important;
     }
+
+    .btn-group {
+        flex-wrap: wrap;
+    }
+
+    .input-group {
+        max-width: 100% !important;
+        margin-bottom: 0.5rem;
+    }
+
+    .sticky-header-container .container-fluid {
+        padding: 0.25rem 0.5rem !important;
+    }
 }
+
+@media (max-width: 480px) {
+    .document-history .history-preview iframe,
+    .document-history .history-preview img {
+        max-height: 300px;
+        min-height: 150px;
+    }
+
+    .document-history .history-preview iframe.pdf-thumbnail {
+        height: 40vh !important;
+        min-height: 200px;
+    }
+}
+
     
     `
         }
@@ -8418,27 +8262,6 @@ html body .content .content-wrapper {
   z-index: 999;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .multi-select-options-new {
-    max-height: 250px;
-  }
-  
-  .options-header {
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  
-  .select-all-btn,
-  .clear-all-btn {
-    width: 100%;
-  }
-  
-  .options-list-new {
-    max-height: 150px;
-  }
-}
-
 /* Focus states for accessibility */
 .multi-select-trigger:focus {
   outline: none;
@@ -8503,7 +8326,32 @@ html body .content .content-wrapper {
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
-
+.react-calendar{
+width:min-content !important;
+height:min-content !important;
+}
+@media (max-width: 768px) {
+  .multi-select-options-new {
+    max-height: 250px;
+  }
+  
+  .options-header {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .select-all-btn,
+  .clear-all-btn {
+    width: 100%;
+  }
+  
+  .options-list-new {
+    max-height: 150px;
+  }
+  .marginTopMobile {
+    margin-top: 340px !important;
+  }
+}
 
     `
         }

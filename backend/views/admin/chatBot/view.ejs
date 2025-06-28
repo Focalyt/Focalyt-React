@@ -6,7 +6,7 @@
           <h3 class="content-header-title float-left mb-0">View FAQ</h3>
           <div class="breadcrumb-wrapper col-12">
             <ol class="breadcrumb">
-              <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+              <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
               <li class="breadcrumb-item active">View FAQ</li>
             </ol>
           </div>
@@ -140,7 +140,7 @@
           }
           let data = { id: id, status: myStatus }
           let headers = { 'x-auth': localStorage.getItem('token') }
-          axios.patch(`/admin/chatBotFAQ/changeStatus`, data, { headers: headers })
+          axios.patch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/chatBotFAQ/changeStatus`, data, { headers: headers })
             .then((res) => {
               location.reload()
             }).catch((err) => {
@@ -156,8 +156,8 @@
             // alert("isDeleted = " + isDeleted)
             $.ajax({
               type: "GET",
-              url: "/admin/chatBotFAQ/view?status=false",
-              success: () => window.location.href = "/admin/chatBotFAQ/view?status=false",
+              url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/chatBotFAQ/view?status=false",
+              success: () => window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/chatBotFAQ/view?status=false",
 
             }
 
@@ -167,8 +167,8 @@
             // alert("isDeleted = " + isDeleted);
             $.ajax({
               type: "GET",
-              url: "/admin/chatBotFAQ/view?status=true",
-              success: () => window.location.href = "/admin/chatBotFAQ/view?status=true"
+              url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/chatBotFAQ/view?status=true",
+              success: () => window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/chatBotFAQ/view?status=true"
             });
           }
         }
@@ -179,7 +179,7 @@
          
           let data = { id: id, Question: question, Answer: answer }
           let headers = { 'x-auth': localStorage.getItem('token') }
-          axios.patch(`/admin/chatBotFAQ/edit`, data, { headers: headers })
+          axios.patch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/chatBotFAQ/edit`, data, { headers: headers })
             .then((res) => {
               location.reload()
             }).catch((err) => {

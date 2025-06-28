@@ -242,7 +242,7 @@
                       // inputField.value = ''
                       $(`#${section}${id}`).val('')
                     } else {
-                      axios.post('/api/uploadSingleFile', body, header)
+                      axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadSingleFile', body, header)
                         .then(result => {
                             // document.getElementById(`${section}`).value = result.data.data.Key;
                             $(`#${section}`).val(result.data.data.Key)
@@ -299,7 +299,7 @@ console.log(documentsData,"this is documents datra..,,<< from html fole")
 
     header = { headers: { 'x-auth': localStorage.getItem('token') } }
 
-    axios.post('/candidate/document', documentsData,header)
+    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/candidate/document', documentsData,header)
         .then(response => {
           location.reload();  
           if(response.data.success){
@@ -319,7 +319,7 @@ function deletedata(documentName,id) {
     if (confirmation) {
         const header = { headers: { 'x-auth': localStorage.getItem('token') } };
         
-        axios.delete(`/admin/candidate/candidatedoc`, {
+        axios.delete(`<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/candidatedoc`, {
             headers: header.headers,
             params: { documentName,id } 
         })

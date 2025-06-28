@@ -6,8 +6,8 @@
           <h3 class="content-header-title float-left mb-0">Candidate Profile</h3>
           <div class="breadcrumb-wrapper col-12">
             <ol class="breadcrumb">
-              <li class="breadcrumb-item"><a href="/admin">Home</a></li>
-              <li class="breadcrumb-item"><a href="/admin/candidate">Candidates</a></li>
+              <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
+              <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate">Candidates</a></li>
               <li class="breadcrumb-item active">Candidate Profile</li>
             </ol>
           </div>
@@ -438,7 +438,7 @@
             Go
           </button>
           <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-md-0 mx-0 px-xl-2 px-lg-2 px-md-2 px-sm-2 px-1"
-            href="/admin/candidate/details/<%= candidate._id %>">RESET</a>                 
+            href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%= candidate._id %>">RESET</a>                 
         </div>
         <div class="totalCount col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12">
           <span>Total Candidates: <%= count %></span>
@@ -608,7 +608,7 @@ pageAnchors.forEach((el) => {
     preloader.hide();
     function addTextContent(id) {
       preloader.show();
-      axios.get(`/company/createResume/${id}`, {
+      axios.get(`<%= process.env.MIPIE_BACKEND_URL %>/company/createResume/${id}`, {
         headers: { 'x-auth': localStorage.getItem('token') }
       }).then(res => {
         preloader.hide();

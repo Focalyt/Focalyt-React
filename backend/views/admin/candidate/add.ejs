@@ -6,9 +6,9 @@
 					<h3 class="content-header-title float-left mb-0">Add Candidate</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item">
-								<a href="/admin/candidate">Candidates</a>
+								<a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate">Candidates</a>
 							</li>
 							<li class="breadcrumb-item active">Add Candidates</li>
 						</ol>
@@ -300,7 +300,7 @@
 								const data = await Promise.all(
 									filesData.map(async (file) => {
 										const ext = file.name.split(".").pop();
-										const res = await axios.get("/admin/s3upload", {
+										const res = await axios.get("<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload", {
 											params: { type: file.type, ext },
 										});
 										if (!res || !res.data || !res.data.data) return null;
@@ -392,7 +392,7 @@
 								const data = await Promise.all(
 									filesData.map(async (file) => {
 										const ext = file.name.split(".").pop();
-										const res = await axios.get("/admin/s3upload", {
+										const res = await axios.get("<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload", {
 											params: { type: file.type, ext },
 										});
 										if (!res || !res.data || !res.data.data) return null;
@@ -477,7 +477,7 @@
 								'<option disabled selected value="">Select Option</option>'
 							);
 						axios
-							.post("/panel/helper/getstate", {
+							.post("<%= process.env.MIPIE_BACKEND_URL %>/panel/helper/getstate", {
 								countryId: $("#country").val(),
 							})
 							.then(({ data }) => {
@@ -499,7 +499,7 @@
 								'<option disabled selected value="">Select Option</option>'
 							);
 						axios
-							.post("/panel/helper/getcity", {
+							.post("<%= process.env.MIPIE_BACKEND_URL %>/panel/helper/getcity", {
 								stateId: $("#state").val(),
 							})
 							.then(({ data }) => {
@@ -521,7 +521,7 @@
 								'<option disabled selected value="">Select Option</option>'
 							);
 						axios
-							.post("/panel/helper/getsubQual", {
+							.post("<%= process.env.MIPIE_BACKEND_URL %>/panel/helper/getsubQual", {
 								_qualification: $("#qual").val(),
 							})
 							.then(({ data }) => {

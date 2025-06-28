@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Candidates</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Candidates</li>
 						</ol>
 					</div>
@@ -135,7 +135,7 @@
 												  class="btn btn-success  waves-effect waves-light  text-white d-inline "
 												  id="submit-btn">Go</button>
 												  <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-1"
-												  href="/admin/candidate">RESET</a>
+												  href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate">RESET</a>
 											</div>
 										</div>
 									  </form>
@@ -168,7 +168,7 @@
 																<%= l.createdAt ? moment(l.createdAt).utcOffset("+05:30").format('MMM DD YYYY  hh:mm A') : "NA" %>
 															</td>
 															<td class="text-capitalize candid-wrap">
-																<a  href="/admin/candidate/details/<%=l._id%>">	<%= l.name ? l.name : "NA" %></a>
+																<a  href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%=l._id%>">	<%= l.name ? l.name : "NA" %></a>
 																<% if(l.verified == true){ %>
 																	<i class="fa-solid fa-circle-check" style="color: #28c76f ;"></i>
 																<% } %>
@@ -217,11 +217,11 @@
 															<% } %>
 															<% if (view === false) { %>
 															<td class="d-flex">
-																<a href="/admin/candidate/candidatedoc/<%= l._id %>" title="Document" class="pr-1">
+																<a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/candidatedoc/<%= l._id %>" title="Document" class="pr-1">
 											                        <i class="feather icon-file-text		 fa-lg primary"></i>
 																</a>
 
-																<a href="/admin/candidate/edit/<%= l._id %>" title="Edit" class="pr-1">
+																<a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/edit/<%= l._id %>" title="Edit" class="pr-1">
 											                        <i class="feather icon-edit fa-lg primary"></i>
 																</a>
 																<a herf="#" title="Send Notification" class="pr-1">
@@ -375,7 +375,7 @@
 						// 	}
 						// });
 						const body={FromDate:$('#from-date').val(),ToDate:$('#to-date').val(), username:$('#username').val(), isProfileCompleted:$('#profile').val() }
-						axios.post(`/admin/candidate/downloadCSV`,body , { responseType: 'blob' }).then(res => {
+						axios.post(`<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/downloadCSV`,body , { responseType: 'blob' }).then(res => {
 							    const href = URL.createObjectURL(res.data);
                                 window.open(href, '_blank')
 								}).catch((err) => {
@@ -391,7 +391,7 @@
 						}
 						$.ajax({
 							type: "POST",
-							url: "/admin/candidate/changeprofilestatus",
+							url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/changeprofilestatus",
 							data: {
 								mobile,
 								status: field,
@@ -409,7 +409,7 @@
 							candidateId
 						}
 						if(message&&event){
-							axios.post("/admin/candidate/sendNotification",body).then((res)=>{
+							axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/sendNotification",body).then((res)=>{
 							  if(res.data.status){
 								$('#errorMsg').hide();
 								$('#errorMsg').text('');
@@ -445,7 +445,7 @@
 					function removeFile() {
 						$.ajax({
 							type: "DELETE",
-							url: "/admin/candidate/deleteCSV",
+							url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/deleteCSV",
 							success: (res) => {
 								if(res.status){
 									console.log('File Deleted')
@@ -464,7 +464,7 @@
 						}
 						$.ajax({
 							type: "POST",
-							url: "/admin/changestatus",
+							url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/changestatus",
 							data: {
 								id,
 								status: myStatus,
@@ -483,13 +483,13 @@
 						if (x) {
 							$.ajax({
 								type: "POST",
-								url: "/admin/deleteRecord",
+								url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/deleteRecord",
 								data: {
 									id,
 									status: myStatus,
 									model,
 								},
-								success: () => window.location.href = "/admin/candidate"
+								success: () => window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate"
 							});
 						}
 					}
@@ -563,7 +563,7 @@
 					// show deleted data
 					function archived() {
 						let checkbox = document.getElementById('checkbox1');
-						window.location.href = `/admin/candidate?status=${!checkbox.checked}`
+						window.location.href = `<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate?status=${!checkbox.checked}`
 					}
 
 					// show selected colleges
@@ -575,8 +575,8 @@
 						// alert("isDeleted = " + isDeleted)
 						$.ajax({
 							type: "GET",
-							url: "/admin/candidate?clgId=" + `${clgId}`,
-							success: () => window.location.href = "/admin/candidate?clgId=" + `${clgId}`
+							url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate?clgId=" + `${clgId}`,
+							success: () => window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate?clgId=" + `${clgId}`
 						});
 					}
 
@@ -592,13 +592,13 @@
 						if (x) {
 							$.ajax({
 								type: "POST",
-								url: "/admin/deleteArchieve",
+								url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/deleteArchieve",
 								data: {
 									id,
 									isDeleted: myStatus,
 									model,
 								},
-								success: () => window.location.href = "/admin/candidate?isDeleted=true"
+								success: () => window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate?isDeleted=true"
 							});
 						}
 					}
@@ -684,7 +684,7 @@
                         $('#sendBtn').addClass('disabled')
 						$.ajax({
 								type: "POST",
-								url: "/admin/candidate/bulkSMS",
+								url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/bulkSMS",
 								data: {
 									isProfileCompleted : false,
 									name,
@@ -698,7 +698,7 @@
 									$('#sendBtn').removeClass('disabled')
 								},
 								error: () =>{
-									window.location.href = `/admin/candidate${params}`
+									window.location.href = `<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate${params}`
 								}
 							});
 					}
@@ -713,19 +713,19 @@
 							obj[key] = value
 							str += `${key}=${value}&`
                            }
-						window.location.href = `/admin/candidate${str}value=${value}&order=${order}`
+						window.location.href = `<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate${str}value=${value}&order=${order}`
 					}
 
 					function loginAs(mobile){
 						$.ajax({
 								type: "POST",
 								data: {mobile, module: 'candidate'},
-								url: "/api/loginAsCandidate",
+								url: "<%= process.env.MIPIE_BACKEND_URL %>/api/loginAsCandidate",
 								success: (data) => {
 									if(data.role===3) {
 										localStorage.setItem("candidate", data.name);
                                         localStorage.setItem("token", data.token);
-                                        window.location.href = "/candidate/dashboard";
+                                        window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/candidate/dashboard";
 									}									
 								}
 							});

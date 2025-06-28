@@ -8,7 +8,7 @@
         <h3 class="content-header-title float-left mb-0">KYC Requests</h3>
         <div class="breadcrumb-wrapper col-12">
           <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
             <li class="breadcrumb-item active">KYC Requests</li>
           </ol>
         </div>
@@ -56,7 +56,7 @@
                       class="btn btn-success  waves-effect waves-light  text-white d-inline "
                       id="submit-btn">Go</button>
                       <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-1"
-                      href="/admin/candidate/kycRequest">RESET</a>
+                      href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/kycRequest">RESET</a>
                   </div>
                 </div>
                 </form>
@@ -87,7 +87,7 @@
                   <% if (kycRequests.length > 0) { %>
                   <% kycRequests.forEach((kyc, i)=> { %>
                   <tr>
-                    <td class="text-capitalize"><a  href="/admin/candidate/details/<%=kyc._candidate._id%>"><%= kyc._candidate ? kyc._candidate.name : "NA" %></a></td>
+                    <td class="text-capitalize"><a  href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%=kyc._candidate._id%>"><%= kyc._candidate ? kyc._candidate.name : "NA" %></a></td>
                     <td><%= kyc._candidate ? kyc._candidate.mobile : "NA" %></td>
                     <td><%= kyc.aadharCard ? kyc.aadharCard : 'NA' %></td>
                     <% if (kyc.aadharCardImage) { %>
@@ -263,7 +263,7 @@
         _candidate: candidateId
       }
       let header = { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" }
-      axios.post('/admin/candidate/kycRequest', body, header).then(res => {
+      axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/kycRequest', body, header).then(res => {
         window.location.reload()
       }).catch(err => {
         console.log(err.message)
@@ -289,7 +289,7 @@
         comment
       }
       let header = { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" }
-      axios.post('/admin/candidate/kycRequest', body, header).then(res => {
+      axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/kycRequest', body, header).then(res => {
         window.location.reload()
       }).catch(err => {
         console.log(err.message)
