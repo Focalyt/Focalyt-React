@@ -138,9 +138,9 @@ const CRMDashboard = () => {
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
-      console.log(result,'result')
+      console.log(result, 'result')
       if (result === true) {
-        setOpenModalId(null) ; setSelectedProfile(null)
+        setOpenModalId(null); setSelectedProfile(null)
       }
     }
   };
@@ -161,6 +161,7 @@ const CRMDashboard = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+
   const [viewMode, setViewMode] = useState('grid');
   const [isMobile, setIsMobile] = useState(false);
   const [allProfiles, setAllProfiles] = useState([]);
@@ -1786,22 +1787,22 @@ const CRMDashboard = () => {
   // Add this function in your component:
   const updateCrmFiltersFromBackend = (backendCounts) => {
     console.log('Backend counts received:', backendCounts);
-    
+
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
         if (filter._id === 'all') {
           return { ...filter, count: backendCounts.all || 0 };
         }
-        
+
         const backendFilter = backendCounts[filter._id];
         if (backendFilter) {
-          return { 
-            ...filter, 
+          return {
+            ...filter,
             count: backendFilter.count || 0,
-            milestone: backendFilter.milestone 
+            milestone: backendFilter.milestone
           };
         }
-        
+
         return { ...filter, count: 0 };
       });
     });
@@ -2806,122 +2807,6 @@ const CRMDashboard = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
 
-          {/* Header */}
-          {/* <div className="bg-white shadow-sm border-bottom mb-3 sticky-header-container" >
-            <div className="container-fluid py-2 " >
-              <div className="row align-items-center">
-                <div className="col-md-6 d-md-block d-sm-none">
-                  <div className="d-flex align-items-center">
-                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
-                      </ol>
-                    </nav>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="d-flex justify-content-end align-items-center gap-2">
-                    <div className="input-group" style={{ maxWidth: '300px' }}>
-                      <span className="input-group-text bg-white border-end-0 input-height">
-                        <i className="fas fa-search text-muted"></i>
-                      </span>
-                      <input
-                        type="text"
-                        name="name"
-                        className="form-control border-start-0 m-0"
-                        placeholder="Quick search..."
-                        value={filterData.name}
-                        onChange={handleFilterChange}
-                      />
-                      {filterData.name && (
-                        <button
-                          className="btn btn-outline-secondary border-start-0"
-                          type="button"
-                          onClick={() => {
-                            setFilterData(prev => ({ ...prev, name: '' }));
-                            setAllProfiles(allProfilesData);
-                          }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                      className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                      style={{ whiteSpace: 'nowrap' }}
-                    >
-                      <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                      Filters
-                      {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                        <span className="bg-light text-dark ms-1">
-                          {Object.values(filterData).filter(val => val && val !== 'true').length}
-                        </span>
-                      )}
-                    </button>
-                    <div className="btn-group">
-                      <button
-                        onClick={() => setViewMode('grid')}
-                        className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-th"></i>
-                      </button>
-                      <button
-                        onClick={() => setViewMode('list')}
-                        className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-list"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-
-                <div className="card-body p-3">
-                  <div className="d-flex flex-wrap gap-2 align-items-center">
-                    {crmFilters.map((filter, index) => (
-                      <div key={index} className="d-flex align-items-center gap-1">
-                        <div className='d-flex'>
-                          <button
-                            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                            onClick={() => handleCrmFilterClick(filter._id, index)}
-                          >
-                            {filter.name}
-                            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                              ({filter.count})
-                            </span>
-                          </button>
-
-                        
-                          {filter.milestone && (
-                            <span
-                              className="bg-success d-flex align-items-center"
-                              style={{
-                                fontSize: '0.75rem', color: 'white', verticalAlign: 'middle', padding: '0.25em 0.5em', transform: 'translate(15%, -100%)',
-                                position: 'absolute'
-                              }}
-                              title={`Milestone: ${filter.milestone}`}
-                            >
-                              🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                </div>
-
-              </div>
-            </div>
-          </div> */}
-
-
-
           <div className="position-relative">
             <div className="site-header--sticky--register">
               <div className="container-fluid">
@@ -3041,398 +2926,6 @@ const CRMDashboard = () => {
 
 
 
-          {/* Advanced Filters */}
-          {/* Advanced Filters - Improved Design */}
-          {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm" style={{ marginTop: '130px', transition: '0.4s ease' }}>
-              <div className="container-fluid py-4">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <div className="d-flex align-items-center">
-                    <i className="fas fa-filter text-primary me-2"></i>
-                    <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                    <span className="bg-light text-dark ms-2">
-                      {Object.values(filterData).filter(val => val && val !== 'true').length} Active
-                    </span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => {
-                        setFilterData({
-                          name: '',
-                          courseType: '',
-                          status: 'true',
-                          leadStatus: '',
-                          sector: '',
-                          createdFromDate: null,
-                          createdToDate: null,
-                          modifiedFromDate: null,
-                          modifiedToDate: null,
-                          nextActionFromDate: null,
-                          nextActionToDate: null,
-                        });
-                        fetchProfileData();
-                      }}
-                    >
-                      <i className="fas fa-times-circle me-1"></i>
-                      Clear All
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-chevron-up"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="row g-4">
-
-                  <div className="col-md-3">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-graduation-cap me-1 text-success"></i>
-                      Course Type
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="courseType"
-                        value={filterData.courseType}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Types</option>
-                        <option value="Free">🆓 Free</option>
-                        <option value="Paid">💰 Paid</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="col-md-3">
-                   
-                    <MultiSelectCheckbox
-                      title="Project"
-                      options={projectOptions}
-                      selectedValues={formData.projects.values}
-                      onChange={(values) => handleCriteriaChange('projects', values)}
-                      icon="fas fa-sitemap"
-                      isOpen={dropdownStates.projects}
-                      onToggle={() => toggleDropdown('projects')}
-                    />
-
-                  </div>
-                  <div className="col-md-3">
-                    
-                    <MultiSelectCheckbox
-                      title="Verticals"
-                      options={verticalOptions}
-                      selectedValues={formData.verticals.values}
-                      icon="fas fa-sitemap"
-                      isOpen={dropdownStates.verticals}
-                      onToggle={() => toggleDropdown('verticals')}
-                      onChange={(values) => handleCriteriaChange('verticals', values)}
-                    />
-
-
-                  </div>
-                  <div className="col-md-3">
-                    
-                    <MultiSelectCheckbox
-                      title="Course"
-                      options={courseOptions}
-                      selectedValues={formData.course.values}
-                      onChange={(values) => handleCriteriaChange('course', values)}
-                      icon="fas fa-graduation-cap"
-                      isOpen={dropdownStates.course}
-                      onToggle={() => toggleDropdown('course')}
-                    />
-                  </div>
-                  <div className="col-md-3">
-                    
-                    <MultiSelectCheckbox
-                      title="Center"
-                      options={centerOptions}
-                      selectedValues={formData.center.values}
-                      onChange={(values) => handleCriteriaChange('center', values)}
-                      icon="fas fa-building"
-                      isOpen={dropdownStates.center}
-                      onToggle={() => toggleDropdown('center')}
-                    />
-                  </div>
-                  <div className="col-md-3">
-                    
-                    <MultiSelectCheckbox
-                      title="Counselor"
-                      options={counselorOptions}
-                      selectedValues={formData.counselor.values}
-                      onChange={(values) => handleCriteriaChange('counselor', values)}
-                      icon="fas fa-user-tie"
-                      isOpen={dropdownStates.counselor}
-                      onToggle={() => toggleDropdown('counselor')}
-                    />
-                  </div>
-
-                  {/* Date Range */}
-                 
-                  <div className="col-12">
-                    <div className="row g-4">
-                      {/* Created Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-plus me-1 text-success"></i>
-                          Lead Creation Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
-                                value={filterData.createdFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                maxDate={filterData.createdToDate || new Date()}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
-                                value={filterData.createdToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                minDate={filterData.createdFromDate}
-                                maxDate={new Date()}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.createdFromDate || filterData.createdToDate) && (
-                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
-                              <small className="text-success">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
-                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('created')}
-                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Created Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Modified Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
-                          Lead Modification Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
-                                value={filterData.modifiedFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                maxDate={filterData.modifiedToDate || new Date()}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
-                                value={filterData.modifiedToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                minDate={filterData.modifiedFromDate}
-                                maxDate={new Date()}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
-                              <small className="text-warning">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
-                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('modified')}
-                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Next Action Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-check me-1 text-info"></i>
-                          Next Action Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
-                                value={filterData.nextActionFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                maxDate={filterData.nextActionToDate}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
-                                value={filterData.nextActionToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                minDate={filterData.nextActionFromDate}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
-                              <small className="text-info">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
-                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('nextAction')}
-                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Update the Clear All button in your existing filters section */}
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={clearAllFilters}
-                  >
-                    <i className="fas fa-times-circle me-1"></i>
-                    Clear All Filters
-                  </button>
-
-                  {/* Update the results summary section */}
-                  <div className="text-muted small">
-                    <i className="fas fa-info-circle me-1"></i>
-                    Showing {allProfiles.length} results on page {currentPage} of {totalPages}
-
-                    {/* Active filter indicators */}
-                    {(filterData.createdFromDate || filterData.createdToDate) && (
-                      <div className="mt-1">
-                        <span className="badge bg-success me-2">
-                          <i className="fas fa-calendar-plus me-1"></i>
-                          Created:
-                          {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                          {filterData.createdFromDate && filterData.createdToDate && ' to '}
-                          {filterData.createdToDate && formatDate(filterData.createdToDate)}
-                        </span>
-                      </div>
-                    )}
-
-                    {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-warning me-2">
-                          <i className="fas fa-calendar-edit me-1"></i>
-                          Modified:
-                          {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                          {filterData.modifiedFromDate && filterData.modifiedToDate && ' to '}
-                          {filterData.modifiedToDate && formatDate(filterData.modifiedToDate)}
-                        </span>
-                      </div>
-                    )}
-
-                    {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-info me-2">
-                          <i className="fas fa-calendar-check me-1"></i>
-                          Next Action:
-                          {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                          {filterData.nextActionFromDate && filterData.nextActionToDate && ' to '}
-                          {filterData.nextActionToDate && formatDate(filterData.nextActionToDate)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-eye-slash me-1"></i>
-                      Hide Filters
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => fetchProfileData(filterData)}
-                    >
-                      <i className="fas fa-search me-1"></i>
-                      Apply Filters
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Main Content */}
           <div className="content-body" style={{ marginTop: '185px' }}>
@@ -5036,6 +4529,8 @@ const CRMDashboard = () => {
                         ))}
 
 
+
+                        
                       </div>
 
 
@@ -8505,7 +8000,10 @@ html body .content .content-wrapper {
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
-
+.react-calendar{
+width:min-content !important;
+height:min-content !important;
+}
 
     `
         }

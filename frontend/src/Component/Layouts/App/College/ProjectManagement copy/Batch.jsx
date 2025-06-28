@@ -3055,9 +3055,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
       {/* Add/Edit Modal - Only for Batches */}
       {(showAddForm || showEditForm) && (
-        <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
+        <div className="modal d-block overflowY d-flex justify-content-center w-100" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg w-100">
+            <div className="modal-content p-0">
               <div className="modal-header bg-warning text-dark">
                 <h5 className="modal-title">{editingBatch ? 'Edit Batch' : 'Add New Batch'}</h5>
                 <button type="button" className="btn-close" onClick={closeModal}></button>
@@ -3173,7 +3173,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
               </div>
             </div>
           </div>
-        </div>
+        </div>    
       )}
 
       {/* Delete Confirmation Modal */}

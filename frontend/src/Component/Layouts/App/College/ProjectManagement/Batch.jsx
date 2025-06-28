@@ -139,6 +139,25 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     // });
   };
 
+  const formatDateForState = (date) => {
+    if (!date) return null;
+    if (typeof date === 'string') {
+      return new Date(date);
+    }
+    return date;
+  };
+
+  const addDays = (date, days) => {
+    if (!date) return null;
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const zeroPeriodMinEndDate = formData.zeroPeriodStartDate ? addDays(formData.zeroPeriodStartDate, 7) : null;
+  const batchMinEndDate = formData.startDate ? addDays(formData.startDate, 7) : null;
+  const batchMinStartDate = formData.zeroPeriodEndDate ? addDays(formData.zeroPeriodEndDate, 1) : today;
   const [batches, setBatches] = useState([]);
 
   // Exact same tabs as CRM Dashboard
@@ -621,10 +640,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     setFormData(
       {
         name: '', // Batch Name
-        startDate: '', // Start Date
-        endDate: '', // End Date
-        zeroPeriodStartDate: '', // Zero Period Start Date
-        zeroPeriodEndDate: '', // Zero Period End Date
+        startDate: null, // Start Date
+        endDate: null, // End Date
+        zeroPeriodStartDate: null, // Zero Period Start Date
+        zeroPeriodEndDate: null, // Zero Period End Date
         maxStudents: 0, // Changed from 'students' to 'maxStudents'
         status: 'active', // Default to 'active'
         courseId: selectedCourse._id, // Course ID (using selectedCourseData)
@@ -704,6 +723,55 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     if (!formData.name.trim() || !formData.instructor.trim()) {
       alert('Please fill in all required fields');
       return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (formData.zeroPeriodStartDate && new Date(formData.zeroPeriodStartDate) < today) {
+      alert('Zero Period start date cannot be in the past');
+      return;
+    }
+
+    if (formData.startDate && new Date(formData.startDate) < today) {
+      alert('Batch start date cannot be in the past');
+      return;
+    }
+
+    // Validate Zero Period dates
+    if (formData.zeroPeriodStartDate && formData.zeroPeriodEndDate) {
+      const startDate = new Date(formData.zeroPeriodStartDate);
+      const endDate = new Date(formData.zeroPeriodEndDate);
+      const minEndDate = addDays(startDate, 7);
+
+      if (endDate < minEndDate) {
+        alert('Zero Period end date must be at least 7 days after the start date');
+        return;
+      }
+    }
+
+    // Validate Batch dates
+    if (formData.startDate && formData.endDate) {
+      const startDate = new Date(formData.startDate);
+      const endDate = new Date(formData.endDate);
+      const minEndDate = addDays(startDate, 7);
+
+      if (endDate < minEndDate) {
+        alert('Batch end date must be at least 7 days after the start date');
+        return;
+      }
+    }
+
+    // Validate that batch start date is at least 1 day after zero period end date
+    if (formData.zeroPeriodEndDate && formData.startDate) {
+      const zeroPeriodEnd = new Date(formData.zeroPeriodEndDate);
+      const batchStart = new Date(formData.startDate);
+      const minBatchStart = addDays(zeroPeriodEnd, 1);
+
+      if (batchStart < minBatchStart) {
+        alert('Batch start date must be at least 1 day after zero period end date');
+        return;
+      }
     }
 
     if (editingBatch) {
@@ -3370,9 +3438,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
       {/* Add/Edit Modal - Only for Batches */}
       {(showAddForm || showEditForm) && (
-        <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
+        <div className="modal d-block overflowY d-flex justify-content-center align-items-centr w-100" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg w-100 d-flex justify-content-center">
+            <div className="modal-content p-0">
               <div className="modal-header bg-warning text-dark">
                 <h5 className="modal-title">{editingBatch ? 'Edit Batch' : 'Add New Batch'}</h5>
                 <button type="button" className="btn-close" onClick={closeModal}></button>
@@ -3426,44 +3494,156 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                   </div>
                 </div>
                 <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Zero Period Start Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={formData.zeroPeriodStartDate}
+                  <div className="col-12">
+                    <div className="row border" style={{
+                      margin: "0px 3px 0 2px",
+                      padding: "5px 2px 5px 2px"
+                    }}>
+                      <h6>Zero Period Dates</h6>
+                      <div className="col-md-6 mb-3">
+                        <label className="form-label">Start Date</label>
+                        {/* <DatePicker
                       onChange={(e) => setFormData(prev => ({ ...prev, zeroPeriodStartDate: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Zero Period End Date</label>
-                    <input
-                      type="date"
+                      value={formatDateForState(formData.zeroPeriodStartDate)}
+                      format="dd/MM/yyyy"
+                      clearIcon={null}
                       className="form-control"
-                      value={formData.zeroPeriodEndDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, zeroPeriodEndDate: e.target.value }))}
-                    />
+                      dayPlaceholder="dd"
+                      monthPlaceholder="mm"
+                      yearPlaceholder="yyyy"
+                      calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                    /> */}
+                        <DatePicker
+                          onChange={(date) => {
+                            setFormData(prev => {
+                              const newData = { ...prev, zeroPeriodStartDate: date };
+                              // If end date is less than 7 days from new start date, adjust it
+                              if (date && prev.zeroPeriodEndDate) {
+                                const minEndDate = addDays(date, 7);
+                                if (new Date(prev.zeroPeriodEndDate) < minEndDate) {
+                                  newData.zeroPeriodEndDate = minEndDate;
+                                }
+                              }
+                              return newData;
+                            });
+                          }}
+                          value={formatDateForState(formData.zeroPeriodStartDate)}
+                          minDate={today}
+                          format="dd/MM/yyyy"
+                          clearIcon={null}
+                          className="form-control"
+                          dayPlaceholder="dd"
+                          monthPlaceholder="mm"
+                          yearPlaceholder="yyyy"
+                          calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                        />
+                      </div>
+                      <div className="col-md-6 mb-3">
+                        <label className="form-label">End Date</label>
+                        <DatePicker
+                          onChange={!formData.zeroPeriodStartDate ? null : (date) => {
+                            setFormData(prev => {
+                              const newData = { ...prev, zeroPeriodEndDate: date };
+                              // If batch start date exists and is less than 1 day after zero period end date, adjust it
+                              if (date && prev.startDate) {
+                                const minBatchStartDate = addDays(date, 1);
+                                if (new Date(prev.startDate) < minBatchStartDate) {
+                                  newData.startDate = minBatchStartDate;
+                                  // Also adjust batch end date if needed
+                                  if (prev.endDate) {
+                                    const minBatchEndDate = addDays(minBatchStartDate, 7);
+                                    if (new Date(prev.endDate) < minBatchEndDate) {
+                                      newData.endDate = minBatchEndDate;
+                                    }
+                                  }
+                                }
+                              }
+                              return newData;
+                            });
+                          }}
+                          value={formData.zeroPeriodStartDate ? formatDateForState(formData.zeroPeriodEndDate) : null}
+                          minDate={zeroPeriodMinEndDate || today}
+                          disabled={!formData.zeroPeriodStartDate}
+                          format="dd/MM/yyyy"
+                          clearIcon={null}
+                          className={`form-control ${!formData.zeroPeriodStartDate ? 'disabled-datepicker' : ''}`}
+                          dayPlaceholder="dd"
+                          monthPlaceholder="mm"
+                          yearPlaceholder="yyyy"
+                          calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                        />
+                      </div>
+                    </div>
+
                   </div>
+
                 </div>
                 <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">Start Date</label>
-                    <input
-                      type="date"
+                  <div className="col-12">
+                    <div className="row border" style={{
+                      margin: "40px 3px 0 2px",
+                      padding: "5px 2px 5px 2px"
+                    }}>
+                      <h6>Batch Dates</h6>
+                      <div className="col-md-6 mb-3">
+                        <label className="form-label">Start Date</label>
+
+                        {/* <DatePicker
+                      onChange={(date) => setFormData(prev => ({ ...prev, startDate: date }))}
+                      value={formatDateForState(formData.startDate)}
+                      format="dd/MM/yyyy"
+                      clearIcon={null}
                       className="form-control"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                    />
+                      dayPlaceholder="dd"
+                      monthPlaceholder="mm"
+                      yearPlaceholder="yyyy"
+                      calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                    /> */}
+                        <DatePicker
+                          onChange={(date) => {
+                            setFormData(prev => {
+                              const newData = { ...prev, startDate: date };
+                              // If end date is less than 7 days from new start date, adjust it
+                              if (date && prev.endDate) {
+                                const minEndDate = addDays(date, 7);
+                                if (new Date(prev.endDate) < minEndDate) {
+                                  newData.endDate = minEndDate;
+                                }
+                              }
+                              return newData;
+                            });
+                          }}
+                          value={formatDateForState(formData.startDate)}
+                          minDate={batchMinStartDate}
+                          format="dd/MM/yyyy"
+                          clearIcon={null}
+                          className="form-control"
+                          dayPlaceholder="dd"
+                          monthPlaceholder="mm"
+                          yearPlaceholder="yyyy"
+                          calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                        />
+                      </div>
+                      <div className="col-md-6 mb-3">
+                        <label className="form-label">End Date</label>
+                        <DatePicker
+                          onChange={!formData.startDate ? null : (date) => setFormData(prev => ({ ...prev, endDate: date }))}
+                          value={formData.startDate ? formatDateForState(formData.endDate) : null}
+                          minDate={batchMinEndDate || batchMinStartDate}
+                          disabled={!formData.startDate}
+                          format="dd/MM/yyyy"
+                          clearIcon={null}
+                          className={`form-control ${!formData.startDate ? 'disabled-datepicker' : ''}`}
+                          dayPlaceholder="dd"
+                          monthPlaceholder="mm"
+                          yearPlaceholder="yyyy"
+                          calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label">End Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={formData.endDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                    />
-                  </div>
+
+
                 </div>
 
                 <div className="mb-3">
@@ -4694,6 +4874,14 @@ background: #fd2b5a;
 }
 
 /* Add this to your existing style tag or CSS file */
+.react-date-picker{
+padding:0 !important;
+
+}
+.react-calendar{
+width: min-content !important;
+height: min-content !important;
+}
 .react-date-picker__wrapper {
     border: 1px solid #ced4da !important;
     border-radius: 0.375rem !important;
@@ -6935,7 +7123,12 @@ html body .content .content-wrapper {
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
-
+.react-date-picker.react-date-picker--closed.react-date-picker--enabled{
+padding:0!important;
+}
+.react-date-picker__wrapper{
+height:100%;
+}
 
     `
         }
