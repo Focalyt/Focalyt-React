@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { isCollege } = require('../../middleware/auth');
+const { isCollege } = require('../../../helpers');
 const { AppliedCourses, College } = require('../../models');
 
 // Mark attendance for a student
@@ -15,10 +15,12 @@ router.route("/mark-attendance").post(isCollege, async (req, res) => {
 			remarks = '' 
 		} = req.body;
 
+		console.log("req.body", req.body);
+
 		// Validate required fields
 		if (!appliedCourseId || !date || !status) {
 			return res.status(400).json({
-				success: false,
+				status: false,
 				message: "appliedCourseId, date, and status are required"
 			});
 		}
@@ -26,7 +28,7 @@ router.route("/mark-attendance").post(isCollege, async (req, res) => {
 		// Validate status
 		if (!['Present', 'Absent'].includes(status)) {
 			return res.status(400).json({
-				success: false,
+				status: false,
 				message: "Status must be 'Present' or 'Absent'"
 			});
 		}
@@ -34,7 +36,7 @@ router.route("/mark-attendance").post(isCollege, async (req, res) => {
 		// Validate period
 		if (!['zeroPeriod', 'regularPeriod'].includes(period)) {
 			return res.status(400).json({
-				success: false,
+				status: false,
 				message: "Period must be 'zeroPeriod' or 'regularPeriod'"
 			});
 		}
@@ -46,7 +48,7 @@ router.route("/mark-attendance").post(isCollege, async (req, res) => {
 
 		if (!appliedCourse) {
 			return res.status(404).json({
-				success: false,
+				status: false,
 				message: "Applied course not found"
 			});
 		}
@@ -58,14 +60,14 @@ router.route("/mark-attendance").post(isCollege, async (req, res) => {
 
 		if (!college) {
 			return res.status(403).json({
-				success: false,
+				status: false,
 				message: "College not found"
 			});
 		}
 
 		if (String(appliedCourse._course.college) !== String(college._id)) {
 			return res.status(403).json({
-				success: false,
+				status: false,
 				message: "You don't have permission to mark attendance for this course"
 			});
 		}
@@ -79,7 +81,7 @@ router.route("/mark-attendance").post(isCollege, async (req, res) => {
 			.populate('batch');
 
 		res.status(200).json({
-			success: true,
+			status: true,
 			message: "Attendance marked successfully",
 			data: {
 				appliedCourseId,
@@ -94,7 +96,7 @@ router.route("/mark-attendance").post(isCollege, async (req, res) => {
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({
-			success: false,
+			status: false,
 			message: err.message || "Server Error"
 		});
 	}
@@ -115,7 +117,7 @@ router.route("/bulk-mark-attendance").post(isCollege, async (req, res) => {
 		// Validate required fields
 		if (!attendanceData || !Array.isArray(attendanceData) || attendanceData.length === 0) {
 			return res.status(400).json({
-				success: false,
+				status: false,
 				message: "attendanceData array is required"
 			});
 		}
@@ -123,7 +125,7 @@ router.route("/bulk-mark-attendance").post(isCollege, async (req, res) => {
 		// Validate status
 		if (!['Present', 'Absent'].includes(status)) {
 			return res.status(400).json({
-				success: false,
+				status: false,
 				message: "Status must be 'Present' or 'Absent'"
 			});
 		}
@@ -131,7 +133,7 @@ router.route("/bulk-mark-attendance").post(isCollege, async (req, res) => {
 		// Validate period
 		if (!['zeroPeriod', 'regularPeriod'].includes(period)) {
 			return res.status(400).json({
-				success: false,
+				status: false,
 				message: "Period must be 'zeroPeriod' or 'regularPeriod'"
 			});
 		}
@@ -143,7 +145,7 @@ router.route("/bulk-mark-attendance").post(isCollege, async (req, res) => {
 
 		if (!college) {
 			return res.status(403).json({
-				success: false,
+				status: false,
 				message: "College not found"
 			});
 		}
@@ -185,7 +187,7 @@ router.route("/bulk-mark-attendance").post(isCollege, async (req, res) => {
 
 				results.push({
 					appliedCourseId: record.appliedCourseId,
-					success: true,
+					status: true,
 					message: "Attendance marked successfully"
 				});
 
@@ -198,7 +200,7 @@ router.route("/bulk-mark-attendance").post(isCollege, async (req, res) => {
 		}
 
 		res.status(200).json({
-			success: true,
+			status: true,
 			message: `Processed ${attendanceData.length} records`,
 			results,
 			errors,
@@ -212,7 +214,7 @@ router.route("/bulk-mark-attendance").post(isCollege, async (req, res) => {
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({
-			success: false,
+			status: false,
 			message: err.message || "Server Error"
 		});
 	}
@@ -233,7 +235,7 @@ router.route("/attendance-report/:appliedCourseId").get(isCollege, async (req, r
 
 		if (!appliedCourse) {
 			return res.status(404).json({
-				success: false,
+				status: false,
 				message: "Applied course not found"
 			});
 		}
@@ -245,7 +247,7 @@ router.route("/attendance-report/:appliedCourseId").get(isCollege, async (req, r
 
 		if (!college || String(appliedCourse._course.college) !== String(college._id)) {
 			return res.status(403).json({
-				success: false,
+				status: false,
 				message: "You don't have permission to access this data"
 			});
 		}
@@ -254,7 +256,7 @@ router.route("/attendance-report/:appliedCourseId").get(isCollege, async (req, r
 		const report = appliedCourse.getAttendanceReport(startDate, endDate, period);
 
 		res.status(200).json({
-			success: true,
+			status: true,
 			data: {
 				appliedCourseId,
 				studentName: appliedCourse._candidate?.name || 'N/A',
@@ -267,7 +269,7 @@ router.route("/attendance-report/:appliedCourseId").get(isCollege, async (req, r
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({
-			success: false,
+			status: false,
 			message: err.message || "Server Error"
 		});
 	}

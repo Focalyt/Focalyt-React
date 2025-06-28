@@ -18,6 +18,7 @@ let path = require("path");
 const candidateRoutes = require("./candidate");
 const digitalLeadRoutes = require('./digitalLead');
 const leadAssignmentRuleRoutes = require("./leadAssingmentRule");
+const attendanceRoutes = require("./attendance");
 
 
 const batchRoutes = require("./batches");
@@ -34,6 +35,8 @@ const coursesRoutes = require("./courses");
 const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
+router.use("/attendance", isCollege, attendanceRoutes);
+
 router.use("/digitalLead", digitalLeadRoutes);
 router.use("/leadAssignmentRule", isCollege, leadAssignmentRuleRoutes);
 router.use("/users", userRoutes);
@@ -1051,7 +1054,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			counselorArray
 		});
 
-		console.log('crmFilterCounts', crmFilterCounts)
 
 		// Apply pagination
 		const totalCount = results.length;
@@ -5858,16 +5860,26 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 		}
 
 		// Add status filter
-		if (req.query.status && req.query.status !== 'all' && req.query.status !== 'admission') {
+		if (req.query.status && req.query.status !== 'all') {
 			console.log("req.query.status", req.query.status);
+
+			if (req.query.status === "admission") {
+				query.admissionDone = { $in: [true] };
+				query.isZeroPeriodAssigned = { $in: [false] };
+				query.isBatchFreeze = { $in: [false] };
+				query.dropout = { $in: [false] };
+			}
 			if (req.query.status === "dropout") {
 				query.dropout = { $in: [true] };
 			} 
 			if (req.query.status === "zeroPeriod") {
 				query.isZeroPeriodAssigned = true;
+				query.isBatchFreeze = { $in: [false] };
+				query.dropout = { $in: [false] };
 			}
 			if (req.query.status === "batchFreeze") {
 				query.isBatchFreeze = { $in: [true] };
+				query.dropout = { $in: [false] };
 			} 
 			
 		}
@@ -5972,7 +5984,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 				baseQuery.nextActionDate = { ...baseQuery.nextActionDate, $lte: new Date(req.query.nextActionToDate) };
 			}
 
-			console.log("baseQuery", baseQuery);
 			
 			// Get all records for this college (without pagination)
 			const allAppliedCourses = await AppliedCourses.find(baseQuery)
@@ -5994,9 +6005,9 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 			const counts = {
 				all: allFilteredAppliedCourses.length,
 				dropout: allFilteredAppliedCourses.filter(doc => doc.dropout === true).length,
-				zeroPeriod: allFilteredAppliedCourses.filter(doc => doc.isZeroPeriodAssigned === true).length,
-				batchFreeze: allFilteredAppliedCourses.filter(doc => doc.isBatchFreeze === true).length,
-				admission: allFilteredAppliedCourses.filter(doc => doc.admissionDone === true).length,
+				zeroPeriod: allFilteredAppliedCourses.filter(doc => (doc.isZeroPeriodAssigned === true && doc.isBatchFreeze === false && doc.dropout === false)).length,
+				batchFreeze: allFilteredAppliedCourses.filter(doc => (doc.isBatchFreeze === true && doc.dropout === false)).length,
+				admission: allFilteredAppliedCourses.filter(doc => (doc.admissionDone === true && doc.isZeroPeriodAssigned === false && doc.isBatchFreeze === false && doc.dropout === false)).length,
 			};
 			console.log("counts", counts);
 
