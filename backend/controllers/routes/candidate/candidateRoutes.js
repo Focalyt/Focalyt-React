@@ -496,6 +496,13 @@ router
         }
       }
       const dataCheck = await Candidate.findOne({ mobile: mobile });
+      const dataCheck1 = await Candidate.findOne({ email });
+      if (dataCheck1) {
+        return res.send({
+          status: "failure",
+          error: "Candidate email already exist!",
+        });
+      }
       if (dataCheck) {
         return res.send({
           status: "failure",
@@ -504,21 +511,16 @@ router
       }
 
       const datacheck2 = await User.findOne({ mobile, role: "3" });
+      const datacheck3 = await User.findOne({ email, role: "3" });
 
-      if (datacheck2) {
+      if (datacheck2 || datacheck3) {
         return res.send({
           status: "failure",
-          error: "User mobile already exist!",
+          error: "User mobile or email already exist!",
         });
       }
 
-      const dataCheck1 = await Candidate.findOne({ mobile });
-      if (dataCheck1) {
-        return res.send({
-          status: "failure",
-          error: "Candidate mobile already exist!",
-        });
-      }
+     
 
       const usr = await User.create({
         name,

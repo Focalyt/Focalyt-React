@@ -3421,8 +3421,8 @@ const Student = ({
     activeTab === "zeroPeriod" || activeTab === "all" || activeTab === "batchFreeze";
   const attendanceEligibleStudents = allProfiles.filter(
     (s) =>
-      (s.isZeroPeriodAssigned === true || s.isBatchFreeze === true) && s.attendance?.regularPeriod?.sessions?.some(session =>
-        new Date(session.date).toDateString() !== new Date().toDateString() || s.attendance?.zeroPeriod?.sessions?.some(session =>
+      (s.isZeroPeriodAssigned === true || s.isBatchFreeze === true) && s.attendance?.regularPeriod?.sessions?.some(session => 
+        new Date(session.date).toDateString() !== new Date().toDateString() || s.attendance?.zeroPeriod?.sessions?.some(session => 
           new Date(session.date).toDateString() !== new Date().toDateString()
         )
       )
