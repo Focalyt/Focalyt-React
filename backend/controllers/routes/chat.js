@@ -13,10 +13,12 @@ const apiKey = process.env.MIPIE_RAZORPAY_KEY;
 const razorSecretKey = process.env.MIPIE_RAZORPAY_SECRET;
 
 const {
-	coinsOffers, PaymentDetails, Vacancy, Courses, Company, AppliedJobs, AppliedCourses, User, CandidateCashBack, FAQ
+	coinsOffers, PaymentDetails, CoinsAlgo, Vacancy, Courses, Company, AppliedJobs, AppliedCourses, User, CandidateCashBack, FAQ
 } = require("../models");
 
 const Candidate = require('../models/candidateProfile');
+const {msg91WelcomeTemplate} = require('../../config')
+const {sendSms} = require('../../helpers')
 
 const { sendNotification } = require('./services/notification');
 const { CandidateValidators } = require('../../helpers/validators')
@@ -34,12 +36,8 @@ const commonRoutes = express.Router();
 commonRoutes.post("/registration", async (req, res) => {
 	try {
 		console.log("Received data from frontend:", req.body); 
-		if (error) {
-		  console.log('====== register error ', error, value)
-		  return res.send({ status: "failure", error: value });
-		}
-		let formData = value;
-		const { name, mobile, sex} = formData;
+		
+		const { name, mobile, sex} = req.body;
   
 		
 		const dataCheck = await Candidate.findOne({ mobile: mobile });
@@ -82,7 +80,7 @@ commonRoutes.post("/registration", async (req, res) => {
   
 		console.log("Candidate Data", candidateBody)
 		
-		const candidate = await CandidateProfile.create(candidateBody);
+		const candidate = await Candidate.create(candidateBody);
   
 		if (!candidate) {
 		  console.log("candidate not created");
