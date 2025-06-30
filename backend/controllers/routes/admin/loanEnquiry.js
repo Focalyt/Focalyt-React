@@ -39,6 +39,7 @@ router.route('/')
         const page = p || 1;
         const loans = await LoanEnquiry.find(filter)
         .populate(populate)
+        .populate('_candidate')
         .sort({ createdAt: -1 })
         .skip(perPage * page - perPage)
         .limit(perPage);
