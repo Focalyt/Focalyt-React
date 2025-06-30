@@ -291,7 +291,7 @@
 								'<option disabled selected value="">Select Option</option>'
 							);
 						axios
-							.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/helper/getsubQual", {
+							.post("<%= process.env.MIPIE_BACKEND_URL %>/panel/helper/getsubQual", {
 								_qualification: $("#qual").val(),
 							})
 							.then(({ data }) => {

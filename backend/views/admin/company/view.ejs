@@ -570,7 +570,7 @@
 					$("#industry").change(() => {
 						$(".selectpicker").find("option").remove().end();
 						axios
-							.post("<%= process.env.MIPIE_BACKEND_URL %>/helper/getsubInd", {
+							.post("/helper/getsubInd", {
 								_industry: $("#industry").val(),
 							})
 							.then(({ data }) => {
@@ -718,7 +718,7 @@
 					});
 
 					function reset() {
-						window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/company/view";
+						window.location.reload();
 					}
 				</script>
 	</div>

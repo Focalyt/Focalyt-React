@@ -68,7 +68,7 @@
                                                     <% loans.forEach((l) =>{%>
                                                     <tr>
                                                         <td><%= moment(l.updatedAt).utcOffset("+05:30").format('MMM DD YYYY')%></td>
-                                                        <td><a  href="/admin/candidate/details/<%=l._candidate._id%>">	<%= l._candidate?.name ? l._candidate?.name : 'NA' %></td>
+                                                        <td><a  href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%=l._candidate._id%>">	<%= l._candidate?.name ? l._candidate?.name : 'NA' %></td>
                                                         <td><%= l._candidate?.mobile ? l._candidate?.mobile : 'NA' %></td>
                                                         <td><%= l._candidate?.city?.name && l._candidate?.state?.name ? l._candidate?.city?.name + ', ' + l._candidate?.state?.name : l._candidate?.city?.name ? l._candidate?.city?.name : l._candidate?.state?.name ? l._candidate?.state?.name : 'NA' %></td>
                                                         <td><%= l.amount ? l.amount : 'NA' %></td>

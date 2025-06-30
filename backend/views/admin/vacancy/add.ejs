@@ -294,7 +294,7 @@
               .remove()
               .end()
               .append('<option disabled selected value="">Select Option</option>');
-            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/helper/getsubInd', {
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/helper/getsubInd', {
               _industry: $('#industry').val()
             })
               .then(({
@@ -358,7 +358,7 @@
               .remove()
               .end()
               .append('<option disabled selected value="">Select Option</option>');
-            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/helper/getsubQual', {
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/helper/getsubQual', {
               _qualification: $('#qualification').val()
             })
               .then(({

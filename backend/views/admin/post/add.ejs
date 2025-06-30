@@ -1104,7 +1104,7 @@ $(document).on("click", ".remove-btn", function () {
 
         // ✅ API Call करें
         $.ajax({
-            url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/post/postfiles", // API Endpoint
+            url: "<%= process.env.MIPIE_BACKEND_URL %>/api/postfiles", // API Endpoint
             type: "POST",
             data: formData,
             processData: false,  // Required for FormData

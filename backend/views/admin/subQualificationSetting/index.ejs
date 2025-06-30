@@ -31,7 +31,7 @@
 								<div class="card-body">
 									<!--  -->
 
-									<form class="form-horizontal" action="<%= process.env.MIPIE_BACKEND_URL %>/admin/subQualification" method="post">
+									<form class="form-horizontal" action="" method="post">
 										<div class="row">
 											<% if (!subQua) { %>
 												<div class="col-xl-4 mb-1">
@@ -400,7 +400,7 @@
 								'<option disabled selected value="">Select Option</option>'
 							);
 						axios
-							.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/helper/getsubQual", {
+							.post("<%= process.env.MIPIE_BACKEND_URL %>/panel/helper/getsubQual", {
 								_qualification: $("#qual").val(),
 							})
 							.then(({ data }) => {

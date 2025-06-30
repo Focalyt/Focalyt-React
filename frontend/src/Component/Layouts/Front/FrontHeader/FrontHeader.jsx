@@ -5,6 +5,7 @@ import MetaPixel from '../../../../Component/MetaPixel';
 
 
 const FrontHeader = () => {
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const logo = "/Assets/images/logo/focalyt_new_logo.png";
   const menuRef = useRef(null);
   const menuMainRef = useRef(null);
@@ -181,7 +182,7 @@ const FrontHeader = () => {
 
                         {/* <!-- Dropdown Menu --> */}
                         <ul class="dropdown-menu" id="loginDropdown">
-                          <li><a href="https://app.focalyt.com/company/login" class="dropdown-item">Login as Corporate</a></li>
+                          <li><a href={`${backendUrl}company/login`} class="dropdown-item">Login as Corporate</a></li>
                          <li><a href="/candidate/login" class="dropdown-item">Login as Student</a></li> 
                           {/* <li><a href="/candidate/dashboard" class="dropdown-item">Login as Student</a></li> */}
                         </ul>

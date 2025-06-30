@@ -387,7 +387,7 @@
 
 
     <script>
-        const selectedCourseIds = '<%- JSON.stringify((editUser?.access?.courseAccess || []).map(id => id.toString())) %>';
+        const selectedCourseIds = <%- JSON.stringify((editUser?.access?.courseAccess || []).map(id => id.toString())) %>;
         console.log("Selected course ids from backend:", selectedCourseIds);
     </script>
 
@@ -423,7 +423,7 @@ function fetchCourses(centerIds) {
     axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/portalaccess/getCoursesByCenter', { centerIds: centerIdsParam })
         .then((response) => {
             const courses = response.data.courses;
-            const selectedCourseIds = '<%- JSON.stringify((editUser?.access?.courseAccess || []).map(id => id.toString())) %>';
+            const selectedCourseIds = <%- JSON.stringify((editUser?.access?.courseAccess || []).map(id => id.toString())) %>;
 
             console.log('Course IDs from backend:', selectedCourseIds);
             console.log('Courses received:', courses);

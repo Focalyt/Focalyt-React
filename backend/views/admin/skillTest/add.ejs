@@ -433,8 +433,8 @@ $('#industry').change(() => {
     $('.appointdining').click(() => {
         let tech;
         let nontech;
-        const techSkill = `<%- JSON.stringify(techSkill) %>`;
-        const nonTechSkill = `<%- JSON.stringify(nonTechSkill) %>`;
+        const techSkill = '<%- JSON.stringify(techSkill) %>';
+        const nonTechSkill = '<%- JSON.stringify(nonTechSkill) %>';
         techSkill.forEach((c) => {
             tech += `<option value="${c._id}">${c.name}</option><br>`;
         });
