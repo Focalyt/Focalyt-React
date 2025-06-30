@@ -32,7 +32,7 @@
               <div class="breadcrumb-wrapper col-12">
                 <ol class="breadcrumb">
                   <li class="breadcrumb-item">
-                    <a href="/company/dashboard">Home</a>
+                    <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                   </li>
                   <li class="breadcrumb-item"><a href="#">Candidates Near Me</a></li>
                 </ol>
@@ -52,7 +52,7 @@
                   Filter Data / डेटा फ़िल्टर करें </h5>
                  </div>
                 <div class="col-6 text-right">
-                  <img src="/images/filtern.png" class="btn btn-link collapsed py-0 mx-0 " data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne" width="90px" id="filter-img"    >
+                  <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/filtern.png" class="btn btn-link collapsed py-0 mx-0 " data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne" width="90px" id="filter-img"    >
                 </div>
               </div>
              </div>
@@ -159,7 +159,7 @@
                               class="btn btn-success  waves-effect waves-light  text-white d-inline px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
                               id="submit-btn" onclick="filter()" >Go</button>
                               <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-sm-1 mx-0 px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
-                              href="/company/nearbyCandidates">RESET</a>
+                              href="<%= process.env.MIPIE_BACKEND_URL %>/company/nearbyCandidates">RESET</a>
                             </div>
                           <div  class="cont" style="display:none">
                             <p id="candidateNameMarker"></p>
@@ -192,7 +192,7 @@
     function initMap(filterData) {
       let locationArray = [];
       axios
-        .get("/company/getNearbyCandidatesForMap", {
+        .get("<%= process.env.MIPIE_BACKEND_URL %>/company/getNearbyCandidatesForMap", {
           headers: {
             "x-auth": localStorage.getItem("token"),
             "Content-Type": "multipart/form-data",
@@ -224,7 +224,7 @@
             $('#qualificationMarker').text(`Qualification: ${candidate.highestQualification[0]?.name ? candidate.highestQualification[0]?.name : 'NA'}`)
             $('#locationMarker').text(`Location: ${Math.round(candidate.distance / 1000)} km`)
             $('#candidateDetailsMarker').text('View Details')
-            $('#candidateDetailsMarker').attr('href', `/company/candidate/${candidate._id}`)
+            $('#candidateDetailsMarker').attr('href', `<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/${candidate._id}`)
 
             let content =$(temp).html()
             
@@ -234,7 +234,7 @@
             const marker = new google.maps.Marker({
               position: obj,
               icon: {
-                url: "/images/marker.png",
+                url: "<%= process.env.MIPIE_BACKEND_URL %>/images/marker.png",
                 scaledSize: new google.maps.Size(35, 35),
               },
               map: map,
@@ -271,7 +271,7 @@
 
             header = { headers: { 'x-auth': localStorage.getItem('token') } }
 
-            axios.get('/company/getcities', { params: { stateId } }, header)
+            axios.get('<%= process.env.MIPIE_BACKEND_URL %>/company/getcities', { params: { stateId } }, header)
               .then(result => {
                 if (result.data.cities.length > 0) {
                   $('option.cityclass').remove();
@@ -291,7 +291,7 @@
             if (!stateId) {
               $(`select#${cityId} option.companycitylist`).remove();
             } else {
-              $.get('/company/getcitiesbyId', body).done((res) => {
+              $.get('<%= process.env.MIPIE_BACKEND_URL %>/company/getcitiesbyId', body).done((res) => {
                 $(`select#${cityId} option.companycitylist`).remove();
                 let options;
                 for (let i = 0; i < res.cityValues.length; i++) {

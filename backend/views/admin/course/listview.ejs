@@ -6,7 +6,7 @@
                     <h3 class="content-header-title float-left mb-0">View Documents</h3>
                     <div class="breadcrumb-wrapper col-12">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+                            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
                             <li class="breadcrumb-item active">Documents</li>
                         </ol>
                     </div>
@@ -983,7 +983,7 @@ function updateTransform() {
     console.log("data", data);
 
 
-            axios.put(`/admin/courses/${courseId}/${candidateId}/docsview`, data, {
+            axios.put(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/${courseId}/${candidateId}/docsview`, data, {
                                 headers: {
                                     'x-auth': localStorage.getItem('token'),
                                     'Content-Type': 'multipart/form-data'

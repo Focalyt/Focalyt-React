@@ -15,7 +15,7 @@
                   <h2 class="content-header-title float-left mb-0">Shortlisted Candidates</h2>
                   <div class="breadcrumb-wrapper col-12">
                     <ol class="breadcrumb">
-                      <li class="breadcrumb-item"><a href="/company/dashboard">Home</a>
+                      <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                       </li>
                       <li class="breadcrumb-item active">Shortlisted Candidates</li>
                     </ol>
@@ -102,10 +102,10 @@
                                   <%= shortlisted.status %>
                                 </td>
                                 <td class="actions" id="socail-iconw">
-                                  <a href="/company/candidate/<%=shortlisted.candidate[0]?._id%>?src=shortlisted"><i
+                                  <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/<%=shortlisted.candidate[0]?._id%>?src=shortlisted"><i
                                     class="fa-regular fa-user fa-lg"></i></a>
-                                   <a href="https://wa.me/91<%= shortlisted?.candidate[0]?.whatsapp %>" target="_blank"> <img src="/public_assets/images/whatsappicon.png" width="18%" class="mx-1"></a> 
-                                   <a href="tel:<%= shortlisted?.candidate[0]?.mobile %>"> <img src="/public_assets/images/telephone.png" width="18.5%"> </a>
+                                   <a href="https://wa.me/91<%= shortlisted?.candidate[0]?.whatsapp %>" target="_blank"> <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/whatsappicon.png" width="18%" class="mx-1"></a> 
+                                   <a href="tel:<%= shortlisted?.candidate[0]?.mobile %>"> <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/telephone.png" width="18.5%"> </a>
                                 </td>
                               </tr>
                               <% }) } else {%>

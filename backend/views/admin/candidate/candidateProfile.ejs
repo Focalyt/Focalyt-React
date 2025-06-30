@@ -31,7 +31,7 @@
                       <img class="img-fluid rounded mb-2 mt-2" height="60" width="80"
                         src="<%= process.env.MIPIE_BUCKET_URL +'/' + candidate.image %>" alt="User avatar">
                       <% } else { %>
-                        <img class="img-fluid rounded mb-2 mt-2" src="/images/elements/1.png"
+                        <img class="img-fluid rounded mb-2 mt-2" src="<%= process.env.MIPIE_BACKEND_URL %>/images/elements/1.png"
                           alt="User avatar">
                         <% } %>
                           <div class="user-info text-center">
@@ -113,7 +113,7 @@
                 <div class="col-xl-12" id="mipie_profile">
                   <div class="row">
                     <div class="col-xl-2 col-lg-2 col-md-2 col-sm-2 col-2 bg-cs-one px-0 text-center">
-                      <img src="/images/icons/profile.png" class="img-fluid pt-1">
+                      <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/profile.png" class="img-fluid pt-1">
                     </div>
                     <div class="col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 py-1 my-auto">
                       <h5 class="p-0 m-0">Focalyt Profile</h5>
@@ -130,7 +130,7 @@
                         id="candidate_resume">
                         <div class="row">
                           <div class="col-xl-2 col-lg-2 col-md-2 col-sm-2 col-2 bg-cs-two px-0 text-center">
-                            <img src="/images/icons/resume.png" class="img-fluid pt-1">
+                            <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/resume.png" class="img-fluid pt-1">
                           </div>
                           <div class="col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 py-1 my-auto">
                             <h5 class="p-0 m-0">Resume</h5>

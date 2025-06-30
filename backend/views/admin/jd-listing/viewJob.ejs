@@ -6,7 +6,7 @@
           <h3 class="content-header-title float-left mb-0">Job Listings</h3>
           <div class="breadcrumb-wrapper col-12">
             <ol class="breadcrumb">
-              <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+              <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
               <li class="breadcrumb-item active">Job Listings</li>
             </ol>
           </div>
@@ -26,7 +26,7 @@
                   <h4 class="card-title">JOB Brief</h4>
                 </div>
                 <div class="col-xl-6 lg-6 md-8 sm-8 col-8 text-right">
-                  <a href="/admin/joblisting" class="btn btn-primary">All JDs</a>
+                  <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting" class="btn btn-primary">All JDs</a>
                 </div>
               </div>
               <div class="card-content">
@@ -351,10 +351,10 @@
                 <div class="col-xl-6 lg-6 md-8 sm-8 col-8 text-right px-xl-1 px-lg-1 px-md-1 px-sm-0 px-0">
                   <div class="speak-btn">
                     <button type="button" onclick="speakEnglish()" class="btn btn-eng btn-sm"><img
-                        src="/images/icons/icons8-speak-21.png" alt="" class="img-fluid">
+                        src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/icons8-speak-21.png" alt="" class="img-fluid">
                       English</button>
                     <button type="button" onclick="speakHindi()" class="btn btn-hindi btn-sm"><img
-                        src="/images/icons/icons8-speak-21.png" alt="" class="img-fluid">
+                        src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/icons8-speak-21.png" alt="" class="img-fluid">
                       Hindi</button>
                   </div>
                 </div>
@@ -500,7 +500,7 @@
                                 candidate.totalExperience + ' Years' : 'NA' %>
                             </td>
                             <td class="actions">
-                              <a href="/admin/candidate/details/<%=candidate._id%>"><i
+                              <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%=candidate._id%>"><i
                                   class="fa-regular fa-user"></i></a>
                             </td>
                           </tr>
@@ -545,7 +545,7 @@
         body = { message }
         header = { headers: { 'x-auth': localStorage.getItem('token') } }
 
-        axios.post(`/admin/vacancy/translate`, body, header)
+        axios.post(`<%= process.env.MIPIE_BACKEND_URL %>/admin/vacancy/translate`, body, header)
           .then(res => {
             console.log(res)
             speak(res.data.message, 'hi')
@@ -556,7 +556,7 @@
       changeApplyCoins = (_id) => {
         let applyReduction = parseFloat($('#applycoinsField').val());
         if (applyReduction && applyReduction > 0) {
-          axios.put(`/admin/joblisting/${_id}`, { applyReduction }).then((res) => {
+          axios.put(`<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/${_id}`, { applyReduction }).then((res) => {
             if (res.status) {
               console.log("Coins status updated!");
             }
@@ -626,14 +626,14 @@
       function updateVerification(_id, verified) {
         verified = verified == 'true' ? false : true;
         let applyReduction = parseFloat($('#applycoinsField').val());
-        axios.put(`/admin/joblisting/${_id}`, { verified, applyReduction }).then((res) => {
+        axios.put(`<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/${_id}`, { verified, applyReduction }).then((res) => {
           window.location.reload()
         })
       }
 
       function updateRecommendation(_id, isRecommended, courseId) {
         isRecommended = isRecommended == 'true' ? false : true;
-        axios.put(`/admin/joblisting/${_id}`, { isRecommended, courseId }).then((res) => {
+        axios.put(`<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/${_id}`, { isRecommended, courseId }).then((res) => {
           window.location.reload()
         })
       }
@@ -646,7 +646,7 @@
 
         // Construct the URL with the query parameter
         // Replace `_id` with the actual job listing ID
-        const url = `/admin/joblisting/${_id}?sectorId=${selectedSectorId}`;
+        const url = `<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/${_id}?sectorId=${selectedSectorId}`;
 
         // Redirect the user to the new URL
         window.location.href = url;
@@ -657,7 +657,7 @@
         const selectedSectorId = document.getElementById('sector').value;
 
         // Make a request to fetch courses based on the selected sector ID
-        fetch(`/admin/courses/getCourseViaSector?sectorId=${selectedSectorId}`)
+        fetch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/getCourseViaSector?sectorId=${selectedSectorId}`)
           .then(response => response.json())
           .then(data => {
             // Update the courses dropdown with the fetched courses
@@ -684,7 +684,7 @@
         console.log('selectedCourseLevel:dd ', selectedCourseLevel);
 
         // Make a request to fetch course names based on the selected course level
-        fetch(`/admin/courses/getCourseDetailById?courseId=${selectedCourseLevel}`)
+        fetch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/getCourseDetailById?courseId=${selectedCourseLevel}`)
           .then(response => response.json())
           .then(data => {
             // Update the Name dropdown with the fetched course names
@@ -758,7 +758,7 @@
         rowToRemove.remove();
       }
       function removeSelectCourseObj(_id, courseId,) {
-        axios.put(`/admin/joblisting/removeCourse/${_id}`, { courseId }).then((res) => {
+        axios.put(`<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/removeCourse/${_id}`, { courseId }).then((res) => {
           window.location.reload()
         })
       }
@@ -839,10 +839,10 @@
         };
 
         // Perform the PUT request with the updated data
-        axios.put(`/admin/joblisting/${id}`, data)
+        axios.put(`<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting/${id}`, data)
           .then((res) => {
             // Handle success if needed
-            window.location.href= "/admin/joblisting" /*  window.location.reload() */
+            window.location.href= "<%= process.env.MIPIE_BACKEND_URL %>/admin/joblisting" /*  window.location.reload() */
           })
           .catch(error => {
             console.error('Error saving data', error);

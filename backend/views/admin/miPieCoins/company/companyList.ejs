@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Coins - Companies</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Coins - Companies</li>
 						</ol>
 					</div>
@@ -58,7 +58,7 @@
                                             class="btn btn-success  waves-effect waves-light  text-white d-inline "
                                             id="submit-btn">Go</button>
                                             <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-1"
-                                            href="/admin/Coins/availedCompanies/<%= offerId %>">RESET</a>
+                                            href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/availedCompanies/<%= offerId %>">RESET</a>
                                         </div>
                                       </div>
                                       </form>
@@ -211,7 +211,7 @@
 			obj[key] = value
 			str += `${key}=${value}&`
             }
-		window.location.href = `/admin/Coins/availedCompanies/<%= offerId %>/${str}value=${value}&order=${order}`
+		window.location.href = `<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/availedCompanies/<%= offerId %>/${str}value=${value}&order=${order}`
 	}
         </script>
 </div>

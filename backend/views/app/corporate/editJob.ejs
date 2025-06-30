@@ -18,7 +18,7 @@
             <section id="Concerned-Person">
               <div class="row">
                 <div class="col-xl-12 px-3 text-right">
-                  <a href="/company/list/jobs" class="btn btn-outline-primary">All Job Details</a>
+                  <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs" class="btn btn-outline-primary">All Job Details</a>
                 </div>
                 <div class="col-xl-12 col-lg-12 px-3">
                   <div class="card mt-2">
@@ -230,7 +230,7 @@
                               <label for="work-loc">Work Location<span class="mandatory"> *</span></label>
                               <div class="input-group mb-2">
                                 <div class="input-group-prepend bg-locat">
-                                  <div class="input-group-text bg-intext"><img src="/images/isist.png" id="siteforcomp">
+                                  <div class="input-group-text bg-intext"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/isist.png" id="siteforcomp">
                                   </div>
                                 </div>
                                 <input type="text" class="form-control" id="work-loc" value="<%= jd?.place %>">
@@ -1009,14 +1009,14 @@
               offerId: offerId,
               amount: amount
             }
-            axios({ method: 'post', url: '/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
+            axios({ method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/payment', data, headers: { 'x-auth': localStorage.getItem('token') } }).then((res) => {
               let options = {
                 "key": '<%= process.env.MIPIE_RAZORPAY_KEY %>',
                 "amount": res.data.order.amount,
                 "currency": res.data.order.currency,
                 "name": "MiPie",
                 "description": "",
-                "image": "/images/logo/logo.png",
+                "image": "<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png",
                 "order_id": res.data.order.id,
                 "handler": function (response) {
                   let data = {
@@ -1027,7 +1027,7 @@
                     amount: amount,
                     code: code
                   }
-                  axios({ method: 'post', url: '/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') } }).then(res => {
+                  axios({ method: 'post', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/paymentStatus', data, headers: { 'x-auth': localStorage.getItem('token') } }).then(res => {
                     window.location.reload()
                   }).catch(
                     (error) => {
@@ -1064,7 +1064,7 @@
                 offerId: offer
               }
               document.getElementById('codevalue').value = code
-              axios({ method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
+              axios({ method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
                 .then((res) => {
                   if (res.data.status && res.data.amount > 0) {
                     $('#error-message').text('')
@@ -1106,7 +1106,7 @@
               offerId: offer
             }
             document.getElementById('codevalue').value = code
-            axios({ method: 'put', url: '/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
+            axios({ method: 'put', url: '<%= process.env.MIPIE_BACKEND_URL %>/company/checkvoucher', data, headers: { 'x-auth': localStorage.getItem('token') } })
               .then((res) => {
                 if (res.data.status && res.data.amount > 0) {
                   $('#error-message').text('')
@@ -1132,7 +1132,7 @@
           }
 
           function getOffers() {
-            axios({ method: 'get', url: `/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
+            axios({ method: 'get', url: `<%= process.env.MIPIE_BACKEND_URL %>/company/getCoinOffers`, headers: { 'x-auth': localStorage.getItem('token') } })
               .then(res => {
                 let offers = document.getElementById('offers');
                 let html = ''
@@ -1266,7 +1266,7 @@
               inputField.value = ''
             } else {
               $('#preloader').show();
-              axios.post('/api/uploadJD', body, header)
+              axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadJD', body, header)
                 .then(result => {
                   if (result.data.status) {
                     $('#jobvideo').val(result.data.data.Key)
@@ -1417,9 +1417,9 @@
 
 
             if (!lessCoins) {
-              axios.post("/company/editJobs/<%= jd?._id%>", formData).then((res) => {
+              axios.post("<%= process.env.MIPIE_BACKEND_URL %>/company/editJobs/<%= jd?._id%>", formData).then((res) => {
                 if (res.status && res) {
-                  window.location.href = "/company/list/jobs"
+                  window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs"
                 }
               })
             }
@@ -1628,9 +1628,9 @@
             };
 
 
-            axios.post('/api/deleteSingleFile', data, header)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deleteSingleFile', data, header)
               .then(res => {
-                axios.post("/company/removeVideoThuumbnailJd/<%= jd?._id%>")
+                axios.post("<%= process.env.MIPIE_BACKEND_URL %>/company/removeVideoThuumbnailJd/<%= jd?._id%>")
                   .then(() => {
                     $('.thumbnail-preview-container').hide();
                     $('#jobVideoThumbnail').removeClass('d-none');
@@ -1649,9 +1649,9 @@
               key: key
             };
 
-            axios.post('/api/deleteSingleFile', data, header)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deleteSingleFile', data, header)
               .then(res => {
-                axios.post("/company/removeVideoJd/<%= jd?._id%>")
+                axios.post("<%= process.env.MIPIE_BACKEND_URL %>/company/removeVideoJd/<%= jd?._id%>")
                   .then(() => {
                     $('.video-preview-container').hide();
                     $('#jobvideo').removeClass('d-none');

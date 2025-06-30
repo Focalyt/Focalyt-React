@@ -96,7 +96,7 @@
                   <% if (cashbackRequests.length > 0) { %>
                   <% cashbackRequests.forEach((cashback)=> { %>
                   <tr>
-                    <td class="text-capitalize"><a  href="/admin/candidate/details/<%=cashback._candidate._id%>"><%= cashback._candidate ? cashback._candidate.name : "NA" %></a></td>
+                    <td class="text-capitalize"><a  href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%=cashback._candidate._id%>"><%= cashback._candidate ? cashback._candidate.name : "NA" %></a></td>
                     <td><%= cashback._candidate ? cashback._candidate.mobile : "NA" %></td>
                     <td><%= cashback._candidate?.upi ? cashback._candidate?.upi : 'NA' %></td>
                     <td><%= cashback.amount %></td>

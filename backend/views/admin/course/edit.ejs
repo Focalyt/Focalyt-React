@@ -78,7 +78,7 @@
                     <h3 class="content-header-title float-left mb-0">Edit Course</h3>
                     <div class="breadcrumb-wrapper col-12">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+                            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
                             <li class="breadcrumb-item active">Edit Course</li>
                         </ol>
                     </div>
@@ -88,7 +88,7 @@
     </div>
     <div class="content-body">
         <% include ../partials/flash %>
-            <form action="/admin/courses/edit/<%= course._id %>" method="POST"></form>
+            <form action="<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/edit/<%= course._id %>" method="POST"></form>
             <section id="personal-info">
 
                 <div class="row">
@@ -1063,7 +1063,7 @@
                 return;
             }
 
-            axios.patch(`/admin/courses/edit/${courseId}/add-doc`, { Name: docName })
+            axios.patch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/edit/${courseId}/add-doc`, { Name: docName })
                 .then(res => {
                     alert("Document Added Successfully");
                     location.reload();  // Optional: ya UI update karo
@@ -1077,7 +1077,7 @@
         function disableDocument( docId) {
             if (confirm("Are you sure you want to remove this document?")) {
                 const courseId = '<%=id%>';
-                axios.patch(`/admin/courses/${courseId}/disable-doc/${docId}`)
+                axios.patch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/${courseId}/disable-doc/${docId}`)
                     .then(res => {
                         alert(res.data.message);
                         location.reload(); // Optional: ya UI se remove kar do
@@ -1131,12 +1131,12 @@
             let data = {
                 key: e.attributes.value.textContent
             }
-            axios.post('/api/deletefile', data)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deletefile', data)
                 .then(result => {
                     if (result.status) {
                         let parentdiv = $(e).closest('div.testimonialgallery')
                         $(parentdiv).remove();
-                        axios.post("/admin/courses/removetestimonial", { courseId, key: e.attributes.value.textContent }).then(() => console.log('deleted'))
+                        axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/removetestimonial", { courseId, key: e.attributes.value.textContent }).then(() => console.log('deleted'))
                     }
                 })
             return false;
@@ -1146,12 +1146,12 @@
             let data = {
                 key: e.attributes.value.textContent
             }
-            axios.post('/api/deletefile', data)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deletefile', data)
                 .then(result => {
                     if (result.status) {
                         let parentdiv = $(e).closest('div.videogallery')
                         $(parentdiv).remove();
-                        axios.post("/admin/courses/removevideo", { courseId, key: e.attributes.value.textContent }).then(() => console.log('deleted'))
+                        axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/removevideo", { courseId, key: e.attributes.value.textContent }).then(() => console.log('deleted'))
                     }
                 })
             return false;
@@ -1161,12 +1161,12 @@
             let data = {
                 key: e.attributes.value.textContent
             }
-            axios.post('/api/deletefile', data)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deletefile', data)
                 .then(result => {
                     if (result.status) {
                         let parentdiv = $(e).closest('div.galleryImage')
                         $(parentdiv).remove();
-                        axios.post("/admin/courses/removephoto", { courseId, key: e.attributes.value.textContent }).then(() => console.log('deleted'))
+                        axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/removephoto", { courseId, key: e.attributes.value.textContent }).then(() => console.log('deleted'))
                     }
                 })
             return false;
@@ -1176,12 +1176,12 @@
             let data = {
                 key: brochure
             }
-            axios.post('/api/deletefile', data)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deletefile', data)
                 .then(result => {
                     if (result.status) {
                         let parentdiv = $(e).closest('div.brochureImage')
                         $(parentdiv).remove();
-                        axios.post("/admin/courses/removebrochure", { courseId: courseId, key: brochure }).then(() => console.log('deleted'))
+                        axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/removebrochure", { courseId: courseId, key: brochure }).then(() => console.log('deleted'))
                     }
                 })
             return false;
@@ -1191,12 +1191,12 @@
             let data = {
                 key: thumbnail
             }
-            axios.post('/api/deletefile', data)
+            axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/deletefile', data)
                 .then(result => {
                     if (result.status) {
                         let parentdiv = $(e).closest('div.thumbnailImage')
                         $(parentdiv).remove();
-                        axios.post("/admin/courses/removethumbnail", { courseId: courseId, key: thumbnail }).then(() => console.log('deleted'))
+                        axios.post("<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/removethumbnail", { courseId: courseId, key: thumbnail }).then(() => console.log('deleted'))
                     }
                 })
             return false;
@@ -1236,7 +1236,7 @@
                 }
 
                 header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
-                axios.post('/api/uploadMultiFiles', formData, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadMultiFiles', formData, header)
                     .then(result => {
                         debugger
                         if (result.data.status) {
@@ -1279,7 +1279,7 @@
                 }
 
                 header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
-                axios.post('/api/uploadMultiFiles', formData, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadMultiFiles', formData, header)
                     .then(result => {
                         if (result.data.status) {
                             let combinedKeys = ''
@@ -1320,7 +1320,7 @@
                 }
 
                 header = { headers: { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" } }
-                axios.post('/api/uploadMultiFiles', formData, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadMultiFiles', formData, header)
                     .then(result => {
                         if (result.data.status) {
                             let combinedKeys = ''
@@ -1358,7 +1358,7 @@
                 alert("upload the thumbnail in .docx, .doc,.jpg, .jpeg, .png or pdf format");
                 e.target.value = ''
             } else {
-                axios.post('/api/uploadAdminFile', body, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadAdminFile', body, header)
                     .then(result => {
                         console.log('=============> here ', result)
                         if (result.data.status) {
@@ -1388,7 +1388,7 @@
                 alert("upload the brochure in .docx, .doc,.jpg, .jpeg, .png or pdf format");
                 e.target.value = ''
             } else {
-                axios.post('/api/uploadAdminFile', body, header)
+                axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/uploadAdminFile', body, header)
                     .then(result => {
                         console.log('=============> here ', result)
                         if (result.data.status) {
@@ -1447,7 +1447,7 @@
                     const data = await Promise.all(
                         filesData.map(async (file) => {
                             const ext = file.name.split(".").pop();
-                            const res = await axios.get("/admin/s3upload", {
+                            const res = await axios.get("<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload", {
                                 params: { type: file.type, ext },
                             });
                             if (!res || !res.data || !res.data.data) return null;
@@ -1657,10 +1657,10 @@
             body.docsRequired = docsArray;
             console.log(JSON.stringify(body), "body");
             // Send updated data to the server
-            axios.post(`/admin/courses/edit/<%=course._id %>`, body)
+            axios.post(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/edit/<%=course._id %>`, body)
                 .then((res) => {
                     if (res && res.status) {
-                        window.location.href = "/admin/courses";
+                        window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/courses";
                     }
                 })
                 .catch(error => {

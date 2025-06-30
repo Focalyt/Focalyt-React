@@ -119,6 +119,8 @@ router.use('/portalaccess', addPortalAccessRoutes);
 router.use('/autocontrol', addControlRoutes);
 router.use('/eventType', eventTypeRoutes);
 
+const backendUrl = process.env.MIPIE_BACKEND_URL;
+
 // router.use(isAdmin);
 router.post ('/courses',async(req,res)=>{
   
@@ -130,7 +132,7 @@ router.get('/', async (req, res) => {
     let loggedInUser = null;
 
     if (!userId) {
-      return res.redirect('/admin/login'); // ✅ User not logged in, redirect to login
+      return res.redirect(`${backendUrl}/admin/login`); // ✅ User not logged in, redirect to login
     }
 
     if (userId) {

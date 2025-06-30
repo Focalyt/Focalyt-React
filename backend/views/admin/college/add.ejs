@@ -135,7 +135,7 @@
 														<div class="image-upload">
 															<label for="filestwo" style="cursor: pointer;">
 																<img class="custom-cursor-pointer"
-																	src="/images/add_receipt.png" width="40px"
+																	src="<%= process.env.MIPIE_BACKEND_URL %>/images/add_receipt.png" width="40px"
 																	height="auto" id="outputtwo" />
 																<p class="mt-1 custom-cursor-pointer">
 																	Click to upload logo
@@ -322,7 +322,7 @@
 													<div class="card-body">
 														<div class="row">
 															<div class="col-xl-12 text-right">
-																 <a type="reset" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/college/add"
+																 <a type="reset" href="/admin/college/add"
 																	class="btn btn-danger" value="Reset">Reset</a>
 																
 															</div>

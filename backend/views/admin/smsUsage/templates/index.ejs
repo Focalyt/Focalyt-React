@@ -9,7 +9,7 @@
         </h3>
         <div class="breadcrumb-wrapper col-12">
           <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
             <li class="breadcrumb-item active">SMS Usage</li>
           </ol>
         </div>
@@ -34,7 +34,7 @@
                   <p>Show Archived</p>
                 </div></div>
                 <div class="col-6 text-right "><div class="launch pl-1 py-1 px-1">
-                  <a href="/admin/smsUsage/addTemplate" class="btn btn-primary  <% if(view==true ) {%> disabled <% } %>"
+                  <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/smsUsage/addTemplate" class="btn btn-primary  <% if(view==true ) {%> disabled <% } %>"
                   <% if(view==true ) {%> disabled <% } %>>+ Add Template</a>
                 </div></div>
               </div>
@@ -94,11 +94,11 @@
                     <% } %>
                     <td valign="middle">
                       <% if (view === false) { %>
-                      <a href="/admin/smsUsage/addTemplate/<%= i._id %>">
+                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/smsUsage/addTemplate/<%= i._id %>">
                         <i class="feather icon-edit fa-lg primary"></i>
                       </a>
                       <% } %>
-                      <a style="padding-left: 7px" href="/admin/smsUsage/viewTemplate/<%= i._id %>">
+                      <a style="padding-left: 7px" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/smsUsage/viewTemplate/<%= i._id %>">
                         <i class="feather icon-eye fa-lg primary"></i>
                       </a>
                     </td>
@@ -184,17 +184,17 @@
       if (checkbox.checked) {
         $.ajax({
           type: "GET",
-          url: "/admin/smsUsage/templates?status=false",
+          url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/smsUsage/templates?status=false",
           success: () =>
-            (window.location.href = "/admin/smsUsage/templates?status=false"),
+            (window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/smsUsage/templates?status=false"),
         });
       } else {
         $.ajax({
           type: "GET",
-          url: "/admin/smsUsage/templates?status=true",
+          url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/smsUsage/templates?status=true",
           success: () =>
             (window.location.href =
-              "/admin/smsUsage/templates?status=true"),
+              "<%= process.env.MIPIE_BACKEND_URL %>/admin/smsUsage/templates?status=true"),
         });
       }
     }
@@ -206,7 +206,7 @@
       }
       $.ajax({
         type: "PUT",
-        url: "/admin/smsUsage/updateTemplate",
+        url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/smsUsage/updateTemplate",
         data: {
           id,
           status: myStatus,

@@ -11,7 +11,7 @@
             </h3>
             <div class="breadcrumb-wrapper col-12">
               <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+                <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
                 <li class="breadcrumb-item active">Youtube Videos</li>
               </ol>
             </div>
@@ -39,7 +39,7 @@
                   <% if (view === false) { %>
                   <div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 text-right">
                     <a
-                      href="/admin/uploadedVideos/addOrEditVideo"
+                      href="<%= process.env.MIPIE_BACKEND_URL %>/admin/uploadedVideos/addOrEditVideo"
                       class="btn btn-primary"
                       >+ Add Video Link </a
                     >
@@ -97,7 +97,7 @@
                                   </td>
                                   <td>
                                     <% if(isChecked=='false' && view === false) {%>
-                                      <a href="/admin/uploadedVideos/addOrEditVideo/<%= video._id%>">
+                                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/uploadedVideos/addOrEditVideo/<%= video._id%>">
                                         <i class="feather icon-edit fa-lg primary"></i>
                                       </a>
                                       <% } %>
@@ -176,7 +176,7 @@
             }
             let data = { id: id, status: myStatus }
             let headers = { 'x-auth': localStorage.getItem('token') }
-            axios.patch(`/admin/uploadedVideos/changeStatus`, data, { headers: headers })
+            axios.patch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/uploadedVideos/changeStatus`, data, { headers: headers })
               .then((res) => {
                 location.reload()
               }).catch((err) => {
@@ -186,7 +186,7 @@
           function updateSequence(e, id) {
           const val = e.target.value;
           console.log("id",id)
-            axios.patch("/admin/uploadedVideos/updatesequence", { videoId: id, val }).then((res) => {
+            axios.patch("<%= process.env.MIPIE_BACKEND_URL %>/admin/uploadedVideos/updatesequence", { videoId: id, val }).then((res) => {
             if (res.data.status === true) {
              e.target.value = res.data.sequence
            }
@@ -194,7 +194,7 @@
     }
     function archived() {
       let checkbox = document.getElementById('checkbox1');
-      window.location.href = `/admin/uploadedVideos/list?status=${!checkbox.checked}`
+      window.location.href = `<%= process.env.MIPIE_BACKEND_URL %>/admin/uploadedVideos/list?status=${!checkbox.checked}`
     }
         </script>
         <% include ../partials/footer%>

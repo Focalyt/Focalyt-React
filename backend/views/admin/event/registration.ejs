@@ -6,7 +6,7 @@
                     <h3 class="content-header-title float-left mb-0">Registrations</h3>
                     <div class="breadcrumb-wrapper col-12">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+                            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
                             <li class="breadcrumb-item active">Registrations</li>
                         </ol>
                     </div>
@@ -37,7 +37,7 @@
                                                             class="btn btn-success waves-effect waves-light text-white d-inline"
                                                             id="submit-btn">Go</button>
                                                         <a class="extra-ss btn btn-danger d-inline waves-effect waves-light mb-2 text-white mx-1"
-                                                            href="/admin/courses/registrations">RESET</a>
+                                                            href="<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/registrations">RESET</a>
                                                     </div>
                                                     <div class="col-xl-6 text-right mt-3">
                                                         <div class="custom-control custom-checkbox">
@@ -79,7 +79,7 @@
                                                             class="btn btn-success  waves-effect waves-light  text-white d-inline "
                                                             id="submit-btn">Go</button>
                                                         <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-1"
-                                                            href="/admin/registrations">RESET</a>
+                                                            href="<%= process.env.MIPIE_BACKEND_URL %>/admin/registrations">RESET</a>
                                                     </div>
                                                 </div>
                                             </form>
@@ -127,7 +127,7 @@
                                                                 <%= l._candidate?.email ? l._candidate?.email : "N/A" %>
                                                             </td>
                                                             <td class="text-capitalize">
-                                                                <a href="/admin/candidate/details/<%= l._candidate?._id ? l._candidate?._id : '/' %>">
+                                                                <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%= l._candidate?._id ? l._candidate?._id : '/' %>">
                                                                     <i class="fas fa-eye"></i>
 
                                                                 </a>
@@ -257,7 +257,7 @@
         <script>
             function statusUpdate(appliedId) {
 
-                axios.post(`/admin/courses/leadStatus`, appliedId)
+                axios.post(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/leadStatus`, appliedId)
                     .then(response => {
                         console.log("aaaaaa");
 
@@ -306,10 +306,10 @@
                     assignDate: isoAssignDate
 
                 };
-                axios.put(`/admin/courses/assignCourses/${id}`, updateCourse)
+                axios.put(`<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/assignCourses/${id}`, updateCourse)
                     .then(response => {
                         console.log("aaaaaa");
-                        window.location.href = "/admin/courses/registrations"
+                        window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/registrations"
                     })
                     .catch(error => {
                         console.error(error);
@@ -327,12 +327,12 @@
                 $.ajax({
                     type: "POST",
                     data: { mobile, module: 'candidate' },
-                    url: "/api/loginAsCandidate",
+                    url: "<%= process.env.MIPIE_BACKEND_URL %>/api/loginAsCandidate",
                     success: (data) => {
                         if (data.role === 3) {
                             localStorage.setItem("candidate", data.name);
                             localStorage.setItem("token", data.token);
-                            window.location.href = "/candidate/dashboard";
+                            window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/candidate/dashboard";
                         }
                     }
                 });
@@ -347,7 +347,7 @@
                 }
                 $.ajax({
                     type: "POST",
-                    url: "/admin/candidate/changeprofilestatus",
+                    url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/changeprofilestatus",
                     data: {
                         mobile,
                         status: field,
@@ -363,7 +363,7 @@
                 }
                 $.ajax({
                     type: "POST",
-                    url: "/admin/changestatus",
+                    url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/changestatus",
                     data: {
                         id,
                         status: myStatus,

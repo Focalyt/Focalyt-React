@@ -17,7 +17,7 @@
                     <h3 class="content-header-title float-left mb-0">Job Details</h3>
                     <div class="breadcrumb-wrapper col-12">
                       <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="/company/dashboard">Home</a>
+                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                         </li>
                         <li class="breadcrumb-item active">Job Details</li>
                       </ol>
@@ -39,7 +39,7 @@
                       </div>
                       <div class="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 text-right">
                         <% if(canAdd && isExist) {%>
-                          <a href="/company/addjobs" class="btn btn-primary">+ Add JD</a>
+                          <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs" class="btn btn-primary">+ Add JD</a>
                           <%} else if(!canAdd&&isExist){%>
                             <a href="javascript:;" class="btn btn-primary" data-toggle="modal" data-target="#popup" data-dismiss="modal">+ Add JD</a>
                             <%}%>
@@ -83,11 +83,11 @@
                                     <%= moment(curr.createdAt).format('MMM DD YYYY') %>
                                   </td>
                                   <td>
-                                    <a href="/company/editJobs/<%= jd[i]._id %>"><i class="fas fa-edit disable_button" style="color:black;"></i></a>
+                                    <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/editJobs/<%= jd[i]._id %>"><i class="fas fa-edit disable_button" style="color:black;"></i></a>
                                   </td>
                                   <td>
                                     <% if(canAdd) {%>
-                                      <a href="/company/addjobs/<%= jd[i]._id %>"><i class="fas fa-copy disable_button"  style="color:black;"></i></a>
+                                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs/<%= jd[i]._id %>"><i class="fas fa-copy disable_button"  style="color:black;"></i></a>
                                       <%} else{%>
                                         <a href="javascript:;" data-toggle="modal" data-target="#popup" data-dismiss="modal"><i class="fas fa-copy disable_button" style="color:black;"></i></a>
                                         <%}%>
@@ -135,11 +135,11 @@
                                       <%= moment(curr.createdAt).format('MMM DD YYYY') %>
                                     </td>
                                     <td>
-                                      <a href="/company/editJobs/<%= jd[i]._id %>"><i class="fas fa-edit"></i></a>
+                                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/editJobs/<%= jd[i]._id %>"><i class="fas fa-edit"></i></a>
                                     </td>
                                     <td>
                                       <% if(canAdd) {%>
-                                        <a href="/company/addjobs/<%= jd[i]._id %>"><i class="fas fa-copy"></i></a>
+                                        <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs/<%= jd[i]._id %>"><i class="fas fa-copy"></i></a>
                                         <%} else{%>
                                           <a href="javascript:;" data-toggle="modal" data-target="#popup" data-dismiss="modal"><i class="fas fa-copy"></i></a>
                                           <%}%>
@@ -161,7 +161,7 @@
                                             <% } %>
                                       </div>
                                     </td>
-                                    <td><a href="/company/jobs/<%= jd[i]._id %>" class="btn btn-primary btn-sm">View</a>
+                                    <td><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/jobs/<%= jd[i]._id %>" class="btn btn-primary btn-sm">View</a>
                                       <%if(moment(curr.validity).utcOffset("+05:30") < moment().startOf("day")){%>
                                        <span class="badge bg-danger ml-1" style="position: relative;">
                                         Expired
@@ -260,7 +260,7 @@
               </h5>
             </div>
             <div class="modal-footer">
-              <a href="/company/myProfile">
+              <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/myProfile">
                 <button type="submit" class="btn btn-primary">Complete Profile</button>
               </a>
               <button type="button" class="btn btn-outline-light" data-dismiss="modal"><i
@@ -279,7 +279,7 @@
             }
             let data = { id: id, status: myStatus }
             let headers = { 'x-auth': localStorage.getItem('token') }
-            axios.patch(`/company/changeStatus`, data, { headers: headers })
+            axios.patch(`<%= process.env.MIPIE_BACKEND_URL %>/company/changeStatus`, data, { headers: headers })
               .then((res) => {
                 location.reload()
               }).catch((err) => {

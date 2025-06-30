@@ -8,7 +8,7 @@
           </h3>
           <div class="breadcrumb-wrapper col-12">
             <ol class="breadcrumb">
-              <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+              <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
               <li class="breadcrumb-item active">Coins - Candidates</li>
             </ol>
           </div>
@@ -34,7 +34,7 @@
                 </div>
                 <% if (view===false) { %>
                   <div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 text-right">
-                    <a href="/admin/Coins/candidate/addEditOffer" class="btn btn-primary">+ Add Offer</a>
+                    <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/candidate/addEditOffer" class="btn btn-primary">+ Add Offer</a>
                   </div>
                   <% } %>
               </div>
@@ -75,7 +75,7 @@
                                   
                                     <% if(offer.availedCount){%>
                                     <td class="text-capitalize">
-                                    <a href="/admin/Coins/availedCandidates/<%= offer._id %>">
+                                    <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/availedCandidates/<%= offer._id %>">
                                     <%= offer.availedCount %>
                                     </a>
                                     </td>
@@ -105,12 +105,12 @@
                                       <% } %>
                                         <td valign="middle">
                                           <% if(isChecked=='false' && view===false) {%>
-                                            <a href="/admin/Coins/candidate/addEditOffer/<%= offer._id%>">
+                                            <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/candidate/addEditOffer/<%= offer._id%>">
                                               <i class="feather icon-edit fa-lg primary"></i>
                                             </a>
                                             <% } %>
                                               <a style="padding-left: 7px"
-                                                href="/admin/Coins/candidate/viewOffer/<%= offer._id%>">
+                                                href="<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/candidate/viewOffer/<%= offer._id%>">
                                                 <i class="feather icon-eye fa-lg primary"></i>
                                               </a>
                                         </td>
@@ -201,7 +201,7 @@
             }
             $.ajax({
               type: "PUT",
-              url: "/admin/Coins/updateOffer",
+              url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/updateOffer",
               data: {
                 id,
                 status: myStatus,
@@ -215,17 +215,17 @@
             if (checkbox.checked) {
               $.ajax({
                 type: "GET",
-                url: "/admin/Coins/candidate?status=false",
+                url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/candidate?status=false",
                 success: () =>
-                  (window.location.href = "/admin/Coins/candidate?status=false"),
+                  (window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/candidate?status=false"),
               });
             } else {
               $.ajax({
                 type: "GET",
-                url: "/admin/Coins/candidate?status=true",
+                url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/candidate?status=true",
                 success: () =>
                 (window.location.href =
-                  "/admin/Coins/candidate?status=true"),
+                  "<%= process.env.MIPIE_BACKEND_URL %>/admin/Coins/candidate?status=true"),
               });
             }
           }

@@ -6,7 +6,7 @@
                     <h3 class="content-header-title float-left mb-0">Report</h3>
                     <div class="breadcrumb-wrapper col-12">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/admin">Home</a></li>
+                            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
                             <li class="breadcrumb-item active">Report</li>
                         </ol>
                     </div>
@@ -117,7 +117,7 @@
             if (status) {
                 params['status'] = status
             }
-            axios.get('/admin/report/hiringStatus', { params }).then(res => {
+            axios.get('<%= process.env.MIPIE_BACKEND_URL %>/admin/report/hiringStatus', { params }).then(res => {
                 window.open(res.data.path, '_blank')
             }).catch((err) => {
                 console.log(err.message)
@@ -131,7 +131,7 @@
             if (status) {
                 params['status'] = status
             }
-            axios.get('/admin/report/appliedCandidates', { params, responseType: 'blob' }).then(res => {
+            axios.get('<%= process.env.MIPIE_BACKEND_URL %>/admin/report/appliedCandidates', { params, responseType: 'blob' }).then(res => {
                 const href = URL.createObjectURL(res.data);
                 window.open(href, '_blank')
             }).catch((err) => {

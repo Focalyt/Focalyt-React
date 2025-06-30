@@ -6,7 +6,7 @@
 					<h3 class="content-header-title float-left mb-0">Loan Enquiry</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Loan Enquiry</li>
 						</ol>
 					</div>
@@ -68,7 +68,7 @@
                                                     <% loans.forEach((l) =>{%>
                                                     <tr>
                                                         <td><%= moment(l.updatedAt).utcOffset("+05:30").format('MMM DD YYYY')%></td>
-                                                        <td><a  href="/admin/candidate/details/<%=l._candidate._id%>">	<%= l._candidate?.name ? l._candidate?.name : 'NA' %></td>
+                                                        <td><a  href="<%= process.env.MIPIE_BACKEND_URL %>/admin/candidate/details/<%=l._candidate._id%>">	<%= l._candidate?.name ? l._candidate?.name : 'NA' %></td>
                                                         <td><%= l._candidate?.mobile ? l._candidate?.mobile : 'NA' %></td>
                                                         <td><%= l._candidate?.city?.name && l._candidate?.state?.name ? l._candidate?.city?.name + ', ' + l._candidate?.state?.name : l._candidate?.city?.name ? l._candidate?.city?.name : l._candidate?.state?.name ? l._candidate?.state?.name : 'NA' %></td>
                                                         <td><%= l.amount ? l.amount : 'NA' %></td>
@@ -228,7 +228,7 @@
                 loanId,status,comment
             }
             let header = { 'x-auth': localStorage.getItem('token'), "Content-Type": "multipart/form-data" }
-            axios.put('/admin/loanEnquiry/updateStatus', body, header).then(res => {
+            axios.put('<%= process.env.MIPIE_BACKEND_URL %>/admin/loanEnquiry/updateStatus', body, header).then(res => {
                 if(res.data.status)
                 window.location.reload()
             }).catch(err => {

@@ -3,7 +3,7 @@
 
     <body
         class="vertical-layout vertical-menu-modern 1-column  navbar-floating footer-static bg-full-screen-image  blank-page blank-page"
-        data-open="click" data-menu="vertical-menu-modern" data-col="1-column">
+        data-open="click" data-menu="vertical-menu-modern" data-col="1-column" style="background-image: url('<%= process.env.MIPIE_BACKEND_URL %>/images/logo/rename.webp');">
         <!-- BEGIN: Content-->
         <div class="app-content content">
             <div class="content-overlay"></div>
@@ -18,7 +18,7 @@
                             <div class="col-xl-12 card bg-authentication rounded mb-0 Regular shadow px-0">
                                 <div class="row m-0">
                                     <div class="col-12 text-center align-self-center px-1 py-0 logo_sec my-1">
-                                        <img src="/images/logo/logo.png" alt="branding logo"
+                                        <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png" alt="branding logo"
                                             class="img-fluid  brand_logo brand-custom">
                                     </div>
                                     <div class=" col-12 p-0">
@@ -34,13 +34,13 @@
                                                     <ul class="nav nav-tabs justify-content-left" role="tablist">
                                                         <li class="nav-item">
                                                             <a class="nav-link" id="service-tab-center"
-                                                                data-toggle="tab" href="/company/login"
+                                                                data-toggle="tab" href="<%= process.env.MIPIE_BACKEND_URL %>/company/login"
                                                                 aria-controls="service-center" role="tab"
                                                                 aria-selected="false">Login</a>
                                                         </li>
                                                         <li class="nav-item">
                                                             <a class="nav-link active" id="home-tab-center"
-                                                                data-toggle="tab" href="/company/register"
+                                                                data-toggle="tab" href="<%= process.env.MIPIE_BACKEND_URL %>/company/register"
                                                                 aria-controls="home-center" role="tab"
                                                                 aria-selected="true">Signup</a>
                                                         </li>
@@ -140,10 +140,10 @@
                                                                                     OTP</label>
                                                                             </fieldset>
                                                                             <p class="pt-0 px-1">I agree to <a
-                                                                                    href="/employersTermsofService"
+                                                                                    href="<%= process.env.MIPIE_BACKEND_URL %>/employersTermsofService"
                                                                                     target="_blank">Employers terms of
                                                                                     use</a> and <a
-                                                                                    href="/userAgreement"
+                                                                                    href="<%= process.env.MIPIE_BACKEND_URL %>/userAgreement"
                                                                                     target="_blank">User Agreement</a>.
                                                                             </p>
                                                                             <div class="row">
@@ -250,7 +250,7 @@
                         $('#error').hide();
                         generateOTP.addEventListener('click', (event) => {
                             event.preventDefault();
-                            axios.post("/api/sendOtptoRegisterCompany", body).then((res) => {
+                            axios.post("<%= process.env.MIPIE_BACKEND_URL %>/api/sendOtptoRegisterCompany", body).then((res) => {
                                 if (res.data.status === true) {
                                     $('#error').hide()
                                     $('#success').show();
@@ -314,28 +314,28 @@
                 else if (firstName.value.trim().length !== 0 && lastName.value.trim().length !== 0 && phoneNumber.value.length !== 0 && otpField.value.length !== 0 && corporateName.value.trim() !== '') {
                     let body;
                     body = { mobile: phoneNumber.value, otp: otpField.value }
-                    axios.post('/api/verifyOtp', body).then((res) => {
+                    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/api/verifyOtp', body).then((res) => {
                         if (res.data.status === true) {
                             $('#error').text(' ');
                             $('#error').hide();
                             $('#success').show();
                             $('#success').text("OTP verified");
                             body = { firstName: firstName.value, lastName: lastName.value, email: userMail.value.trim(), phoneNumber: userNumber.value, companyName: corporateName.value };
-                            axios.post("/company/register", body).then((res) => {
+                            axios.post("<%= process.env.MIPIE_BACKEND_URL %>/company/register", body).then((res) => {
                                 if (res.data.status === 'success') {
                                     body = { mobile: phoneNumber.value }
-                                    axios.post("/api/otpCompanyLogin", body).then((res) => {
+                                    axios.post("<%= process.env.MIPIE_BACKEND_URL %>/api/otpCompanyLogin", body).then((res) => {
                                         if (res.data.status === true) {
                                             localStorage.setItem("company", res.data.name);
                                             localStorage.setItem("registeredEmail", res.data.email);
                                             localStorage.setItem("token", res.data.token);
-                                            window.location.href = "/company/dashboard";
+                                            window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard";
                                         } else {
                                             $('#success').text(" ");
                                             $('#success').hide();
                                             $('#error').show();
                                             $('#error').text("Login failed !!!");
-                                            window.location.href = "/company/login"
+                                            window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/company/login"
                                         }
                                     })
                                 } else {

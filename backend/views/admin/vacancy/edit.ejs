@@ -6,7 +6,7 @@
                 <h3 class="content-header-title float-left mb-0">Edit Vacancy</h3>
                 <div class="breadcrumb-wrapper col-12">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="/admin">Home</a>
+                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a>
                         </li>
                         <li class="breadcrumb-item active">Edit Vacancy
                         </li>
@@ -217,7 +217,7 @@
                           <div class="col-xl-12 col-md-12 col-sm-12 col-12 mt-1 firstImage <%= clas %>">
                             <div class="image-upload">
                                 <label for="filestwo">
-                                <img src="/images/add_receipt.png" width="40px" height="auto" id="outputtwo">
+                                <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/add_receipt.png" width="40px" height="auto" id="outputtwo">
                                 <p class="mt-1">Click to upload Image</p>
                                 </label>
                                 <input id="filestwo" data-id="document" type="file" name="filebrand" class="my-logo-uploader form-control" multiple/>
@@ -244,7 +244,7 @@
                   </div>
                   <div class="row">
                     <div class="col-xl-12 text-right">
-                        <a type="reset" href="/admin/vacancy/add" class="btn btn-danger" value="Reset">Reset</a>
+                        <a type="reset" href="<%= process.env.MIPIE_BACKEND_URL %>/admin/vacancy/add" class="btn btn-danger" value="Reset">Reset</a>
                         <button type="submit" class="btn btn-success">Save</button>
                     </div>
                   </div>
@@ -272,7 +272,7 @@
 
           const data = await Promise.all(filesData.map(async (file) => {
             const ext = file.name.split('.').pop();
-            const res = await axios.get('/admin/s3upload', { params: { type: file.type, ext } });
+            const res = await axios.get('<%= process.env.MIPIE_BACKEND_URL %>/admin/s3upload', { params: { type: file.type, ext } });
             if (!res || !res.data || !res.data.data) return null;
             const { url, key } = res.data.data;
             if (!url || !key) return null;
@@ -342,7 +342,7 @@ $(".rmvClass").click(function(){
       .remove()
       .end()
       .append('<option disabled selected value="">Select Option</option>');
-    axios.post('/helper/getsubInd', {
+    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/helper/getsubInd', {
       _industry: $('#industry').val()
     })
     .then(({
@@ -363,7 +363,7 @@ $(".rmvClass").click(function(){
       .remove()
       .end()
       .append('<option disabled selected value="">Select Option</option>');
-    axios.post('/admin/helper/getstate', {
+    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/admin/helper/getstate', {
       countryId: $('#country').val()
     })
     .then(({
@@ -385,7 +385,7 @@ $(".rmvClass").click(function(){
       .remove()
       .end()
       .append('<option disabled selected value="">Select Option</option>');
-    axios.post('/helper/getcity', {
+    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/helper/getcity', {
       stateId: $('#state').val()
     })
     .then(({
@@ -406,7 +406,7 @@ $('#qualification').change(() => {
       .remove()
       .end()
       .append('<option disabled selected value="">Select Option</option>');
-    axios.post('/helper/getsubQual', {
+    axios.post('<%= process.env.MIPIE_BACKEND_URL %>/helper/getsubQual', {
       _qualification: $('#qualification').val()
     })
     .then(({

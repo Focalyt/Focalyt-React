@@ -15,7 +15,7 @@
                   <h2 class="content-header-title float-left mb-0">Ongoing Candidates</h2>
                   <div class="breadcrumb-wrapper col-12">
                     <ol class="breadcrumb">
-                      <li class="breadcrumb-item"><a href="/company/dashboard">Home</a>
+                      <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
                       </li>
                       <li class="breadcrumb-item active">Ongoing Candidates</li>
                     </ol>
@@ -87,10 +87,10 @@
                                     <td><%= ongoing?.status ? ongoing?.status : 'NA' %></td>
                                     <td><%= !ongoing.candidate[0]?.isExperienced ? 'Fresher' : ongoing.candidate[0]?.totalExperience ? ongoing.candidate?.totalExperience  + ' Years': 'NA' %></td>
                                     <td class="actions " id="socail-iconw" >
-                                      <a href="/company/candidate/<%=ongoing.candidate[0]?._id%>?src=onGoing"><i
+                                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/<%=ongoing.candidate[0]?._id%>?src=onGoing"><i
                                         class="fa-regular fa-user fa-lg"></i></a>
-                                        <a href="https://wa.me/91<%= ongoing?.candidate[0]?.whatsapp %>" target="_blank"> <img src="/public_assets/images/whatsappicon.png" class="mx-1" style="width: 1.5rem;"></a> 
-                                        <a href="tel:<%= ongoing?.candidate[0]?.mobile %>"> <img src="/public_assets/images/telephone.png" style="width: 1.5rem;"> </a>     
+                                        <a href="https://wa.me/91<%= ongoing?.candidate[0]?.whatsapp %>" target="_blank"> <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/whatsappicon.png" class="mx-1" style="width: 1.5rem;"></a> 
+                                        <a href="tel:<%= ongoing?.candidate[0]?.mobile %>"> <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/telephone.png" style="width: 1.5rem;"> </a>     
                                     </td>
                                   </tr>
                                 <% }) } else {%>

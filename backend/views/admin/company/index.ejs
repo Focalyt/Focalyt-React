@@ -14,7 +14,7 @@
 					<h3 class="content-header-title float-left mb-0">Companies</h3>
 					<div class="breadcrumb-wrapper col-12">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/admin">Home</a></li>
+							<li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
 							<li class="breadcrumb-item active">Companies</li>
 						</ol>
 					</div>
@@ -101,7 +101,7 @@
 												  class="btn btn-success  waves-effect waves-light  text-white d-inline px-lg-3 px-md-3 px-sm-2"
 												  id="submit-btn">Go</button>
 												  <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-2 px-lg-3 px-md-3 px-sm-2"
-												  href="/admin/company">RESET</a>
+												  href="<%= process.env.MIPIE_BACKEND_URL %>/admin/company">RESET</a>
 											</div>
 									</div>
 								  </form>
@@ -188,18 +188,18 @@
 
 
 																			<a
-																				href="/admin/company/View/<%= l._id %>">
+																				href="<%= process.env.MIPIE_BACKEND_URL %>/admin/company/View/<%= l._id %>">
 																				<i
 																					class="feather icon-eye fa-lg primary"></i>
 																			</a>
 																			<%}else{%>
 																				<a
-																					href="/admin/company/edit/<%= l._id %>">
+																					href="<%= process.env.MIPIE_BACKEND_URL %>/admin/company/edit/<%= l._id %>">
 																					<i
 																						class="feather icon-edit fa-lg primary"></i>
 																				</a>
 																				<a 
-																					href="/admin/company/View/<%= l._id %>">
+																					href="<%= process.env.MIPIE_BACKEND_URL %>/admin/company/View/<%= l._id %>">
 																					<i
 																						class="feather icon-eye fa-lg primary"></i>
 																				</a>
@@ -279,7 +279,7 @@
 					function getApplications(companyId, ele) {
 						$.ajax({
 							type: "GET",
-							url: `/admin/company/getApplicationCount/${companyId}`,							
+							url: `<%= process.env.MIPIE_BACKEND_URL %>/admin/company/getApplicationCount/${companyId}`,							
 							success: (res) =>{
 								let span = $(ele).parent().find('span.applicationCount')
 								$(span).text(res.applicationCount)
@@ -295,7 +295,7 @@
 						}
 						$.ajax({
 							type: "POST",
-							url: "/admin/changestatus",
+							url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/changestatus",
 							data: {
 								id,
 								status: myStatus,
@@ -394,16 +394,16 @@
 							// alert("isDeleted = " + isDeleted)
 							$.ajax({
 								type: "GET",
-								url: "/admin/company?status=false",
-								success: () => window.location.href = "/admin/company?status=false"
+								url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/company?status=false",
+								success: () => window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/company?status=false"
 							});
 						} else {
 							var status = true;
 							// alert("isDeleted = " + isDeleted);
 							$.ajax({
 								type: "GET",
-								url: "/admin/company?status=true",
-								success: () => window.location.href = "/admin/company?status=true"
+								url: "<%= process.env.MIPIE_BACKEND_URL %>/admin/company?status=true",
+								success: () => window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/company?status=true"
 							});
 						}
 					}
@@ -412,13 +412,13 @@
 						$.ajax({
 								type: "POST",
 								data: {id, module: 'company'},
-								url: "/api/loginAs",
+								url: "<%= process.env.MIPIE_BACKEND_URL %>/api/loginAs",
 								success: (data) => {
 									if(data.role===1) {
 										localStorage.setItem("company", data.name);
                                         localStorage.setItem("registeredEmail", data.email);
                                         localStorage.setItem("token", data.token);
-                                        window.location.href = "/company/dashboard";
+                                        window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard";
 									}									
 								}
 							});
