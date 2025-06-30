@@ -31,7 +31,99 @@ const commonRoutes = express.Router();
 // Helper function to extract Meta parameters from cookies and URL
 
 
-
+commonRoutes.post("/registration", async (req, res) => {
+	try {
+		console.log("Received data from frontend:", req.body); 
+		if (error) {
+		  console.log('====== register error ', error, value)
+		  return res.send({ status: "failure", error: value });
+		}
+		let formData = value;
+		const { name, mobile, sex} = formData;
+  
+		
+		const dataCheck = await Candidate.findOne({ mobile: mobile });
+		if (dataCheck) {
+		  return res.send({
+			status: "failure",
+			error: "Candidate mobile already registered",
+		  });
+		}
+  
+		const datacheck2 = await User.findOne({ mobile, role: "3" });
+  
+		if (datacheck2) {
+		  return res.send({
+			status: "failure",
+			error: "User mobile already exist!",
+		  });
+		}
+  
+		
+  
+		const usr = await User.create({
+		  name,
+		  sex,
+		  mobile,
+		  role: 3,
+		});
+		if (!usr) {
+		  console.log("usr not created");
+		  throw req.ykError("candidate user not create!");
+		}
+  
+		let coins = await CoinsAlgo.findOne();
+		let candidateBody = {
+		  name,
+		  sex,
+		  mobile,
+		  
+		};
+  
+		console.log("Candidate Data", candidateBody)
+		
+		const candidate = await CandidateProfile.create(candidateBody);
+  
+		if (!candidate) {
+		  console.log("candidate not created");
+		  throw req.ykError("Candidate not create!");
+		}
+		
+		
+	   
+  
+		let phone = "91" + mobile.toString();
+		let num = parseInt(phone);
+  
+		let body = {
+		  flow_id: msg91WelcomeTemplate,
+		  recipients: [
+			{
+			  mobiles: num,
+			  var: name,
+			},
+		  ],
+		};
+  
+		const data = sendSms(body);
+		
+		let notificationData = {
+		  title: 'Signup',
+		  message: `Complete your profile to get your dream job.`,
+		  _candidate: candidate._id,
+		  source: "System"
+		}
+		await sendNotification(notificationData)
+		return res.send({
+		  status: "success",
+		  error: "Candidate added successfully!",
+		});
+	  } catch (err) {
+		console.log("error is ", err);
+		req.flash("error", err.message || "Something went wrong!");
+		return res.send({ status: "failure", error: "Something went wrong!" });
+	  }
+	});
 
 commonRoutes.post("/userverification", async (req, res) => {
 	try {

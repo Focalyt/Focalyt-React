@@ -275,6 +275,43 @@ const Student = ({
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
 
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+        const token = userData.token;
+        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        const res = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { 'x-auth': token }
+        });
+        if (res.data.status) {
+          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
+          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
+          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch filter options:', err);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    mobile: "",
+    enrollmentNumber: "",
+    batchId: selectedBatch?.id || "",
+    admissionDate: "",
+    address: "",
+    parentName: "",
+    parentMobile: "",
+    status: "all",
+    password: "",
+    confirmPassword: "",
+  });
 
   const handleFilterChange = (e) => {
     try {
@@ -3425,7 +3462,11 @@ const Student = ({
     activeTab === "zeroPeriod" || activeTab === "all" || activeTab === "batchFreeze";
   const attendanceEligibleStudents = allProfiles.filter(
     (s) =>
-      s.isZeroPeriodAssigned === true || s.isBatchFreeze === true
+      (s.isZeroPeriodAssigned === true || s.isBatchFreeze === true) && s.attendance?.regularPeriod?.sessions?.some(session => 
+        new Date(session.date).toDateString() !== new Date().toDateString() || s.attendance?.zeroPeriod?.sessions?.some(session => 
+          new Date(session.date).toDateString() !== new Date().toDateString()
+        )
+      )
   );
   const totalSelected = Object.values(formData || {}).reduce((total, filter) => {
     return total + (filter?.values?.length || 0);
@@ -4194,12 +4235,6 @@ const Student = ({
                                           </div>
                                         )}
 
-                                      <div className="form-check me-3">
-                                        <input
-                                          className="form-check-input"
-                                          type="checkbox"
-                                        />
-                                      </div>
                                       <div className="me-3">
                                         <div
                                           className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
