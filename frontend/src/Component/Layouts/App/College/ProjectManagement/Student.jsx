@@ -275,6 +275,43 @@ const Student = ({
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
 
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+        const token = userData.token;
+        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        const res = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { 'x-auth': token }
+        });
+        if (res.data.status) {
+          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
+          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
+          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch filter options:', err);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    mobile: "",
+    enrollmentNumber: "",
+    batchId: selectedBatch?.id || "",
+    admissionDate: "",
+    address: "",
+    parentName: "",
+    parentMobile: "",
+    status: "all",
+    password: "",
+    confirmPassword: "",
+  });
 
   const handleFilterChange = (e) => {
     try {
@@ -310,7 +347,7 @@ const Student = ({
     counselor: false,
     sector: false
   });
-  
+
   const clearDateFilter = (filterType) => {
     let newFilterData = { ...filterData };
 
@@ -328,7 +365,7 @@ const Student = ({
     setFilterData(newFilterData);
     applyFilters(newFilterData);
   };
-  
+
   const handleDateFilterChange = (date, fieldName) => {
     const newFilterData = {
       ...filterData,
@@ -1556,7 +1593,14 @@ const Student = ({
 
       if (response.data.success && response.data.data) {
         setAllProfiles(response.data.data);
-        setTotalPages(response.data.totalPages);
+        setTotalPages(response.data.totalPages)
+        const getStartAndEndDate = response.data.data.map(item => {
+          return {
+            startDate: item.batch.zeroPeriodStartDate.split('T')[0],
+            endDate: item.batch.endDate.split('T')[0]
+          }
+        })
+        setRegisterDateRange(getStartAndEndDate[0])
 
         // Update tab counts if available
         if (response.data.filterCounts) {
@@ -1571,6 +1615,9 @@ const Student = ({
       console.error("Error fetching profile data:", error);
     }
   };
+  useEffect(() => {
+    console.log(registerDateRange, 'registerDateRange')
+  }, [registerDateRange]);
 
   const handleSearch = (searchTerm) => {
     setSearchQuery(searchTerm);
@@ -1712,51 +1759,25 @@ const Student = ({
     setDocumentRotation(0);
   };
 
-  const getRegisterDates = (year, month, viewMode = 'month') => {
+  const getRegisterDates = () => {
     let dates = [];
+    console.log(registerDateRange, 'registerDateRange')
+    console.log(registerDateRange.startDate, 'registerDateRange.startDate')
+    console.log(registerDateRange.endDate, 'registerDateRange.endDate')
+    const startDate = new Date(registerDateRange.startDate);
+    const endDate = new Date(registerDateRange.endDate);
+    const currentDate = new Date(startDate);
 
-    if (viewMode === 'month') {
-      // Get all dates for the month
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
-        dates.push({
-          date: date.toISOString().split('T')[0],
-          day: day,
-          dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: date.getDay() === 0 || date.getDay() === 6
-        });
-      }
-    } else if (viewMode === 'week') {
-      // Get current week dates
-      const today = new Date();
-      const currentWeekStart = new Date(today.setDate(today.getDate() - today.getDay()));
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(currentWeekStart);
-        date.setDate(currentWeekStart.getDate() + i);
-        dates.push({
-          date: date.toISOString().split('T')[0],
-          day: date.getDate(),
-          dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: date.getDay() === 0 || date.getDay() === 6
-        });
-      }
-    } else if (viewMode === 'custom' && registerDateRange.startDate && registerDateRange.endDate) {
-      // Get custom date range
-      const startDate = new Date(registerDateRange.startDate);
-      const endDate = new Date(registerDateRange.endDate);
-      const currentDate = new Date(startDate);
-
-      while (currentDate <= endDate) {
-        dates.push({
-          date: currentDate.toISOString().split('T')[0],
-          day: currentDate.getDate(),
-          dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: currentDate.getDay() === 0 || currentDate.getDay() === 6
-        });
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
+    while (currentDate <= endDate) {
+      dates.push({
+        date: currentDate.toISOString().split('T')[0],
+        day: currentDate.getDate(),
+        dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        isWeekend: currentDate.getDay() === 0 || currentDate.getDay() === 6
+      });
+      currentDate.setDate(currentDate.getDate() + 1);
     }
+
 
     return dates;
   };
@@ -1809,21 +1830,18 @@ const Student = ({
         yearlyData,
       };
     });
-    console.log(allStudentsAttendanceData,'allStudentsAttendanceData')
+    console.log(allStudentsAttendanceData, 'allStudentsAttendanceData')
 
     // ===== STEP 5: Attendance Register View Component =====
     const renderAttendanceRegisterView = () => {
       const dates = getRegisterDates(registerCurrentYear, registerCurrentMonth, registerViewMode);
 
-      const monthNames = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-      ];
+
 
       return (
         <div className="attendance-register-container">
           {/* Register Header Controls */}
-          <div className="register-header mb-4">
+          {/* <div className="register-header mb-4">
             <div className="row align-items-center">
               <div className="col-md-3">
                 <label className="form-label fw-bold">View Mode:</label>
@@ -1898,14 +1916,14 @@ const Student = ({
                 </button>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Register Title */}
           <div className="register-title text-center mb-4">
-            <h4 className="fw-bold text-primary">
+            {/* <h4 className="fw-bold text-primary">
               <i className="fas fa-clipboard-list me-2"></i>
               Attendance Register - {monthNames[registerCurrentMonth]} {registerCurrentYear}
-            </h4>
+            </h4> */}
             <p className="text-muted mb-0">
               Total Students: {allStudentsAttendanceData.length} |
               Period: {dates.length > 0 ? `${dates[0]?.day}/${registerCurrentMonth + 1}` : ''} to {dates.length > 0 ? `${dates[dates.length - 1]?.day}/${registerCurrentMonth + 1}/${registerCurrentYear}` : ''}
@@ -2017,7 +2035,7 @@ const Student = ({
                               <span className="stat-label">A:</span>
                               <span className="stat-value">{student.filteredStats.absentDays}</span>
                             </div>
-                            
+
                           </div>
                           <div className="attendance-percentage mt-2">
                             <div className="percentage-bar">
@@ -2124,7 +2142,7 @@ const Student = ({
                   <th style={{ minWidth: "200px" }}>Student Details</th>
                   <th colSpan={4} className="text-center">Zero Period Attendance</th>
                   <th colSpan={4} className="text-center">Regular Period Attendance</th>
-                 
+
                 </tr>
                 <tr>
                   <th style={{ minWidth: "200px" }}></th>
@@ -2228,7 +2246,7 @@ const Student = ({
                         </small>
                       </div>
                     </td>
-                   
+
                   </tr>
                 ))}
               </tbody>
@@ -3240,13 +3258,13 @@ const Student = ({
           "x-auth": token
         }
       });
-      if(result.status){
+      if (result.status) {
         alert(result.message)
       }
-      else{
+      else {
         alert(result.message)
       }
-      
+
     } catch (error) {
       console.error("Error marking attendance:", error);
     }
@@ -3357,11 +3375,11 @@ const Student = ({
     if (student.dropout) {
       return <span className="badge bg-danger">Dropout</span>;
     }
-    
+
     if (student.isBatchFreeze) {
       return <span className="badge bg-info">Batch Freeze</span>;
     }
-    
+
     if (student.isZeroPeriodAssigned) {
       return (
         <span className="badge bg-warning">
@@ -3369,7 +3387,7 @@ const Student = ({
         </span>
       );
     }
-    
+
     // Default case - pending/applied
     return <span className="badge bg-secondary">Pending</span>;
   };
@@ -3403,7 +3421,11 @@ const Student = ({
     activeTab === "zeroPeriod" || activeTab === "all" || activeTab === "batchFreeze";
   const attendanceEligibleStudents = allProfiles.filter(
     (s) =>
-      s.isZeroPeriodAssigned === true || s.isBatchFreeze === true
+      (s.isZeroPeriodAssigned === true || s.isBatchFreeze === true) && s.attendance?.regularPeriod?.sessions?.some(session =>
+        new Date(session.date).toDateString() !== new Date().toDateString() || s.attendance?.zeroPeriod?.sessions?.some(session =>
+          new Date(session.date).toDateString() !== new Date().toDateString()
+        )
+      )
   );
   // const totalSelected = Object.values(formData || {}).reduce((total, filter) => {
   //   return total + (filter?.values?.length || 0);
@@ -3740,7 +3762,7 @@ const Student = ({
                   </div>
 
                   {/* Modal Body - Scrollable content */}
-        
+
 
                   {/* Modal Footer - Fixed at bottom */}
                   <div className="modal-footer bg-light border-top">
@@ -3845,12 +3867,6 @@ const Student = ({
                                           </div>
                                         )}
 
-                                      <div className="form-check me-3">
-                                        <input
-                                          className="form-check-input"
-                                          type="checkbox"
-                                        />
-                                      </div>
                                       <div className="me-3">
                                         <div
                                           className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"

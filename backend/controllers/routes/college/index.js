@@ -6026,6 +6026,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 				}
 			})
 			.populate('_center')
+			.populate('batch')
 			.populate('_leadStatus')
 			.populate('registeredBy')
 			.populate({

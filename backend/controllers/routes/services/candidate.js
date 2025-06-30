@@ -367,7 +367,7 @@ module.exports = {
     const agg = [
       {
         $lookup: {
-          from: "candidates",
+          from: "candidateprofiles",
           let: { id: "$_candidate" },
           pipeline: [
             {
@@ -377,7 +377,7 @@ module.exports = {
               },
             },
             {
-              $project: { name: 1, mobile: 1 } // Fetch only necessary fields
+              $project: { name: 1, mobile: 1, email: 1 } // Fetch only necessary fields including email
             }
           ],
           as: "_candidate",
@@ -439,6 +439,7 @@ module.exports = {
         $addFields: {
           name: { $ifNull: ["$_candidate.name", ""] },
           mobile: { $ifNull: ["$_candidate.mobile", ""] },
+          email: { $ifNull: ["$_candidate.email", ""] }, // Add email field
           courseName: { $ifNull: ["$_course.name", ""] },
           registrationCharges: { $ifNull: ["$_course.registrationCharges", 0] },
           registrationFee: { $ifNull: ["$registrationFee", "Unpaid"] },
@@ -451,6 +452,7 @@ module.exports = {
           _id: 1,
           name: 1,
           mobile: 1,
+          email: 1, // Include email in projection
           courseName: 1,
           registrationCharges: 1,
           registrationFee: 1,

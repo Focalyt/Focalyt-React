@@ -4,7 +4,7 @@ const { ObjectId } = Schema.Types
 const loanEnquirySchema = new Schema({
     _candidate : {
         type: ObjectId,
-        ref:"Candidate",
+        ref:"CandidateProfile",
         required: true
     },
     amount : {

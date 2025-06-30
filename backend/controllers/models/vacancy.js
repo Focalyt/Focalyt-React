@@ -35,6 +35,8 @@ const vacancySchema = new Schema(
     compensation: { type: String },
     pay: { type: String },
     shift: { type: String },
+    shiftTimingFrom: { type: String },
+    shiftTimingTo: { type: String },
     work: { type: String },
     questionsAnswers: [{ Question: String, Answer: String }],
     benifits: [String],

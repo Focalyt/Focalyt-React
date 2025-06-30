@@ -60,7 +60,7 @@ const uuid = require("uuid/v1");
 const puppeteer = require("puppeteer");
 const path = require("path");
 const { authenti, isCompany, getDistanceFromLatLonInKm, sendSms, isCandidate } = require("../../../helpers");
-const candidate = require("../../models/candidate");
+const candidate = require("../../models/candidateProfile");
 const { urlencoded } = require("body-parser");
 const skills = require("../../models/skills");
 const { validateHeaderValue } = require("http");
@@ -1210,6 +1210,8 @@ router.get('/editJobs/:id', isCompany, async (req, res) => {
       hasState,
       company,
       coinsRequired,
+      shiftTimingFrom: jd?.shiftTimingFrom,
+      shiftTimingTo: jd?.shiftTimingTo,
     })
   } catch (err) {
     console.log(err);
@@ -1231,6 +1233,10 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
           type: 'Point',
           coordinates: [req.body.longitude, req.body.latitude]
         }
+      }
+      if (req.body.shiftTimingFrom && req.body.shiftTimingTo) {
+        updatedJob['shiftTimingFrom'] = req.body.shiftTimingFrom
+        updatedJob['shiftTimingTo'] = req.body.shiftTimingTo
       }
     }
     const company = await Company.findOne({ _concernPerson: req.session.user._id })
@@ -1263,6 +1269,7 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
     if (industryValue) {
       updatedJob['_industry'] = industryValue._id
     }
+
 
     const coins = +(coinsRequired.contactcoins)
     if (updatedJob.isContact == true && updatedJob.isedited == true && job?.isedited == false) {
@@ -1462,6 +1469,10 @@ router
             type: 'Point',
             coordinates: [req.body.longitude, req.body.latitude]
           }
+        }
+        if (req.body.shiftTimingFrom && req.body.shiftTimingTo) {
+          jobDetails['shiftTimingFrom'] = req.body.shiftTimingFrom
+          jobDetails['shiftTimingTo'] = req.body.shiftTimingTo
         }
       }
       const companyId = company._id
