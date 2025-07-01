@@ -12,7 +12,7 @@ const candidateServices = require('../services/candidate')
 
 const {
 	Import,
-	Candidate,
+	
 	Qualification,
 	Skill,
 	Country,
@@ -32,7 +32,7 @@ const {
 	Referral,
 	CandidateDoc
 } = require("../../models");
-
+const Candidate = require("../../models/candidateProfile");
 const { generatePassword, sendMail, getTechSkills, getNonTechSkills,sendSms } = require("../../../helpers");
 const { msg91ProfileStrengthening ,env} = require("../../../config")
 const router = express.Router();
