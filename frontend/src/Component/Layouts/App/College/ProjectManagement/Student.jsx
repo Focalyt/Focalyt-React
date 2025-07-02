@@ -11,120 +11,7 @@ import 'react-calendar/dist/Calendar.css';
 import axios from "axios";
 import moment from "moment";
 
-// const MultiSelectCheckbox = ({
-//   title,
-//   options,
-//   selectedValues,
-//   onChange,
-//   icon = "fas fa-list",
-//   isOpen,
-//   onToggle
-// }) => {
-//   const handleCheckboxChange = (value) => {
-//     const newValues = selectedValues.includes(value)
-//       ? selectedValues.filter(v => v !== value)
-//       : [...selectedValues, value];
-//     onChange(newValues);
-//   };
 
-//   // Get display text for selected items
-//   const getDisplayText = () => {
-//     if (selectedValues.length === 0) {
-//       return `Select ${title}`;
-//     } else if (selectedValues.length === 1) {
-//       const selectedOption = options.find(opt => opt.value === selectedValues[0]);
-//       return selectedOption ? selectedOption.label : selectedValues[0];
-//     } else if (selectedValues.length <= 2) {
-//       const selectedLabels = selectedValues.map(val => {
-//         const option = options.find(opt => opt.value === val);
-//         return option ? option.label : val;
-//       });
-//       return selectedLabels.join(', ');
-//     } else {
-//       return `${selectedValues.length} items selected`;
-//     }
-//   };
-
-//   return (
-//     <div className="multi-select-container-new">
-//       <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
-//         <i className={`${icon} me-1 text-primary`}></i>
-//         {title}
-//         {selectedValues.length > 0 && (
-//           <span className="badge bg-primary ms-2">{selectedValues.length}</span>
-//         )}
-//       </label>
-
-//       <div className="multi-select-dropdown-new">
-//         <button
-//           type="button"
-//           className={`form-select multi-select-trigger ${isOpen ? 'open' : ''}`}
-//           onClick={onToggle}
-//           style={{ cursor: 'pointer', textAlign: 'left' }}
-//         >
-//           <span className="select-display-text">
-//             {getDisplayText()}
-//           </span>
-//           <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`}></i>
-//         </button>
-
-//         {isOpen && (
-//           <div className="multi-select-options-new">
-//             {/* Search functionality (optional) */}
-//             <div className="options-search">
-//               <div className="input-group input-group-sm">
-//                 <span className="input-group-text" style={{ height: '40px' }}>
-//                   <i className="fas fa-search"></i>
-//                 </span>
-//                 <input
-//                   type="text"
-//                   className="form-control"
-//                   placeholder={`Search ${title.toLowerCase()}...`}
-//                   onClick={(e) => e.stopPropagation()}
-//                 />
-//               </div>
-//             </div>
-
-//             {/* Options List */}
-//             <div className="options-list-new">
-//               {options.map((option) => (
-//                 <label key={option.value} className="option-item-new">
-//                   <input
-//                     type="checkbox"
-//                     className="form-check-input me-2"
-//                     checked={selectedValues.includes(option.value)}
-//                     onChange={() => handleCheckboxChange(option.value)}
-//                     onClick={(e) => e.stopPropagation()}
-//                   />
-//                   <span className="option-label-new">{option.label}</span>
-//                   {selectedValues.includes(option.value) && (
-//                     <i className="fas fa-check text-primary ms-auto"></i>
-//                   )}
-//                 </label>
-//               ))}
-
-//               {options.length === 0 && (
-//                 <div className="no-options">
-//                   <i className="fas fa-info-circle me-2"></i>
-//                   No {title.toLowerCase()} available
-//                 </div>
-//               )}
-//             </div>
-
-//             {/* Footer with count */}
-//             {selectedValues.length > 0 && (
-//               <div className="options-footer">
-//                 <small className="text-muted">
-//                   {selectedValues.length} of {options.length} selected
-//                 </small>
-//               </div>
-//             )}
-//           </div>
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
 
 const Student = ({
   selectedBatch = null,
@@ -136,20 +23,21 @@ const Student = ({
 }) => {
 
   useEffect(() => {
-    // Define the event handler function
     const handleClick = (event) => {
-      const className = event.target?.__reactProps$qsrhagrkar?.className || event.target.className || "";
-      if ((!className.includes('popup-button')) && (!className.includes('popup-icon')) && (!className.includes('ignore-click'))) {
-        setShowPopup(null);
-        console.log('Clicked outside the popup button!');
-      }
+      const className = event.target?.__reactProps$qsrhagrkar?.className || event.target?.className || "";
 
+      // Ensure className is a string before using .includes()
+      const classNameString = String(className || "");
+
+      if ((!classNameString.includes('popup-button')) &&
+        (!classNameString.includes('popup-icon')) &&
+        (!classNameString.includes('ignore-click'))) {
+        setShowPopup(null);
+      }
     };
 
-    // Add event listener on mount
     document.addEventListener('click', handleClick);
 
-    // Cleanup the event listener on unmount
     return () => {
       document.removeEventListener('click', handleClick);
     };
@@ -183,11 +71,26 @@ const Student = ({
   const [studentTabsActive, setStudentTabsActive] = useState({});
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const getISTDate = (date = new Date()) => {
+    const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+    const istOffset = 5.5; // IST is UTC +5:30
+    const ist = new Date(utc + (istOffset * 3600000));
+    return ist;
+  };
+  const getTodayIST = () => {
+    const now = new Date();
+    // Get local date without timezone conversion
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   // ===== ENHANCED ATTENDANCE STATE =====
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  useEffect(() => {
+    console.log(selectedDate, 'selectedDate')
+  }, [selectedDate])
   const [showBulkControls, setShowBulkControls] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState(new Set());
   const [bulkAttendanceStatus, setBulkAttendanceStatus] = useState("");
@@ -275,6 +178,8 @@ const Student = ({
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
 
+
+
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
@@ -347,7 +252,7 @@ const Student = ({
     counselor: false,
     sector: false
   });
-  
+
   const clearDateFilter = (filterType) => {
     let newFilterData = { ...filterData };
 
@@ -365,7 +270,7 @@ const Student = ({
     setFilterData(newFilterData);
     applyFilters(newFilterData);
   };
-  
+
   const handleDateFilterChange = (date, fieldName) => {
     const newFilterData = {
       ...filterData,
@@ -446,7 +351,6 @@ const Student = ({
   };
 
   const handleAttendanceManagement = () => {
-    console.log("Attendance Dashboard clicked!");
     setShowAttendanceModal(true);
 
   };
@@ -458,7 +362,6 @@ const Student = ({
     const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : 'Dropout'}`)
 
     if (confirmed) {
-      console.log('selectedStudent._id', profile._id);
       try {
         const response = await axios.post(`${backendUrl}/college/candidate/move-candidate-status/${profile._id}`, {
           status: e,
@@ -467,7 +370,6 @@ const Student = ({
             "x-auth": token,
           },
         });
-        console.log(response, "response");
         if (response.status === 200) {
           window.alert("Student moved to zero period successfully");
           await fetchProfileData();
@@ -503,7 +405,190 @@ const Student = ({
     }
   };
 
+  // calculateAttendance function add karein component ke andar
+  const calculateAttendance = (data) => {
+    try {
 
+      const attendance = data.attendance || {};
+      const batch = data.batch || {};
+      const currentDate = new Date();
+
+      // Zero Period data
+      const zeroPeriod = attendance.zeroPeriod || {};
+      const zeroPeriodSessions = zeroPeriod.sessions || [];
+
+      // Regular Period data  
+      const regularPeriod = attendance.regularPeriod || attendance.regular || {};
+      const regularSessions = regularPeriod.sessions || [];
+
+     
+
+      // ===== WORKING DAYS CALCULATION (EXCLUDING SUNDAYS ONLY) =====
+
+      // Zero Period working days
+      const zeroPeriodStartDate = batch.zeroPeriodStartDate ? new Date(batch.zeroPeriodStartDate) : null;
+      const zeroPeriodEndDate = batch.zeroPeriodEndDate ? new Date(batch.zeroPeriodEndDate) : null;
+
+      let zeroPeriodWorkingDays = 0;
+      if (zeroPeriodStartDate && zeroPeriodEndDate) {
+        const endDate = zeroPeriodEndDate > currentDate ? currentDate : zeroPeriodEndDate;
+        if (endDate >= zeroPeriodStartDate) {
+          zeroPeriodWorkingDays = getWorkingDaysBetween(zeroPeriodStartDate, endDate);
+        }
+      }
+
+
+      // Regular Period working days
+      const regularStartDate = new Date(batch.startDate);
+      const regularEndDate = batch.endDate ? new Date(batch.endDate) : currentDate;
+
+      let regularWorkingDays = 0;
+      if (regularStartDate) {
+        const endDate = regularEndDate > currentDate ? currentDate : regularEndDate;
+        if (endDate >= regularStartDate) {
+          regularWorkingDays = getWorkingDaysBetween(regularStartDate, endDate);
+        }
+      }
+
+
+      // ===== ATTENDANCE CALCULATION =====
+
+      // Helper function to get attendance status
+      const getAttendanceStatus = (session) => {
+        const status = session.status || session.remarks || 'absent';
+        return status.toLowerCase();
+      };
+
+      // Initialize stats for zero period
+      let zeroPeriodStats = {
+        totalDays: zeroPeriodWorkingDays,
+        present: 0,
+        absent: 0,
+        holiday: 0,
+        notMarked: 0,
+        percentage: 0,
+        periodStartDate: zeroPeriodStartDate,
+        periodEndDate: zeroPeriodEndDate,
+        sessions: zeroPeriodSessions
+      };
+
+      // Calculate zero period attendance
+      if (zeroPeriodSessions.length > 0) {
+        zeroPeriodSessions.forEach(session => {
+          const status = getAttendanceStatus(session);
+          if (status === 'present') {
+            zeroPeriodStats.present++;
+          } else if (status === 'absent') {
+            zeroPeriodStats.absent++;
+          } else if (status === 'holiday') {
+            zeroPeriodStats.holiday++;
+          }
+        });
+      }
+
+
+      // Calculate zero period not marked and percentage
+      const zeroPeriodMarkedDays = zeroPeriodStats.present + zeroPeriodStats.absent + zeroPeriodStats.holiday;
+      zeroPeriodStats.notMarked = Math.max(0, zeroPeriodStats.totalDays - zeroPeriodMarkedDays);
+
+      // Zero period percentage (holiday exclude karke)
+      const zeroPeriodWorkingMarkedDays = zeroPeriodStats.present + zeroPeriodStats.absent + zeroPeriodStats.notMarked;
+      if (zeroPeriodWorkingMarkedDays > 0) {
+        zeroPeriodStats.percentage = Math.round((zeroPeriodStats.present / zeroPeriodWorkingMarkedDays) * 100);
+      }
+
+
+      // Similar for regular period...
+      // Initialize stats for regular period
+      let regularPeriodStats = {
+        totalDays: regularWorkingDays,
+        present: 0,
+        absent: 0,
+        holiday: 0,
+        notMarked: 0,
+        percentage: 0,
+        periodStartDate: regularStartDate,
+        periodEndDate: regularEndDate,
+        sessions: regularSessions
+      };
+
+      // Calculate regular period attendance
+      if (regularSessions.length > 0) {
+        regularSessions.forEach(session => {
+          const status = getAttendanceStatus(session);
+          if (status === 'present') {
+            regularPeriodStats.present++;
+          } else if (status === 'absent') {
+            regularPeriodStats.absent++;
+          } else if (status === 'holiday') {
+            regularPeriodStats.holiday++;
+          }
+        });
+      }
+
+      // Calculate regular period not marked and percentage
+      const regularMarkedDays = regularPeriodStats.present + regularPeriodStats.absent + regularPeriodStats.holiday;
+      regularPeriodStats.notMarked = Math.max(0, regularPeriodStats.totalDays - regularMarkedDays);
+
+      // Regular period percentage (holiday exclude karke)
+      const regularWorkingMarkedDays = regularPeriodStats.present + regularPeriodStats.absent + regularPeriodStats.notMarked;
+      if (regularWorkingMarkedDays > 0) {
+        regularPeriodStats.percentage = Math.round((regularPeriodStats.present / regularWorkingMarkedDays) * 100);
+      }
+
+
+      // Overall calculation
+      const totalPresent = zeroPeriodStats.present + regularPeriodStats.present;
+      const totalAbsent = zeroPeriodStats.absent + regularPeriodStats.absent;
+      const totalHolidays = zeroPeriodStats.holiday + regularPeriodStats.holiday;
+      const totalNotMarked = zeroPeriodStats.notMarked + regularPeriodStats.notMarked;
+      const totalWorkingMarkedDays = totalPresent + totalAbsent + totalNotMarked; // holidays exclude
+      const overallPercentage = totalWorkingMarkedDays > 0 ? Math.round((totalPresent / totalWorkingMarkedDays) * 100) : 0;
+
+      const result = {
+        success: true,
+        data: {
+          zeroPeriod: zeroPeriodStats,
+          regularPeriod: regularPeriodStats,
+          overall: {
+            totalDays: zeroPeriodStats.totalDays + regularPeriodStats.totalDays,
+            totalPresent: totalPresent,
+            totalAbsent: totalAbsent,
+            totalHolidays: totalHolidays,
+            totalNotMarked: zeroPeriodStats.notMarked + regularPeriodStats.notMarked,
+            overallPercentage: overallPercentage
+          }
+        }
+      };
+
+      return result;
+
+    } catch (error) {
+      console.error('Calculate attendance error:', error); // Debug log
+      return {
+        success: false,
+        error: error.message,
+        data: null
+      };
+    }
+  };
+
+  // Working days calculation function (excluding ONLY SUNDAYS)
+  const getWorkingDaysBetween = (startDate, endDate) => {
+    let count = 0;
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      const dayOfWeek = currentDate.getDay();
+      // 0 = Sunday - exclude only this
+      if (dayOfWeek !== 0) {
+        count++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return count;
+  };
 
   const getMonthlyAttendanceBreakdown = (profile) => {
     const allSessions = [
@@ -758,11 +843,11 @@ const Student = ({
             <thead className="table-dark">
               <tr>
                 <th>Month</th>
-                <th>Total Days</th>
+                <th>Total Days (Excluding Sundays)</th>
                 <th>Present</th>
                 <th>Absent</th>
                 <th>Half Day</th>
-                <th>Attendance %</th>
+                <th>Attendance % (Excluding Sundays)</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -1377,12 +1462,7 @@ const Student = ({
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
 
-    console.log(
-      "selectedDocumentForUpload",
-      selectedDocumentForUpload,
-      "selectedProfile",
-      selectedProfile
-    );
+   
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -1409,7 +1489,7 @@ const Student = ({
         }
       );
 
-      console.log("response", response);
+    
 
       if (response.data.status) {
         alert("Document uploaded successfully! Status: Pending Review");
@@ -1514,7 +1594,6 @@ const Student = ({
 
   const updateDocumentStatus = (uploadId, status) => {
     // In real app, this would make an API call
-    console.log(`Updating document ${uploadId} to ${status}`);
     if (status === "Rejected" && !rejectionReason.trim()) {
       alert("Please provide a rejection reason");
       return;
@@ -1589,16 +1668,21 @@ const Student = ({
         }
       );
 
-      console.log("Backend profile data:", response.data);
 
       if (response.data.success && response.data.data) {
         setAllProfiles(response.data.data);
         setTotalPages(response.data.totalPages);
 
+        const getStartandEndDate = () => {
+          const startDate = new Date(response.data.data[0].batch.zeroPeriodStartDate);
+          const endDate = new Date(response.data.data[0].batch.endDate);
+          return { startDate, endDate };
+        }
+        setRegisterDateRange(getStartandEndDate());
+
         // Update tab counts if available
         if (response.data.filterCounts) {
           // You can store tab counts in state and use them
-          console.log("Tab counts:", response.data.filterCounts);
           setTabCounts(response.data.filterCounts);
         }
       } else {
@@ -1749,50 +1833,79 @@ const Student = ({
     setDocumentRotation(0);
   };
 
-  const getRegisterDates = (year, month, viewMode = 'month') => {
+
+
+  const formatDateForIST = (date) => {
+    if (!date) return '';
+
+    // If date is already a string in YYYY-MM-DD format, return as is
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
+    }
+
+    // For Date objects from date picker, get local date without timezone conversion
+    if (date instanceof Date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // For backend dates that are already adjusted for IST (18:30 UTC = next day IST)
+    if (typeof date === 'string' && date.includes('18:30:00.000')) {
+      const utcDate = new Date(date);
+      const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+      return istDate.toISOString().split('T')[0];
+    }
+
+    // For other dates, create date without timezone issues
+    const dateObj = new Date(date);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+
+  const handleDatePickerChange = (date) => {
+    if (date) {
+      // Get the local date without timezone conversion
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+
+      // Create YYYY-MM-DD format without timezone issues
+      const localDateString = `${year}-${month}-${day}`;
+      setSelectedDate(localDateString);
+
+    }
+  };
+
+
+
+
+  const getRegisterDates = () => {
     let dates = [];
 
-    if (viewMode === 'month') {
-      // Get all dates for the month
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
-        dates.push({
-          date: date.toISOString().split('T')[0],
-          day: day,
-          dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: date.getDay() === 0 || date.getDay() === 6
-        });
-      }
-    } else if (viewMode === 'week') {
-      // Get current week dates
-      const today = new Date();
-      const currentWeekStart = new Date(today.setDate(today.getDate() - today.getDay()));
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(currentWeekStart);
-        date.setDate(currentWeekStart.getDate() + i);
-        dates.push({
-          date: date.toISOString().split('T')[0],
-          day: date.getDate(),
-          dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: date.getDay() === 0 || date.getDay() === 6
-        });
-      }
-    } else if (viewMode === 'custom' && registerDateRange.startDate && registerDateRange.endDate) {
-      // Get custom date range
-      const startDate = new Date(registerDateRange.startDate);
-      const endDate = new Date(registerDateRange.endDate);
-      const currentDate = new Date(startDate);
+    // Get start and end dates
+    const startDate = new Date(registerDateRange.startDate);
+    const endDate = new Date(registerDateRange.endDate);
 
-      while (currentDate <= endDate) {
-        dates.push({
-          date: currentDate.toISOString().split('T')[0],
-          day: currentDate.getDate(),
-          dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: currentDate.getDay() === 0 || currentDate.getDay() === 6
-        });
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
+    // No need to convert to IST here as the dates are already in correct format
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      // Format the date as YYYY-MM-DD without timezone conversion
+      const dateString = currentDate.toISOString().split('T')[0];
+
+      dates.push({
+        date: dateString,
+        day: currentDate.getDate(),
+        dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        isWeekend: currentDate.getDay() === 0 || currentDate.getDay() === 6
+      });
+
+      currentDate.setDate(currentDate.getDate() + 1);
     }
 
     return dates;
@@ -1804,9 +1917,14 @@ const Student = ({
       ...(profile.attendance?.regularPeriod?.sessions || [])
     ];
 
+    // The input date is already in IST format (YYYY-MM-DD)
+    const targetDate = date;
+
+
     const attendanceRecord = allSessions.find(record => {
-      const recordDate = new Date(record.date).toISOString().split('T')[0];
-      return recordDate === date;
+      // Convert backend date to IST date string
+      const recordDate = formatDateForIST(record.date);
+      return recordDate === targetDate;
     });
 
     if (!attendanceRecord) {
@@ -1817,7 +1935,6 @@ const Student = ({
     const statusMap = {
       'present': { symbol: 'P', class: 'present', title: 'Present' },
       'absent': { symbol: 'A', class: 'absent', title: 'Absent' },
-
     };
 
     const statusInfo = statusMap[status] || statusMap['not-marked'];
@@ -1846,11 +1963,10 @@ const Student = ({
         yearlyData,
       };
     });
-    console.log(allStudentsAttendanceData,'allStudentsAttendanceData')
 
     // ===== STEP 5: Attendance Register View Component =====
     const renderAttendanceRegisterView = () => {
-      const dates = getRegisterDates(registerCurrentYear, registerCurrentMonth, registerViewMode);
+      const dates = getRegisterDates();
 
       const monthNames = [
         "January", "February", "March", "April", "May", "June",
@@ -1859,93 +1975,17 @@ const Student = ({
 
       return (
         <div className="attendance-register-container">
-          {/* Register Header Controls */}
-          <div className="register-header mb-4">
-            <div className="row align-items-center">
-              <div className="col-md-3">
-                <label className="form-label fw-bold">View Mode:</label>
-                <select
-                  className="form-select"
-                  value={registerViewMode}
-                  onChange={(e) => setRegisterViewMode(e.target.value)}
-                >
-                  <option value="month">Monthly View</option>
-                  <option value="week">Weekly View</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-              </div>
 
-              {registerViewMode === 'month' && (
-                <>
-                  <div className="col-md-3">
-                    <label className="form-label fw-bold">Month:</label>
-                    <select
-                      className="form-select"
-                      value={registerCurrentMonth}
-                      onChange={(e) => setRegisterCurrentMonth(parseInt(e.target.value))}
-                    >
-                      {monthNames.map((month, index) => (
-                        <option key={index} value={index}>{month}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-md-3">
-                    <label className="form-label fw-bold">Year:</label>
-                    <select
-                      className="form-select"
-                      value={registerCurrentYear}
-                      onChange={(e) => setRegisterCurrentYear(parseInt(e.target.value))}
-                    >
-                      {Array.from({ length: 5 }, (_, i) => {
-                        const year = new Date().getFullYear() - 2 + i;
-                        return <option key={year} value={year}>{year}</option>;
-                      })}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              {registerViewMode === 'custom' && (
-                <>
-                  <div className="col-md-3">
-                    <label className="form-label fw-bold">Start Date:</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={registerDateRange.startDate}
-                      onChange={(e) => setRegisterDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-md-3">
-                    <label className="form-label fw-bold">End Date:</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={registerDateRange.endDate}
-                      onChange={(e) => setRegisterDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="col-md-3 d-flex align-items-end">
-                <button className="btn btn-primary">
-                  <i className="fas fa-download me-1"></i>
-                  Export Register
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Register Title */}
           <div className="register-title text-center mb-4">
             <h4 className="fw-bold text-primary">
               <i className="fas fa-clipboard-list me-2"></i>
-              Attendance Register - {monthNames[registerCurrentMonth]} {registerCurrentYear}
+              Attendance Register
             </h4>
             <p className="text-muted mb-0">
               Total Students: {allStudentsAttendanceData.length} |
-              Period: {dates.length > 0 ? `${dates[0]?.day}/${registerCurrentMonth + 1}` : ''} to {dates.length > 0 ? `${dates[dates.length - 1]?.day}/${registerCurrentMonth + 1}/${registerCurrentYear}` : ''}
+              Period: {dates.length > 0 ? `${dates[0]?.day}/${registerCurrentMonth + 1}/${registerCurrentYear}` : ''} to {dates.length > 0 ? `${dates[dates.length - 1]?.day}/${registerCurrentMonth + 1}/${registerCurrentYear}` : ''}
             </p>
           </div>
 
@@ -2054,7 +2094,7 @@ const Student = ({
                               <span className="stat-label">A:</span>
                               <span className="stat-value">{student.filteredStats.absentDays}</span>
                             </div>
-                            
+
                           </div>
                           <div className="attendance-percentage mt-2">
                             <div className="percentage-bar">
@@ -2152,33 +2192,43 @@ const Student = ({
 
     // ===== STEP 6: Daily Attendance View (existing) =====
     const renderDailyAttendanceView = () => {
+      const processedStudents = allStudentsAttendanceData.map(student => {
+        const result = calculateAttendance(student);
+        return {
+          ...student,
+          calculatedAttendance: result.success ? result.data : null
+        };
+      });
+
       return (
         <div className="daily-attendance-management">
           <div className="table-responsive">
             <table className="table table-striped table-hover">
               <thead className="table-dark">
                 <tr>
-                  <th style={{ minWidth: "200px" }}>Student Details</th>
-                  <th colSpan={4} className="text-center">Zero Period Attendance</th>
-                  <th colSpan={4} className="text-center">Regular Period Attendance</th>
-                 
+                  <th rowSpan={2} style={{ minWidth: "200px" }}>Student Details</th>
+                  <th colSpan={5} className="text-center">Zero Period Attendance</th>
+                  <th colSpan={5} className="text-center">Regular Period Attendance</th>
+
                 </tr>
-                <tr>
-                  <th style={{ minWidth: "200px" }}></th>
-                  <th>Total Days</th>
+                <tr className="text-center">
+                  <th>Total Days <small>(Excluding Sundays)</small></th>
                   <th>Present</th>
                   <th>Absent</th>
+                  <th>Not Marked</th>
                   <th>Attendance %</th>
-                  <th>Total Days</th>
+                  <th>Total Days <small>(Excluding Sundays)</small></th>
                   <th>Present</th>
                   <th>Absent</th>
+                  <th>Not Marked</th>
                   <th>Attendance %</th>
                 </tr>
               </thead>
               <tbody>
-                {allStudentsAttendanceData.map((student, index) => (
-                  <tr key={student.id}>
-                    <td>
+                {processedStudents.map((student, index) => (
+
+                  <tr key={student._id} className="text-center">
+                    <td className="text-start">
                       <div className="d-flex align-items-center">
                         <div
                           className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3"
@@ -2195,34 +2245,29 @@ const Student = ({
                         </div>
                       </div>
                     </td>
-                    <td>
+                    {/* <td>
                       <span className="fw-medium">
                         {student.enrollmentNumber}
                       </span>
-                    </td>
+                    </td> */}
                     <td>
                       <span className="badge bg-primary">
-                        {student.filteredStats.totalWorkingDays}
+                        {student?.calculatedAttendance?.zeroPeriod?.totalDays || 0}
                       </span>
                     </td>
                     <td>
                       <span className="badge bg-success">
-                        {student.filteredStats.presentDays}
+                        {student?.calculatedAttendance?.zeroPeriod?.present || 0}
                       </span>
                     </td>
                     <td>
                       <span className="badge bg-danger">
-                        {student.filteredStats.absentDays}
+                        {student?.calculatedAttendance?.zeroPeriod?.absent || 0}
                       </span>
                     </td>
                     <td>
                       <span className="badge bg-warning text-dark">
-                        {student.filteredStats.lateDays}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="badge bg-info">
-                        {student.filteredStats.leaveDays}
+                        {student?.calculatedAttendance?.zeroPeriod?.notMarked || 0}
                       </span>
                     </td>
                     <td>
@@ -2233,39 +2278,61 @@ const Student = ({
                         >
                           <div
                             className={`progress-bar bg-${getProgressColor(
-                              student.filteredStats.attendancePercentage
+                              student?.calculatedAttendance?.zeroPeriod?.percentage || 0
                             )}`}
                             style={{
-                              width: `${student.filteredStats.attendancePercentage}%`,
+                              width: `${student?.calculatedAttendance?.zeroPeriod?.percentage || 0}%`,
                             }}
                           ></div>
                         </div>
                         <small className="fw-medium">
-                          {student.filteredStats.attendancePercentage}%
+                          {student?.calculatedAttendance?.zeroPeriod?.percentage || 0}%
                         </small>
                       </div>
                     </td>
                     <td>
+                      <span className="badge bg-primary">
+                        {student?.calculatedAttendance?.regularPeriod?.totalDays || 0}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge bg-success">
+                        {student?.calculatedAttendance?.regularPeriod?.present || 0}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge bg-danger">
+                        {student?.calculatedAttendance?.regularPeriod?.absent || 0}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge bg-warning text-dark">
+                        {student?.calculatedAttendance?.regularPeriod?.notMarked || 0}
+                      </span>
+                    </td>
+
+                    <td>
                       <div className="d-flex align-items-center">
                         <div
                           className="progress flex-grow-1 me-2"
-                          style={{ height: "18px", width: "50px" }}
+                          style={{ height: "20px", width: "60px" }}
                         >
                           <div
                             className={`progress-bar bg-${getProgressColor(
-                              student.filteredStats.punctualityScore
+                              student?.calculatedAttendance?.regularPeriod?.percentage || 0
                             )}`}
                             style={{
-                              width: `${student.filteredStats.punctualityScore}%`,
+                              width: `${student?.calculatedAttendance?.regularPeriod?.percentage || 0}%`,
                             }}
                           ></div>
                         </div>
                         <small className="fw-medium">
-                          {student.filteredStats.punctualityScore}%
+                          {student?.calculatedAttendance?.regularPeriod?.percentage || 0}%
                         </small>
                       </div>
                     </td>
-                   
+
+
                   </tr>
                 ))}
               </tbody>
@@ -2334,19 +2401,19 @@ const Student = ({
                 </div>
                 <div className="col-md-4">
                   <div className="action-buttons">
-                    <label className="form-label fw-bold mb-2">
+                    {/* <label className="form-label fw-bold mb-2">
                       <i className="fas fa-tools me-2"></i>
                       Actions
-                    </label>
-                    <div className="d-flex gap-2">
+                    </label> */}
+                    {/* <div className="d-flex gap-2">
                       <button
                         className="btn btn-success"
                         onClick={() => exportAttendanceData("excel")}
                       >
                         <i className="fas fa-file-excel me-1"></i>
                         Export
-                      </button>
-                      {/* <button
+                      </button> */}
+                    {/* <button
                         className="btn btn-warning"
                         onClick={() => {
                           alert("Printing attendance register...");
@@ -2356,7 +2423,7 @@ const Student = ({
                         <i className="fas fa-print me-1"></i>
                         Print
                       </button> */}
-                    </div>
+                    {/* </div> */}
                   </div>
                 </div>
               </div>
@@ -2377,9 +2444,14 @@ const Student = ({
                   <div className="stat-card bg-success text-white">
                     <div className="stat-number">
                       {
-                        allStudentsAttendanceData.filter(
-                          (s) => s.filteredStats.attendancePercentage >= 85
-                        ).length
+                        allStudentsAttendanceData.filter((student) => {
+                          const result = calculateAttendance(student);
+                          if (result.success) {
+                            const overallPercentage = result.data.overall.percentage || 0;
+                            return overallPercentage >= 85;
+                          }
+                          return false;
+                        }).length
                       }
                     </div>
                     <div className="stat-label">High Attendance (85%+)</div>
@@ -2390,9 +2462,14 @@ const Student = ({
                     <div className="stat-number">
                       {
                         allStudentsAttendanceData.filter(
-                          (s) =>
-                            s.filteredStats.attendancePercentage >= 75 &&
-                            s.filteredStats.attendancePercentage < 85
+                          (student) => {
+                            const result = calculateAttendance(student);
+                            if (result.success) {
+                              const overallPercentage = result.data.overall.percentage || 0;
+                              return overallPercentage >= 75 && overallPercentage < 85;
+                            }
+                            return false;
+                          }
                         ).length
                       }
                     </div>
@@ -2404,7 +2481,14 @@ const Student = ({
                     <div className="stat-number">
                       {
                         allStudentsAttendanceData.filter(
-                          (s) => s.filteredStats.attendancePercentage < 75
+                          (student) => {
+                            const result = calculateAttendance(student);
+                            if (result.success) {
+                              const overallPercentage = result.data.overall.percentage || 0;
+                              return overallPercentage < 75;
+                            }
+                            return false;
+                          }
                         ).length
                       }
                     </div>
@@ -2669,8 +2753,7 @@ const Student = ({
                     selectedDocument?.status !== "No Uploads") ? (
                   <>
                     {(() => {
-                      console.log("selectedDocument:", selectedDocument);
-                      console.log("latestUpload:", latestUpload);
+                      
 
                       const fileUrl =
                         latestUpload?.fileUrl || selectedDocument?.fileUrl;
@@ -2680,8 +2763,6 @@ const Student = ({
                           selectedDocument?.status !== "Not Uploaded" &&
                           selectedDocument?.status !== "No Uploads");
 
-                      console.log("fileUrl:", fileUrl);
-                      console.log("hasDocument:", hasDocument);
 
                       if (hasDocument) {
                         // If we have a file URL, show the appropriate viewer
@@ -3263,12 +3344,13 @@ const Student = ({
 
   // Mark individual attendance
   const markIndividualAttendance = async (studentId, status) => {
-    console.log("studentId", studentId);
 
     try {
+      // Use IST date for marking attendance
+
       const result = await axios.post(`${backendUrl}/college/attendance/mark-attendance`, {
         appliedCourseId: studentId,
-        date: selectedDate,
+        date: selectedDate, // Send IST date
         status: status,
         period: activeTab === 'zeroPeriod' ? 'zeroPeriod' : 'regularPeriod',
         remarks: ''
@@ -3277,17 +3359,30 @@ const Student = ({
           "x-auth": token
         }
       });
-      if(result.status){
-        alert(result.message)
+
+      if (result.status) {
+        alert(result.data.message)
+        fetchProfileData()
+      } else {
+        alert(result.data.message)
+        fetchProfileData()
       }
-      else{
-        alert(result.message)
-      }
-      
+
     } catch (error) {
       console.error("Error marking attendance:", error);
+      alert(error.response?.data?.message || "Failed to mark attendance")
     }
+  };
 
+
+  const isEligibleForTodayAttendance = (profile) => {
+    const todayIST = getTodayIST();
+    const hasAttendanceToday = [
+      ...(profile.attendance?.zeroPeriod?.sessions || []),
+      ...(profile.attendance?.regularPeriod?.sessions || [])
+    ].some(session => formatDateForIST(session.date) === todayIST);
+
+    return (profile.isZeroPeriodAssigned || profile.isBatchFreeze) && !hasAttendanceToday;
   };
 
   // Bulk attendance functions
@@ -3302,18 +3397,50 @@ const Student = ({
   };
 
   const selectAllStudents = () => {
-    const eligibleStudents = filteredStudents.filter(
-      (s) =>
-        (activeTab === "zeroPeriod" && s.admissionStatus === "zeroPeriod") ||
-        activeTab === "all"
-    );
-
-    if (selectedStudents.size === eligibleStudents.length) {
+    // Get eligible students based on current tab and attendance status
+    const eligibleStudents = allProfiles.filter((s) => {
+      // Basic eligibility - student should be assigned to zero period or batch
+      const isAssigned = s.isZeroPeriodAssigned || s.isBatchFreeze;
+      
+      // Tab-specific filtering
+      let tabCondition = false;
+      
+      if (activeTab === "all") {
+        tabCondition = true; // All students are eligible if assigned
+      } else if (activeTab === "zeroPeriod") {
+        tabCondition = s.isZeroPeriodAssigned === true;
+      } else if (activeTab === "batchFreeze") {
+        tabCondition = s.isBatchFreeze === true;
+      } else if (activeTab === "admission") {
+        tabCondition = s.admissionDone === true;
+      }
+      
+      // Check if attendance already marked for selected date
+      const hasAttendanceForSelectedDate = [
+        ...(s.attendance?.zeroPeriod?.sessions || []),
+        ...(s.attendance?.regularPeriod?.sessions || [])
+      ].some(session => {
+        // Use our new date helper for comparison
+        return session.date === selectedDate;
+      });
+      
+      // Student is eligible if:
+      // 1. Meets tab condition
+      // 2. Is assigned to period/batch
+      // 3. Doesn't have attendance marked for selected date
+      return tabCondition && isAssigned && !hasAttendanceForSelectedDate;
+    });
+  
+    
+    // Toggle selection
+    if (selectedStudents.size === eligibleStudents.length && eligibleStudents.length > 0) {
+      // If all eligible students are selected, deselect all
       setSelectedStudents(new Set());
     } else {
-      setSelectedStudents(new Set(eligibleStudents.map((s) => s.id)));
+      // Select all eligible students
+      setSelectedStudents(new Set(eligibleStudents.map((s) => s._id))); // Use _id for MongoDB
     }
-  };
+  }
 
   const applyBulkAttendance = () => {
     if (!bulkAttendanceStatus || selectedStudents.size === 0) return;
@@ -3361,7 +3488,6 @@ const Student = ({
     }));
   };
   useEffect(() => {
-    console.log("studentTabsActive", studentTabsActive);
   }, [studentTabsActive]);
 
   const getStatusColor = (status) => {
@@ -3394,11 +3520,11 @@ const Student = ({
     if (student.dropout) {
       return <span className="badge bg-danger">Dropout</span>;
     }
-    
+
     if (student.isBatchFreeze) {
       return <span className="badge bg-info">Batch Freeze</span>;
     }
-    
+
     if (student.isZeroPeriodAssigned) {
       return (
         <span className="badge bg-warning">
@@ -3406,7 +3532,7 @@ const Student = ({
         </span>
       );
     }
-    
+
     // Default case - pending/applied
     return <span className="badge bg-secondary">Pending</span>;
   };
@@ -3438,18 +3564,77 @@ const Student = ({
   // Check if current tab shows attendance controls
   const showAttendanceControls =
     activeTab === "zeroPeriod" || activeTab === "all" || activeTab === "batchFreeze";
-  const attendanceEligibleStudents = allProfiles.filter(
-    (s) =>
-      (s.isZeroPeriodAssigned === true || s.isBatchFreeze === true) && s.attendance?.regularPeriod?.sessions?.some(session => 
-        new Date(session.date).toDateString() !== new Date().toDateString() || s.attendance?.zeroPeriod?.sessions?.some(session => 
-          new Date(session.date).toDateString() !== new Date().toDateString()
-        )
-      )
-  );
+
+
+
+    const attendanceEligibleStudents = allProfiles.filter(s => {
+      // Check assignment status
+      const hasAssignment = s.isZeroPeriodAssigned === true || s.isBatchFreeze === true;
+      
+      if (!hasAssignment) {
+        return false;
+      }
+    
+      // Get all attendance sessions
+      const allSessions = [
+        ...(s.attendance?.zeroPeriod?.sessions || []),
+        ...(s.attendance?.regularPeriod?.sessions || [])
+      ];
+    
+      // Check if attendance exists for selected date
+      const hasAttendanceForSelectedDate = allSessions.some(session => {
+        let sessionDate;
+        
+        // Handle different date formats from backend
+        if (typeof session.date === 'string') {
+          if (session.date.includes('T')) {
+            // Full ISO date: "2025-01-01T18:30:00.000Z"
+            sessionDate = new Date(session.date).toISOString().split('T')[0];
+            
+            // If it's IST representation (18:30 UTC = next day IST)
+            if (session.date.includes('18:30:00.000Z')) {
+              const utcDate = new Date(session.date);
+              const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+              sessionDate = istDate.toISOString().split('T')[0];
+            }
+          } else {
+            // Already in YYYY-MM-DD format
+            sessionDate = session.date;
+          }
+        } else {
+          // Date object
+          sessionDate = new Date(session.date).toISOString().split('T')[0];
+        }
+        
+        return sessionDate === selectedDate;
+      });
+    
+      const isEligible = hasAssignment && !hasAttendanceForSelectedDate;
+      
+    
+      return isEligible;
+    });
+
+
+
+
+
+  useEffect(() => {
+    console.log(selectedStudents, 'selectedStudents')
+  }, [selectedStudents])
   // const totalSelected = Object.values(formData || {}).reduce((total, filter) => {
   //   return total + (filter?.values?.length || 0);
   // }, 0);
-
+  const getCurrentISTDisplay = () => {
+    const istDate = getISTDate();
+    return istDate.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    });
+  };
   return (
     <div className="container-fluid">
       <div className="row">
@@ -3509,58 +3694,59 @@ const Student = ({
                   <div className="col-md-7">
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       {/* ===== ENHANCED ATTENDANCE CONTROLS ===== */}
-                      {showAttendanceControls &&
-                        attendanceEligibleStudents.length > 0 && (
+
+                      <>
+                        {/* Time Filter */}
+
+
+                        {/* Attendance Mode Toggle */}
+                        <button
+                          onClick={() => {
+                            setShowAttendanceMode(!showAttendanceMode);
+                            setShowBulkControls(false)
+                          }
+                          }
+                          className={`btn btn-sm ${showAttendanceMode
+                            ? "btn-success"
+                            : "btn-outline-success"
+                            }`}
+                        >
+                          <i className="fas fa-check-circle me-1"></i>
+                          {showAttendanceMode
+                            ? "Exit Attendance"
+                            : "Mark Attendance"}
+                        </button>
+
+                        {/* Bulk Controls */}
+                        {showAttendanceMode && (
+                          <button
+                            onClick={() =>
+                              setShowBulkControls(!showBulkControls)
+                            }
+                            className={`btn btn-sm ${showBulkControls
+                              ? "btn-primary"
+                              : "btn-outline-primary"
+                              }`}
+                          >
+                            <i className="fas fa-users me-1"></i>
+                            {showBulkControls ? "Exit Bulk Controls" : "Show Bulk Controls"}
+                          </button>
+                        )}
+
+                        {/* Save & Export */}
+                        {showAttendanceMode && (
                           <>
-                            {/* Time Filter */}
-
-
-                            {/* Attendance Mode Toggle */}
                             <button
-                              onClick={() =>
-                                setShowAttendanceMode(!showAttendanceMode)
-                              }
-                              className={`btn btn-sm ${showAttendanceMode
-                                ? "btn-success"
-                                : "btn-outline-success"
-                                }`}
+                              className="btn btn-sm btn-warning"
+                              onClick={saveAllAttendance}
                             >
-                              <i className="fas fa-check-circle me-1"></i>
-                              {showAttendanceMode
-                                ? "Exit Attendance"
-                                : "Mark Attendance"}
+                              <i className="fas fa-save me-1"></i>
+                              Save
                             </button>
-
-                            {/* Bulk Controls */}
-                            {showAttendanceMode && (
-                              <button
-                                onClick={() =>
-                                  setShowBulkControls(!showBulkControls)
-                                }
-                                className={`btn btn-sm ${showBulkControls
-                                  ? "btn-primary"
-                                  : "btn-outline-primary"
-                                  }`}
-                              >
-                                <i className="fas fa-users me-1"></i>
-                                Bulk
-                              </button>
-                            )}
-
-                            {/* Save & Export */}
-                            {showAttendanceMode && (
-                              <>
-                                <button
-                                  className="btn btn-sm btn-warning"
-                                  onClick={saveAllAttendance}
-                                >
-                                  <i className="fas fa-save me-1"></i>
-                                  Save
-                                </button>
-                              </>
-                            )}
                           </>
                         )}
+                      </>
+
 
                       {/* Search */}
                       <div
@@ -3667,8 +3853,26 @@ const Student = ({
                   </div>
 
                   {/* ===== BULK ATTENDANCE CONTROLS ===== */}
-                  {showBulkControls && showAttendanceMode && (
-                    <div className="col-12 mt-3 p-3 bg-light rounded">
+
+                  <div className="col-12 mt-3 p-3 bg-light rounded">
+                    {showAttendanceMode && (
+                      <div className="d-flex align-items-center gap-2">
+                        <label className="form-label mb-0 small fw-bold">
+                          Date:
+                        </label>
+                        <DatePicker
+                          value={selectedDate ? new Date(selectedDate + 'T12:00:00') : new Date()}
+                          onChange={handleDatePickerChange}
+                          format="dd/MM/yyyy"
+                          maxDate={new Date()}
+                          minDate={new Date(new Date().setDate(new Date().getDate() - 7))}
+                          clearIcon={null}
+                          calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                        />
+                      </div>
+                    )}
+                    {showBulkControls && showAttendanceMode && (
+
                       <div className="d-flex align-items-center gap-3 flex-wrap">
                         <div className="d-flex align-items-center">
                           <input
@@ -3687,51 +3891,53 @@ const Student = ({
                           </label>
                         </div>
 
-                        {selectedStudents.size > 0 && (
-                          <>
-                            <div className="d-flex align-items-center gap-2">
-                              <label className="form-label mb-0 small fw-bold">
-                                Mark as:
-                              </label>
-                              <select
-                                className="form-select form-select-sm"
-                                value={bulkAttendanceStatus}
-                                onChange={(e) =>
-                                  setBulkAttendanceStatus(e.target.value)
-                                }
-                                style={{ width: "150px" }}
-                              >
-                                <option value="">Select Status</option>
-                                <option value="present">Present</option>
-                                <option value="absent">Absent</option>
 
-                              </select>
-                            </div>
+                        <>
 
-                            <button
-                              onClick={applyBulkAttendance}
-                              className="btn btn-primary btn-sm"
-                              disabled={!bulkAttendanceStatus}
+                          <div className="d-flex align-items-center gap-2">
+                            <label className="form-label mb-0 small fw-bold">
+                              Mark as:
+                            </label>
+                            <select
+                              className="form-select form-select-sm"
+                              value={bulkAttendanceStatus}
+                              onChange={(e) =>
+                                setBulkAttendanceStatus(e.target.value)
+                              }
+                              style={{ width: "150px" }}
                             >
-                              <i className="fas fa-check me-1"></i>
-                              Apply to {selectedStudents.size} Students
-                            </button>
+                              <option value="">Select Status</option>
+                              <option value="Present">Present</option>
+                              <option value="Absent">Absent</option>
 
-                            <button
-                              onClick={() => {
-                                setSelectedStudents(new Set());
-                                setBulkAttendanceStatus("");
-                              }}
-                              className="btn btn-outline-secondary btn-sm"
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear
-                            </button>
-                          </>
-                        )}
+                            </select>
+                          </div>
+
+                          <button
+                            onClick={applyBulkAttendance}
+                            className="btn btn-primary btn-sm"
+                            disabled={!bulkAttendanceStatus}
+                          >
+                            <i className="fas fa-check me-1"></i>
+                            Apply to {selectedStudents.size} Students
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedStudents(new Set());
+                              setBulkAttendanceStatus("");
+                            }}
+                            className="btn btn-outline-secondary btn-sm"
+                          >
+                            <i className="fas fa-times me-1"></i>
+                            Clear
+                          </button>
+                        </>
+
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -3781,7 +3987,7 @@ const Student = ({
                   </div>
 
                   {/* Modal Body - Scrollable content */}
-        
+
 
                   {/* Modal Footer - Fixed at bottom */}
                   <div className="modal-footer bg-light border-top">
@@ -3839,13 +4045,12 @@ const Student = ({
                         const isEligibleForAttendance =
                           (profile.isZeroPeriodAssigned || profile.isBatchAssigned) &&
                           !profile.attendance?.regularPeriod?.sessions?.some(session =>
-                            new Date(session.date).toDateString() === new Date().toDateString()
+                            new Date(session.date).toDateString() === new Date(selectedDate).toDateString()
                           ) &&
                           !profile.attendance?.zeroPeriod?.sessions?.some(session =>
-                            new Date(session.date).toDateString() === new Date().toDateString()
+                            new Date(session.date).toDateString() === new Date(selectedDate).toDateString()
                           );
 
-                        console.log(isEligibleForAttendance, 'isEligibleForAttendance')
 
                         return (
                           <div
@@ -3875,11 +4080,11 @@ const Student = ({
                                               className="form-check-input"
                                               type="checkbox"
                                               checked={selectedStudents.has(
-                                                profile.id
+                                                profile._id
                                               )}
                                               onChange={() =>
                                                 toggleStudentSelection(
-                                                  profile.id
+                                                  profile._id
                                                 )
                                               }
                                             />
@@ -3952,15 +4157,21 @@ const Student = ({
 
                                   {/* ===== ENHANCED ATTENDANCE CONTROLS ===== */}
                                   {showAttendanceMode &&
-                                    isEligibleForAttendance && (
+                                    isEligibleForAttendance && !showBulkControls && (
                                       <div className="col-md-5">
                                         <div className="attendance-controls">
                                           <h6 className="text-dark mb-2 small fw-bold">
                                             <i className="fas fa-calendar-check me-1"></i>
                                             Mark Attendance -{" "}
-                                            {new Date(
-                                              selectedDate
-                                            ).toLocaleDateString()}
+                                            <DatePicker
+                                              value={selectedDate ? new Date(selectedDate + 'T12:00:00') : new Date()}
+                                              onChange={handleDatePickerChange}
+                                              format="dd/MM/yyyy"
+                                              clearIcon={null}
+                                              maxDate={new Date()}
+                                              minDate={new Date(new Date().setDate(new Date().getDate() - 7))}
+                                              calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                                            />
                                           </h6>
                                           <div className="row mb-2">
                                             <div className="col-12">
