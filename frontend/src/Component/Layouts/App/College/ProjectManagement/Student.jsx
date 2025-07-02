@@ -1673,6 +1673,13 @@ const Student = ({
         setAllProfiles(response.data.data);
         setTotalPages(response.data.totalPages);
 
+        const getStartandEndDate = () => {
+          const startDate = new Date(response.data.data[0].batch.zeroPeriodStartDate);
+          const endDate = new Date(response.data.data[0].batch.endDate);
+          return { startDate, endDate };
+        }
+        setRegisterDateRange(getStartandEndDate());
+
         // Update tab counts if available
         if (response.data.filterCounts) {
           // You can store tab counts in state and use them
@@ -1685,9 +1692,6 @@ const Student = ({
       console.error("Error fetching profile data:", error);
     }
   };
-  useEffect(() => {
-    console.log(registerDateRange, 'registerDateRange')
-  }, [registerDateRange]);
 
   const handleSearch = (searchTerm) => {
     setSearchQuery(searchTerm);
@@ -1829,52 +1833,80 @@ const Student = ({
     setDocumentRotation(0);
   };
 
-  const getRegisterDates = (year, month, viewMode = 'month') => {
-    let dates = [];
 
-    if (viewMode === 'month') {
-      // Get all dates for the month
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
-        dates.push({
-          date: date.toISOString().split('T')[0],
-          day: day,
-          dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: date.getDay() === 0 || date.getDay() === 6
-        });
-      }
-    } else if (viewMode === 'week') {
-      // Get current week dates
-      const today = new Date();
-      const currentWeekStart = new Date(today.setDate(today.getDate() - today.getDay()));
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(currentWeekStart);
-        date.setDate(currentWeekStart.getDate() + i);
-        dates.push({
-          date: date.toISOString().split('T')[0],
-          day: date.getDate(),
-          dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: date.getDay() === 0 || date.getDay() === 6
-        });
-      }
-    } else if (viewMode === 'custom' && registerDateRange.startDate && registerDateRange.endDate) {
-      // Get custom date range
-      const startDate = new Date(registerDateRange.startDate);
-      const endDate = new Date(registerDateRange.endDate);
-      const currentDate = new Date(startDate);
 
-      while (currentDate <= endDate) {
-        dates.push({
-          date: currentDate.toISOString().split('T')[0],
-          day: currentDate.getDate(),
-          dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
-          isWeekend: currentDate.getDay() === 0 || currentDate.getDay() === 6
-        });
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
+  const formatDateForIST = (date) => {
+    if (!date) return '';
+
+    // If date is already a string in YYYY-MM-DD format, return as is
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
     }
 
+    // For Date objects from date picker, get local date without timezone conversion
+    if (date instanceof Date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // For backend dates that are already adjusted for IST (18:30 UTC = next day IST)
+    if (typeof date === 'string' && date.includes('18:30:00.000')) {
+      const utcDate = new Date(date);
+      const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+      return istDate.toISOString().split('T')[0];
+    }
+
+    // For other dates, create date without timezone issues
+    const dateObj = new Date(date);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+
+  const handleDatePickerChange = (date) => {
+    if (date) {
+      // Get the local date without timezone conversion
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+
+      // Create YYYY-MM-DD format without timezone issues
+      const localDateString = `${year}-${month}-${day}`;
+      setSelectedDate(localDateString);
+
+    }
+  };
+
+
+
+
+  const getRegisterDates = () => {
+    let dates = [];
+
+    // Get start and end dates
+    const startDate = new Date(registerDateRange.startDate);
+    const endDate = new Date(registerDateRange.endDate);
+
+    // No need to convert to IST here as the dates are already in correct format
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      // Format the date as YYYY-MM-DD without timezone conversion
+      const dateString = currentDate.toISOString().split('T')[0];
+
+      dates.push({
+        date: dateString,
+        day: currentDate.getDate(),
+        dayName: currentDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        isWeekend: currentDate.getDay() === 0 || currentDate.getDay() === 6
+      });
+
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
 
     return dates;
   };
@@ -1931,99 +1963,25 @@ const Student = ({
         yearlyData,
       };
     });
-    console.log(allStudentsAttendanceData,'allStudentsAttendanceData')
 
     // ===== STEP 5: Attendance Register View Component =====
     const renderAttendanceRegisterView = () => {
       const dates = getRegisterDates();
 
-
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
 
       return (
         <div className="attendance-register-container">
-          {/* Register Header Controls */}
-          <div className="register-header mb-4">
-            <div className="row align-items-center">
-              <div className="col-md-3">
-                <label className="form-label fw-bold">View Mode:</label>
-                <select
-                  className="form-select"
-                  value={registerViewMode}
-                  onChange={(e) => setRegisterViewMode(e.target.value)}
-                >
-                  <option value="month">Monthly View</option>
-                  <option value="week">Weekly View</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-              </div>
 
-              {registerViewMode === 'month' && (
-                <>
-                  <div className="col-md-3">
-                    <label className="form-label fw-bold">Month:</label>
-                    <select
-                      className="form-select"
-                      value={registerCurrentMonth}
-                      onChange={(e) => setRegisterCurrentMonth(parseInt(e.target.value))}
-                    >
-                      {monthNames.map((month, index) => (
-                        <option key={index} value={index}>{month}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-md-3">
-                    <label className="form-label fw-bold">Year:</label>
-                    <select
-                      className="form-select"
-                      value={registerCurrentYear}
-                      onChange={(e) => setRegisterCurrentYear(parseInt(e.target.value))}
-                    >
-                      {Array.from({ length: 5 }, (_, i) => {
-                        const year = new Date().getFullYear() - 2 + i;
-                        return <option key={year} value={year}>{year}</option>;
-                      })}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              {registerViewMode === 'custom' && (
-                <>
-                  <div className="col-md-3">
-                    <label className="form-label fw-bold">Start Date:</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={registerDateRange.startDate}
-                      onChange={(e) => setRegisterDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-md-3">
-                    <label className="form-label fw-bold">End Date:</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={registerDateRange.endDate}
-                      onChange={(e) => setRegisterDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="col-md-3 d-flex align-items-end">
-                <button className="btn btn-primary">
-                  <i className="fas fa-download me-1"></i>
-                  Export Register
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Register Title */}
           <div className="register-title text-center mb-4">
-            {/* <h4 className="fw-bold text-primary">
+            <h4 className="fw-bold text-primary">
               <i className="fas fa-clipboard-list me-2"></i>
-              Attendance Register - {monthNames[registerCurrentMonth]} {registerCurrentYear}
+              Attendance Register
             </h4>
             <p className="text-muted mb-0">
               Total Students: {allStudentsAttendanceData.length} |
@@ -2248,10 +2206,10 @@ const Student = ({
             <table className="table table-striped table-hover">
               <thead className="table-dark">
                 <tr>
-                  <th style={{ minWidth: "200px" }}>Student Details</th>
-                  <th colSpan={4} className="text-center">Zero Period Attendance</th>
-                  <th colSpan={4} className="text-center">Regular Period Attendance</th>
-                 
+                  <th rowSpan={2} style={{ minWidth: "200px" }}>Student Details</th>
+                  <th colSpan={5} className="text-center">Zero Period Attendance</th>
+                  <th colSpan={5} className="text-center">Regular Period Attendance</th>
+
                 </tr>
                 <tr className="text-center">
                   <th>Total Days <small>(Excluding Sundays)</small></th>
@@ -2373,7 +2331,8 @@ const Student = ({
                         </small>
                       </div>
                     </td>
-                   
+
+
                   </tr>
                 ))}
               </tbody>
@@ -3400,11 +3359,13 @@ const Student = ({
           "x-auth": token
         }
       });
-      if(result.status){
-        alert(result.message)
-      }
-      else{
-        alert(result.message)
+
+      if (result.status) {
+        alert(result.data.message)
+        fetchProfileData()
+      } else {
+        alert(result.data.message)
+        fetchProfileData()
       }
 
     } catch (error) {
