@@ -321,232 +321,6 @@ router.route("/register")
 
 
 
-// router.route("/appliedCandidates").get(isCollege, async (req, res) => {
-
-// 	try {
-// 		console.log('====================>!api called')
-// 		const user = req.user;
-// 		const teamMembers = await getAllTeamMembers(user._id);
-// 		console.log('teamMembers', teamMembers)
-// 		const college = await College.findOne({
-// 			'_concernPerson._id': user._id
-// 		});
-
-// 		const page = parseInt(req.query.page) || 1;      // Default page 1
-// 		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
-// 		const skip = (page - 1) * limit;
-
-// 		let appliedCourses = [];
-
-// 		for (const member of teamMembers) {
-// 			const response = await AppliedCourses.find({
-// 				kycStage: { $nin: [true] },
-// 				kyc: { $nin: [true] },
-// 				admissionDone: { $nin: [true] },
-// 				$or: [
-// 					// registeredBy field se match (single member ke liye)
-// 					{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
-
-// 					// leadAssignment ke last element ki _id se match
-// 					{
-// 						$expr: {
-// 							$eq: [
-// 								{ $arrayElemAt: ["$leadAssignment._id", -1] },
-// 								member
-// 							]
-// 						}
-// 					}
-// 				]
-// 			})
-// 				.populate({
-// 					path: '_course',
-// 					populate: [
-// 						{
-// 							path: 'sectors',
-// 							select: 'name'
-// 						},
-// 						{
-// 							path: 'vertical',
-// 							select: 'name'  // Add the fields you want to populate from the `vertical` path
-// 						},
-// 						{
-// 							path: 'project',
-// 							select: 'name'  // Add the fields you want to populate from the `project` path
-// 						}
-// 					]
-// 				})
-// 				.populate('_leadStatus')
-// 				.populate('_center')
-// 				.populate('registeredBy')
-// 				.populate({
-// 					path: '_candidate',
-// 					populate: [
-// 						{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
-// 					]
-// 				})
-// 				.populate({
-// 					path: 'logs',
-// 					populate: {
-// 						path: 'user',
-// 						select: 'name'
-// 					}
-// 				})
-// 				.sort({ createdAt: -1 })
-
-
-// 			response.forEach(doc => {
-// 				if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
-// 					appliedCourses.push(doc);
-// 				}
-// 			});
-// 		}
-
-// 		const filteredAppliedCourses = appliedCourses.filter(doc => {
-// 			// _course must be populated!
-// 			return doc._course && String(doc._course.college) === String(college._id);
-// 		});
-
-// 		const results = filteredAppliedCourses.map(doc => {
-// 			let selectedSubstatus = null;
-
-// 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
-// 				selectedSubstatus = doc._leadStatus.substatuses.find(
-// 					sub => sub._id.toString() === doc._leadSubStatus.toString()
-// 				);
-// 			}
-
-// 			const docObj = doc.toObject();
-
-// 			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
-// 			if (docObj._course) {
-// 				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
-// 			}
-
-// 			const requiredDocs = docObj._course?.docsRequired || [];
-// 			const uploadedDocs = docObj.uploadedDocs || [];
-
-// 			// Map uploaded docs by docsId for quick lookup
-// 			const uploadedDocsMap = {};
-// 			uploadedDocs.forEach(d => {
-// 				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
-// 			});
-
-// 			// Prepare combined docs array
-// 			const allDocs = requiredDocs.map(reqDoc => {
-// 				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
-// 				if (uploadedDoc) {
-// 					// Agar uploaded hai to uploadedDoc details bhejo
-// 					return {
-// 						...uploadedDoc,
-// 						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
-// 						mandatory: reqDoc.mandatory,
-// 						_id: reqDoc._id
-// 					};
-// 				} else {
-// 					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
-// 					return {
-// 						docsId: reqDoc._id,
-// 						Name: reqDoc.Name,
-// 						mandatory: reqDoc.mandatory,
-// 						status: "Not Uploaded",
-// 						fileUrl: null,
-// 						reason: null,
-// 						verifiedBy: null,
-// 						verifiedDate: null,
-// 						uploadedAt: null
-// 					};
-// 				}
-// 			});
-
-// 			if (requiredDocs) {
-// 				docsRequired = requiredDocs
-
-// 				// Create a merged array with both required docs and uploaded docs info
-// 				combinedDocs = docsRequired.map(reqDoc => {
-// 					// Convert Mongoose document to plain object
-// 					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
-
-// 					// Find matching uploaded docs for this required doc
-// 					const matchingUploads = uploadedDocs.filter(
-// 						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
-// 					);
-
-// 					return {
-// 						_id: docObj._id,
-// 						Name: docObj.Name || 'Document',
-// 						mandatory: docObj.mandatory,
-// 						description: docObj.description || '',
-// 						uploads: matchingUploads || []
-// 					};
-// 				});
-
-
-// 			} else {
-// 				console.log("Course not found or no docs required");
-// 			};
-
-// 			// Count calculations
-// 			let verifiedCount = 0;
-// 			let RejectedCount = 0;
-// 			let pendingVerificationCount = 0;
-// 			let notUploadedCount = 0;
-
-// 			allDocs.forEach(doc => {
-// 				if (doc.status === "Verified") verifiedCount++;
-// 				else if (doc.status === "Rejected") RejectedCount++;
-// 				else if (doc.status === "Pending") pendingVerificationCount++;
-// 				else if (doc.status === "Not Uploaded") notUploadedCount++;
-// 			});
-
-// 			const totalRequired = allDocs.length;
-// 			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
-// 			const uploadPercentage = totalRequired > 0
-// 				? Math.round((uploadedCount / totalRequired) * 100)
-// 				: 0;
-// 			return {
-// 				...docObj,
-// 				selectedSubstatus,
-// 				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
-// 				docCounts: {
-// 					totalRequired,
-// 					RejectedCount,
-// 					uploadedCount,
-// 					verifiedCount,
-// 					pendingVerificationCount,
-// 					notUploadedCount,
-// 					uploadPercentage
-// 				}
-// 			};
-// 		});
-
-
-
-// 		const totalCount = results.length
-
-// 		const result = results.slice(skip, skip + limit);
-
-
-
-
-// 		res.status(200).json({
-// 			success: true,
-// 			count: result.length,
-// 			page,
-// 			limit,
-// 			totalCount,
-// 			totalPages: Math.ceil(totalCount / limit),
-// 			data: result,
-// 			allData: results
-// 		});
-
-// 	} catch (err) {
-// 		console.error(err);
-// 		res.status(500).json({
-// 			success: false,
-// 			message: "Server Error"
-// 		});
-// 	}
-// });
 
 router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 	try {
@@ -605,7 +379,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		
 
-		console.log('teamMembers', teamMembers)
 
 		let allFilteredResults = [];
 
@@ -813,30 +586,44 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
 
 				// Logs lookup
+
 				{
 					$lookup: {
-						from: 'logs',
-						localField: 'logs',
+						from: 'users',
+						localField: 'logs.user',
 						foreignField: '_id',
-						as: 'logs',
-						pipeline: [
-							{
-								$lookup: {
-									from: 'users',
-									localField: 'user',
-									foreignField: '_id',
-									as: 'user'
-								}
-							},
-							{ $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }
-						]
+						as: 'logUsers'
 					}
 				},
 				{
-					$unwind: {
-						path: '$logs', preserveNullAndEmptyArrays: true
+					$addFields: {
+						logs: {
+							$map: {
+								input: "$logs",
+								as: "log",
+								in: {
+									$mergeObjects: [
+										"$$log",
+										{
+											user: {
+												$arrayElemAt: [
+													{
+														$filter: {
+															input: "$logUsers",
+															cond: { $eq: ["$$this._id", "$$log.user"] }
+														}
+													},
+													0
+												]
+											}
+										}
+									]
+								}
+							}
+						}
 					}
 				}
+				
 			);
 
 			// Filter by college
@@ -875,23 +662,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 			}
 
-			// Counselor filter (multi-select)
-			// if (counselorArray.length > 0) {
-			// 	console.log('counselorArray', counselorArray)
-			// 	additionalMatches.$or = [
-			// 		// Check if any counselor ID exists in leadAssignment array
-			// 		{ 'leadAssignment._id': { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) } },
-			// 		// Check if the last leadAssignment ID is in the counselor array
-			// 		{
-			// 			$expr: {
-			// 				$in: [
-			// 					{ $arrayElemAt: ["$leadAssignment._id", -1] },
-			// 					counselorArray.map(id => new mongoose.Types.ObjectId(id))
-			// 				]
-			// 			}
-			// 		}
-			// 	];
-			// }
+			
 			// Name search filter
 			if (name && name.trim()) {
 				const searchRegex = new RegExp(name.trim(), 'i');
@@ -3773,67 +3544,385 @@ router.put('/update/:id', isCollege, async (req, res) => {
 router.route("/kycCandidates").get(isCollege, async (req, res) => {
 	try {
 		const user = req.user;
+		let teamMembers = await getAllTeamMembers(user._id);
+
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
 
-		const page = parseInt(req.query.page) || 1;      // Default page 1
-		const limit = parseInt(req.query.limit) || 50;   // Default limit 50
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 50;
 		const skip = (page - 1) * limit;
 
+		// Extract ALL filter parameters from query (same as appliedCandidates)
+		const {
+			name,
+			courseType,
+			status,
+			kyc,
+			leadStatus,
+			sector,
+			createdFromDate,
+			createdToDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
+			// Multi-select filters (these come as JSON strings)
+			projects,
+			verticals,
+			course,
+			center,
+			counselor
+		} = req.query;
+		console.log(req.query, 'req.query')
+
+		// Parse multi-select filter values
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays:', parseError);
+		}
+
+		if (counselorArray.length > 0) {
+			teamMembers = counselorArray;
+		}
 
 
-		const appliedCourses = await AppliedCourses.find({
-			kycStage: { $in: [true] },
-			admissionDone: { $nin: [true] }
-		})
-			.populate({
-				path: '_course',
-				select: 'name description docsRequired college', // Select the necessary fields
-				populate: {
-					path: 'sectors',
-					select: 'name'
-				}
-			})
-			.populate('_center')
-			.populate('_leadStatus')
-			.populate('registeredBy')
-			.populate({
-				path: '_candidate',
-				populate: [
-					{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+		let allFilteredResults = [];
+
+		for (let member of teamMembers) {
+			// Build aggregation pipeline
+			let aggregationPipeline = [];
+
+			if (typeof member === 'string') {
+				member = new mongoose.Types.ObjectId(member);
+			}
+
+			// Base match stage
+			let baseMatchStage = {
+				kycStage: { $in: [true] },
+				admissionDone: { $nin: [true] },
+				$or: [
+					{ registeredBy: member },
+					{
+						$expr: {
+							$eq: [
+								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								member
+							]
+						}
+					}
 				]
-			})
-			.populate({
-				path: 'logs',
-				populate: {
-					path: 'user',
-					select: 'name'
+			};
+
+			// Add KYC filter if specified
+			if (kyc !== undefined && kyc !== '') {
+				if (kyc === 'true' || kyc === true) {
+					baseMatchStage.kyc = true;
+				} else if (kyc === 'false' || kyc === false) {
+					baseMatchStage.kyc = false;
 				}
-			})
-			.sort({ createdAt: -1 })
-			.skip(skip)
-			.limit(limit);
+			}
 
+			// Add date filters to base match
+			if (createdFromDate || createdToDate) {
+				baseMatchStage.createdAt = {};
+				if (createdFromDate) {
+					baseMatchStage.createdAt.$gte = new Date(createdFromDate);
+				}
+				if (createdToDate) {
+					const toDate = new Date(createdToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.createdAt.$lte = toDate;
+				}
+			}
 
+			if (modifiedFromDate || modifiedToDate) {
+				baseMatchStage.updatedAt = {};
+				if (modifiedFromDate) {
+					baseMatchStage.updatedAt.$gte = new Date(modifiedFromDate);
+				}
+				if (modifiedToDate) {
+					const toDate = new Date(modifiedToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.updatedAt.$lte = toDate;
+				}
+			}
 
-		const filteredAppliedCourses = appliedCourses.filter(doc => {
-			// _course must be populated!
-			return doc._course && String(doc._course.college) === String(college._id);
-		});
+			if (nextActionFromDate || nextActionToDate) {
+				baseMatchStage.followupDate = {};
+				if (nextActionFromDate) {
+					baseMatchStage.followupDate.$gte = new Date(nextActionFromDate);
+				}
+				if (nextActionToDate) {
+					const toDate = new Date(nextActionToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.followupDate.$lte = toDate;
+				}
+			}
 
-		const totalCount = filteredAppliedCourses.length;
-		const pendingKycCount = filteredAppliedCourses.filter(doc =>
-			doc.kycStage === true && doc.kyc === false
-		).length;
-		const doneKycCount = totalCount - pendingKycCount
+			// Status filters
+			if (status && status !== 'true') {
+				baseMatchStage._leadStatus = new mongoose.Types.ObjectId(status);
+			}
+			if (leadStatus) {
+				baseMatchStage._leadStatus = new mongoose.Types.ObjectId(leadStatus);
+			}
 
+			// Add base match stage
+			aggregationPipeline.push({ $match: baseMatchStage });
 
+			// Lookup stages for all related collections
+			aggregationPipeline.push(
+				// Course lookup with sectors, vertical, project population
+				{
+					$lookup: {
+						from: 'courses',
+						localField: '_course',
+						foreignField: '_id',
+						as: '_course',
+						pipeline: [
+							{
+								$lookup: {
+									from: 'sectors',
+									localField: 'sectors',
+									foreignField: '_id',
+									as: 'sectors'
+								}
+							},
+							{
+								$lookup: {
+									from: 'verticals',
+									localField: 'vertical',
+									foreignField: '_id',
+									as: 'vertical'
+								}
+							},
+							{
+								$lookup: {
+									from: 'projects',
+									localField: 'project',
+									foreignField: '_id',
+									as: 'project'
+								}
+							}
+						]
+					}
+				},
+				{ $unwind: '$_course' },
 
-		const result = filteredAppliedCourses.map(doc => {
+				// Lead Status lookup
+				{
+					$lookup: {
+						from: 'status',
+						localField: '_leadStatus',
+						foreignField: '_id',
+						as: '_leadStatus'
+					}
+				},
+				{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
+
+				// Center lookup
+				{
+					$lookup: {
+						from: 'centers',
+						localField: '_center',
+						foreignField: '_id',
+						as: '_center'
+					}
+				},
+				{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+
+				// Registered By lookup
+				{
+					$lookup: {
+						from: 'users',
+						localField: 'registeredBy',
+						foreignField: '_id',
+						as: 'registeredBy'
+					}
+				},
+				{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+
+				// Candidate lookup with applied courses
+				{
+					$lookup: {
+						from: 'candidateprofiles',
+						localField: '_candidate',
+						foreignField: '_id',
+						as: '_candidate',
+						pipeline: [
+							{
+								$lookup: {
+									from: 'appliedcourses',
+									localField: '_appliedCourses',
+									foreignField: '_id',
+									as: '_appliedCourses',
+									pipeline: [
+										{
+											$lookup: {
+												from: 'courses',
+												localField: '_course',
+												foreignField: '_id',
+												as: '_course'
+											}
+										},
+										{
+											$lookup: {
+												from: 'users',
+												localField: 'registeredBy',
+												foreignField: '_id',
+												as: 'registeredBy'
+											}
+										},
+										{
+											$lookup: {
+												from: 'centers',
+												localField: '_center',
+												foreignField: '_id',
+												as: '_center'
+											}
+										},
+										{
+											$lookup: {
+												from: 'status',
+												localField: '_leadStatus',
+												foreignField: '_id',
+												as: '_leadStatus'
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+
+				// Logs lookup
+				{
+					$lookup: {
+						from: 'users',
+						localField: 'logs.user',
+						foreignField: '_id',
+						as: 'logUsers'
+					}
+				},
+				{
+					$addFields: {
+						logs: {
+							$map: {
+								input: "$logs",
+								as: "log",
+								in: {
+									$mergeObjects: [
+										"$$log",
+										{
+											user: {
+												$arrayElemAt: [
+													{
+														$filter: {
+															input: "$logUsers",
+															cond: { $eq: ["$$this._id", "$$log.user"] }
+														}
+													},
+													0
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					}
+				}
+			);
+
+			// Filter by college
+			aggregationPipeline.push({
+				$match: {
+					'_course.college': college._id
+				}
+			});
+
+			// Apply additional filters based on populated data
+			let additionalMatches = {};
+
+			// Course type filter
+			if (courseType) {
+				additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(courseType, 'i') };
+			}
+
+			// Sector filter (multi-select - using projects array)
+			if (projectsArray.length > 0) {
+				additionalMatches['_course.sectors._id'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			// Verticals filter (multi-select)
+			if (verticalsArray.length > 0) {
+				additionalMatches['_course.vertical._id'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			// Course filter (multi-select)
+			if (courseArray.length > 0) {
+				additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			// Center filter (multi-select)
+			if (centerArray.length > 0) {
+				additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			// Name search filter
+			if (name && name.trim()) {
+				const searchRegex = new RegExp(name.trim(), 'i');
+				additionalMatches.$or = additionalMatches.$or ? [
+					...additionalMatches.$or,
+					{ '_candidate.name': searchRegex },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.email': searchRegex }
+				] : [
+					{ '_candidate.name': searchRegex },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.email': searchRegex }
+				];
+			}
+
+			// Add additional match stage if any filters are applied
+			if (Object.keys(additionalMatches).length > 0) {
+				aggregationPipeline.push({ $match: additionalMatches });
+			}
+
+			// Sort by creation date
+			aggregationPipeline.push({
+				$sort: { createdAt: -1 }
+			});
+
+			// Execute aggregation
+			const response = await AppliedCourses.aggregate(aggregationPipeline);
+
+			// Add unique results to the main array
+			response.forEach(doc => {
+				if (!allFilteredResults.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
+					allFilteredResults.push(doc);
+				}
+			});
+		}
+
+		// Process results for document counts and other formatting
+		const results = allFilteredResults.map(doc => {
 			let selectedSubstatus = null;
-
-
 
 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
 				selectedSubstatus = doc._leadStatus.substatuses.find(
@@ -3841,53 +3930,26 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				);
 			}
 
-			const docObj = doc.toObject();
-
-			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
-			if (docObj._course) {
-				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+			// Process sectors to show first sector name
+			const firstSectorName = doc._course?.sectors?.[0]?.name || 'N/A';
+			if (doc._course) {
+				doc._course.sectors = firstSectorName;
 			}
 
-			const requiredDocs = docObj._course?.docsRequired || [];
-			const uploadedDocs = docObj.uploadedDocs || [];
+			const requiredDocs = doc._course?.docsRequired || [];
+			const uploadedDocs = doc.uploadedDocs || [];
 
 			// Map uploaded docs by docsId for quick lookup
 			const uploadedDocsMap = {};
 			uploadedDocs.forEach(d => {
 				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
 			});
-			// Prepare combined docs array
-			const allDocs = requiredDocs.map(reqDoc => {
-				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
-				if (uploadedDoc) {
-					// Agar uploaded hai to uploadedDoc details bhejo
-					return {
-						...uploadedDoc,
-						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
-						_id: reqDoc._id
-					};
-				} else {
-					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
-					return {
-						docsId: reqDoc._id,
-						Name: reqDoc.Name,
-						status: "Not Uploaded",
-						fileUrl: null,
-						reason: null,
-						verifiedBy: null,
-						verifiedDate: null,
-						uploadedAt: null
-					};
-				}
-			});
 
+			let combinedDocs = [];
 
-			// Prepare combined docs array
 			if (requiredDocs) {
-				docsRequired = requiredDocs
-
 				// Create a merged array with both required docs and uploaded docs info
-				combinedDocs = docsRequired.map(reqDoc => {
+				combinedDocs = requiredDocs.map(reqDoc => {
 					// Convert Mongoose document to plain object
 					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
 
@@ -3903,11 +3965,30 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 						uploads: matchingUploads || []
 					};
 				});
+			}
 
-
-			} else {
-				console.log("Course not found or no docs required");
-			};
+			// Prepare combined docs array for legacy compatibility
+			const allDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,
+						_id: reqDoc._id
+					};
+				} else {
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
 
 			// Count calculations
 			let verifiedCount = 0;
@@ -3927,10 +4008,11 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			const uploadPercentage = totalRequired > 0
 				? Math.round((uploadedCount / totalRequired) * 100)
 				: 0;
+
 			return {
-				...docObj,
+				...doc,
 				selectedSubstatus,
-				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				uploadedDocs: combinedDocs,
 				docCounts: {
 					totalRequired,
 					RejectedCount,
@@ -3943,18 +4025,44 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			};
 		});
 
+		// Calculate KYC specific counts
+		const totalCount = results.length;
+		const pendingKycCount = results.filter(doc => doc.kycStage === true && doc.kyc === false).length;
+		const doneKycCount = results.filter(doc => doc.kyc === true).length;
 
+		// Calculate CRM filter counts (if needed for additional status filters)
+		const crmFilterCounts = await calculateKycFilterCounts(teamMembers, college._id, {
+			name,
+			courseType,
+			sector,
+			kyc,
+			createdFromDate,
+			createdToDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
+			projectsArray,
+			verticalsArray,
+			courseArray,
+			centerArray,
+			counselorArray
+		});
+
+		// Apply pagination
+		const paginatedResult = results.slice(skip, skip + limit);
 
 		res.status(200).json({
 			success: true,
-			count: result.length,
+			count: paginatedResult.length,
 			page,
+			limit,
 			pendingKycCount,
 			doneKycCount,
-			limit,
 			totalCount,
 			totalPages: Math.ceil(totalCount / limit),
-			data: result,
+			data: paginatedResult,
+			crmFilterCounts
 		});
 
 	} catch (err) {
@@ -3965,6 +4073,294 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		});
 	}
 });
+
+// Helper function to calculate KYC filter counts with applied filters
+async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters = {}) {
+	const counts = { 
+		all: 0,
+		pendingKyc: 0,
+		doneKyc: 0
+	};
+
+	try {
+		// First get all statuses from the database
+		const allStatuses = await Status.find({}).select('_id title milestone');
+
+		// Initialize counts for each status
+		allStatuses.forEach(status => {
+			counts[status._id.toString()] = {
+				_id: status._id,
+				name: status.title,
+				milestone: status.milestone,
+				count: 0
+			};
+		});
+
+		for (let member of teamMembers) {
+			// Build base aggregation pipeline
+			let basePipeline = [];
+
+			if (typeof member === 'string') {
+				member = new mongoose.Types.ObjectId(member);
+			}
+
+			// Base match stage for KYC candidates
+			let baseMatchStage = {
+				kycStage: { $in: [true] },
+				admissionDone: { $nin: [true] },
+				$or: [
+					{ registeredBy: member },
+					{
+						$expr: {
+							$eq: [
+								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								member
+							]
+						}
+					}
+				]
+			};
+
+			// Add date filters
+			if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
+				baseMatchStage.createdAt = {};
+				if (appliedFilters.createdFromDate) {
+					baseMatchStage.createdAt.$gte = new Date(appliedFilters.createdFromDate);
+				}
+				if (appliedFilters.createdToDate) {
+					const toDate = new Date(appliedFilters.createdToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.createdAt.$lte = toDate;
+				}
+			}
+
+			if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
+				baseMatchStage.updatedAt = {};
+				if (appliedFilters.modifiedFromDate) {
+					baseMatchStage.updatedAt.$gte = new Date(appliedFilters.modifiedFromDate);
+				}
+				if (appliedFilters.modifiedToDate) {
+					const toDate = new Date(appliedFilters.modifiedToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.updatedAt.$lte = toDate;
+				}
+			}
+
+			if (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate) {
+				baseMatchStage.followupDate = {};
+				if (appliedFilters.nextActionFromDate) {
+					baseMatchStage.followupDate.$gte = new Date(appliedFilters.nextActionFromDate);
+				}
+				if (appliedFilters.nextActionToDate) {
+					const toDate = new Date(appliedFilters.nextActionToDate);
+					toDate.setHours(23, 59, 59, 999);
+					baseMatchStage.followupDate.$lte = toDate;
+				}
+			}
+
+			basePipeline.push({ $match: baseMatchStage });
+
+			// Add lookups
+			basePipeline.push(
+				{
+					$lookup: {
+						from: 'courses',
+						localField: '_course',
+						foreignField: '_id',
+						as: '_course',
+						pipeline: [
+							{
+								$lookup: {
+									from: 'sectors',
+									localField: 'sectors',
+									foreignField: '_id',
+									as: 'sectors'
+								}
+							},
+							{
+								$lookup: {
+									from: 'verticals',
+									localField: 'vertical',
+									foreignField: '_id',
+									as: 'vertical'
+								}
+							},
+							{
+								$lookup: {
+									from: 'projects',
+									localField: 'project',
+									foreignField: '_id',
+									as: 'project'
+								}
+							}
+						]
+					}
+				},
+				{ $unwind: '$_course' },
+				{
+					$lookup: {
+						from: 'centers',
+						localField: '_center',
+						foreignField: '_id',
+						as: '_center'
+					}
+				},
+				{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+				{
+					$lookup: {
+						from: 'users',
+						localField: 'registeredBy',
+						foreignField: '_id',
+						as: 'registeredBy'
+					}
+				},
+				{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+				{
+					$lookup: {
+						from: 'candidateprofiles',
+						localField: '_candidate',
+						foreignField: '_id',
+						as: '_candidate'
+					}
+				},
+				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
+			);
+
+			// Filter by college FIRST
+			basePipeline.push({
+				$match: {
+					'_course.college': collegeId
+				}
+			});
+
+			// Apply additional filters
+			let additionalMatches = {};
+
+			if (appliedFilters.courseType) {
+				additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(appliedFilters.courseType, 'i') };
+			}
+
+			if (appliedFilters.projectsArray && appliedFilters.projectsArray.length > 0) {
+				additionalMatches['_course.sectors._id'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			if (appliedFilters.verticalsArray && appliedFilters.verticalsArray.length > 0) {
+				additionalMatches['_course.vertical._id'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			if (appliedFilters.courseArray && appliedFilters.courseArray.length > 0) {
+				additionalMatches['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
+				additionalMatches['_center._id'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+
+			if (appliedFilters.name && appliedFilters.name.trim()) {
+				const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
+				additionalMatches.$or = additionalMatches.$or ? [
+					...additionalMatches.$or,
+					{ '_candidate.name': searchRegex },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.email': searchRegex }
+				] : [
+					{ '_candidate.name': searchRegex },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.email': searchRegex }
+				];
+			}
+
+			if (Object.keys(additionalMatches).length > 0) {
+				basePipeline.push({ $match: additionalMatches });
+			}
+
+			// Get all KYC leads count
+			const allKycAggregation = await AppliedCourses.aggregate([
+				...basePipeline,
+				{ $count: "total" }
+			]);
+
+			const allKycCount = allKycAggregation[0]?.total || 0;
+			counts.all += allKycCount;
+
+			// Get KYC status counts
+			const kycStatusAggregation = await AppliedCourses.aggregate([
+				...basePipeline,
+				{
+					$group: {
+						_id: "$kyc",
+						count: { $sum: 1 }
+					}
+				}
+			]);
+
+			// Update KYC counts
+			kycStatusAggregation.forEach(kycGroup => {
+				if (kycGroup._id === true) {
+					counts.doneKyc += kycGroup.count;
+				} else {
+					counts.pendingKyc += kycGroup.count;
+				}
+			});
+
+			// Get status-wise counts
+			const statusCountsAggregation = await AppliedCourses.aggregate([
+				...basePipeline,
+				{
+					$addFields: {
+						leadStatusId: {
+							$ifNull: ["$_leadStatus", null]
+						}
+					}
+				},
+				{
+					$group: {
+						_id: "$leadStatusId",
+						count: { $sum: 1 }
+					}
+				}
+			]);
+
+			// Update status counts
+			statusCountsAggregation.forEach(statusGroup => {
+				const statusId = statusGroup._id;
+				const count = statusGroup.count;
+
+				if (statusId) {
+					const statusKey = statusId.toString();
+					if (counts[statusKey]) {
+						counts[statusKey].count += count;
+					}
+				} else {
+					if (!counts['null']) {
+						counts['null'] = {
+							_id: null,
+							name: 'No Status',
+							milestone: null,
+							count: 0
+						};
+					}
+					counts['null'].count += count;
+				}
+			});
+		}
+
+		// Remove statuses with 0 count (optional)
+		const finalCounts = {};
+		Object.keys(counts).forEach(key => {
+			if (key === 'all' || key === 'pendingKyc' || key === 'doneKyc' || 
+				(counts[key].count && counts[key].count > 0)) {
+				finalCounts[key] = counts[key];
+			}
+		});
+
+		return finalCounts;
+
+	} catch (error) {
+		console.error('Error calculating KYC filter counts:', error);
+		return { all: 0, pendingKyc: 0, doneKyc: 0 };
+	}
+}
 
 router.put("/update_kyc/:id", async (req, res) => {
 	try {

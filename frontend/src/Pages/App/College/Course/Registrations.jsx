@@ -2170,6 +2170,10 @@ const CRMDashboard = () => {
     }
   };
 
+  useEffect(() => {
+    console.log('selectedProfile', selectedProfile);
+  }, [selectedProfile]);
+
   const openProfileEditPanel = async (profile = null) => {
     if (profile) {
       // Set selected profile
@@ -3336,6 +3340,7 @@ const CRMDashboard = () => {
                 <div className="d-flex justify-content-end gap-2">
                   <button
                     className="btn btn-sm btn-outline-primary"
+                    disabled={isLoadingProfiles || allProfiles.length === 0}
                     style={{
                       padding: "6px 12px",
                       fontSize: "11px",
@@ -3354,6 +3359,7 @@ const CRMDashboard = () => {
                   </button>
                   <button
                     className="btn btn-sm btn-outline-secondary"
+                    disabled={isLoadingProfiles || allProfiles.length === 0}
                     style={{
                       padding: "6px 12px",
                       fontSize: "11px",
@@ -3580,7 +3586,7 @@ const CRMDashboard = () => {
                                             }}
 
                                             onClick={() => {
-                                              openRefferPanel(profile);
+                                              openleadHistoryPanel(profile);
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -3924,6 +3930,10 @@ const CRMDashboard = () => {
                                               <div className="info-value">{profile.updatedAt ?
                                                 new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                             </div>
+                                            <div className="info-group">
+                                              <div className="info-label">Remarks</div>
+                                              <div className="info-value">{profile.remarks || 'N/A'}</div>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
@@ -3997,6 +4007,10 @@ const CRMDashboard = () => {
                                                     <div className="info-label">LEAD MODIFICATION DATE</div>
                                                     <div className="info-value">{profile.updatedAt ?
                                                       new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                  </div>
+                                                  <div className="info-group">
+                                                    <div className="info-label">Remarks</div>
+                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION By</div>
@@ -4129,6 +4143,12 @@ const CRMDashboard = () => {
                                                       });
                                                       return `${datePart}, ${timePart}`;
                                                     })() : 'N/A'}</div>
+                                                  </div>
+                                                </div>
+                                                <div className="col-xl- col-3">
+                                                  <div className="info-group">
+                                                    <div className="info-label">Remarks</div>
+                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
