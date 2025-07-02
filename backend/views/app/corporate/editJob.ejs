@@ -421,10 +421,33 @@
                                 </div>
                               </div>
                             </div>
-                            <div class="col-xl-2 mb-1">
+                            <!-- <div class="col-xl-2 mb-1">
                               <label for="timings">Shift Timings</label>
                               <input id="timings" class="form-control" type="text" name="shifttimings"
                                 value="<%= jd?.shifttimings %>" maxlength="3" />
+                            </div> -->
+
+                            <div class="col-xl-3 mb-1" id="shift-field">
+                              <label>Shift Timing
+                                <span class="mandatory">*</span>
+                              </label>
+
+                              <div id="shiftTiming">
+                                <!-- <label>&nbsp;</label> -->
+                                <div class="row">
+                                  <div class="col-6">
+                                    <label>From</label>
+                                    <input name="shiftTimingFrom" type="text" id="timing-from" class="form-control"
+                                      placeholder="From" value="<%= jd?.shiftTimingFrom %>">
+                                  </div>
+                                  <div class="col-6">
+                                    <label>To</label>
+                                    <input name="shiftTimingTo" type="text" id="timing-to" class="form-control"
+                                      placeholder="To" value="<%= jd?.shiftTimingTo %>">
+                                  </div>
+                                </div>
+
+                              </div>
                             </div>
                             <div class="col-xl-3 mb-1" id="jd-work-field">
                               <div class="demo-inline-spacing">
@@ -1492,6 +1515,8 @@
             let genderRadio3 = document.getElementById('genderRadio3');
             const currentLocation = document.getElementById('work-loc');
             let currentLoc = currentLocation.value;
+            let shiftTimingFrom = document.getElementById('timing-from').value;
+            let shiftTimingTo = document.getElementById('timing-to').value;
             const jobValidity = $('#endDate').val()
             let firstError = ''
             let flag = true
@@ -1526,6 +1551,16 @@
             if (jobValidity.trim() === '') {
               $('#jd-validity-field').addClass('error')
               firstError = firstError ? firstError : $('#endDate')
+              flag = false
+            }
+            if (shiftTimingFrom.trim() === '') {
+              $('#shift-field').addClass('error')
+              firstError = firstError ? firstError : $('#timing-from')
+              flag = false
+            }
+            if (shiftTimingTo.trim() === '') {
+              $('#shift-field').addClass('error')
+              firstError = firstError ? firstError : $('#timing-to')
               flag = false
             }
             // if (jobCategory.trim() === '') {

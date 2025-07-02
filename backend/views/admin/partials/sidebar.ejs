@@ -139,7 +139,7 @@
                                                                   Requests</span></a></li>
                               </ul>
                         </li>
-                        <li class="nav-item"><a href="#"><i class="fa-solid fa-graduation-cap"></i><span
+                        <!-- <li class="nav-item"><a href="#"><i class="fa-solid fa-graduation-cap"></i><span
                                           class="menu-title" data-i18n="Todo">Freelancer</span></a>
                               <ul class="menu-content">
                                     <% if(currentUser.role==0) { %>
@@ -149,11 +149,11 @@
                                                             data-i18n="Analytics">Add
                                                             Freelancer</span></a></li>
                                           <% } %>
-                                                <!-- <li class=" <% if(menu==='college') {%>active<%}%>"><a href="/admin/college"><i
+                                                <li class=" <% if(menu==='college') {%>active<%}%>"><a href="/admin/college"><i
                     class="feather icon-list"></i><span class="menu-item" data-i18n="Analytics">All Colleges</span></a>
-              </li> -->
+              </li>
                               </ul>
-                        </li>
+                        </li> -->
                         <li class=" nav-item"><a href="#"><i class="fa-solid fa-coins"></i><span class="menu-title"
                                           data-i18n="Todo">Post</span></a>
                               <ul class="menu-content">
@@ -257,7 +257,7 @@
 
                               </ul>
                         </li>
-                        <li class=" nav-item"><a href="#"><i class="fa-solid fa-coins"></i><span class="menu-title"
+                        <!-- <li class=" nav-item"><a href="#"><i class="fa-solid fa-coins"></i><span class="menu-title"
                                           data-i18n="Todo">Portal Access</span></a>
                               <ul class="menu-content">
 
@@ -275,7 +275,7 @@
                                     </li>
 
                               </ul>
-                        </li>
+                        </li> -->
 
                         <% if(currentUser.role==0) { %>
                               <li class="nav-item <% if(menu==='admin-roles') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/roles"><i

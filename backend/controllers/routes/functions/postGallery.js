@@ -52,9 +52,29 @@ module.exports.uploadPostFiles = async (req, res) => {
     // Validate user authentication
     const userId = req.user?._id || req.session?.user?._id;
     const userType = req.user?.userType || req.session?.user?.userType || req.body?.userType || "admin";
-    let postdata = JSON.parse(req.body.data);
+    
+    // Validate that req.body.tags exists before parsing (frontend sends 'tags' not 'data')
+    if (!req.body.tags) {
+      return res.status(400).send({
+        status: false,
+        message: 'Post tags are required',
+      });
+    }
+
+    let postdata;
+    try {
+      postdata = JSON.parse(req.body.tags);
+    } catch (parseError) {
+      return res.status(400).send({
+        status: false,
+        message: 'Invalid JSON format in post tags',
+      });
+    }
+
+    console.log(postdata,'postdata')
+
     const tags = postdata.map(item => ({
-      userId: item._id,
+      userId: item.userId,
       name: item.name,
       userType: item.userType
     }));
@@ -163,12 +183,24 @@ module.exports.editPost = async (req, res) => {
 
     const { id, content, tags } = req.body;
     const existingFiles = JSON.parse(req.body.existingFiles || '[]');
-    const parsedTags = JSON.parse(tags || '[]');
+    
+    // Validate and parse tags safely
+    let parsedTags = [];
+    if (tags) {
+      try {
+        parsedTags = JSON.parse(tags);
+      } catch (parseError) {
+        return res.status(400).send({
+          status: false,
+          message: 'Invalid JSON format in tags',
+        });
+      }
+    }
     
     const updateData = {
       content,
       tags: parsedTags.map(tag => ({
-        userId: tag._id,
+        userId: tag.userId,
         name: tag.name,
         userType: tag.userType
       }))

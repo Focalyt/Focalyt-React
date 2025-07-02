@@ -438,11 +438,11 @@
                                   </div>
                                 </div>
                               </div>
-                              <div class="col-xl-2 mb-1">
+                              <!-- <div class="col-xl-2 mb-1">
                                 <label for="timings">Shift Timings</label>
                                 <input id="timings" class="form-control" type="text" name="shifttimings"
                                   value="<%= vacancy?.shifttimings %>" maxlength="3" />
-                              </div>
+                              </div> -->
                               <div class="col-xl-3 mb-1">
                                 <label>Shift Timing
                                   <span class="mandatory">*</span>
@@ -452,11 +452,13 @@
                                   <!-- <label>&nbsp;</label> -->
                                   <div class="row">
                                     <div class="col-6">
-                                      <input name="timingFrom" type="text" id="timing-from" class="form-control"
+                                      <label>From</label>
+                                      <input name="shiftTimingFrom" type="text" id="timing-from" class="form-control"
                                         placeholder="From">
                                     </div>
                                     <div class="col-6">
-                                      <input name="timingTo" type="text" id="timing-to" class="form-control"
+                                      <label>To</label>
+                                      <input name="shiftTimingTo" type="text" id="timing-to" class="form-control"
                                         placeholder="To">
                                     </div>
                                   </div>
@@ -1501,7 +1503,8 @@
               let minSalary = document.getElementById('min-input').value
               let maxSalary = document.getElementById('max-input').value
               let fixedSalary = document.getElementById('fixed-range-input').value
-
+              let shiftTimingFrom = document.getElementById('timing-from').value
+              let shiftTimingTo = document.getElementById('timing-to').value
               let firstError = ''
               let flag = true
               if (title.trim() === '') {
@@ -1561,6 +1564,16 @@
               if (!typeRadio1.checked && !typeRadio2.checked) {
                 $('#job-type-field').addClass('error')
                 firstError = firstError ? firstError : typeRadio1
+                flag = false
+              }
+              if (shiftTimingFrom.trim() === '') {
+                $('#shift-field').addClass('error')
+                firstError = firstError ? firstError : $('#timing-from')
+                flag = false
+              }
+              if (shiftTimingTo.trim() === '') {
+                $('#shift-field').addClass('error')
+                firstError = firstError ? firstError : $('#timing-to')
                 flag = false
               }
               if (!shiftRadio1.checked && !shiftRadio2.checked && !shiftRadio3.checked && !shiftRadio4.checked) {
