@@ -2177,6 +2177,10 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
     }
   };
 
+  useEffect(() => {
+    console.log('selectedProfile', selectedProfile);
+  }, [selectedProfile]);
+
   const openProfileEditPanel = async (profile = null) => {
     if (profile) {
       // Set selected profile
@@ -3343,6 +3347,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                 <div className="d-flex justify-content-end gap-2">
                   <button
                     className="btn btn-sm btn-outline-primary"
+                    disabled={isLoadingProfiles || allProfiles.length === 0}
                     style={{
                       padding: "6px 12px",
                       fontSize: "11px",
@@ -3361,6 +3366,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                   </button>
                   <button
                     className="btn btn-sm btn-outline-secondary"
+                    disabled={isLoadingProfiles || allProfiles.length === 0}
                     style={{
                       padding: "6px 12px",
                       fontSize: "11px",
@@ -3589,7 +3595,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                             }}
 
                                             onClick={() => {
-                                              openRefferPanel(profile);
+                                              openleadHistoryPanel(profile);
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -3933,6 +3939,10 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                               <div className="info-value">{profile.updatedAt ?
                                                 new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                             </div>
+                                            <div className="info-group">
+                                              <div className="info-label">Remarks</div>
+                                              <div className="info-value">{profile.remarks || 'N/A'}</div>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
@@ -4006,6 +4016,10 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                                     <div className="info-label">LEAD MODIFICATION DATE</div>
                                                     <div className="info-value">{profile.updatedAt ?
                                                       new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                  </div>
+                                                  <div className="info-group">
+                                                    <div className="info-label">Remarks</div>
+                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION By</div>
@@ -4138,6 +4152,12 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                                       });
                                                       return `${datePart}, ${timePart}`;
                                                     })() : 'N/A'}</div>
+                                                  </div>
+                                                </div>
+                                                <div className="col-xl- col-3">
+                                                  <div className="info-group">
+                                                    <div className="info-label">Remarks</div>
+                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
