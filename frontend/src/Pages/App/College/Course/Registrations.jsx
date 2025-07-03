@@ -261,7 +261,7 @@ const CRMDashboard = () => {
 
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
-    setShowUploadModal(true);
+    // setShowUploadModal(true);
     setSelectedFile(null);
     setUploadPreview(null);
     setUploadProgress(0);
@@ -327,7 +327,8 @@ const CRMDashboard = () => {
 
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('doc', selectedDocumentForUpload.docsId);
+      formData.append('doc', selectedDocumentForUpload._id);
+console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
 
       const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
         headers: {
@@ -1043,6 +1044,7 @@ const CRMDashboard = () => {
                 <button
                   className="action-btn upload-btn"
                   title="Upload Document"
+                  data-bs-toggle="modal" data-bs-target="#staticBackdrop"
                   onClick={() => {
                     openUploadModal(selectedDocument);   // Just pass the selectedDocument
                   }}
@@ -1095,7 +1097,12 @@ const CRMDashboard = () => {
                     />
                     <button
                       className="btn btn-primary"
-                      onClick={() => document.getElementById('file-input').click()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        fileInputRef.current?.click(); // Use ref instead of getElementById
+                      }}
+                    // onClick={() => document.getElementById('file-input').click()}
                     >
                       <i className="fas fa-folder-open me-2"></i>
                       Choose File
@@ -2366,7 +2373,7 @@ const CRMDashboard = () => {
                 CLOSE
               </button>
               <button
-              
+
                 className="btn text-white"
                 onClick={handleUpdateStatus}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
@@ -2922,411 +2929,411 @@ const CRMDashboard = () => {
             </div>
           </div>
 
-  {/* Advanced Filters */}
-  {!isFilterCollapsed && (
-                          <div
-                            className="modal show fade d-block"
-                            style={{
-                              backgroundColor: 'rgba(0,0,0,0.5)',
-                              zIndex: 1050
-                            }}
-                            onClick={(e) => {
-                              if (e.target === e.currentTarget) setIsFilterCollapsed(true);
-                            }}
+          {/* Advanced Filters */}
+          {!isFilterCollapsed && (
+            <div
+              className="modal show fade d-block"
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 1050
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsFilterCollapsed(true);
+              }}
+            >
+              <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
+                <div className="modal-content">
+                  {/* Modal Header - Fixed at top */}
+                  <div className="modal-header bg-white border-bottom">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-filter text-primary me-2"></i>
+                        <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                        {totalSelected > 0 && (
+                          <span className="badge bg-primary ms-2">
+                            {totalSelected} Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={clearAllFilters}
+                        >
+                          <i className="fas fa-times-circle me-1"></i>
+                          Clear All
+                        </button>
+                        <button
+                          className="btn-close"
+                          onClick={() => setIsFilterCollapsed(true)}
+                          aria-label="Close"
+                        ></button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Body - Scrollable content */}
+                  <div className="modal-body p-4">
+                    <div className="row g-4">
+                      {/* Course Type Filter */}
+                      <div className="col-md-3">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-graduation-cap me-1 text-success"></i>
+                          Course Type
+                        </label>
+                        <div className="position-relative">
+                          <select
+                            className="form-select"
+                            name="courseType"
+                            value={filterData.courseType}
+                            onChange={handleFilterChange}
                           >
-                            <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
-                              <div className="modal-content">
-                                {/* Modal Header - Fixed at top */}
-                                <div className="modal-header bg-white border-bottom">
-                                  <div className="d-flex justify-content-between align-items-center w-100">
-                                    <div className="d-flex align-items-center">
-                                      <i className="fas fa-filter text-primary me-2"></i>
-                                      <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                                      {totalSelected > 0 && (
-                                        <span className="badge bg-primary ms-2">
-                                          {totalSelected} Active
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="d-flex align-items-center gap-2">
-                                      <button
-                                        className="btn btn-sm btn-outline-danger"
-                                        onClick={clearAllFilters}
-                                      >
-                                        <i className="fas fa-times-circle me-1"></i>
-                                        Clear All
-                                      </button>
-                                      <button
-                                        className="btn-close"
-                                        onClick={() => setIsFilterCollapsed(true)}
-                                        aria-label="Close"
-                                      ></button>
-                                    </div>
-                                  </div>
-                                </div>
+                            <option value="">All Types</option>
+                            <option value="Free">🆓 Free</option>
+                            <option value="Paid">💰 Paid</option>
+                          </select>
+                        </div>
+                      </div>
 
-                                {/* Modal Body - Scrollable content */}
-                                <div className="modal-body p-4">
-                                  <div className="row g-4">
-                                    {/* Course Type Filter */}
-                                    <div className="col-md-3">
-                                      <label className="form-label small fw-bold text-dark">
-                                        <i className="fas fa-graduation-cap me-1 text-success"></i>
-                                        Course Type
-                                      </label>
-                                      <div className="position-relative">
-                                        <select
-                                          className="form-select"
-                                          name="courseType"
-                                          value={filterData.courseType}
-                                          onChange={handleFilterChange}
-                                        >
-                                          <option value="">All Types</option>
-                                          <option value="Free">🆓 Free</option>
-                                          <option value="Paid">💰 Paid</option>
-                                        </select>
-                                      </div>
-                                    </div>
+                      {/* Project Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Project"
+                          options={projectOptions}
+                          selectedValues={formData.projects.values}
+                          onChange={(values) => handleCriteriaChange('projects', values)}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.projects}
+                          onToggle={() => toggleDropdown('projects')}
+                        />
+                      </div>
 
-                                    {/* Project Filter */}
-                                    <div className="col-md-3">
-                                      <MultiSelectCheckbox
-                                        title="Project"
-                                        options={projectOptions}
-                                        selectedValues={formData.projects.values}
-                                        onChange={(values) => handleCriteriaChange('projects', values)}
-                                        icon="fas fa-sitemap"
-                                        isOpen={dropdownStates.projects}
-                                        onToggle={() => toggleDropdown('projects')}
-                                      />
-                                    </div>
+                      {/* Verticals Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Verticals"
+                          options={verticalOptions}
+                          selectedValues={formData.verticals.values}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.verticals}
+                          onToggle={() => toggleDropdown('verticals')}
+                          onChange={(values) => handleCriteriaChange('verticals', values)}
+                        />
+                      </div>
 
-                                    {/* Verticals Filter */}
-                                    <div className="col-md-3">
-                                      <MultiSelectCheckbox
-                                        title="Verticals"
-                                        options={verticalOptions}
-                                        selectedValues={formData.verticals.values}
-                                        icon="fas fa-sitemap"
-                                        isOpen={dropdownStates.verticals}
-                                        onToggle={() => toggleDropdown('verticals')}
-                                        onChange={(values) => handleCriteriaChange('verticals', values)}
-                                      />
-                                    </div>
+                      {/* Course Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Course"
+                          options={courseOptions}
+                          selectedValues={formData.course.values}
+                          onChange={(values) => handleCriteriaChange('course', values)}
+                          icon="fas fa-graduation-cap"
+                          isOpen={dropdownStates.course}
+                          onToggle={() => toggleDropdown('course')}
+                        />
+                      </div>
 
-                                    {/* Course Filter */}
-                                    <div className="col-md-3">
-                                      <MultiSelectCheckbox
-                                        title="Course"
-                                        options={courseOptions}
-                                        selectedValues={formData.course.values}
-                                        onChange={(values) => handleCriteriaChange('course', values)}
-                                        icon="fas fa-graduation-cap"
-                                        isOpen={dropdownStates.course}
-                                        onToggle={() => toggleDropdown('course')}
-                                      />
-                                    </div>
+                      {/* Center Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Center"
+                          options={centerOptions}
+                          selectedValues={formData.center.values}
+                          onChange={(values) => handleCriteriaChange('center', values)}
+                          icon="fas fa-building"
+                          isOpen={dropdownStates.center}
+                          onToggle={() => toggleDropdown('center')}
+                        />
+                      </div>
 
-                                    {/* Center Filter */}
-                                    <div className="col-md-3">
-                                      <MultiSelectCheckbox
-                                        title="Center"
-                                        options={centerOptions}
-                                        selectedValues={formData.center.values}
-                                        onChange={(values) => handleCriteriaChange('center', values)}
-                                        icon="fas fa-building"
-                                        isOpen={dropdownStates.center}
-                                        onToggle={() => toggleDropdown('center')}
-                                      />
-                                    </div>
+                      {/* Counselor Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Counselor"
+                          options={counselorOptions}
+                          selectedValues={formData.counselor.values}
+                          onChange={(values) => handleCriteriaChange('counselor', values)}
+                          icon="fas fa-user-tie"
+                          isOpen={dropdownStates.counselor}
+                          onToggle={() => toggleDropdown('counselor')}
+                        />
+                      </div>
+                    </div>
 
-                                    {/* Counselor Filter */}
-                                    <div className="col-md-3">
-                                      <MultiSelectCheckbox
-                                        title="Counselor"
-                                        options={counselorOptions}
-                                        selectedValues={formData.counselor.values}
-                                        onChange={(values) => handleCriteriaChange('counselor', values)}
-                                        icon="fas fa-user-tie"
-                                        isOpen={dropdownStates.counselor}
-                                        onToggle={() => toggleDropdown('counselor')}
-                                      />
-                                    </div>
-                                  </div>
+                    {/* Date Filters Section */}
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Date Range Filters
+                        </h6>
+                      </div>
 
-                                  {/* Date Filters Section */}
-                                  <div className="row g-4 mt-3">
-                                    <div className="col-12">
-                                      <h6 className="text-dark fw-bold mb-3">
-                                        <i className="fas fa-calendar-alt me-2 text-primary"></i>
-                                        Date Range Filters
-                                      </h6>
-                                    </div>
+                      {/* Created Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-plus me-1 text-success"></i>
+                          Lead Creation Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
+                                value={filterData.createdFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                maxDate={filterData.createdToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
+                                value={filterData.createdToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                minDate={filterData.createdFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
 
-                                    {/* Created Date Range */}
-                                    <div className="col-md-4">
-                                      <label className="form-label small fw-bold text-dark">
-                                        <i className="fas fa-calendar-plus me-1 text-success"></i>
-                                        Lead Creation Date Range
-                                      </label>
-                                      <div className="card border-0 bg-light p-3">
-                                        <div className="row g-2">
-                                          <div className="col-6">
-                                            <label className="form-label small">From Date</label>
-                                            <DatePicker
-                                              onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
-                                              value={filterData.createdFromDate}
-                                              format="dd/MM/yyyy"
-                                              className="form-control p-0"
-                                              clearIcon={null}
-                                              calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                              maxDate={filterData.createdToDate || new Date()}
-                                            />
-                                          </div>
-                                          <div className="col-6">
-                                            <label className="form-label small">To Date</label>
-                                            <DatePicker
-                                              onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
-                                              value={filterData.createdToDate}
-                                              format="dd/MM/yyyy"
-                                              className="form-control p-0"
-                                              clearIcon={null}
-                                              calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                              minDate={filterData.createdFromDate}
-                                              maxDate={new Date()}
-                                            />
-                                          </div>
-                                        </div>
+                          {/* Show selected dates */}
+                          {(filterData.createdFromDate || filterData.createdToDate) && (
+                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
+                              <small className="text-success">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
+                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
+                              </small>
+                            </div>
+                          )}
 
-                                        {/* Show selected dates */}
-                                        {(filterData.createdFromDate || filterData.createdToDate) && (
-                                          <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
-                                            <small className="text-success">
-                                              <i className="fas fa-info-circle me-1"></i>
-                                              <strong>Selected:</strong>
-                                              {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                                              {filterData.createdFromDate && filterData.createdToDate && ' |'}
-                                              {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
-                                            </small>
-                                          </div>
-                                        )}
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('created')}
+                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Created Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
 
-                                        {/* Clear button */}
-                                        <div className="mt-2">
-                                          <button
-                                            className="btn btn-sm btn-outline-danger w-100"
-                                            onClick={() => clearDateFilter('created')}
-                                            disabled={!filterData.createdFromDate && !filterData.createdToDate}
-                                          >
-                                            <i className="fas fa-times me-1"></i>
-                                            Clear Created Date
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
+                      {/* Modified Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
+                          Lead Modification Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
+                                value={filterData.modifiedFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                maxDate={filterData.modifiedToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
+                                value={filterData.modifiedToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                minDate={filterData.modifiedFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
 
-                                    {/* Modified Date Range */}
-                                    <div className="col-md-4">
-                                      <label className="form-label small fw-bold text-dark">
-                                        <i className="fas fa-calendar-edit me-1 text-warning"></i>
-                                        Lead Modification Date Range
-                                      </label>
-                                      <div className="card border-0 bg-light p-3">
-                                        <div className="row g-2">
-                                          <div className="col-6">
-                                            <label className="form-label small">From Date</label>
-                                            <DatePicker
-                                              onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
-                                              value={filterData.modifiedFromDate}
-                                              format="dd/MM/yyyy"
-                                              className="form-control p-0"
-                                              clearIcon={null}
-                                              calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                              maxDate={filterData.modifiedToDate || new Date()}
-                                            />
-                                          </div>
-                                          <div className="col-6">
-                                            <label className="form-label small">To Date</label>
-                                            <DatePicker
-                                              onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
-                                              value={filterData.modifiedToDate}
-                                              format="dd/MM/yyyy"
-                                              className="form-control p-0"
-                                              clearIcon={null}
-                                              calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                              minDate={filterData.modifiedFromDate}
-                                              maxDate={new Date()}
-                                            />
-                                          </div>
-                                        </div>
+                          {/* Show selected dates */}
+                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
+                              <small className="text-warning">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
+                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
+                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
+                              </small>
+                            </div>
+                          )}
 
-                                        {/* Show selected dates */}
-                                        {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                                          <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
-                                            <small className="text-warning">
-                                              <i className="fas fa-info-circle me-1"></i>
-                                              <strong>Selected:</strong>
-                                              {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                                              {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
-                                              {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
-                                            </small>
-                                          </div>
-                                        )}
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('modified')}
+                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Modified Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
 
-                                        {/* Clear button */}
-                                        <div className="mt-2">
-                                          <button
-                                            className="btn btn-sm btn-outline-danger w-100"
-                                            onClick={() => clearDateFilter('modified')}
-                                            disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
-                                          >
-                                            <i className="fas fa-times me-1"></i>
-                                            Clear Modified Date
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
+                      {/* Next Action Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-check me-1 text-info"></i>
+                          Next Action Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
+                                value={filterData.nextActionFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                maxDate={filterData.nextActionToDate}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
+                                value={filterData.nextActionToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                minDate={filterData.nextActionFromDate}
+                              />
+                            </div>
+                          </div>
 
-                                    {/* Next Action Date Range */}
-                                    <div className="col-md-4">
-                                      <label className="form-label small fw-bold text-dark">
-                                        <i className="fas fa-calendar-check me-1 text-info"></i>
-                                        Next Action Date Range
-                                      </label>
-                                      <div className="card border-0 bg-light p-3">
-                                        <div className="row g-2">
-                                          <div className="col-6">
-                                            <label className="form-label small">From Date</label>
-                                            <DatePicker
-                                              onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
-                                              value={filterData.nextActionFromDate}
-                                              format="dd/MM/yyyy"
-                                              className="form-control p-0"
-                                              clearIcon={null}
-                                              calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                              maxDate={filterData.nextActionToDate}
-                                            />
-                                          </div>
-                                          <div className="col-6">
-                                            <label className="form-label small">To Date</label>
-                                            <DatePicker
-                                              onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
-                                              value={filterData.nextActionToDate}
-                                              format="dd/MM/yyyy"
-                                              className="form-control p-0"
-                                              clearIcon={null}
-                                              calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                              minDate={filterData.nextActionFromDate}
-                                            />
-                                          </div>
-                                        </div>
+                          {/* Show selected dates */}
+                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
+                              <small className="text-info">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
+                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
+                              </small>
+                            </div>
+                          )}
 
-                                        {/* Show selected dates */}
-                                        {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                                          <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
-                                            <small className="text-info">
-                                              <i className="fas fa-info-circle me-1"></i>
-                                              <strong>Selected:</strong>
-                                              {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                                              {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
-                                              {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
-                                            </small>
-                                          </div>
-                                        )}
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('nextAction')}
+                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Next Action Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-                                        {/* Clear button */}
-                                        <div className="mt-2">
-                                          <button
-                                            className="btn btn-sm btn-outline-danger w-100"
-                                            onClick={() => clearDateFilter('nextAction')}
-                                            disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
-                                          >
-                                            <i className="fas fa-times me-1"></i>
-                                            Clear Next Action Date
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
+                    {/* Results Summary */}
+                    <div className="row mt-4">
+                      <div className="col-12">
+                        <div className="alert alert-info">
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-info-circle me-2"></i>
+                            <div>
+                              <strong>Results Summary:</strong> Showing {allProfiles.length} results on page {currentPage} of {totalPages}
 
-                                  {/* Results Summary */}
-                                  <div className="row mt-4">
-                                    <div className="col-12">
-                                      <div className="alert alert-info">
-                                        <div className="d-flex align-items-center">
-                                          <i className="fas fa-info-circle me-2"></i>
-                                          <div>
-                                            <strong>Results Summary:</strong> Showing {allProfiles.length} results on page {currentPage} of {totalPages}
+                              {/* Active filter indicators */}
+                              <div className="mt-2">
+                                {(filterData.createdFromDate || filterData.createdToDate) && (
+                                  <span className="badge bg-success me-2">
+                                    <i className="fas fa-calendar-plus me-1"></i>
+                                    Created Date Filter Active
+                                  </span>
+                                )}
 
-                                            {/* Active filter indicators */}
-                                            <div className="mt-2">
-                                              {(filterData.createdFromDate || filterData.createdToDate) && (
-                                                <span className="badge bg-success me-2">
-                                                  <i className="fas fa-calendar-plus me-1"></i>
-                                                  Created Date Filter Active
-                                                </span>
-                                              )}
+                                {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                                  <span className="badge bg-warning me-2">
+                                    <i className="fas fa-calendar-edit me-1"></i>
+                                    Modified Date Filter Active
+                                  </span>
+                                )}
 
-                                              {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                                                <span className="badge bg-warning me-2">
-                                                  <i className="fas fa-calendar-edit me-1"></i>
-                                                  Modified Date Filter Active
-                                                </span>
-                                              )}
+                                {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                                  <span className="badge bg-info me-2">
+                                    <i className="fas fa-calendar-check me-1"></i>
+                                    Next Action Date Filter Active
+                                  </span>
+                                )}
 
-                                              {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                                                <span className="badge bg-info me-2">
-                                                  <i className="fas fa-calendar-check me-1"></i>
-                                                  Next Action Date Filter Active
-                                                </span>
-                                              )}
-
-                                              {totalSelected > 0 && (
-                                                <span className="badge bg-primary me-2">
-                                                  <i className="fas fa-filter me-1"></i>
-                                                  {totalSelected} Multi-Select Filters Active
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Modal Footer - Fixed at bottom */}
-                                <div className="modal-footer bg-light border-top">
-                                  <div className="d-flex justify-content-between align-items-center w-100">
-                                    <div className="text-muted small">
-                                      <i className="fas fa-filter me-1"></i>
-                                      {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
-                                    </div>
-                                    <div className="d-flex gap-2">
-                                      <button
-                                        className="btn btn-outline-secondary"
-                                        onClick={() => setIsFilterCollapsed(true)}
-                                      >
-                                        <i className="fas fa-eye-slash me-1"></i>
-                                        Hide Filters
-                                      </button>
-                                      <button
-                                        className="btn btn-primary"
-                                        onClick={() => {
-                                          fetchProfileData(filterData);
-                                          setIsFilterCollapsed(true);
-                                        }}
-                                      >
-                                        <i className="fas fa-search me-1"></i>
-                                        Apply Filters
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
+                                {totalSelected > 0 && (
+                                  <span className="badge bg-primary me-2">
+                                    <i className="fas fa-filter me-1"></i>
+                                    {totalSelected} Multi-Select Filters Active
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
-                        )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Footer - Fixed at bottom */}
+                  <div className="modal-footer bg-light border-top">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="text-muted small">
+                        <i className="fas fa-filter me-1"></i>
+                        {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
+                      </div>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => setIsFilterCollapsed(true)}
+                        >
+                          <i className="fas fa-eye-slash me-1"></i>
+                          Hide Filters
+                        </button>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => {
+                            fetchProfileData(filterData);
+                            setIsFilterCollapsed(true);
+                          }}
+                        >
+                          <i className="fas fa-search me-1"></i>
+                          Apply Filters
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
 
           {/* Main Content */}
@@ -3367,6 +3374,8 @@ const CRMDashboard = () => {
                     <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
                     Bulk Action
                   </button>
+                  
+                  
                 </div>
               </div>
               <div className='row'>
@@ -4333,16 +4342,16 @@ const CRMDashboard = () => {
                                                 <div className="resume-section">
                                                   <h2 className="resume-section-title">Skills</h2>
                                                   <div className="resume-skills-list">
-                                                    {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                    {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
                                                       <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                        <div className="resume-skill-name">{skill.skillName || skill}</div>
-                                                        {skill.skillPercent && (
+                                                        <div className="resume-skill-name">{skill?.skillName || skill}</div>
+                                                        {skill?.skillPercent && (
                                                           <div className="resume-skill-bar-container">
                                                             <div
                                                               className="resume-skill-bar"
-                                                              style={{ width: `${skill.skillPercent}%` }}
+                                                              style={{ width: `${skill?.skillPercent||0}%` }}
                                                             ></div>
-                                                            <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                            <span className="resume-skill-percent">{skill?.skillPercent||0}%</span>
                                                           </div>
                                                         )}
                                                       </div>
@@ -4804,7 +4813,7 @@ const CRMDashboard = () => {
                                                           <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
                                                           <div className="document-actions">
                                                             {(!latestUpload) ? (
-                                                              <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                              <button className="action-btn upload-btn" title="Upload Document" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick={() => {
                                                                 setSelectedProfile(profile); // Set the current profile
                                                                 openUploadModal(doc);        // Open the upload modal
                                                               }}>
@@ -4859,7 +4868,127 @@ const CRMDashboard = () => {
                                             </div>
 
                                             <DocumentModal />
-                                            <UploadModal />
+                                            <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                                              <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
+                                                <div className="modal-content p-0 w-100">
+                                                  <div className="modal-header">
+                                                  <h3>
+                                                          <i className="fas fa-cloud-upload-alt me-2"></i>
+                                                          Upload {selectedDocumentForUpload?.Name || 'Document'}
+                                                        </h3>
+                                                        <button  type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
+                                                  </div>
+                                                  <div className="modal-body">
+                                                   
+
+                                                    
+                                                        <div className="upload-section">
+                                                          {!selectedFile ? (
+                                                            <div className="file-drop-zone">
+                                                              <div className="drop-zone-content">
+                                                                <i className="fas fa-cloud-upload-alt upload-icon"></i>
+                                                                <h4>Choose a file to upload</h4>
+                                                                <p>Drag and drop a file here, or click to select</p>
+                                                                <div className="file-types">
+                                                                  <span>Supported: JPG, PNG, GIF, PDF</span>
+                                                                  <span>Max size: 10MB</span>
+                                                                </div>
+                                                                <input
+                                                                  type="file"
+                                                                  id="file-input"
+                                                                  accept=".jpg,.jpeg,.png,.gif,.pdf"
+                                                                  onChange={handleFileSelect}
+                                                                  style={{ display: 'none' }}
+                                                                />
+                                                                <button
+                                                                  className="btn btn-primary"
+
+                                                                  onClick={() => document.getElementById('file-input').click()}
+                                                                >
+                                                                  <i className="fas fa-folder-open me-2"></i>
+                                                                  Choose File
+                                                                </button>
+                                                              </div>
+                                                            </div>
+                                                          ) : (
+                                                            <div className="file-preview-section">
+                                                              <div className="selected-file-info">
+                                                                <h4>Selected File:</h4>
+                                                                <div className="file-details">
+                                                                  <div className="file-icon">
+                                                                    <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                                                                  </div>
+                                                                  <div className="file-info">
+                                                                    <p className="file-name">{selectedFile.name}</p>
+                                                                    <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                                  </div>
+                                                                  <button
+                                                                    className="btn btn-sm btn-outline-secondary"
+                                                                    onClick={() => {
+                                                                      setSelectedFile(null);
+                                                                      setUploadPreview(null);
+                                                                    }}
+                                                                  >
+                                                                    <i className="fas fa-trash"></i>
+                                                                  </button>
+                                                                </div>
+                                                              </div>
+
+                                                              {uploadPreview && (
+                                                                <div className="upload-preview">
+                                                                  <h5>Preview:</h5>
+                                                                  <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
+                                                                </div>
+                                                              )}
+
+                                                              {isUploading && (
+                                                                <div className="upload-progress-section">
+                                                                  <h5>Uploading...</h5>
+                                                                  <div className="progress-bar-container">
+                                                                    <div
+                                                                      className="progress-bar"
+                                                                      style={{ width: `${uploadProgress}%` }}
+                                                                    ></div>
+                                                                  </div>
+                                                                  <p>{uploadProgress}% Complete</p>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                     
+
+                                                   
+                                                  </div>
+                                                  <div className="modal-footer">
+                                                  <button
+                                                          className="btn btn-secondary"
+                                                          onClick={closeUploadModal}
+                                                          disabled={isUploading}
+                                                        >
+                                                          Cancel
+                                                        </button>
+                                                        <button
+                                                          className="btn btn-primary"
+                                                          onClick={handleFileUpload}
+                                                          disabled={!selectedFile || isUploading}
+                                                        >
+                                                          {isUploading ? (
+                                                            <>
+                                                              <i className="fas fa-spinner fa-spin me-2"></i>
+                                                              Uploading...
+                                                            </>
+                                                          ) : (
+                                                            <>
+                                                              <i className="fas fa-upload me-2"></i>
+                                                              Upload Document
+                                                            </>
+                                                          )}
+                                                        </button>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
                                           </div>
                                         );
                                       })()}
@@ -4868,7 +4997,7 @@ const CRMDashboard = () => {
 
                                 </div>
                               )}
-                            </div>
+                            </div>                          
 
                             {/* <div class="modal fade" id={`profileModal-${profile._id}`} data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby={`profileModalLabel-${profile._id}`} aria-hidden="true">
                               <div class="modal-dialog modal-dialog-scrollable">
@@ -4932,7 +5061,7 @@ const CRMDashboard = () => {
 
 
 
-                        
+
                       </div>
 
 
@@ -5795,13 +5924,7 @@ background: #fd2b5a;
         }
                 
 /* Mobile Modal Styles */
-.modal {
-    z-index: 1050;
-}
 
-.modal-dialog {
-    margin: 1rem;
-}
 
 /* WhatsApp Panel Mobile Styles */
 .whatsapp-chat {
@@ -6050,15 +6173,6 @@ background: #fd2b5a;
 
 .no-scroll {
     overflow: hidden;
-}
-
-.modal-content {
-    background-color: #fff;
-    max-height: 90vh;
-    width: 80%;
-    overflow-y: auto;
-    padding: 20px;
-    border-radius: 8px;
 }
 
 .doc-iframe {
@@ -6313,23 +6427,6 @@ background: #fd2b5a;
     }
 }
 
-.document-modal-content .modal-header {
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid #e9ecef;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.document-modal-content .modal-header h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: white;
-}
-
 .document-modal-content .close-btn {
     background: none;
     border: none;
@@ -6346,16 +6443,7 @@ background: #fd2b5a;
     transition: background-color 0.2s;
 }
 
-.document-modal-content .close-btn:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-}
 
-.document-modal-content .modal-body {
-    padding: 2rem;
-    display: flex;
-    gap: 2rem;
-    overflow-y: auto;
-}
 
 .document-preview-section {
     flex: 2;
@@ -6655,12 +6743,6 @@ background: #fd2b5a;
     color: #777;
 }
 
-.modal-actions {
-    margin-top: 30px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
 
 .rejection-form {
     margin-top: 20px;
@@ -7336,163 +7418,7 @@ background: #fd2b5a;
 .react-date-picker__clear-button {
     display: none;
 }
-
-/* Upload Modal Styles */
-.upload-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1050;
-    backdrop-filter: blur(2px);
-}
-
-.upload-modal-content {
-    background-color: white;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    position: relative;
-}
-
-.upload-modal-header {
-    padding: 24px 24px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.upload-modal-body {
-    padding: 24px;
-}
-
-.upload-modal-footer {
-    padding: 16px 24px 24px;
-    border-top: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-}
-
-.file-drop-zone {
-    border: 2px dashed #d1d5db;
-    border-radius: 8px;
-    padding: 48px 24px;
-    text-align: center;
-    background-color: #f9fafb;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.file-drop-zone:hover {
-    border-color: #3b82f6;
-    background-color: #eff6ff;
-}
-
-.drop-zone-content .upload-icon {
-    font-size: 48px;
-    color: #3b82f6;
-    margin-bottom: 16px;
-    display: block;
-}
-
-.file-details {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background-color: #f3f4f6;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-}
-
-.file-icon {
-    width: 48px;
-    height: 48px;
-    background-color: #3b82f6;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 20px;
-}
-
-.file-info {
-    flex: 1;
-}
-
-.file-name {
-    margin: 0 0 4px;
-    font-weight: 500;
-    color: #1f2937;
-    font-size: 0.875rem;
-}
-
-.file-size {
-    margin: 0;
-    color: #6b7280;
-    font-size: 0.75rem;
-}
-
-.preview-image {
-    max-width: 100%;
-    max-height: 200px;
-    object-fit: contain;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-}
-
-.progress-bar-container {
-    width: 100%;
-    height: 8px;
-    background-color: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 8px;
-}
-
-.progress-bar {
-    height: 100%;
-    background-color: #3b82f6;
-    transition: width 0.3s ease;
-    border-radius: 4px;
-}
-
-/* Document Modal Styles */
-.document-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1500;
-    backdrop-filter: blur(2px);
-}
-
-.document-modal-content {
-    background-color: white;
-    border-radius: 12px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    position: relative;
-    z-index: 1501;
-}
-         .react-date-picker__calendar.react-date-picker__calendar--open{
+.react-date-picker__calendar.react-date-picker__calendar--open{
     inset: 0 !important;
     width: 300px !important;
 }
@@ -7839,11 +7765,9 @@ html body .content .content-wrapper {
         height: 40px;
     }
 
-    .modal-dialog {
-        margin: 0.5rem;
-    }
 
-    .whatsapp-chat .modal-content {
+
+    .whatsapp-chat{
         height: 90vh;
     }
 
@@ -7857,9 +7781,7 @@ html body .content .content-wrapper {
         padding: 0.5rem 0.75rem;
     }
 
-    .modal-content {
-        width: 100%;
-    }
+
 
     .document-modal-content {
         width: 98%;
@@ -7867,11 +7789,6 @@ html body .content .content-wrapper {
         max-height: 95vh;
     }
 
-    .document-modal-content .modal-body {
-        flex-direction: column;
-        padding: 1rem;
-        gap: 1rem;
-    }
 
     .document-preview-section {
         min-width: auto;

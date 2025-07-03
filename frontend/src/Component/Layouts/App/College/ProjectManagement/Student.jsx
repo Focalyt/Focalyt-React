@@ -3902,6 +3902,7 @@ const Student = ({
                             onClick={() => {
                               setActiveTab(tab.key);
                               setFilterData({ ...filterData, status: tab.key });
+                              setActiveSubTab("student");
                               setCurrentPage(1);
                             }}
                           >
@@ -4116,7 +4117,7 @@ const Student = ({
             padding: '15px',
             borderRadius: '8px',
           }}>
-            {activeTab === "zeroPeriod" && (
+            {(activeTab === "zeroPeriod" || activeTab === "batchFreeze") && (
               <div className="subViewTabs" style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -4149,34 +4150,7 @@ const Student = ({
               </div>
             )}
 
-            {/* Agar aap chahte hain ki different tabs mein different subTabs ho */}
-            {activeTab === "batchFreeze" && (
-              <div className="subViewTabs" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginTop: '15px',
-                background: 'white',
-                borderRadius: '8px',
-                marginBottom: '150px',
-                transition: 'all 0.3s ease'
-              }}>
-                {/* Batch Freeze ke liye alag subTabs define kar sakte hain */}
-                {subTabs?.map((tab, index) => (
-                  <div key={index} className="d-flex align-items-center gap-1">
-                    <button
-                      className={`btn btn-sm ${activeSubTab === tab.key ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      onClick={() => setActiveSubTab(tab.key)}
-                    >
-                      {tab.label}
-                      <span className={`badge ${activeSubTab === tab.key ? 'bg-light text-primary' : 'bg-secondary'}`}>
-                        {tab.count}
-                      </span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+         
           </div>
 
           {/* Main Content - Enhanced Students Cards */}
@@ -4188,7 +4162,7 @@ const Student = ({
                   ? "320px"
                   : showAttendanceMode
                     ? "150px"
-                    : "40px",
+                    : activeSubTab === "classroommedia" ? "0px" : "40px",
             }}
           >
             {activeSubTab === "classroommedia" ? (
@@ -6111,7 +6085,7 @@ const Student = ({
             )}
           </div>
           {/* Empty State */}
-          {allProfiles.length === 0 && (
+          {activeSubTab !== "classroommedia" && allProfiles.length === 0 && (
             <div className="text-center py-5">
               <i className="bi bi-person fs-1 text-muted"></i>
               <h5 className="text-muted mt-3">No students found</h5>
