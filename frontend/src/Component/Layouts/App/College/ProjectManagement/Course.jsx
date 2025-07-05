@@ -166,6 +166,48 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     setShowShareModal(true);
   };
 
+  // URL-based state management
+  const getURLParams = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return {
+      stage: urlParams.get('stage') || 'course',
+      courseId: urlParams.get('courseId'),
+      courseName: urlParams.get('courseName'),
+      centerId: urlParams.get('centerId'),
+      centerName: urlParams.get('centerName'),
+      projectId: urlParams.get('projectId'),
+      projectName: urlParams.get('projectName'),
+      verticalId: urlParams.get('verticalId'),
+      verticalName: urlParams.get('verticalName')
+    };
+  };
+
+  const updateURL = (params) => {
+    const url = new URL(window.location);
+    
+    // Clear all existing params first
+    url.searchParams.delete('stage');
+    url.searchParams.delete('courseId');
+    url.searchParams.delete('courseName');
+    url.searchParams.delete('centerId');
+    url.searchParams.delete('centerName');
+    url.searchParams.delete('projectId');
+    url.searchParams.delete('projectName');
+    url.searchParams.delete('verticalId');
+    url.searchParams.delete('verticalName');
+    url.searchParams.delete('batchId');
+    url.searchParams.delete('batchName');
+    
+    // Set new params
+    Object.keys(params).forEach(key => {
+      if (params[key] !== null && params[key] !== undefined) {
+        url.searchParams.set(key, params[key]);
+      }
+    });
+    
+    window.history.replaceState({}, '', url);
+  };
+
   // ======== ADD THESE NEW FUNCTIONS FOR BATCH NAVIGATION ========
   // Function to handle course click for batches
   const handleCourseClick = (course) => {
@@ -228,15 +270,12 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     setShowBatches(false);
     setSelectedCourseForBatches(null);
     
-     // Update URL to course view while preserving navigation context
+     // Update URL to course view - only set essential parameters, not names
      updateURL({ 
       stage: 'course',
       centerId: selectedCenter?._id,
-      centerName: selectedCenter?.name,
       projectId: selectedProject?._id,
-      projectName: selectedProject?.name,
-      verticalId: selectedVertical?.id,
-      verticalName: selectedVertical?.name
+      verticalId: selectedVertical?.id
     });
   };
 
@@ -333,44 +372,11 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
       </div>
     );
   }
-  // URL-based state management
-  const getURLParams = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return {
-      stage: urlParams.get('stage') || 'course',
-      courseId: urlParams.get('courseId'),
-      courseName: urlParams.get('courseName'),
-      centerId: urlParams.get('centerId'),
-      centerName: urlParams.get('centerName'),
-      projectId: urlParams.get('projectId'),
-      projectName: urlParams.get('projectName'),
-      verticalId: urlParams.get('verticalId'),
-      verticalName: urlParams.get('verticalName')
-    };
-  };
-
-  const updateURL = (params) => {
-    const url = new URL(window.location);
-    
-    // Clear existing params
-    url.searchParams.delete('stage');
-    url.searchParams.delete('courseId');
-    url.searchParams.delete('courseName');
-    
-    // Set new params
-    Object.keys(params).forEach(key => {
-      if (params[key]) {
-        url.searchParams.set(key, params[key]);
-      }
-    });
-    
-    window.history.replaceState({}, '', url);
-  };
   return (
     <div className="container py-4">
       {/* ======== ADD THIS: Back Button and Header ======== */}
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
+        <div className='d-md-block d-none'>
           <div className="d-flex align-items-center gap-3">
 
             <div className='d-flex align-items-center'>
