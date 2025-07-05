@@ -5168,7 +5168,9 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
         {isMobile && renderRefferPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
+
       </div>
+       <UploadModal />
 
       {/* <div style={{ background: 'rgba(0, 0, 0, 0.5)', width: '100%', position: 'absolute', minHeight: '100vh', top: '0', zIndex: '13', position: 'fixed' }}>
         <div className='card' style={{ border: '1px solid red', width: '70%', height: '100%' }}>

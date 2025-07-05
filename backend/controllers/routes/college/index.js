@@ -377,7 +377,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			teamMembers = counselorArray
 		}
 
-		
+
 
 
 		let allFilteredResults = [];
@@ -386,7 +386,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			// Build aggregation pipeline
 			let aggregationPipeline = [];
 
-			if(typeof member === 'string'){
+			if (typeof member === 'string') {
 				member = new mongoose.Types.ObjectId(member)
 
 			}
@@ -623,7 +623,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 						}
 					}
 				}
-				
+
 			);
 
 			// Filter by college
@@ -662,7 +662,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 			}
 
-			
+
 			// Name search filter
 			if (name && name.trim()) {
 				const searchRegex = new RegExp(name.trim(), 'i');
@@ -873,7 +873,7 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 			// Build base aggregation pipeline
 			let basePipeline = [];
 
-			if(typeof member === 'string'){
+			if (typeof member === 'string') {
 				member = new mongoose.Types.ObjectId(member)
 			}
 
@@ -1033,7 +1033,7 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 			}
 
 
-			
+
 			if (appliedFilters.name && appliedFilters.name.trim()) {
 				const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
 				additionalMatches.$or = additionalMatches.$or ? [
@@ -4076,7 +4076,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 // Helper function to calculate KYC filter counts with applied filters
 async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters = {}) {
-	const counts = { 
+	const counts = {
 		all: 0,
 		pendingKyc: 0,
 		doneKyc: 0
@@ -4084,17 +4084,6 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 
 	try {
 		// First get all statuses from the database
-		const allStatuses = await Status.find({}).select('_id title milestone');
-
-		// Initialize counts for each status
-		allStatuses.forEach(status => {
-			counts[status._id.toString()] = {
-				_id: status._id,
-				name: status.title,
-				milestone: status.milestone,
-				count: 0
-			};
-		});
 
 		for (let member of teamMembers) {
 			// Build base aggregation pipeline
@@ -4321,38 +4310,18 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 				}
 			]);
 
-			// Update status counts
-			statusCountsAggregation.forEach(statusGroup => {
-				const statusId = statusGroup._id;
-				const count = statusGroup.count;
 
-				if (statusId) {
-					const statusKey = statusId.toString();
-					if (counts[statusKey]) {
-						counts[statusKey].count += count;
-					}
-				} else {
-					if (!counts['null']) {
-						counts['null'] = {
-							_id: null,
-							name: 'No Status',
-							milestone: null,
-							count: 0
-						};
-					}
-					counts['null'].count += count;
-				}
-			});
 		}
 
 		// Remove statuses with 0 count (optional)
 		const finalCounts = {};
 		Object.keys(counts).forEach(key => {
-			if (key === 'all' || key === 'pendingKyc' || key === 'doneKyc' || 
-				(counts[key].count && counts[key].count > 0)) {
+			if (key === 'all' || key === 'pendingKyc' || key === 'doneKyc') {
 				finalCounts[key] = counts[key];
 			}
 		});
+
+		console.log(finalCounts, 'finalCounts')
 
 		return finalCounts;
 
@@ -4525,6 +4494,516 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 
 
 //my followups
+// router.get("/leads/my-followups", isCollege, async (req, res) => {
+// 	try {
+// 		// Add debug log to identify which API is being called
+// 		console.log("🔥 NEW ENHANCED API CALLED 🔥");
+// 		console.log("Request Query:", req.query);
+		
+// 		const user = req.user;
+// 		console.log("User ID:", user._id);
+		
+// 		let teamMembers = await getAllTeamMembers(user._id);
+// 		console.log("Team Members:", teamMembers);
+		
+// 		const college = await College.findOne({
+// 			'_concernPerson._id': user._id
+// 		});
+// 		console.log("College ID:", college?._id);
+
+// 		// Extract ALL filter parameters from query
+// 		const {
+// 			fromDate,
+// 			toDate,
+// 			page = 1,
+// 			limit = 10,
+// 			// New comprehensive filters
+// 			name,
+// 			courseType,
+// 			status,
+// 			leadStatus,
+// 			sector,
+// 			kyc,
+// 			createdFromDate,
+// 			createdToDate,
+// 			modifiedFromDate,
+// 			modifiedToDate,
+// 			nextActionFromDate,
+// 			nextActionToDate,
+// 			// Multi-select filters (these come as JSON strings)
+// 			projects,
+// 			verticals,
+// 			course,
+// 			center,
+// 			counselor
+// 		} = req.query;
+
+// 		console.log("📅 FILTERS RECEIVED:", {
+// 			name,
+// 			courseType,
+// 			status,
+// 			leadStatus,
+// 			sector,
+// 			kyc,
+// 			hasProjects: !!projects,
+// 			hasVerticals: !!verticals,
+// 			hasCourse: !!course,
+// 			hasCenter: !!center,
+// 			hasCounselor: !!counselor
+// 		});
+
+// 		// Parse multi-select filter values
+// 		let projectsArray = [];
+// 		let verticalsArray = [];
+// 		let courseArray = [];
+// 		let centerArray = [];
+// 		let counselorArray = [];
+
+// 		try {
+// 			if (projects) projectsArray = JSON.parse(projects);
+// 			if (verticals) verticalsArray = JSON.parse(verticals);
+// 			if (course) courseArray = JSON.parse(course);
+// 			if (center) centerArray = JSON.parse(center);
+// 			if (counselor) counselorArray = JSON.parse(counselor);
+// 		} catch (parseError) {
+// 			console.error('Error parsing filter arrays:', parseError);
+// 		}
+
+// 		console.log("📊 PARSED ARRAYS:", {
+// 			projectsArray,
+// 			verticalsArray,
+// 			courseArray,
+// 			centerArray,
+// 			counselorArray
+// 		});
+
+// 		// If counselor filter is applied, override teamMembers
+// 		if (counselorArray.length > 0) {
+// 			teamMembers = counselorArray;
+// 			console.log("🎯 COUNSELOR FILTER APPLIED - NEW TEAM MEMBERS:", teamMembers);
+// 		}
+
+// 		// Date validation for followup date range
+// 		let from, to;
+
+// 		if (fromDate) {
+// 			from = new Date(fromDate);
+// 			if (isNaN(from.getTime())) {
+// 				return res.status(400).json({ error: "Invalid fromDate format" });
+// 			}
+// 		} else {
+// 			from = new Date(new Date().setHours(0, 0, 0, 0));
+// 		}
+
+// 		if (toDate) {
+// 			to = new Date(toDate);
+// 			if (isNaN(to.getTime())) {
+// 				return res.status(400).json({ error: "Invalid toDate format" });
+// 			}
+// 		} else {
+// 			to = new Date(new Date().setHours(23, 59, 59, 999));
+// 		}
+
+// 		console.log("🗓️ DATE RANGE:", { from, to });
+
+// 		// Build additional date filters
+// 		let additionalDateFilters = {};
+
+// 		if (createdFromDate || createdToDate) {
+// 			additionalDateFilters.createdAt = {};
+// 			if (createdFromDate) {
+// 				additionalDateFilters.createdAt.$gte = new Date(createdFromDate);
+// 			}
+// 			if (createdToDate) {
+// 				const toDate = new Date(createdToDate);
+// 				toDate.setHours(23, 59, 59, 999);
+// 				additionalDateFilters.createdAt.$lte = toDate;
+// 			}
+// 		}
+
+// 		if (modifiedFromDate || modifiedToDate) {
+// 			additionalDateFilters.updatedAt = {};
+// 			if (modifiedFromDate) {
+// 				additionalDateFilters.updatedAt.$gte = new Date(modifiedFromDate);
+// 			}
+// 			if (modifiedToDate) {
+// 				const toDate = new Date(modifiedToDate);
+// 				toDate.setHours(23, 59, 59, 999);
+// 				additionalDateFilters.updatedAt.$lte = toDate;
+// 			}
+// 		}
+
+// 		if (nextActionFromDate || nextActionToDate) {
+// 			additionalDateFilters.followupDate = {};
+// 			if (nextActionFromDate) {
+// 				additionalDateFilters.followupDate.$gte = new Date(nextActionFromDate);
+// 			}
+// 			if (nextActionToDate) {
+// 				const toDate = new Date(nextActionToDate);
+// 				toDate.setHours(23, 59, 59, 999);
+// 				additionalDateFilters.followupDate.$lte = toDate;
+// 			}
+// 		}
+
+// 		console.log("📋 ADDITIONAL DATE FILTERS:", additionalDateFilters);
+
+// 		const skip = (parseInt(page) - 1) * parseInt(limit);
+// 		let allFollowups = [];
+
+// 		console.log("👥 PROCESSING TEAM MEMBERS:", teamMembers.length);
+
+// 		for (const member of teamMembers) {
+// 			// Convert string member ID to ObjectId if needed
+// 			let memberId = member;
+// 			if (typeof member === 'string') {
+// 				memberId = new mongoose.Types.ObjectId(member);
+// 			}
+
+// 			console.log(`🔍 PROCESSING MEMBER: ${memberId}`);
+
+// 			// Build base query for team member
+// 			const baseQuery = {
+// 				followups: { $exists: true, $ne: [] },
+// 				"followups.date": { $gte: from, $lte: to },
+// 				$or: [
+// 					{ registeredBy: memberId },
+// 					{
+// 						$expr: {
+// 							$eq: [
+// 								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+// 								memberId
+// 							]
+// 						}
+// 					}
+// 				],
+// 				...additionalDateFilters
+// 			};
+
+// 			// Add additional filters
+// 			if (status && status !== 'true') {
+// 				baseQuery._leadStatus = new mongoose.Types.ObjectId(status);
+// 				console.log("✅ STATUS FILTER APPLIED:", status);
+// 			}
+// 			if (leadStatus) {
+// 				baseQuery._leadStatus = new mongoose.Types.ObjectId(leadStatus);
+// 				console.log("✅ LEAD STATUS FILTER APPLIED:", leadStatus);
+// 			}
+// 			if (kyc && kyc !== 'false') {
+// 				if (kyc === 'true') {
+// 					baseQuery.$or = [
+// 						{ kycStage: true },
+// 						{ kyc: true },
+// 						{ admissionDone: true }
+// 					];
+// 				} else {
+// 					baseQuery.kycStage = { $nin: [true] };
+// 					baseQuery.kyc = { $nin: [true] };
+// 					baseQuery.admissionDone = { $nin: [true] };
+// 				}
+// 				console.log("✅ KYC FILTER APPLIED:", kyc);
+// 			}
+
+// 			console.log("🔎 FINAL BASE QUERY:", JSON.stringify(baseQuery, null, 2));
+
+// 			// Get matching documents for this team member
+// 			const matchingDocs = await AppliedCourses.find(baseQuery)
+// 				.populate([
+// 					{
+// 						path: '_course',
+// 						select: 'name description docsRequired sectors vertical project courseFeeType college',
+// 						populate: [
+// 							{ path: 'sectors', select: 'name' },
+// 							{ path: 'vertical', select: 'name' },
+// 							{ path: 'project', select: 'name' }
+// 						]
+// 					},
+// 					{ path: '_leadStatus' },
+// 					{ path: '_center' },
+// 					{ path: 'registeredBy' },
+// 					{
+// 						path: '_candidate',
+// 						populate: [
+// 							{
+// 								path: '_appliedCourses',
+// 								populate: [
+// 									{ path: '_course', select: 'name description' },
+// 									{ path: 'registeredBy', select: 'name email' },
+// 									{ path: '_center', select: 'name location' },
+// 									{ path: '_leadStatus', select: 'title' }
+// 								]
+// 							}
+// 						]
+// 					},
+// 					{
+// 						path: 'logs',
+// 						populate: {
+// 							path: 'user',
+// 							select: 'name'
+// 						}
+// 					}
+// 				]);
+
+// 			console.log(`📄 RAW DOCS FOUND FOR MEMBER ${memberId}:`, matchingDocs.length);
+
+// 			// Filter by college and process followups
+// 			const collegeFilteredDocs = matchingDocs.filter(doc => {
+// 				const isCollegeMatch = doc._course && String(doc._course.college) === String(college._id);
+// 				if (!isCollegeMatch) {
+// 					console.log(`❌ COLLEGE MISMATCH: Doc ${doc._id} - Course college: ${doc._course?.college}, Expected: ${college._id}`);
+// 				}
+// 				return isCollegeMatch;
+// 			});
+
+// 			console.log(`🏫 COLLEGE FILTERED DOCS FOR MEMBER ${memberId}:`, collegeFilteredDocs.length);
+
+// 			collegeFilteredDocs.forEach(doc => {
+// 				doc.followups.forEach(followup => {
+// 					if (followup.date >= from && followup.date <= to) {
+// 						allFollowups.push({
+// 							...doc.toObject(),
+// 							followupDate: followup.date,
+// 							followupStatus: followup.status
+// 						});
+// 					}
+// 				});
+// 			});
+// 		}
+
+// 		console.log("📊 TOTAL FOLLOWUPS BEFORE POST-FILTERING:", allFollowups.length);
+
+// 		// Apply additional filters after population
+// 		let finalFilteredFollowups = allFollowups.filter(doc => {
+// 			// Course type filter
+// 			if (courseType && doc._course) {
+// 				const courseTypeMatch = new RegExp(courseType, 'i').test(doc._course.courseFeeType);
+// 				if (!courseTypeMatch) {
+// 					console.log(`❌ COURSE TYPE FILTER: ${doc._id} failed`);
+// 					return false;
+// 				}
+// 			}
+
+// 			// Sector/Projects filter (multi-select)
+// 			if (projectsArray.length > 0 && doc._course && doc._course.sectors) {
+// 				const sectorMatch = doc._course.sectors.some(sector =>
+// 					projectsArray.includes(sector._id.toString())
+// 				);
+// 				if (!sectorMatch) {
+// 					console.log(`❌ PROJECTS FILTER: ${doc._id} failed`);
+// 					return false;
+// 				}
+// 			}
+
+// 			// Verticals filter (multi-select)
+// 			if (verticalsArray.length > 0 && doc._course && doc._course.vertical) {
+// 				const verticalMatch = verticalsArray.includes(doc._course.vertical._id.toString());
+// 				if (!verticalMatch) {
+// 					console.log(`❌ VERTICALS FILTER: ${doc._id} failed`);
+// 					return false;
+// 				}
+// 			}
+
+// 			// Course filter (multi-select)
+// 			if (courseArray.length > 0 && doc._course) {
+// 				const courseMatch = courseArray.includes(doc._course._id.toString());
+// 				if (!courseMatch) {
+// 					console.log(`❌ COURSE FILTER: ${doc._id} failed`);
+// 					return false;
+// 				}
+// 			}
+
+// 			// Center filter (multi-select)
+// 			if (centerArray.length > 0 && doc._center) {
+// 				const centerMatch = centerArray.includes(doc._center._id.toString());
+// 				if (!centerMatch) {
+// 					console.log(`❌ CENTER FILTER: ${doc._id} failed`);
+// 					return false;
+// 				}
+// 			}
+
+// 			// Name search filter
+// 			if (name && name.trim() && doc._candidate) {
+// 				const searchRegex = new RegExp(name.trim(), 'i');
+// 				const nameMatch = searchRegex.test(doc._candidate.name) ||
+// 					searchRegex.test(doc._candidate.mobile) ||
+// 					searchRegex.test(doc._candidate.email);
+// 				if (!nameMatch) {
+// 					console.log(`❌ NAME FILTER: ${doc._id} failed`);
+// 					return false;
+// 				}
+// 			}
+
+// 			return true;
+// 		});
+
+// 		console.log("✅ FINAL FILTERED FOLLOWUPS:", finalFilteredFollowups.length);
+
+// 		// Sort by followup date
+// 		finalFilteredFollowups.sort((a, b) => new Date(b.followupDate) - new Date(a.followupDate));
+
+// 		// Apply pagination
+// 		const total = finalFilteredFollowups.length;
+// 		const totalPages = Math.ceil(total / parseInt(limit));
+// 		const paginatedData = finalFilteredFollowups.slice(skip, skip + parseInt(limit));
+
+// 		console.log("📄 PAGINATION:", { total, totalPages, pageSize: paginatedData.length });
+
+// 		const result = paginatedData.map(doc => {
+// 			let selectedSubstatus = null;
+
+// 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+// 				selectedSubstatus = doc._leadStatus.substatuses.find(
+// 					sub => sub._id.toString() === doc._leadSubStatus.toString()
+// 				);
+// 			}
+
+// 			const docObj = doc;
+
+// 			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
+// 			if (docObj._course) {
+// 				docObj._course.sectors = firstSectorName;
+// 			}
+
+// 			const requiredDocs = docObj._course?.docsRequired || [];
+// 			const uploadedDocs = docObj.uploadedDocs || [];
+
+// 			// Map uploaded docs by docsId for quick lookup
+// 			const uploadedDocsMap = {};
+// 			uploadedDocs.forEach(d => {
+// 				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+// 			});
+
+// 			// Prepare combined docs array
+// 			const allDocs = requiredDocs.map(reqDoc => {
+// 				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+// 				if (uploadedDoc) {
+// 					return {
+// 						...uploadedDoc,
+// 						Name: reqDoc.Name,
+// 						mandatory: reqDoc.mandatory,
+// 						_id: reqDoc._id
+// 					};
+// 				} else {
+// 					return {
+// 						docsId: reqDoc._id,
+// 						Name: reqDoc.Name,
+// 						mandatory: reqDoc.mandatory,
+// 						status: "Not Uploaded",
+// 						fileUrl: null,
+// 						reason: null,
+// 						verifiedBy: null,
+// 						verifiedDate: null,
+// 						uploadedAt: null
+// 					};
+// 				}
+// 			});
+
+// 			let combinedDocs = [];
+
+// 			if (requiredDocs && requiredDocs.length > 0) {
+// 				combinedDocs = requiredDocs.map(reqDoc => {
+// 					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+// 					const matchingUploads = uploadedDocs.filter(
+// 						uploadDoc => uploadDoc.docsId && uploadDoc.docsId.toString() === docObj._id.toString()
+// 					);
+
+// 					return {
+// 						_id: docObj._id,
+// 						Name: docObj.Name || 'Document',
+// 						mandatory: docObj.mandatory,
+// 						description: docObj.description || '',
+// 						uploads: matchingUploads || []
+// 					};
+// 				});
+// 			}
+
+// 			// Count calculations
+// 			let verifiedCount = 0;
+// 			let RejectedCount = 0;
+// 			let pendingVerificationCount = 0;
+// 			let notUploadedCount = 0;
+
+// 			allDocs.forEach(doc => {
+// 				if (doc.status === "Verified") verifiedCount++;
+// 				else if (doc.status === "Rejected") RejectedCount++;
+// 				else if (doc.status === "Pending") pendingVerificationCount++;
+// 				else if (doc.status === "Not Uploaded") notUploadedCount++;
+// 			});
+
+// 			const totalRequired = allDocs.length;
+// 			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
+// 			const uploadPercentage = totalRequired > 0
+// 				? Math.round((uploadedCount / totalRequired) * 100)
+// 				: 0;
+
+// 			return {
+// 				...docObj,
+// 				selectedSubstatus,
+// 				uploadedDocs: combinedDocs,
+// 				docCounts: {
+// 					totalRequired,
+// 					RejectedCount,
+// 					uploadedCount,
+// 					verifiedCount,
+// 					pendingVerificationCount,
+// 					notUploadedCount,
+// 					uploadPercentage
+// 				}
+// 			};
+// 		});
+
+// 		console.log("🎉 FINAL RESULT COUNT:", result.length);
+// 		console.log("🚀 NEW ENHANCED API RESPONSE SENT 🚀");
+
+// 		res.status(200).json({
+// 			success: true,
+// 			page: parseInt(page),
+// 			limit: parseInt(limit),
+// 			total,
+// 			totalPages,
+// 			data: result,
+// 			// Enhanced filter info for debugging
+// 			appliedFilters: {
+// 				followupDateRange: {
+// 					fromDate,
+// 					toDate,
+// 					from: from.toISOString(),
+// 					to: to.toISOString()
+// 				},
+// 				dateFilters: {
+// 					createdFromDate,
+// 					createdToDate,
+// 					modifiedFromDate,
+// 					modifiedToDate,
+// 					nextActionFromDate,
+// 					nextActionToDate,
+// 					appliedDateFilter: Object.keys(additionalDateFilters).length > 0 ? additionalDateFilters : 'No additional date filters applied'
+// 				},
+// 				otherFilters: {
+// 					name,
+// 					courseType,
+// 					status,
+// 					leadStatus,
+// 					sector,
+// 					kyc,
+// 					projects: projectsArray,
+// 					verticals: verticalsArray,
+// 					course: courseArray,
+// 					center: centerArray,
+// 					counselor: counselorArray
+// 				}
+// 			}
+// 		});
+
+// 	} catch (err) {
+// 		console.error("❌ NEW API ERROR:", err);
+// 		res.status(500).json({
+// 			success: false,
+// 			error: "Server Error",
+// 			message: err.message
+// 		});
+// 	}
+// });
+
 router.get("/leads/my-followups", async (req, res) => {
 	try {
 		const { fromDate, toDate, page = 1, limit = 10 } = req.query;
@@ -4549,7 +5028,7 @@ router.get("/leads/my-followups", async (req, res) => {
 		} else {
 			to = new Date(new Date().setHours(23, 59, 59, 999));
 		}
-
+		console.log(from, to, 'from, to')
 		const skip = (parseInt(page) - 1) * parseInt(limit);
 
 		// First, get the documents that match our criteria
@@ -4722,6 +5201,7 @@ router.get("/leads/my-followups", async (req, res) => {
 		});
 
 
+		console.log(result, 'result')
 
 		res.status(200).json({
 			success: true,
@@ -4738,10 +5218,13 @@ router.get("/leads/my-followups", async (req, res) => {
 	}
 });
 
+
+
 // Get admission list
-
-
 // Verify document and update KYC status
+
+
+
 router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req, res) => {
 	try {
 		const { profileId, uploadId } = req.params;
@@ -5798,120 +6281,141 @@ router.get("/generate-application-form/:id", async (req, res) => {
 })
 
 router.get('/dashbord-data', isCollege, async (req, res) => {
-
-
 	try {
 		const user = req.user;
-		const teamMembers = await getAllTeamMembers(user._id);
+		let teamMembers = await getAllTeamMembers(user._id);
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
 
-		// Date filtering parameters
-		const { startDate, endDate, period } = req.query;
+		// Extract ALL filter parameters from query
+		const {
+			name,
+			courseType,
+			status,
+			leadStatus,
+			sector,
+			kyc,
+			createdFromDate,
+			createdToDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
+			// Multi-select filters (these come as JSON strings)
+			projects,
+			verticals,
+			course,
+			center,
+			counselor
+		} = req.query;
+
+		// Parse multi-select filter values
+		let projectsArray = [];
+		let verticalsArray = [];
+		let courseArray = [];
+		let centerArray = [];
+		let counselorArray = [];
+
+		try {
+			if (projects) projectsArray = JSON.parse(projects);
+			if (verticals) verticalsArray = JSON.parse(verticals);
+			if (course) courseArray = JSON.parse(course);
+			if (center) centerArray = JSON.parse(center);
+			if (counselor) counselorArray = JSON.parse(counselor);
+		} catch (parseError) {
+			console.error('Error parsing filter arrays:', parseError);
+		}
+
+		// If counselor filter is applied, override teamMembers
+		if (counselorArray.length > 0) {
+			teamMembers = counselorArray;
+		}
 
 		// Build date filter
 		let dateFilter = {};
 
-		if (startDate && endDate) {
-			// Custom date range
-			const start = new Date(startDate);
-			const end = new Date(endDate);
-			end.setHours(23, 59, 59, 999); // Include the entire end date
-			dateFilter.createdAt = { $gte: start, $lte: end };
-		} else if (period) {
-			// Predefined periods
-			const now = new Date();
-			const start = new Date();
+		if (createdFromDate || createdToDate) {
+			dateFilter.createdAt = {};
+			if (createdFromDate) {
+				dateFilter.createdAt.$gte = new Date(createdFromDate);
+			}
+			if (createdToDate) {
+				const toDate = new Date(createdToDate);
+				toDate.setHours(23, 59, 59, 999);
+				dateFilter.createdAt.$lte = toDate;
+			}
+		}
 
-			switch (period) {
-				case 'today':
-					start.setHours(0, 0, 0, 0);
-					dateFilter.createdAt = {
-						$gte: start,
-						$lte: new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
-					};
-					break;
-				case 'yesterday':
-					start.setDate(start.getDate() - 1);
-					start.setHours(0, 0, 0, 0);
-					dateFilter.createdAt = {
-						$gte: start,
-						$lte: new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
-					};
-					break;
-				case 'last7':
-					start.setDate(start.getDate() - 6);
-					start.setHours(0, 0, 0, 0);
-					dateFilter.createdAt = { $gte: start, $lte: now };
-					break;
-				case 'last14':
-					start.setDate(start.getDate() - 13);
-					start.setHours(0, 0, 0, 0);
-					dateFilter.createdAt = { $gte: start, $lte: now };
-					break;
-				case 'last28':
-					start.setDate(start.getDate() - 27);
-					start.setHours(0, 0, 0, 0);
-					dateFilter.createdAt = { $gte: start, $lte: now };
-					break;
-				case 'last30':
-					start.setDate(start.getDate() - 29);
-					start.setHours(0, 0, 0, 0);
-					dateFilter.createdAt = { $gte: start, $lte: now };
-					break;
-				case 'thisWeek':
-					start.setDate(start.getDate() - start.getDay());
-					start.setHours(0, 0, 0, 0);
-					dateFilter.createdAt = { $gte: start, $lte: now };
-					break;
-				case 'lastWeek':
-					start.setDate(start.getDate() - start.getDay() - 7);
-					start.setHours(0, 0, 0, 0);
-					const lastWeekEnd = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
-					dateFilter.createdAt = { $gte: start, $lte: lastWeekEnd };
-					break;
-				case 'thisMonth':
-					start.setDate(1);
-					start.setHours(0, 0, 0, 0);
-					dateFilter.createdAt = { $gte: start, $lte: now };
-					break;
-				case 'lastMonth':
-					start.setMonth(start.getMonth() - 1);
-					start.setDate(1);
-					start.setHours(0, 0, 0, 0);
-					const lastMonthEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
-					dateFilter.createdAt = { $gte: start, $lte: lastMonthEnd };
-					break;
-				case 'maximum':
-					// No date filter - get all data
-					break;
-				default:
-					// No date filter for unknown periods
-					break;
+		if (modifiedFromDate || modifiedToDate) {
+			dateFilter.updatedAt = {};
+			if (modifiedFromDate) {
+				dateFilter.updatedAt.$gte = new Date(modifiedFromDate);
+			}
+			if (modifiedToDate) {
+				const toDate = new Date(modifiedToDate);
+				toDate.setHours(23, 59, 59, 999);
+				dateFilter.updatedAt.$lte = toDate;
+			}
+		}
+
+		if (nextActionFromDate || nextActionToDate) {
+			dateFilter.followupDate = {};
+			if (nextActionFromDate) {
+				dateFilter.followupDate.$gte = new Date(nextActionFromDate);
+			}
+			if (nextActionToDate) {
+				const toDate = new Date(nextActionToDate);
+				toDate.setHours(23, 59, 59, 999);
+				dateFilter.followupDate.$lte = toDate;
 			}
 		}
 
 		let appliedCourses = [];
 
 		for (const member of teamMembers) {
+			// Convert string member ID to ObjectId if needed
+			let memberId = member;
+			if (typeof member === 'string') {
+				memberId = new mongoose.Types.ObjectId(member);
+			}
+
+			// Build base query
 			const query = {
 				$or: [
-					// registeredBy field se match (single member ke liye)
-					{ registeredBy: member }, // $in hata diya kyunki member ek single value hai
-
-					// leadAssignment ke last element ki _id se match
+					{ registeredBy: memberId },
 					{
 						$expr: {
 							$eq: [
 								{ $arrayElemAt: ["$leadAssignment._id", -1] },
-								member
+								memberId
 							]
 						}
 					}
 				],
-				...dateFilter // Add date filter to the query
+				...dateFilter
 			};
+
+			// Add additional filters
+			if (status && status !== 'true') {
+				query._leadStatus = new mongoose.Types.ObjectId(status);
+			}
+			if (leadStatus) {
+				query._leadStatus = new mongoose.Types.ObjectId(leadStatus);
+			}
+			if (kyc && kyc !== 'false') {
+				if (kyc === 'true') {
+					query.$or = [
+						{ kycStage: true },
+						{ kyc: true },
+						{ admissionDone: true }
+					];
+				} else {
+					query.kycStage = { $nin: [true] };
+					query.kyc = { $nin: [true] };
+					query.admissionDone = { $nin: [true] };
+				}
+			}
 
 			const response = await AppliedCourses.find(query)
 				.populate({
@@ -5923,11 +6427,11 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 						},
 						{
 							path: 'vertical',
-							select: 'name'  // Add the fields you want to populate from the `vertical` path
+							select: 'name'
 						},
 						{
 							path: 'project',
-							select: 'name'  // Add the fields you want to populate from the `project` path
+							select: 'name'
 						}
 					]
 				})
@@ -5947,8 +6451,7 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 						select: 'name'
 					}
 				})
-				.sort({ createdAt: -1 })
-
+				.sort({ createdAt: -1 });
 
 			response.forEach(doc => {
 				if (!appliedCourses.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
@@ -5957,12 +6460,58 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			});
 		}
 
+		// Filter by college
 		const filteredAppliedCourses = appliedCourses.filter(doc => {
-			// _course must be populated!
 			return doc._course && String(doc._course.college) === String(college._id);
 		});
 
-		const results = filteredAppliedCourses.map(doc => {
+		// Apply additional filters after population
+		let finalFilteredCourses = filteredAppliedCourses.filter(doc => {
+			// Course type filter
+			if (courseType && doc._course) {
+				const courseTypeMatch = new RegExp(courseType, 'i').test(doc._course.courseFeeType);
+				if (!courseTypeMatch) return false;
+			}
+
+			// Sector/Projects filter (multi-select)
+			if (projectsArray.length > 0 && doc._course && doc._course.sectors) {
+				const sectorMatch = doc._course.sectors.some(sector =>
+					projectsArray.includes(sector._id.toString())
+				);
+				if (!sectorMatch) return false;
+			}
+
+			// Verticals filter (multi-select)
+			if (verticalsArray.length > 0 && doc._course && doc._course.vertical) {
+				const verticalMatch = verticalsArray.includes(doc._course.vertical._id.toString());
+				if (!verticalMatch) return false;
+			}
+
+			// Course filter (multi-select)
+			if (courseArray.length > 0 && doc._course) {
+				const courseMatch = courseArray.includes(doc._course._id.toString());
+				if (!courseMatch) return false;
+			}
+
+			// Center filter (multi-select)
+			if (centerArray.length > 0 && doc._center) {
+				const centerMatch = centerArray.includes(doc._center._id.toString());
+				if (!centerMatch) return false;
+			}
+
+			// Name search filter
+			if (name && name.trim() && doc._candidate) {
+				const searchRegex = new RegExp(name.trim(), 'i');
+				const nameMatch = searchRegex.test(doc._candidate.name) ||
+					searchRegex.test(doc._candidate.mobile) ||
+					searchRegex.test(doc._candidate.email);
+				if (!nameMatch) return false;
+			}
+
+			return true;
+		});
+
+		const results = finalFilteredCourses.map(doc => {
 			let selectedSubstatus = null;
 
 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
@@ -5975,7 +6524,7 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 
 			const firstSectorName = docObj._course?.sectors?.[0]?.name || 'N/A';
 			if (docObj._course) {
-				docObj._course.sectors = firstSectorName; // yahan replace ho raha hai
+				docObj._course.sectors = firstSectorName;
 			}
 
 			const requiredDocs = docObj._course?.docsRequired || [];
@@ -5991,15 +6540,13 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			const allDocs = requiredDocs.map(reqDoc => {
 				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
 				if (uploadedDoc) {
-					// Agar uploaded hai to uploadedDoc details bhejo
 					return {
 						...uploadedDoc,
-						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						Name: reqDoc.Name,
 						mandatory: reqDoc.mandatory,
 						_id: reqDoc._id
 					};
 				} else {
-					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
 					return {
 						docsId: reqDoc._id,
 						Name: reqDoc.Name,
@@ -6014,15 +6561,10 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 				}
 			});
 
+			let combinedDocs = [];
 			if (requiredDocs) {
-				docsRequired = requiredDocs
-
-				// Create a merged array with both required docs and uploaded docs info
-				combinedDocs = docsRequired.map(reqDoc => {
-					// Convert Mongoose document to plain object
+				combinedDocs = requiredDocs.map(reqDoc => {
 					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
-
-					// Find matching uploaded docs for this required doc
 					const matchingUploads = uploadedDocs.filter(
 						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
 					);
@@ -6035,11 +6577,7 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 						uploads: matchingUploads || []
 					};
 				});
-
-
-			} else {
-				console.log("Course not found or no docs required");
-			};
+			}
 
 			// Count calculations
 			let verifiedCount = 0;
@@ -6059,10 +6597,11 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			const uploadPercentage = totalRequired > 0
 				? Math.round((uploadedCount / totalRequired) * 100)
 				: 0;
+
 			return {
 				...docObj,
 				selectedSubstatus,
-				uploadedDocs: combinedDocs,    // Uploaded + Not uploaded combined docs array
+				uploadedDocs: combinedDocs,
 				docCounts: {
 					totalRequired,
 					RejectedCount,
@@ -6075,28 +6614,38 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			};
 		});
 
-
-
-		const totalCount = results.length
-
-		// Remove pagination - return all results
-		const result = results;
-
-
-
+		const totalCount = results.length;
 
 		res.status(200).json({
 			success: true,
-			count: result.length,
+			count: results.length,
 			totalCount,
-			data: result,
+			data: results,
 			allData: results,
-			// Date filter info for debugging
-			dateFilter: {
-				startDate,
-				endDate,
-				period,
-				appliedFilter: Object.keys(dateFilter).length > 0 ? dateFilter : 'No date filter applied'
+			// Filter info for debugging
+			appliedFilters: {
+				dateFilters: {
+					createdFromDate,
+					createdToDate,
+					modifiedFromDate,
+					modifiedToDate,
+					nextActionFromDate,
+					nextActionToDate,
+					appliedDateFilter: Object.keys(dateFilter).length > 0 ? dateFilter : 'No date filter applied'
+				},
+				otherFilters: {
+					name,
+					courseType,
+					status,
+					leadStatus,
+					sector,
+					kyc,
+					projects: projectsArray,
+					verticals: verticalsArray,
+					course: courseArray,
+					center: centerArray,
+					counselor: counselorArray
+				}
 			}
 		});
 
@@ -6107,9 +6656,7 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			message: "Server Error"
 		});
 	}
-
-
-})
+});
 
 // GET /college/filters-data
 router.get('/filters-data', [isCollege], async (req, res) => {
@@ -6268,7 +6815,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 			}
 			if (req.query.status === "dropout") {
 				query.dropout = { $in: [true] };
-			} 
+			}
 			if (req.query.status === "zeroPeriod") {
 				query.isZeroPeriodAssigned = true;
 				query.isBatchFreeze = { $in: [false] };
@@ -6277,8 +6824,8 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 			if (req.query.status === "batchFreeze") {
 				query.isBatchFreeze = { $in: [true] };
 				query.dropout = { $in: [false] };
-			} 
-			
+			}
+
 		}
 
 		// Add date range filters
@@ -6381,7 +6928,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 				baseQuery.nextActionDate = { ...baseQuery.nextActionDate, $lte: new Date(req.query.nextActionToDate) };
 			}
 
-			
+
 			// Get all records for this college (without pagination)
 			const allAppliedCourses = await AppliedCourses.find(baseQuery)
 				.populate({

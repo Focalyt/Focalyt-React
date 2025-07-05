@@ -6,14 +6,128 @@ import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
 
+const MultiSelectCheckbox = ({
+  title,
+  options,
+  selectedValues,
+  onChange,
+  icon = "fas fa-list",
+  isOpen,
+  onToggle
+}) => {
+  const handleCheckboxChange = (value) => {
+    const newValues = selectedValues.includes(value)
+      ? selectedValues.filter(v => v !== value)
+      : [...selectedValues, value];
+    onChange(newValues);
+  };
+
+  // Get display text for selected items
+  const getDisplayText = () => {
+    if (selectedValues.length === 0) {
+      return `Select ${title}`;
+    } else if (selectedValues.length === 1) {
+      const selectedOption = options.find(opt => opt.value === selectedValues[0]);
+      return selectedOption ? selectedOption.label : selectedValues[0];
+    } else if (selectedValues.length <= 2) {
+      const selectedLabels = selectedValues.map(val => {
+        const option = options.find(opt => opt.value === val);
+        return option ? option.label : val;
+      });
+      return selectedLabels.join(', ');
+    } else {
+      return `${selectedValues.length} items selected`;
+    }
+  };
+
+  return (
+    <div className="multi-select-container-new">
+      <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
+        <i className={`${icon} me-1 text-primary`}></i>
+        {title}
+        {selectedValues.length > 0 && (
+          <span className="badge bg-primary ms-2">{selectedValues.length}</span>
+        )}
+      </label>
+
+      <div className="multi-select-dropdown-new">
+        <button
+          type="button"
+          className={`form-select multi-select-trigger ${isOpen ? 'open' : ''}`}
+          onClick={onToggle}
+          style={{ cursor: 'pointer', textAlign: 'left' }}
+        >
+          <span className="select-display-text">
+            {getDisplayText()}
+          </span>
+          <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`}></i>
+        </button>
+
+        {isOpen && (
+          <div className="multi-select-options-new">
+            {/* Search functionality (optional) */}
+            <div className="options-search">
+              <div className="input-group input-group-sm">
+                <span className="input-group-text" style={{ height: '40px' }}>
+                  <i className="fas fa-search"></i>
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder={`Search ${title.toLowerCase()}...`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+
+            {/* Options List */}
+            <div className="options-list-new">
+              {options.map((option) => (
+                <label key={option.value} className="option-item-new">
+                  <input
+                    type="checkbox"
+                    className="form-check-input me-2"
+                    checked={selectedValues.includes(option.value)}
+                    onChange={() => handleCheckboxChange(option.value)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span className="option-label-new">{option.label}</span>
+                  {selectedValues.includes(option.value) && (
+                    <i className="fas fa-check text-primary ms-auto"></i>
+                  )}
+                </label>
+              ))}
+
+              {options.length === 0 && (
+                <div className="no-options">
+                  <i className="fas fa-info-circle me-2"></i>
+                  No {title.toLowerCase()} available
+                </div>
+              )}
+            </div>
+
+            {/* Footer with count */}
+            {selectedValues.length > 0 && (
+              <div className="options-footer">
+                <small className="text-muted">
+                  {selectedValues.length} of {options.length} selected
+                </small>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const MyFollowups = () => {
   //Calendar Stats
   // State management
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState(null);
-  const [rangeStart, setRangeStart] = useState(null);
-  const [rangeEnd, setRangeEnd] = useState(null);
+
   const [isRangeMode, setIsRangeMode] = useState(true); // Set to true by default to show range functionality
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [customDays, setCustomDays] = useState(7);
@@ -90,6 +204,75 @@ const MyFollowups = () => {
     setUploadProgress(0);
     setIsUploading(false);
   };
+
+  
+  const [formData, setFormData] = useState({
+    projects: {
+      type: "includes",
+      values: []
+    },
+    verticals: {
+      type: "includes",
+      values: []
+    },
+    course: {
+      type: "includes",
+      values: []
+    },
+    center: {
+      type: "includes",
+      values: []
+    },
+    counselor: {
+      type: "includes",
+      values: []
+    },
+    sector: {
+      type: "includes",
+      values: []
+    }
+  });
+
+  const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
+  const [verticalOptions, setVerticalOptions] = useState([]);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [courseOptions, setCourseOptions] = useState([]);
+  const [centerOptions, setCenterOptions] = useState([]);
+  const [counselorOptions, setCounselorOptions] = useState([]);
+
+  const handleCriteriaChange = (criteria, values) => {
+    setFormData((prevState) => ({
+      ...prevState,
+      [criteria]: {
+        type: "includes",
+        values: values
+      }
+    }));
+    console.log('Selected verticals:', values);
+    // Reset to first page and fetch with new filters
+  };
+
+  const [dropdownStates, setDropdownStates] = useState({
+    projects: false,
+    verticals: false,
+    course: false,
+    center: false,
+    counselor: false,
+    sector: false
+  });
+
+  const toggleDropdown = (filterName) => {
+    setDropdownStates(prev => {
+      // Close all other dropdowns and toggle the current one
+      const newState = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = key === filterName ? !prev[key] : false;
+        return acc;
+      }, {});
+      return newState;
+    });
+  };
+
+
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -937,9 +1120,10 @@ const MyFollowups = () => {
   const [filterData, setFilterData] = useState({
     name: '',
     courseType: '',
-    status: 'true',
     leadStatus: '',
     sector: '',
+    fromDate: null,
+    toDate: null,    
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
@@ -1718,35 +1902,68 @@ const MyFollowups = () => {
 
   useEffect(() => {
     fetchProfileData();
-  }, [currentPage, rangeEnd, rangeStart]);
+  }, [filterData]);
 
-  const fetchProfileData = async () => {
+  const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
-
+  
       if (!token) {
         console.warn('No token found in session storage.');
         return;
       }
-
-      // Replace with your actual profile API endpoint
-      const response = await axios.get(`${backendUrl}/college/leads/my-followups?page=${currentPage}&fromDate=${rangeStart}&toDate=${rangeEnd}`, {
+  
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: pageSize.toString(),
+        ...(filters?.name && { name: filters.name }),
+        ...(filters?.courseType && { courseType: filters.courseType }),
+        ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters?.kyc && filters.kyc !== 'false' && { kyc: filters.kyc }),
+        ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters?.sector && { sector: filters.sector }),
+        ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        // Multi-select filters
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) }),
+        // Followup specific date range (if you want to add separate followup date filters)
+        // You can add fromDate and toDate here if needed for followup date filtering
+        ...(filters?.fromDate && { fromDate: filters.fromDate }),
+        ...(filters?.toDate && { toDate: filters.toDate }),
+      });
+  
+      // Use the My Followups specific API endpoint
+      const response = await axios.get(`${backendUrl}/college/leads/my-followups?${queryParams}`, {
         headers: {
           'x-auth': token,
         },
       });
-      console.log('Backend profile data:', response.data);
+      
+      console.log('Backend followups data:', response.data);
+      
       if (response.data.success && response.data.data) {
-        const data = response.data.data; // create array 
+        const data = response.data.data;
         setAllProfiles(response.data.data);
-        setAllProfilesData(response.data.data)
+        setAllProfilesData(response.data.data); // Store all data for filtering
         setTotalPages(response.data.totalPages);
-
+        setCurrentPage(response.data.page);
         
       } else {
-        console.error('Failed to fetch profile data', response.data.message);
+        console.error('Failed to fetch followups data', response.data.message);
+        setAllProfiles([]);
+        setAllProfilesData([]);
       }
     } catch (error) {
-      console.error('Error fetching profile data:', error);
+      console.error('Error fetching followups data:', error);
+      setAllProfiles([]);
+      setAllProfilesData([]);
     }
   };
 
@@ -2058,8 +2275,8 @@ const MyFollowups = () => {
     };
 
     const isInRange = (date) => {
-      if (!rangeStart || !rangeEnd) return false;
-      return date >= rangeStart && date <= rangeEnd;
+      if (!filterData.fromDate || !filterData.toDate) return false;
+      return date >= filterData.fromDate && date <= filterData.toDate;
     };
 
     // Range preset functions
@@ -2102,8 +2319,13 @@ const MyFollowups = () => {
           return;
       }
 
-      setRangeStart(start);
-      setRangeEnd(end);
+      console.log(start, end, 'start, end')
+      setFilterData(prev => ({
+        ...prev,
+        fromDate: start,
+        toDate: end
+      }));
+      
       setIsRangeMode(true);
     };
 
@@ -2116,22 +2338,25 @@ const MyFollowups = () => {
       const start = new Date(today);
       const end = new Date(today);
       end.setDate(today.getDate() + parseInt(customDays) - 1);
-
-      setRangeStart(start);
-      setRangeEnd(end);
+      setFilterData(prev => ({
+        ...prev,
+        fromDate: start,
+        toDate: end
+      }));
+      
       setRangePreset('custom');
     };
 
     // Range and filtering functions
     const getFollowupsInRange = () => {
-      if (!rangeStart || !rangeEnd) return [];
+      if (!filterData.fromDate || !filterData.toDate) return [];
 
       return followupDates.filter(followup => {
         const followupDate = new Date(followup.date);
         followupDate.setHours(0, 0, 0, 0);
-        const start = new Date(rangeStart);
+        const start = new Date(filterData.fromDate);
         start.setHours(0, 0, 0, 0);
-        const end = new Date(rangeEnd);
+        const end = new Date(filterData.toDate);
         end.setHours(0, 0, 0, 0);
 
         return followupDate >= start && followupDate <= end;
@@ -2164,8 +2389,8 @@ const MyFollowups = () => {
     };
 
     const getRangeDays = () => {
-      if (!rangeStart || !rangeEnd) return 0;
-      const diffTime = Math.abs(rangeEnd - rangeStart);
+      if (!filterData.fromDate || !filterData.toDate) return 0;
+      const diffTime = Math.abs(filterData.toDate - filterData.fromDate);
       return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     };
 
@@ -2206,38 +2431,57 @@ const MyFollowups = () => {
         return;
       }
 
-      if (!rangeStart) {
-        setRangeStart(new Date(clickedDate));
-        setRangeEnd(null);
+      if (!filterData.fromDate) {
+        setFilterData(prev => ({
+          ...prev,
+          fromDate: new Date(clickedDate),
+          toDate: null
+        }));
         setSelectedDate(null);
         setRangePreset('custom');
-      } else if (!rangeEnd) {
-        if (clickedDate >= rangeStart) {
-          setRangeEnd(new Date(clickedDate));
+      } else if (!filterData.toDate) {
+        if (clickedDate >= filterData.fromDate) {
+          setFilterData(prev => ({
+            ...prev,
+            toDate: new Date(clickedDate),
+            fromDate: null
+          }));
         } else {
-          setRangeEnd(new Date(rangeStart));
-          setRangeStart(new Date(clickedDate));
+          setFilterData(prev => ({
+            ...prev,
+            toDate: new Date(filterData.fromDate),
+            fromDate: new Date(clickedDate)
+          }));
         }
         setRangePreset('custom');
       } else {
-        setRangeStart(new Date(clickedDate));
-        setRangeEnd(null);
+        setFilterData(prev => ({
+          ...prev,
+          fromDate: new Date(clickedDate),
+          toDate: null
+        }));
         setRangePreset('custom');
       }
     };
 
     const toggleRangeMode = () => {
       setIsRangeMode(!isRangeMode);
-      setRangeStart(null);
-      setRangeEnd(null);
+      setFilterData(prev => ({
+        ...prev,
+        fromDate: null,
+        toDate: null
+      }));
       setSelectedDate(null);
       setSelectedFilter('all');
       setRangePreset('custom');
     };
 
     const clearRange = () => {
-      setRangeStart(null);
-      setRangeEnd(null);
+        setFilterData(prev => ({
+        ...prev,
+        fromDate: null,
+        toDate: null
+      }));
       setSelectedFilter('all');
       setRangePreset('custom');
     };
@@ -2254,8 +2498,8 @@ const MyFollowups = () => {
       const isSelectedDate = isSelected(date);
       const hasFollowupDate = hasFollowup(date);
       const isInRangeDate = isInRange(date);
-      const isRangeStartDate = rangeStart && date.toDateString() === rangeStart.toDateString();
-      const isRangeEndDate = rangeEnd && date.toDateString() === rangeEnd.toDateString();
+      const isRangeStartDate = filterData.fromDate && date.toDateString() === filterData.fromDate.toDateString();
+      const isRangeEndDate = filterData.toDate && date.toDateString() === filterData.toDate.toDateString();
 
       let classes = ['calendar-day', 'position-relative', 'text-center', 'p-2', 'border', 'cursor-pointer'];
 
@@ -2326,7 +2570,7 @@ const MyFollowups = () => {
                   <div className="col-md-12">
                     <div className="d-flex justify-content-between align-items-center mb-3">
                       <label className="form-label small fw-semibold mb-0">Quick Range Selection:</label>
-                      {(rangeStart || rangeEnd) && (
+                      {(filterData.fromDate || filterData.toDate) && (
                         <button
                           onClick={clearRange}
                           className="btn btn-outline-danger btn-sm"
@@ -2401,18 +2645,18 @@ const MyFollowups = () => {
               </div>
 
               {/* Range Info with Stats */}
-              {isRangeMode && rangeStart && (
+              {isRangeMode && filterData.fromDate && (
                 <div className="mb-3 p-3 range-stats">
                   <div className="row">
                     <div className="col-md-8">
                       <h6 className="mb-1">📅 Selected Range:</h6>
                       <p className="mb-0 small text-white">
-                        <strong>{formatDate(rangeStart)}</strong>
-                        {rangeEnd ? ` to ${formatDate(rangeEnd)}` : ' (select end date)'}
+                        <strong>{formatDate(filterData.fromDate)}</strong>
+                        {filterData.toDate ? ` to ${formatDate(filterData.toDate)}` : ' (select end date)'}
                       </p>
                     </div>
                     <div className="col-md-4 text-end">
-                      {rangeEnd && (
+                      {filterData.toDate && (
                         <div>
                           <div className="fw-bold fs-4">{getRangeDays()}</div>
                           <div className="small">Days Selected</div>
@@ -2450,8 +2694,8 @@ const MyFollowups = () => {
                       className={dayClasses}
                       onClick={() => handleDateClick(date)}
                       title={isRangeMode ?
-                        (!rangeStart ? 'Click to set range start' :
-                          !rangeEnd ? 'Click to set range end' :
+                        (!filterData.fromDate ? 'Click to set range start' :
+                          !filterData.toDate ? 'Click to set range end' :
                             'Click to start new range') :
                         `${formatDate(date)}${hasFollowupDate ? ` - ${followup?.title}` : ''}`
                       }
@@ -3372,170 +3616,146 @@ const MyFollowups = () => {
               </div>
             </div>
           </div>
-
-          {/* Advanced Filters */}
-          {/* Advanced Filters - Improved Design */}
           {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm" style={{marginTop:'140px'}}>
-              <div className="container-fluid py-4">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <div className="d-flex align-items-center">
-                    <i className="fas fa-filter text-primary me-2"></i>
-                    <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                    <span className="bg-light text-dark ms-2">
-                      {Object.values(filterData).filter(val => val && val !== 'true').length} Active
-                    </span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => {
-                        setFilterData({
-                          name: '',
-                          courseType: '',
-                          status: 'true',
-                          leadStatus: '',
-                          sector: '',
-                          createdFromDate: null,
-                          createdToDate: null,
-                          modifiedFromDate: null,
-                          modifiedToDate: null,
-                          nextActionFromDate: null,
-                          nextActionToDate: null,
-                        });
-                        setAllProfiles(allProfilesData);
-                      }}
-                    >
-                      <i className="fas fa-times-circle me-1"></i>
-                      Clear All
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-chevron-up"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="row g-4">
-
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-graduation-cap me-1 text-success"></i>
-                      Course Type
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="courseType"
-                        value={filterData.courseType}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Types</option>
-                        <option value="Free">🆓 Free</option>
-                        <option value="Paid">💰 Paid</option>
-                      </select>
+            <div
+              className="modal show fade d-block"
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 1050
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsFilterCollapsed(true);
+              }}
+            >
+              <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
+                <div className="modal-content">
+                  {/* Modal Header - Fixed at top */}
+                  <div className="modal-header bg-white border-bottom">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-filter text-primary me-2"></i>
+                        <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                        {totalSelected > 0 && (
+                          <span className="badge bg-primary ms-2">
+                            {totalSelected} Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={clearAllFilters}
+                        >
+                          <i className="fas fa-times-circle me-1"></i>
+                          Clear All
+                        </button>
+                        <button
+                          className="btn-close"
+                          onClick={() => setIsFilterCollapsed(true)}
+                          aria-label="Close"
+                        ></button>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Sector
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Sectors</option>
-                        <option value="Tourism and Hospitality">🏨 Tourism & Hospitality</option>
-                        <option value="Information Technology">💻 Information Technology</option>
-                        <option value="Healthcare">🏥 Healthcare</option>
-                        <option value="Finance">💳 Finance</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Verticals
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Verticals</option>
-                        <option value="Vertical 1">Vertical 1</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Course
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All course</option>
-                        <option value="Course 1">Course 1</option>
-                        <option value="Course 2">Course 2</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Center
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All centers</option>
-                        <option value="center 1">center 1</option>
-                        <option value="center 2">center 2</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Councellor Name
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Sectors</option>
-                        <option value="Councellor 1">Councellor 1</option>
-                        <option value="Councellor 2">Councellor 2</option>
-                      </select>
-                    </div>
-                  </div>
-                  {/* Date Range */}
-                  {/* Date Filters Section */}
-                  {/* REPLACE your existing Date Filters Section with this */}
-                  {/* Date Filters Section - Facebook Style */}
-                  <div className="col-12">
+                  {/* Modal Body - Scrollable content */}
+                  <div className="modal-body p-4">
                     <div className="row g-4">
+                      {/* Course Type Filter */}
+                      <div className="col-md-3">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-graduation-cap me-1 text-success"></i>
+                          Course Type
+                        </label>
+                        <div className="position-relative">
+                          <select
+                            className="form-select"
+                            name="courseType"
+                            value={filterData.courseType}
+                            onChange={handleFilterChange}
+                          >
+                            <option value="">All Types</option>
+                            <option value="Free">🆓 Free</option>
+                            <option value="Paid">💰 Paid</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Project Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Project"
+                          options={projectOptions}
+                          selectedValues={formData.projects.values}
+                          onChange={(values) => handleCriteriaChange('projects', values)}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.projects}
+                          onToggle={() => toggleDropdown('projects')}
+                        />
+                      </div>
+
+                      {/* Verticals Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Verticals"
+                          options={verticalOptions}
+                          selectedValues={formData.verticals.values}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.verticals}
+                          onToggle={() => toggleDropdown('verticals')}
+                          onChange={(values) => handleCriteriaChange('verticals', values)}
+                        />
+                      </div>
+
+                      {/* Course Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Course"
+                          options={courseOptions}
+                          selectedValues={formData.course.values}
+                          onChange={(values) => handleCriteriaChange('course', values)}
+                          icon="fas fa-graduation-cap"
+                          isOpen={dropdownStates.course}
+                          onToggle={() => toggleDropdown('course')}
+                        />
+                      </div>
+
+                      {/* Center Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Center"
+                          options={centerOptions}
+                          selectedValues={formData.center.values}
+                          onChange={(values) => handleCriteriaChange('center', values)}
+                          icon="fas fa-building"
+                          isOpen={dropdownStates.center}
+                          onToggle={() => toggleDropdown('center')}
+                        />
+                      </div>
+
+                      {/* Counselor Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Counselor"
+                          options={counselorOptions}
+                          selectedValues={formData.counselor.values}
+                          onChange={(values) => handleCriteriaChange('counselor', values)}
+                          icon="fas fa-user-tie"
+                          isOpen={dropdownStates.counselor}
+                          onToggle={() => toggleDropdown('counselor')}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Date Filters Section */}
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Date Range Filters
+                        </h6>
+                      </div>
+
                       {/* Created Date Range */}
                       <div className="col-md-4">
                         <label className="form-label small fw-bold text-dark">
@@ -3721,80 +3941,86 @@ const MyFollowups = () => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Results Summary */}
+                    <div className="row mt-4">
+                      <div className="col-12">
+                        <div className="alert alert-info">
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-info-circle me-2"></i>
+                            <div>
+                              <strong>Results Summary:</strong> Showing {allProfiles.length} results on page {currentPage} of {totalPages}
+
+                              {/* Active filter indicators */}
+                              <div className="mt-2">
+                                {(filterData.createdFromDate || filterData.createdToDate) && (
+                                  <span className="badge bg-success me-2">
+                                    <i className="fas fa-calendar-plus me-1"></i>
+                                    Created Date Filter Active
+                                  </span>
+                                )}
+
+                                {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                                  <span className="badge bg-warning me-2">
+                                    <i className="fas fa-calendar-edit me-1"></i>
+                                    Modified Date Filter Active
+                                  </span>
+                                )}
+
+                                {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                                  <span className="badge bg-info me-2">
+                                    <i className="fas fa-calendar-check me-1"></i>
+                                    Next Action Date Filter Active
+                                  </span>
+                                )}
+
+                                {totalSelected > 0 && (
+                                  <span className="badge bg-primary me-2">
+                                    <i className="fas fa-filter me-1"></i>
+                                    {totalSelected} Multi-Select Filters Active
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Update the Clear All button in your existing filters section */}
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={clearAllFilters}
-                  >
-                    <i className="fas fa-times-circle me-1"></i>
-                    Clear All Filters
-                  </button>
-
-                  {/* Update the results summary section */}
-                  <div className="text-muted small">
-                    <i className="fas fa-info-circle me-1"></i>
-                    Showing {allProfiles.length} of {allProfilesData.length} results
-
-                    {/* Active filter indicators */}
-                    {(filterData.createdFromDate || filterData.createdToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-success me-2">
-                          <i className="fas fa-calendar-plus me-1"></i>
-                          Created:
-                          {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                          {filterData.createdFromDate && filterData.createdToDate && ' to '}
-                          {filterData.createdToDate && formatDate(filterData.createdToDate)}
-                        </span>
+                  {/* Modal Footer - Fixed at bottom */}
+                  <div className="modal-footer bg-light border-top">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="text-muted small">
+                        <i className="fas fa-filter me-1"></i>
+                        {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
                       </div>
-                    )}
-
-                    {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-warning me-2">
-                          <i className="fas fa-calendar-edit me-1"></i>
-                          Modified:
-                          {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                          {filterData.modifiedFromDate && filterData.modifiedToDate && ' to '}
-                          {filterData.modifiedToDate && formatDate(filterData.modifiedToDate)}
-                        </span>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => setIsFilterCollapsed(true)}
+                        >
+                          <i className="fas fa-eye-slash me-1"></i>
+                          Hide Filters
+                        </button>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => {
+                            fetchProfileData(filterData);
+                            setIsFilterCollapsed(true);
+                          }}
+                        >
+                          <i className="fas fa-search me-1"></i>
+                          Apply Filters
+                        </button>
                       </div>
-                    )}
-
-                    {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-info me-2">
-                          <i className="fas fa-calendar-check me-1"></i>
-                          Next Action:
-                          {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                          {filterData.nextActionFromDate && filterData.nextActionToDate && ' to '}
-                          {filterData.nextActionToDate && formatDate(filterData.nextActionToDate)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-eye-slash me-1"></i>
-                      Hide Filters
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => applyFilters()}
-                    >
-                      <i className="fas fa-search me-1"></i>
-                      Apply Filters
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
-
+         
           {/* Main Content */}
           <div className="content-body" style={{marginTop:'150px'}}>
             <section className="list-view">

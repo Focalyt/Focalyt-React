@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import DatePicker from 'react-date-picker';
+
 import axios from 'axios';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Calendar, TrendingUp, Users, Building, Clock, Target, CheckCircle, XCircle, DollarSign, AlertCircle, UserCheck, FileCheck, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
@@ -120,12 +122,12 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const isSelected = dateStr === customStartDate || dateStr === customEndDate;
-      const isInRange = customStartDate && customEndDate && 
+      const isInRange = customStartDate && customEndDate &&
         dateStr >= customStartDate && dateStr <= customEndDate;
-      
+
       days.push(
-        <td 
-          key={day} 
+        <td
+          key={day}
           className={`text-center ${isSelected ? 'bg-primary text-white' : isInRange ? 'bg-primary bg-opacity-25' : ''}`}
           style={{ cursor: 'pointer' }}
           onClick={() => {
@@ -161,7 +163,7 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
     return (
       <div className="calendar-container">
         <div className="d-flex justify-content-between align-items-center mb-2">
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary"
             onClick={() => setMonth(new Date(year, monthIndex - 1))}
           >
@@ -170,7 +172,7 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
           <span className="fw-medium">
             {month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </span>
-          <button 
+          <button
             className="btn btn-sm btn-outline-secondary"
             onClick={() => setMonth(new Date(year, monthIndex + 1))}
           >
@@ -256,7 +258,7 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
                   <div>
                     <CalendarDays className="text-primary me-2" size={20} />
                     <span className="fw-medium">
-                      {selectedRange === 'custom' ? 'Select dates' : 
+                      {selectedRange === 'custom' ? 'Select dates' :
                         `${new Date(customStartDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} - 
                          ${new Date(customEndDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
                       }
@@ -268,8 +270,8 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
                   <div className="col-6">
                     <div className="mb-2">
                       <label className="form-label small">Start Date</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         className="form-control form-control-sm"
                         value={customStartDate}
                         onChange={(e) => setCustomStartDate(e.target.value)}
@@ -280,8 +282,8 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
                   <div className="col-6">
                     <div className="mb-2">
                       <label className="form-label small">End Date</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         className="form-control form-control-sm"
                         value={customEndDate}
                         onChange={(e) => setCustomEndDate(e.target.value)}
@@ -313,6 +315,122 @@ const AdvancedDatePicker = ({ onDateRangeChange, onClose }) => {
   );
 };
 
+
+const MultiSelectCheckbox = ({
+  title,
+  options,
+  selectedValues,
+  onChange,
+  icon = "fas fa-list",
+  isOpen,
+  onToggle
+}) => {
+  const handleCheckboxChange = (value) => {
+    const newValues = selectedValues.includes(value)
+      ? selectedValues.filter(v => v !== value)
+      : [...selectedValues, value];
+    onChange(newValues);
+  };
+
+  // Get display text for selected items
+  const getDisplayText = () => {
+    if (selectedValues.length === 0) {
+      return `Select ${title}`;
+    } else if (selectedValues.length === 1) {
+      const selectedOption = options.find(opt => opt.value === selectedValues[0]);
+      return selectedOption ? selectedOption.label : selectedValues[0];
+    } else if (selectedValues.length <= 2) {
+      const selectedLabels = selectedValues.map(val => {
+        const option = options.find(opt => opt.value === val);
+        return option ? option.label : val;
+      });
+      return selectedLabels.join(', ');
+    } else {
+      return `${selectedValues.length} items selected`;
+    }
+  };
+
+  return (
+    <div className="multi-select-container-new">
+      <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
+        <i className={`${icon} me-1 text-primary`}></i>
+        {title}
+        {selectedValues.length > 0 && (
+          <span className="badge bg-primary ms-2">{selectedValues.length}</span>
+        )}
+      </label>
+
+      <div className="multi-select-dropdown-new">
+        <button
+          type="button"
+          className={`form-select multi-select-trigger ${isOpen ? 'open' : ''}`}
+          onClick={onToggle}
+          style={{ cursor: 'pointer', textAlign: 'left' }}
+        >
+          <span className="select-display-text">
+            {getDisplayText()}
+          </span>
+          <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`}></i>
+        </button>
+
+        {isOpen && (
+          <div className="multi-select-options-new">
+            {/* Search functionality (optional) */}
+            <div className="options-search">
+              <div className="input-group input-group-sm">
+                <span className="input-group-text" style={{ height: '40px' }}>
+                  <i className="fas fa-search"></i>
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder={`Search ${title.toLowerCase()}...`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+
+            {/* Options List */}
+            <div className="options-list-new">
+              {options.map((option) => (
+                <label key={option.value} className="option-item-new">
+                  <input
+                    type="checkbox"
+                    className="form-check-input me-2"
+                    checked={selectedValues.includes(option.value)}
+                    onChange={() => handleCheckboxChange(option.value)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span className="option-label-new">{option.label}</span>
+                  {selectedValues.includes(option.value) && (
+                    <i className="fas fa-check text-primary ms-auto"></i>
+                  )}
+                </label>
+              ))}
+
+              {options.length === 0 && (
+                <div className="no-options">
+                  <i className="fas fa-info-circle me-2"></i>
+                  No {title.toLowerCase()} available
+                </div>
+              )}
+            </div>
+
+            {/* Footer with count */}
+            {selectedValues.length > 0 && (
+              <div className="options-footer">
+                <small className="text-muted">
+                  {selectedValues.length} of {options.length} selected
+                </small>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const LeadAnalyticsDashboard = () => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -331,6 +449,158 @@ const LeadAnalyticsDashboard = () => {
     };
   };
 
+  //filter stats
+
+  const [formData, setFormData] = useState({
+    projects: {
+      type: "includes",
+      values: []
+    },
+    verticals: {
+      type: "includes",
+      values: []
+    },
+    course: {
+      type: "includes",
+      values: []
+    },
+  });
+
+  const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+
+  const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
+
+  
+  const [verticalOptions, setVerticalOptions] = useState([]);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [courseOptions, setCourseOptions] = useState([]);
+  const [centerOptions, setCenterOptions] = useState([]);
+  const [counselorOptions, setCounselorOptions] = useState([]);
+
+  
+  const handleCriteriaChange = (criteria, values) => {
+    setFormData((prevState) => ({
+      ...prevState,
+      [criteria]: {
+        type: "includes",
+        values: values
+      }
+    }));
+    console.log('Selected verticals:', values);
+    // Reset to first page and fetch with new filters
+  };
+
+  const [dropdownStates, setDropdownStates] = useState({
+    projects: false,
+    verticals: false,
+    course: false,
+    center: false,
+    counselor: false,
+    sector: false
+  });
+
+  const toggleDropdown = (filterName) => {
+    setDropdownStates(prev => {
+      // Close all other dropdowns and toggle the current one
+      const newState = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = key === filterName ? !prev[key] : false;
+        return acc;
+      }, {});
+      return newState;
+    });
+  };
+
+  const [filterData, setFilterData] = useState({
+    name: '',
+    courseType: '',
+    status: 'true',
+    leadStatus: '',
+    sector: '',
+    createdFromDate: null,
+    createdToDate: null,
+    modifiedFromDate: null,
+    modifiedToDate: null,
+    nextActionFromDate: null,
+    nextActionToDate: null,
+    projects: [],
+    verticals: [],
+    course: [],
+    center: [],
+    counselor: []
+
+  });
+
+  const clearAllFilters = () => {
+    setFilterData({
+      name: '',
+      courseType: '',
+      status: 'true',
+      kyc: false,
+      leadStatus: '',
+      sector: '',
+      createdFromDate: null,
+      createdToDate: null,
+      modifiedFromDate: null,
+      modifiedToDate: null,
+      nextActionFromDate: null,
+      nextActionToDate: null,
+    });
+
+  };
+
+  const handleFilterChange = (e) => {
+    try {
+      const { name, value } = e.target;
+      const newFilterData = { ...filterData, [name]: value };
+      setFilterData(newFilterData);
+
+
+      fetchProfileData(newFilterData);
+
+    } catch (error) {
+      console.error('Filter change error:', error);
+    }
+  };
+
+  const handleDateFilterChange = (date, fieldName) => {
+    const newFilterData = {
+      ...filterData,
+      [fieldName]: date
+    };
+    setFilterData(newFilterData);
+
+  };
+  const formatDate = (date) => {
+    // If the date is not a valid Date object, try to convert it
+    if (date && !(date instanceof Date)) {
+      date = new Date(date);
+    }
+
+    // Check if the date is valid
+    if (!date || isNaN(date)) return ''; // Return an empty string if invalid
+
+    // Now call toLocaleDateString
+    return date.toLocaleDateString('en-GB');
+  };
+
+  // Clear functions
+  const clearDateFilter = (filterType) => {
+    let newFilterData = { ...filterData };
+
+    if (filterType === 'created') {
+      newFilterData.createdFromDate = null;
+      newFilterData.createdToDate = null;
+    } else if (filterType === 'modified') {
+      newFilterData.modifiedFromDate = null;
+      newFilterData.modifiedToDate = null;
+    } else if (filterType === 'nextAction') {
+      newFilterData.nextActionFromDate = null;
+      newFilterData.nextActionToDate = null;
+    }
+
+    setFilterData(newFilterData);
+  };
+
   const initialDates = getInitialDates();
   const [selectedCenter, setSelectedCenter] = useState('all');
   const [selectedPeriod, setSelectedPeriod] = useState('today');
@@ -339,7 +609,7 @@ const LeadAnalyticsDashboard = () => {
   const [endDate, setEndDate] = useState(initialDates.end);
   const [useCustomDate, setUseCustomDate] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+
   // Get today's date for filtering
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -348,22 +618,22 @@ const LeadAnalyticsDashboard = () => {
   const handleDateRangeChange = (dateRange) => {
     setStartDate(dateRange.startDate);
     setEndDate(dateRange.endDate);
-    
+
     // Check if this is a predefined range
     const today = new Date();
     const startDateObj = new Date(dateRange.startDate);
     const endDateObj = new Date(dateRange.endDate);
-    
+
     // Calculate days difference
     const daysDiff = Math.floor((endDateObj - startDateObj) / (1000 * 60 * 60 * 24)) + 1;
-    
+
     // Helper function to format date as YYYY-MM-DD without timezone issues
     const formatDateToYYYYMMDD = (date) => {
       return date.getFullYear() + '-' +
         String(date.getMonth() + 1).padStart(2, '0') + '-' +
         String(date.getDate()).padStart(2, '0');
     };
-    
+
     // Try to match with predefined periods
     if (daysDiff === 1 && dateRange.startDate === formatDateToYYYYMMDD(today)) {
       setSelectedPeriod('today');
@@ -395,54 +665,63 @@ const LeadAnalyticsDashboard = () => {
   }, [appliedCoursesData]);
 
   useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        setIsLoading(true);
-  
-        if (!token) {
-          setAppliedCoursesData([]);
-          setIsLoading(false);
-          return;
-        }
-  
-        // Build query parameters for date filtering
-        let queryParams = {};
-        
-        if (useCustomDate && startDate && endDate) {
-          // Custom date range
-          queryParams.startDate = startDate;
-          queryParams.endDate = endDate;
-        } else if (!useCustomDate && selectedPeriod && selectedPeriod !== 'all') {
-          // Predefined period
-          queryParams.period = selectedPeriod;
-        }
-        // If no date filter is selected, send no parameters (will return all data)
-  
-        // Use the new dashboard API with date filtering
-        const response = await axios.get(`${backendUrl}/college/dashbord-data`, {
-          headers: {
-            'x-auth': token,
-          },
-          params: queryParams
-        });
-        
-        if (response.data.success && response.data.data) {
-          setAppliedCoursesData(response.data.data || []);
-        } else {
-          setAppliedCoursesData([]);
-        }
-  
-      } catch (error) {
-        setAppliedCoursesData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+
     fetchProfileData();
   }, [token, backendUrl, startDate, endDate, selectedPeriod, useCustomDate]);
 
- 
-  
+  const fetchProfileData = async (filters = filterData) => {
+    try {
+      setIsLoading(true);
+
+      if (!token) {
+        setAppliedCoursesData([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const queryParams = new URLSearchParams({
+        ...(filters?.name && { name: filters.name }),
+        ...(filters?.courseType && { courseType: filters.courseType }),
+        ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters?.kyc && filters.kyc !== 'false' && { kyc: filters.kyc }),
+        ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters?.sector && { sector: filters.sector }),
+        ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        // Multi-select filters
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(filters.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(filters.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(filters.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(filters.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(filters.counselor.values) })
+      });
+      // If no date filter is selected, send no parameters (will return all data)
+
+      // Use the new dashboard API with date filtering
+      const response = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
+        headers: {
+          'x-auth': token,
+        }
+      });
+
+      if (response.data.success && response.data.data) {
+        setAppliedCoursesData(response.data.data || []);
+      } else {
+        setAppliedCoursesData([]);
+      }
+
+    } catch (error) {
+      setAppliedCoursesData([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   // After fetching data, add a fake substatus to the first lead for testing
   if (appliedCoursesData.length > 0) {
     appliedCoursesData[0]._leadStatus = appliedCoursesData[0]._leadStatus || {};
@@ -451,22 +730,22 @@ const LeadAnalyticsDashboard = () => {
 
   // Data is now filtered by backend, so we use it directly
   const filteredData = appliedCoursesData;
-  
+
   // Get daily admissions data
   const getDailyAdmissions = () => {
     const admissionsByDate = {};
-    
+
     // Use filtered data from backend and apply center filter
     let admissionsToProcess = filteredData.filter(lead => lead && lead.admissionDone && lead.admissionDate);
-    
+
     // Apply center filter if selected
     if (selectedCenter !== 'all') {
       admissionsToProcess = admissionsToProcess.filter(lead => lead._center && lead._center.name === selectedCenter);
     }
-    
+
     admissionsToProcess.forEach(lead => {
       if (!lead.admissionDate) return;
-      
+
       const dateStr = new Date(lead.admissionDate).toLocaleDateString('en-IN');
       if (!admissionsByDate[dateStr]) {
         admissionsByDate[dateStr] = {
@@ -477,19 +756,19 @@ const LeadAnalyticsDashboard = () => {
           counselors: {}
         };
       }
-      
+
       admissionsByDate[dateStr].admissions++;
       if (lead.registrationFee === 'Paid') {
         admissionsByDate[dateStr].revenue += 15000;
       }
-      
+
       // Track by center
       const centerName = lead._center?.name || 'Unknown';
       if (!admissionsByDate[dateStr].centers[centerName]) {
         admissionsByDate[dateStr].centers[centerName] = 0;
       }
       admissionsByDate[dateStr].centers[centerName]++;
-      
+
       // Track by counselor
       if (lead.leadAssignment && lead.leadAssignment.length > 0) {
         const counselorName = lead.leadAssignment[lead.leadAssignment.length - 1].counsellorName;
@@ -499,17 +778,17 @@ const LeadAnalyticsDashboard = () => {
         admissionsByDate[dateStr].counselors[counselorName]++;
       }
     });
-    
+
     // Convert to array and sort by date
     const sortedAdmissions = Object.values(admissionsByDate).sort((a, b) => {
       const dateA = new Date(a.date.split('/').reverse().join('-'));
       const dateB = new Date(b.date.split('/').reverse().join('-'));
       return dateB - dateA;
     });
-    
+
     return sortedAdmissions;
   };
-  
+
   // Get counselor-status matrix from actual data
   const [expandedStatus, setExpandedStatus] = useState(null);
   const [allStatuses, setAllStatuses] = useState([]);
@@ -547,8 +826,8 @@ const LeadAnalyticsDashboard = () => {
   const getCounselorMatrix = () => {
     const matrix = {};
     // Filter leads based on selected center
-    const centerFilteredLeads = selectedCenter === 'all' 
-      ? filteredData 
+    const centerFilteredLeads = selectedCenter === 'all'
+      ? filteredData
       : filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
     // Process each lead
     centerFilteredLeads.forEach(lead => {
@@ -606,16 +885,16 @@ const LeadAnalyticsDashboard = () => {
   // Get center-wise analytics
   const getCenterAnalytics = () => {
     const centerData = {};
-    
+
     // Apply center filter if selected
     let dataToProcess = filteredData;
     if (selectedCenter !== 'all') {
       dataToProcess = filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
     }
-    
+
     dataToProcess.forEach(lead => {
       const centerName = lead._center?.name || 'Unknown';
-      
+
       if (!centerData[centerName]) {
         centerData[centerName] = {
           totalLeads: 0,
@@ -629,37 +908,37 @@ const LeadAnalyticsDashboard = () => {
           statusCounts: {}
         };
       }
-      
+
       centerData[centerName].totalLeads++;
-      
+
       // Count by actual status from database
       const status = (lead._leadStatus?.title || 'Unknown').trim();
       if (!centerData[centerName].statusCounts[status]) {
         centerData[centerName].statusCounts[status] = 0;
       }
       centerData[centerName].statusCounts[status]++;
-      
+
       if (lead.courseStatus === 1) centerData[centerName].assigned++;
       else centerData[centerName].due++;
-      
+
       if (lead.kyc) centerData[centerName].kyc++;
       if (lead.admissionDone) centerData[centerName].admissions++;
       if (lead.dropout) centerData[centerName].dropouts++;
       if (lead.registrationFee === 'Paid') centerData[centerName].revenue += 15000; // Assuming 15000 per registration
-      
+
       // Track counselor performance per center
       if (lead.leadAssignment && lead.leadAssignment.length > 0) {
         const counselor = lead.leadAssignment[lead.leadAssignment.length - 1].counsellorName;
-        
+
         if (!centerData[centerName].counselors[counselor]) {
-          centerData[centerName].counselors[counselor] = { 
-            leads: 0, 
-            admissions: 0, 
+          centerData[centerName].counselors[counselor] = {
+            leads: 0,
+            admissions: 0,
             dropouts: 0,
-            kyc: 0 
+            kyc: 0
           };
         }
-        
+
         centerData[centerName].counselors[counselor].leads++;
         if (lead.admissionDone) centerData[centerName].counselors[counselor].admissions++;
         if (lead.dropout) centerData[centerName].counselors[counselor].dropouts++;
@@ -676,13 +955,13 @@ const LeadAnalyticsDashboard = () => {
     let doneFollowups = 0;
     let missedFollowups = 0;
     let plannedFollowups = 0;
-    
+
     // Apply center filter if selected
     let dataToProcess = filteredData;
     if (selectedCenter !== 'all') {
       dataToProcess = filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
     }
-    
+
     dataToProcess.forEach(lead => {
       if (lead && lead.followups && Array.isArray(lead.followups) && lead.followups.length > 0) {
         lead.followups.forEach(followup => {
@@ -695,7 +974,7 @@ const LeadAnalyticsDashboard = () => {
         });
       }
     });
-    
+
     return { totalFollowups, doneFollowups, missedFollowups, plannedFollowups };
   };
 
@@ -713,13 +992,13 @@ const LeadAnalyticsDashboard = () => {
 
   // Create status distribution from actual data
   const statusCounts = {};
-  
+
   // Apply center filter if selected
   let dataToProcess = filteredData;
   if (selectedCenter !== 'all') {
     dataToProcess = filteredData.filter(lead => lead._center && lead._center.name === selectedCenter);
   }
-  
+
   dataToProcess.forEach(lead => {
     const status = (lead._leadStatus?.title || 'Unknown').trim();
     statusCounts[status] = (statusCounts[status] || 0) + 1;
@@ -733,7 +1012,7 @@ const LeadAnalyticsDashboard = () => {
   // Generate colors for different statuses
   const generateColors = (statuses) => {
     const colorPalette = [
-      '#dc2626', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', 
+      '#dc2626', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6',
       '#ef4444', '#f97316', '#06b6d4', '#84cc16', '#ec4899'
     ];
     const colors = {};
@@ -821,7 +1100,7 @@ const LeadAnalyticsDashboard = () => {
         <>
           {/* Advanced Date Picker Modal */}
           {showDatePicker && (
-            <AdvancedDatePicker 
+            <AdvancedDatePicker
               onDateRangeChange={handleDateRangeChange}
               onClose={() => setShowDatePicker(false)}
             />
@@ -829,9 +1108,9 @@ const LeadAnalyticsDashboard = () => {
 
           {/* Filters */}
           <div className="card shadow-sm mb-4">
-            <div className="card-body">
-              <div className="row align-items-end g-3">
-                <div className="col-md-3">
+            <div className="card-body d-flex justify-content-end">
+              <div className="row justify-content-end g-3">
+                {/* <div className="col-md-3">
                   <label className="form-label fw-medium">Center:</label>
                   <select 
                     value={selectedCenter} 
@@ -893,6 +1172,52 @@ const LeadAnalyticsDashboard = () => {
                   >
                     Reset Filters
                   </button>
+                </div> */}
+
+                <div className="col-md-12">
+                  <div className="d-flex justify-content-end align-items-center gap-2">
+                    <div className="input-group" style={{ maxWidth: '300px' }}>
+                      <span className="input-group-text bg-white border-end-0 input-height">
+                        <i className="fas fa-search text-muted"></i>
+                      </span>
+                      <input
+                        type="text"
+                        name="name"
+                        className="form-control border-start-0 m-0"
+                        placeholder="Quick search..."
+                        value={filterData.name}
+                        onChange={handleFilterChange}
+                      />
+                      {filterData.name && (
+                        <button
+                          className="btn btn-outline-secondary border-start-0"
+                          type="button"
+                          onClick={() => {
+                            setFilterData(prev => ({ ...prev, name: '' }));
+                            fetchProfileData();
+                          }}
+                        >
+                          <i className="fas fa-times"></i>
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                      className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                      Filters
+                      {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                        <span className="bg-light text-dark ms-1">
+                          {Object.values(filterData).filter(val => val && val !== 'true').length}
+                        </span>
+                      )}
+                    </button>
+
+
+                  </div>
                 </div>
               </div>
             </div>
@@ -904,22 +1229,21 @@ const LeadAnalyticsDashboard = () => {
               <small>
                 <strong>Active Filters:</strong>
                 {selectedCenter !== 'all' && ` Center: ${selectedCenter}`}
-                {!useCustomDate && selectedPeriod !== 'all' && selectedPeriod !== 'last30' && ` • Period: ${
-                  selectedPeriod === 'today' ? 'Today' :
-                  selectedPeriod === 'yesterday' ? 'Yesterday' :
-                  selectedPeriod === 'todayYesterday' ? 'Today and yesterday' :
-                  selectedPeriod === 'last7' ? 'Last 7 days' :
-                  selectedPeriod === 'last30' ? 'Last 30 days' :
-                  selectedPeriod === 'thisWeek' ? 'This week' :
-                  selectedPeriod === 'lastWeek' ? 'Last week' :
-                  selectedPeriod === 'thisMonth' ? 'This month' :
-                  selectedPeriod === 'lastMonth' ? 'Last month' :
-                  selectedPeriod === 'maximum' ? 'Maximum' :
-                  'Custom'
-                }`}
+                {!useCustomDate && selectedPeriod !== 'all' && selectedPeriod !== 'last30' && ` • Period: ${selectedPeriod === 'today' ? 'Today' :
+                    selectedPeriod === 'yesterday' ? 'Yesterday' :
+                      selectedPeriod === 'todayYesterday' ? 'Today and yesterday' :
+                        selectedPeriod === 'last7' ? 'Last 7 days' :
+                          selectedPeriod === 'last30' ? 'Last 30 days' :
+                            selectedPeriod === 'thisWeek' ? 'This week' :
+                              selectedPeriod === 'lastWeek' ? 'Last week' :
+                                selectedPeriod === 'thisMonth' ? 'This month' :
+                                  selectedPeriod === 'lastMonth' ? 'Last month' :
+                                    selectedPeriod === 'maximum' ? 'Maximum' :
+                                      'Custom'
+                  }`}
                 {useCustomDate && startDate && endDate && ` • Date Range: ${new Date(startDate).toLocaleDateString('en-IN')} to ${new Date(endDate).toLocaleDateString('en-IN')}`}
               </small>
-              <button 
+              <button
                 className="btn btn-sm btn-outline-secondary"
                 onClick={() => {
                   const dates = getInitialDates();
@@ -940,28 +1264,28 @@ const LeadAnalyticsDashboard = () => {
             <div className="col-12 mb-2">
               <p className="text-muted small mb-0">
                 <strong>Data Period:</strong> {
-                  useCustomDate && startDate && endDate 
+                  useCustomDate && startDate && endDate
                     ? `${new Date(startDate).toLocaleDateString('en-IN')} - ${new Date(endDate).toLocaleDateString('en-IN')}`
                     : selectedPeriod === 'today' ? 'Today'
-                    : selectedPeriod === 'yesterday' ? 'Yesterday'
-                    : selectedPeriod === 'todayYesterday' ? 'Today and yesterday'
-                    : selectedPeriod === 'last7' ? 'Last 7 Days'
-                    : selectedPeriod === 'last30' ? 'Last 30 Days'
-                    : selectedPeriod === 'thisWeek' ? 'This Week'
-                    : selectedPeriod === 'lastWeek' ? 'Last Week'
-                    : selectedPeriod === 'thisMonth' ? 'This Month'
-                    : selectedPeriod === 'lastMonth' ? 'Last Month'
-                    : selectedPeriod === 'week' ? 'Last 7 Days'
-                    : selectedPeriod === 'month' ? 'Last Month'
-                    : selectedPeriod === 'quarter' ? 'Last Quarter'
-                    : selectedPeriod === 'year' ? 'Last Year'
-                    : selectedPeriod === 'maximum' ? 'All Available Data'
-                    : 'All Time'
+                      : selectedPeriod === 'yesterday' ? 'Yesterday'
+                        : selectedPeriod === 'todayYesterday' ? 'Today and yesterday'
+                          : selectedPeriod === 'last7' ? 'Last 7 Days'
+                            : selectedPeriod === 'last30' ? 'Last 30 Days'
+                              : selectedPeriod === 'thisWeek' ? 'This Week'
+                                : selectedPeriod === 'lastWeek' ? 'Last Week'
+                                  : selectedPeriod === 'thisMonth' ? 'This Month'
+                                    : selectedPeriod === 'lastMonth' ? 'Last Month'
+                                      : selectedPeriod === 'week' ? 'Last 7 Days'
+                                        : selectedPeriod === 'month' ? 'Last Month'
+                                          : selectedPeriod === 'quarter' ? 'Last Quarter'
+                                            : selectedPeriod === 'year' ? 'Last Year'
+                                              : selectedPeriod === 'maximum' ? 'All Available Data'
+                                                : 'All Time'
                 }
                 {selectedCenter !== 'all' && ` • Center: ${selectedCenter}`}
               </p>
             </div>
-            
+
             <div className="col-md-2">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -980,7 +1304,7 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="col-md-2">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -999,7 +1323,7 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="col-md-2">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -1018,7 +1342,7 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="col-md-3">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -1037,7 +1361,7 @@ const LeadAnalyticsDashboard = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="col-md-3">
               <div className="card shadow-sm h-100">
                 <div className="card-body">
@@ -1082,7 +1406,7 @@ const LeadAnalyticsDashboard = () => {
                           style={{ cursor: 'pointer', background: expandedStatus === status ? '#f0f0f0' : undefined }}
                           onClick={() => setExpandedStatus(expandedStatus === status ? null : status)}
                         >
-                          {status} <span style={{fontWeight: 'normal'}}>{expandedStatus === status ? '▲' : '▼'}</span>
+                          {status} <span style={{ fontWeight: 'normal' }}>{expandedStatus === status ? '▲' : '▼'}</span>
                         </th>
                       ))}
                       <th rowSpan={expandedStatus ? 2 : 1}>Total</th>
@@ -1154,11 +1478,10 @@ const LeadAnalyticsDashboard = () => {
                           <span className="text-success fw-medium">₹{(data.Paid * 15000).toLocaleString()}</span>
                         </td>
                         <td className="text-center">
-                          <span className={`badge rounded-pill ${
-                            data.ConversionRate > 50 ? 'bg-success' : 
-                            data.ConversionRate > 30 ? 'bg-warning' : 
-                            'bg-danger'
-                          }`}>
+                          <span className={`badge rounded-pill ${data.ConversionRate > 50 ? 'bg-success' :
+                              data.ConversionRate > 30 ? 'bg-warning' :
+                                'bg-danger'
+                            }`}>
                             {data.ConversionRate}%
                           </span>
                         </td>
@@ -1360,7 +1683,7 @@ const LeadAnalyticsDashboard = () => {
                           </ResponsiveContainer>
                         </div>
                       </div>
-                      
+
                       <div className="border-top pt-3">
                         <p className="small fw-medium text-muted mb-2">Counselor Contribution:</p>
                         {Object.entries(data.counselors).map(([counselor, stats]) => (
@@ -1393,7 +1716,7 @@ const LeadAnalyticsDashboard = () => {
                   </h2>
                   <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     <table className="table table-hover align-middle">
-                      <thead className="table-light sticky-top">
+                      <thead className="table-light">
                         <tr>
                           <th className="text-uppercase small">Date</th>
                           <th className="text-center text-uppercase small">Admissions</th>
@@ -1420,12 +1743,12 @@ const LeadAnalyticsDashboard = () => {
                               <td>
                                 <div>
                                   <div className="small text-muted">
-                                    Centers: {Object.entries(day.centers).map(([center, count]) => 
+                                    Centers: {Object.entries(day.centers).map(([center, count]) =>
                                       `${center} (${count})`
                                     ).join(', ')}
                                   </div>
                                   <div className="small text-muted">
-                                    Counselors: {Object.entries(day.counselors).map(([counselor, count]) => 
+                                    Counselors: {Object.entries(day.counselors).map(([counselor, count]) =>
                                       `${counselor} (${count})`
                                     ).join(', ')}
                                   </div>
@@ -1475,28 +1798,28 @@ const LeadAnalyticsDashboard = () => {
                       <XAxis dataKey="date" />
                       <YAxis yAxisId="left" />
                       <YAxis yAxisId="right" orientation="right" />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name) => {
                           if (name === 'revenue') return [`₹${value}k`, 'Revenue'];
                           return [value, 'Admissions'];
                         }}
                       />
                       <Legend />
-                      <Area 
+                      <Area
                         yAxisId="left"
-                        type="monotone" 
-                        dataKey="admissions" 
-                        stroke="#10b981" 
-                        fill="#10b981" 
+                        type="monotone"
+                        dataKey="admissions"
+                        stroke="#10b981"
+                        fill="#10b981"
                         fillOpacity={0.6}
                         name="Admissions"
                       />
-                      <Area 
+                      <Area
                         yAxisId="right"
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke="#6366f1" 
-                        fill="#6366f1" 
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#6366f1"
+                        fill="#6366f1"
                         fillOpacity={0.3}
                         name="Revenue (₹k)"
                       />
@@ -1588,7 +1911,413 @@ const LeadAnalyticsDashboard = () => {
           color: #0a58ca;
         }
       `}</style>
+
+{!isFilterCollapsed && (
+            <div
+              className="modal show fade d-block"
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 1050
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsFilterCollapsed(true);
+              }}
+            >
+              <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
+                <div className="modal-content">
+                  {/* Modal Header - Fixed at top */}
+                  <div className="modal-header bg-white border-bottom">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-filter text-primary me-2"></i>
+                        <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                        {totalSelected > 0 && (
+                          <span className="badge bg-primary ms-2">
+                            {totalSelected} Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={clearAllFilters}
+                        >
+                          <i className="fas fa-times-circle me-1"></i>
+                          Clear All
+                        </button>
+                        <button
+                          className="btn-close"
+                          onClick={() => setIsFilterCollapsed(true)}
+                          aria-label="Close"
+                        ></button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Body - Scrollable content */}
+                  <div className="modal-body p-4">
+                    <div className="row g-4">
+                      {/* Course Type Filter */}
+                      <div className="col-md-3">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-graduation-cap me-1 text-success"></i>
+                          Course Type
+                        </label>
+                        <div className="position-relative">
+                          <select
+                            className="form-select"
+                            name="courseType"
+                            value={filterData.courseType}
+                            onChange={handleFilterChange}
+                          >
+                            <option value="">All Types</option>
+                            <option value="Free">🆓 Free</option>
+                            <option value="Paid">💰 Paid</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Project Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Project"
+                          options={projectOptions}
+                          selectedValues={formData?.projects?.values}
+                          onChange={(values) => handleCriteriaChange('projects', values)}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.projects}
+                          onToggle={() => toggleDropdown('projects')}
+                        />
+                      </div>
+
+                      {/* Verticals Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Verticals"
+                          options={verticalOptions}
+                          selectedValues={formData?.verticals?.values || []}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.verticals}
+                          onToggle={() => toggleDropdown('verticals')}
+                          onChange={(values) => handleCriteriaChange('verticals', values)}
+                        />
+                      </div>
+
+                      {/* Course Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Course"
+                          options={courseOptions}
+                          selectedValues={formData?.course?.values || []}
+                          onChange={(values) => handleCriteriaChange('course', values)}
+                          icon="fas fa-graduation-cap"
+                          isOpen={dropdownStates.course}
+                          onToggle={() => toggleDropdown('course')}
+                        />
+                      </div>
+
+                      {/* Center Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Center"
+                          options={centerOptions}
+                          selectedValues={formData?.center?.values || []}
+                          onChange={(values) => handleCriteriaChange('center', values)}
+                          icon="fas fa-building"
+                          isOpen={dropdownStates.center}
+                          onToggle={() => toggleDropdown('center')}
+                        />
+                      </div>
+
+                      {/* Counselor Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Counselor"
+                          options={counselorOptions}
+                          selectedValues={formData?.counselor?.values || []}
+                          onChange={(values) => handleCriteriaChange('counselor', values)}
+                          icon="fas fa-user-tie"
+                          isOpen={dropdownStates.counselor}
+                          onToggle={() => toggleDropdown('counselor')}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Date Filters Section */}
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Date Range Filters
+                        </h6>
+                      </div>
+
+                      {/* Created Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-plus me-1 text-success"></i>
+                          Lead Creation Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
+                                value={filterData.createdFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                maxDate={filterData.createdToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
+                                value={filterData.createdToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                minDate={filterData.createdFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.createdFromDate || filterData.createdToDate) && (
+                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
+                              <small className="text-success">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
+                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('created')}
+                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Created Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Modified Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
+                          Lead Modification Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
+                                value={filterData.modifiedFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                maxDate={filterData.modifiedToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
+                                value={filterData.modifiedToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                minDate={filterData.modifiedFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
+                              <small className="text-warning">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
+                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
+                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('modified')}
+                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Modified Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Next Action Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-check me-1 text-info"></i>
+                          Next Action Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
+                                value={filterData.nextActionFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                maxDate={filterData.nextActionToDate}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
+                                value={filterData.nextActionToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                minDate={filterData.nextActionFromDate}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
+                              <small className="text-info">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
+                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('nextAction')}
+                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Next Action Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Results Summary */}
+                    <div className="row mt-4">
+                      <div className="col-12">
+                        <div className="alert alert-info">
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-info-circle me-2"></i>
+                            <div>
+
+                              {/* Active filter indicators */}
+                              <div className="mt-2">
+                                {(filterData.createdFromDate || filterData.createdToDate) && (
+                                  <span className="badge bg-success me-2">
+                                    <i className="fas fa-calendar-plus me-1"></i>
+                                    Created Date Filter Active
+                                  </span>
+                                )}
+
+                                {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                                  <span className="badge bg-warning me-2">
+                                    <i className="fas fa-calendar-edit me-1"></i>
+                                    Modified Date Filter Active
+                                  </span>
+                                )}
+
+                                {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                                  <span className="badge bg-info me-2">
+                                    <i className="fas fa-calendar-check me-1"></i>
+                                    Next Action Date Filter Active
+                                  </span>
+                                )}
+
+                                {totalSelected > 0 && (
+                                  <span className="badge bg-primary me-2">
+                                    <i className="fas fa-filter me-1"></i>
+                                    {totalSelected} Multi-Select Filters Active
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Footer - Fixed at bottom */}
+                  <div className="modal-footer bg-light border-top">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="text-muted small">
+                        <i className="fas fa-filter me-1"></i>
+                        {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
+                      </div>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => setIsFilterCollapsed(true)}
+                        >
+                          <i className="fas fa-eye-slash me-1"></i>
+                          Hide Filters
+                        </button>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => {
+                            fetchProfileData(filterData);
+                            setIsFilterCollapsed(true);
+                          }}
+                        >
+                          <i className="fas fa-search me-1"></i>
+                          Apply Filters
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
     </div>
+
+    
   );
 };
 
