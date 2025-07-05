@@ -302,7 +302,7 @@ router.route("/addleaddandcourseapply")
             console.log("Lead received:", req.body.FirstName);
 
             // Basic validation only
-            const { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
 
             if (!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4) {
                 return res.status(400).json({
