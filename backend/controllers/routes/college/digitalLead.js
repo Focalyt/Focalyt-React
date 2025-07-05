@@ -322,14 +322,14 @@ router.route("/addleaddandcourseapply")
                 }
 
                 if (!/^[0-9]{10}$/.test(MobileNumber)) {
-                    return res.status(400).json({
+                    return res.status(200).json({
                         status: false,
                         msg: "Invalid mobile number format"
                     });
                 }
                 MobileNumber = parseInt(MobileNumber);
             } else {
-                return res.status(400).json({
+                return res.status(200).json({
                     status: false,
                     msg: "Mobile number is required"
                 });
