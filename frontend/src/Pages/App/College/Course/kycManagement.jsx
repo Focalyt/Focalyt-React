@@ -1195,16 +1195,16 @@ const KYCManagement = () => {
       });
 
       if (response.data.success && response.data.data) {
-        const { totalCount = 0, pendingKycCount = 0, doneKycCount = 0 } = response.data;
+        const { crmFilterCounts } = response.data;
 
         const filter = [
-          { _id: 'pendingEkyc', name: 'kyc Pending', count: pendingKycCount, milestone: '' },
-          { _id: 'doneEkyc', name: 'kyc Verified', count: doneKycCount, milestone: 'kyc Done' },
-          { _id: 'All', name: 'All', count: totalCount, milestone: '' }
+          { _id: 'pendingEkyc', name: 'kyc Pending', count: crmFilterCounts.pendingKyc, milestone: '' },
+          { _id: 'doneEkyc', name: 'kyc Verified', count: crmFilterCounts.doneKyc, milestone: 'kyc Done' },
+          { _id: 'All', name: 'All', count: crmFilterCounts.all, milestone: '' }
         ];
 
         setEkycFilters(filter);
-        console.log('backend response', response.data.data)
+        console.log('backend response', response.data)
         setAllProfiles(response.data.data);
         setTotalPages(response.data.totalPages)
 
@@ -1976,6 +1976,7 @@ const KYCManagement = () => {
                       onChange={handleFileSelect}
                       style={{ display: 'none' }}
                     />
+                    
                     <button
                       className="btn btn-primary"
                       onClick={() => document.getElementById('file-input').click()}
