@@ -94,7 +94,9 @@ import NearByCandidate from './Pages/App/Company/Candidate/NearByCandidate';
 import Batch from './Component/Layouts/App/College/ProjectManagement/Student';
 import RegistrationCards from './Component/Layouts/App/College/RegistrationCards/RegistrationCards';
 import ResumeTest from './Pages/Front/Resume/Resume';
-import AttendanceManagement from './Component/Layouts/App/College/ProjectManagement/AttendanceManagement'
+import AttendanceManagement from './Component/Layouts/App/College/ProjectManagement/AttendanceManagement';
+import Whatapp from './Pages/App/College/Whatapp/Whatapp';
+import WhatappTemplate from './Pages/App/College/Whatapp/WhatappTemplate';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -212,6 +214,8 @@ const Layout = () => {
           <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
           <Route path='batch' element={<Batch/>}/>
           <Route path='attendance' element={<AttendanceManagement/>}/>
+          <Route path='whatapp' element={<Whatapp/>}/>
+          <Route path='whatappTemplate' element={<WhatappTemplate/>}/>
         </Route>
 
         {/* company  */}

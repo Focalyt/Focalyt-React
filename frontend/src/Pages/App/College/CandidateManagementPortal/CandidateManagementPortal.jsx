@@ -44,13 +44,13 @@ const CandidateManagementPortal = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  // URL-based state management
+  // URL-based state management only
   const getInitialState = () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const stage = urlParams.get('stage') || localStorage.getItem("cmsStage") || 'vertical';
-    const savedVertical = JSON.parse(localStorage.getItem("selectedVertical") || "null");
+    const stage = urlParams.get('stage') || 'vertical';
+    const verticalId = urlParams.get('verticalId');
     
-    return { stage, savedVertical };
+    return { stage, verticalId };
   };
 
   const updateURL = (stage, vertical = null) => {
@@ -58,10 +58,9 @@ const CandidateManagementPortal = () => {
     url.searchParams.set('stage', stage);
     if (vertical) {
       url.searchParams.set('verticalId', vertical.id);
-      url.searchParams.set('verticalName', vertical.name);
+      // Removed verticalName from URL for security and cleaner URLs
     } else {
       url.searchParams.delete('verticalId');
-      url.searchParams.delete('verticalName');
     }
     window.history.replaceState({}, '', url);
   };
@@ -196,23 +195,22 @@ const CandidateManagementPortal = () => {
   };
 
   useEffect(() => {
-    // Improved localStorage and URL-based restoration logic
-    const { stage, savedVertical } = getInitialState();
+    // URL-based restoration logic only
+    const { stage, verticalId } = getInitialState();
   
-    console.log('Restoring state from localStorage and URL:', { stage, savedVertical });
+    console.log('Restoring state from URL:', { stage, verticalId });
   
-    if (stage === "project" && savedVertical) {
-      // Ensure we have valid vertical data
-      if (savedVertical.id && savedVertical.name) {
-        setSelectedVerticalForProjects(savedVertical);
+    if (stage === "project" && verticalId && verticals.length > 0) {
+      // We have verticalId in URL and verticals are loaded, find the vertical
+      const foundVertical = verticals.find(v => v.id === verticalId);
+      if (foundVertical) {
+        setSelectedVerticalForProjects(foundVertical);
         setShowProjects(true);
         setShowVertical(false);
-        console.log('Restored to project view for vertical:', savedVertical.name);
+        console.log('Found vertical from URL and restored to project view:', foundVertical.name);
       } else {
-        // Invalid data, reset to vertical view
-        console.warn('Invalid saved vertical data, resetting to vertical view');
-        localStorage.setItem("cmsStage", "vertical");
-        localStorage.removeItem("selectedVertical");
+        // Vertical not found, reset to vertical view
+        console.warn('Vertical not found, resetting to vertical view');
         updateURL('vertical');
         setShowVertical(true);
         setShowProjects(false);
@@ -221,18 +219,18 @@ const CandidateManagementPortal = () => {
       // Default to vertical view
       setShowVertical(true);
       setShowProjects(false);
-      updateURL('vertical');
+      if (stage !== 'vertical') {
+        updateURL('vertical');
+      }
       console.log('Restored to vertical view');
     }
-  }, []);
+  }, [verticals]); // Added verticals as dependency
 
   // New function to handle vertical click for projects
   const handleVerticalClick = (vertical) => {
     setSelectedVerticalForProjects(vertical);
     setShowProjects(true);
     setShowVertical(false);
-    localStorage.setItem("cmsStage", "project");
-    localStorage.setItem("selectedVertical", JSON.stringify(vertical));
     updateURL('project', vertical);
   };
 
@@ -240,11 +238,7 @@ const CandidateManagementPortal = () => {
   const handleBackToVerticals = () => {
     setShowProjects(false);
     setShowVertical(true)
-
     setSelectedVerticalForProjects(null);
-
-    localStorage.setItem("cmsStage", "vertical");
-    localStorage.removeItem("selectedVertical");
     updateURL('vertical');
   };
 
@@ -358,7 +352,7 @@ const CandidateManagementPortal = () => {
                     <p className="text-muted mb-1">{vertical.code}</p>
                     <span className={`${vertical.status === 'active' ? 'text-success' : 'text-secondary'}`}>{vertical.status}</span>
                   </div>
-                  <div className="text-end">
+                  <div className="text-end verticalActionBtn">
                     <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(vertical); }}>
                       <i className="bi bi-share-fill"></i>
                     </button>
@@ -529,6 +523,18 @@ const CandidateManagementPortal = () => {
           </div>
         </div>
       )}
+
+      <style>
+        {
+          `
+          @media (max-width: 768px) {
+            .verticalActionBtn{
+              display: flex;
+            }
+          }
+          `
+        }
+      </style>
     </div>
   );
 };

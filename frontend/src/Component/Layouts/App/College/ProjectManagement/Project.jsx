@@ -320,46 +320,67 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     setSelectedProject(project);
     setShowShareModal(true);
   };
+  // URL-based state management for project component
+  const getProjectState = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stage = urlParams.get('stage') || 'project';
+    const projectId = urlParams.get('projectId');
+    
+    return { stage, projectId };
+  };
+
+  const updateProjectURL = (stage, project = null) => {
+    const url = new URL(window.location);
+    url.searchParams.set('stage', stage);
+    if (project) {
+      url.searchParams.set('projectId', project._id || project.id);
+    } else {
+      url.searchParams.delete('projectId');
+    }
+    window.history.replaceState({}, '', url);
+  };
+
   useEffect(() => {
-    // Improved localStorage restoration logic
-    const stage = localStorage.getItem("cmsStage");
-    const savedProject = JSON.parse(localStorage.getItem("selectedProject") || "null");
+    // URL-based restoration logic
+    const { stage, projectId } = getProjectState();
   
-    console.log('Project component - Restoring state from localStorage:', { stage, savedProject });
+    console.log('Project component - Restoring state from URL:', { stage, projectId });
   
-    if (stage === "center" && savedProject) {
-      // Ensure we have valid project data
-      if (savedProject._id && savedProject.name) {
-        setSelectedProjectForCenters(savedProject);
+    if (stage === "center" && projectId && projects.length > 0) {
+      // We have projectId in URL and projects are loaded, find the project
+      const foundProject = projects.find(p => (p._id || p.id) === projectId);
+      if (foundProject) {
+        setSelectedProjectForCenters(foundProject);
         setShowCenters(true);
-        console.log('Restored to center view for project:', savedProject.name);
+        console.log('Found project from URL and restored to center view:', foundProject.name);
       } else {
-        // Invalid data, reset to project view
-        console.warn('Invalid saved project data, resetting to project view');
-        localStorage.setItem("cmsStage", "project");
-        localStorage.removeItem("selectedProject");
+        // Project not found, reset to project view
+        console.warn('Project not found, resetting to project view');
+        updateProjectURL('project');
         setShowCenters(false);
       }
     } else {
       // Default to project view
       setShowCenters(false);
+      if (stage !== 'project') {
+        updateProjectURL('project');
+      }
       console.log('Restored to project view');
     }
-  }, []);
+  }, [projects]); // Added projects as dependency
 
   // New function to handle project click for centers
   const handleProjectClick = (project) => {
     setSelectedProjectForCenters(project);
     setShowCenters(true);
-    localStorage.setItem("cmsStage", "center");
-    localStorage.setItem("selectedProject", JSON.stringify(project));
+    updateProjectURL('center', project);
   };
 
   // Function to go back to projects view
   const handleBackToProjects = () => {
     setShowCenters(false);
-    setSelectedProjectForCenters(null);localStorage.setItem("cmsStage", "project");
-    localStorage.removeItem("selectedProject");
+    setSelectedProjectForCenters(null);
+    updateProjectURL('project');
   };
 
   const closeModal = () => {
@@ -474,7 +495,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
     <div className="container py-4">
       {/* Back Button and Header */}
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
+        <div className='d-md-block d-none'>
           <div className="d-flex align-items-center gap-3">
             <div className='d-flex align-items-center'>
               <h4 onClick={onBackToVerticals} style={{ cursor: 'pointer' }} className="me-2">
@@ -554,7 +575,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                         </span>
                       </div>
                     </div>
-                    <div className="text-end">
+                    <div className="text-end d-flex">
                       <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(project); }}>
                         <i className="bi bi-share-fill"></i>
                       </button>

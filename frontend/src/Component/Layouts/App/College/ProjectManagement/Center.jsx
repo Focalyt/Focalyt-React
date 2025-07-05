@@ -12,13 +12,9 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         return {
             stage: urlParams.get('stage') || 'center',
             centerId: urlParams.get('centerId'),
-            centerName: urlParams.get('centerName'),
             projectId: urlParams.get('projectId'),
-            projectName: urlParams.get('projectName'),
             verticalId: urlParams.get('verticalId'),
-            verticalName: urlParams.get('verticalName'),
-            courseId: urlParams.get('courseId'),
-            courseName: urlParams.get('courseName')
+            courseId: urlParams.get('courseId')
         };
     };
 
@@ -28,9 +24,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         // Clear existing params
         url.searchParams.delete('stage');
         url.searchParams.delete('centerId');
-        url.searchParams.delete('centerName');
         url.searchParams.delete('courseId');
-        url.searchParams.delete('courseName');
         
         // Set new params
         Object.keys(params).forEach(key => {
@@ -430,11 +424,8 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         updateURL({
             stage: 'course',
             centerId: center._id,
-            centerName: center.name,
             projectId: selectedProject?._id,
-            projectName: selectedProject?.name,
-            verticalId: selectedVertical?.id,
-            verticalName: selectedVertical?.name
+            verticalId: selectedVertical?.id
         });
     };
 
@@ -446,9 +437,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         updateURL({
             stage: 'center',
             projectId: selectedProject?._id,
-            projectName: selectedProject?.name,
-            verticalId: selectedVertical?.id,
-            verticalName: selectedVertical?.name
+            verticalId: selectedVertical?.id
         });
     };
 
@@ -559,7 +548,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
 
 
             <div className="d-flex justify-content-between align-items-center mb-3">
-                <div>
+                <div className='d-md-block d-none'>
                     <div className="d-flex align-items-center gap-3">
 
                         <div className='d-flex align-items-center'>
@@ -575,26 +564,35 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                         </div>
                     </div>
                 </div>
-                <div>
+                <div className='centerBtnResponsive'>
 
                     {onBackToProjects && (
                         <button
                             onClick={onBackToProjects}
-                            className="btn btn-light me-2"
+                            className="btn btn-light me-2 d-md-block d-none subBtnRes"
                             title="Back to Verticals"
                         >
                             <i className="bi bi-arrow-left"></i>
                             <span>Back</span>
                         </button>
                     )}
+                    {onBackToProjects && (
+                        <button
+                            onClick={onBackToProjects}
+                            className="btn btn-light me-2 d-md-none d-block subBtnRes"
+                            title="Back to Verticals"
+                        >
+                            <i className="bi bi-arrow-left"></i>
+                        </button>
+                    )}
 
 
 
-                    <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+                    <button className="btn btn-outline-secondary me-2 subBtnRes" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
                         <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
                     </button>
-                    <button className="btn btn-primary me-2" onClick={handleAlign}>Align Exsting Center</button>
-                    <button className="btn btn-primary" onClick={handleAdd}>Add New Center</button>
+                    <button className="btn btn-primary me-2 subBtnRes" onClick={handleAlign}>Align Exsting Center</button>
+                    <button className="btn btn-primary subBtnRes" onClick={handleAdd}>Add New Center</button>
                 </div>
             </div>
 
@@ -666,7 +664,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                                             </div>
                                         </div>
                                         {/* ======== MODIFY THIS: Add stopPropagation to action buttons ======== */}
-                                        <div className="text-end">
+                                        <div className="text-end d-flex">
                                             <button className="btn btn-sm btn-light me-1" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(center); }}>
                                                 <i className="bi bi-share-fill"></i>
                                             </button>
@@ -924,8 +922,20 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     font-weight: 500;
     line-height: 1.2;
     color: var(--bs-heading-color);
-            }            
-            
+            }  
+    .centerBtnResponsive{
+      display: flex;
+    }          
+            @media (max-width: 768px) {
+                .centerBtnResponsive{
+                    display: flex;
+                }
+                .subBtnRes{
+                white-space: nowrap;
+                padding: 0.25rem 0.5rem;
+                font-size: 12px;
+                }
+            }
             `
                 }
             </style>

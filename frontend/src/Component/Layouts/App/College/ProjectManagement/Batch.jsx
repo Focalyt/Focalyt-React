@@ -114,29 +114,85 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
+  // URL-based state management for batch component
+  const getURLParams = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return {
+      stage: urlParams.get('stage') || 'batch',
+      batchId: urlParams.get('batchId'),
+      batchName: urlParams.get('batchName'),
+      courseId: urlParams.get('courseId'),
+      courseName: urlParams.get('courseName'),
+      centerId: urlParams.get('centerId'),
+      centerName: urlParams.get('centerName'),
+      projectId: urlParams.get('projectId'),
+      projectName: urlParams.get('projectName'),
+      verticalId: urlParams.get('verticalId'),
+      verticalName: urlParams.get('verticalName')
+    };
+  };
+
+  const updateURL = (params) => {
+    const url = new URL(window.location);
+    
+    // Clear all existing params first
+    url.searchParams.delete('stage');
+    url.searchParams.delete('batchId');
+    url.searchParams.delete('batchName');
+    url.searchParams.delete('courseId');
+    url.searchParams.delete('courseName');
+    url.searchParams.delete('centerId');
+    url.searchParams.delete('centerName');
+    url.searchParams.delete('projectId');
+    url.searchParams.delete('projectName');
+    url.searchParams.delete('verticalId');
+    url.searchParams.delete('verticalName');
+    
+    // Set new params
+    Object.keys(params).forEach(key => {
+      if (params[key] !== null && params[key] !== undefined) {
+        url.searchParams.set(key, params[key]);
+      }
+    });
+    
+    window.history.replaceState({}, '', url);
+  };
+
   // Function to handle batch click for students
   const handleBatchClick = (batch) => {
     setSelectedBatchForStudents(batch);
     setShowStudents(true);
 
-    // updateURL({
-    //   stage: 'student',
-    //   batchId: batch._id,
-    //   batchName: batch.name,
-    // });
+    updateURL({
+      stage: 'student',
+      batchId: batch._id,
+      batchName: batch.name,
+      courseId: selectedCourse?._id,
+      courseName: selectedCourse?.name,
+      centerId: selectedCenter?._id,
+      centerName: selectedCenter?.name,
+      projectId: selectedProject?._id,
+      projectName: selectedProject?.name,
+      verticalId: selectedVertical?.id,
+      verticalName: selectedVertical?.name
+    });
   };
 
   // Function to go back to batches view
   const handleBackToBatches = () => {
     setShowStudents(false);
     setSelectedBatchForStudents(null);
-    // updateURL({
-    //   stage: 'batch',
-    //   courseId: selectedCourse?._id,
-    //   courseName: selectedCourse?.name,
-    //   centerId: selectedCenter?._id,
-    //   centerName: selectedCenter?.name,
-    // });
+    updateURL({
+      stage: 'batch',
+      courseId: selectedCourse?._id,
+      courseName: selectedCourse?.name,
+      centerId: selectedCenter?._id,
+      centerName: selectedCenter?.name,
+      projectId: selectedProject?._id,
+      projectName: selectedProject?.name,
+      verticalId: selectedVertical?.id,
+      verticalName: selectedVertical?.name
+    });
   };
 
   const formatDateForState = (date) => {
@@ -181,6 +237,60 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     fetchSubStatus()
 
   }, [seletectedStatus]);
+
+  // URL-based state restoration logic
+  useEffect(() => {
+    const urlParams = getURLParams();
+    console.log('Batch component - URL params:', urlParams);
+    
+    // Only restore state if batches are loaded
+    if (batches.length === 0) {
+      console.log('Batches not loaded yet, skipping state restoration');
+      return;
+    }
+    
+    if (urlParams.stage === "student" && urlParams.batchId) {
+      // Find batch from current batches list
+      const batch = batches.find(b => b._id === urlParams.batchId);
+      if (batch) {
+        setSelectedBatchForStudents(batch);
+        setShowStudents(true);
+        console.log('Restored to student view for batch:', batch.name);
+      } else {
+        // Batch not found, reset to batch view
+        console.warn('Batch not found in current list, resetting to batch view');
+        updateURL({
+          stage: 'batch',
+          courseId: selectedCourse?._id,
+          courseName: selectedCourse?.name,
+          centerId: selectedCenter?._id,
+          centerName: selectedCenter?.name,
+          projectId: selectedProject?._id,
+          projectName: selectedProject?.name,
+          verticalId: selectedVertical?.id,
+          verticalName: selectedVertical?.name
+        });
+        setShowStudents(false);
+      }
+    } else {
+      // Default to batch view
+      setShowStudents(false);
+      if (urlParams.stage !== 'batch') {
+        updateURL({
+          stage: 'batch',
+          courseId: selectedCourse?._id,
+          courseName: selectedCourse?.name,
+          centerId: selectedCenter?._id,
+          centerName: selectedCenter?.name,
+          projectId: selectedProject?._id,
+          projectName: selectedProject?.name,
+          verticalId: selectedVertical?.id,
+          verticalName: selectedVertical?.name
+        });
+      }
+      console.log('Restored to batch view');
+    }
+  }, [batches, selectedCourse, selectedCenter, selectedProject, selectedVertical]);
 
   const handleBatchAssign = async () => {
     console.log(selectedBatch, 'selectedBatch');
