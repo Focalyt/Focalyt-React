@@ -17,7 +17,8 @@ const WhatsAppTemplate = () => {
     selectedTokens: [],
     footerText: '',
     footerButton: '',
-    // Call Button fields
+    // Call To Action fields
+    actionType: 'Call Phone Number', // New field added
     callButtonText: '',
     callCountry: '',
     callPhoneNumber: '',
@@ -172,6 +173,7 @@ const WhatsAppTemplate = () => {
       selectedTokens: [],
       footerText: '',
       footerButton: '',
+      actionType: 'Call Phone Number', // Reset to default
       callButtonText: '',
       callCountry: '',
       callPhoneNumber: '',
@@ -874,7 +876,7 @@ const WhatsAppTemplate = () => {
                 <option value="QuickReply">Quick Reply</option>
               </select>
 
-              {/* Call Button Fields */}
+              {/* Call To Action Fields */}
               {enterpriseForm.footerButton === 'Call' && (
                 <div className="border rounded p-3" style={{ backgroundColor: '#f8f9fa' }}>
                   <div className="row">
@@ -882,84 +884,11 @@ const WhatsAppTemplate = () => {
                       <label className="form-label fw-medium">Type Of Action</label>
                       <select 
                         className="form-select"
-                        value="Call Phone Number"
-                        disabled
-                        style={{ backgroundColor: '#e9ecef', border: '1px solid #ced4da' }}
+                        value={enterpriseForm.actionType}
+                        onChange={(e) => setEnterpriseForm({...enterpriseForm, actionType: e.target.value})}
+                        style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
                       >
                         <option value="Call Phone Number">Call Phone Number</option>
-                        <option value="Website">Visit Website</option>
-                      </select>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label fw-medium">Button Text</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="Button Text"
-                        value={enterpriseForm.callButtonText}
-                        onChange={(e) => setEnterpriseForm({...enterpriseForm, callButtonText: e.target.value})}
-                        maxLength={25}
-                        style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
-                      />
-                      <small className="text-muted">{enterpriseForm.callButtonText.length}/25</small>
-                    </div>
-                  </div>
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                    <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="Website url"
-                        value={enterpriseForm.callButtonText}
-                        onChange={(e) => setEnterpriseForm({...enterpriseForm, callButtonText: e.target.value})}
-                        maxLength={25}
-                        style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
-                      />
-                      <small className="text-muted">{enterpriseForm.callButtonText.length}/25</small>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label fw-medium">Country</label>
-                      <select 
-                        className="form-select"
-                        value={enterpriseForm.callCountry}
-                        onChange={(e) => setEnterpriseForm({...enterpriseForm, callCountry: e.target.value})}
-                        style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
-                      >
-                        <option value="">Country</option>
-                        {availableCountries.map((country, index) => (
-                          <option key={index} value={country}>{country}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label fw-medium">Phone Number</label>
-                      <input 
-                        type="tel" 
-                        className="form-control" 
-                        placeholder="Phone Number"
-                        value={enterpriseForm.callPhoneNumber}
-                        onChange={(e) => setEnterpriseForm({...enterpriseForm, callPhoneNumber: e.target.value})}
-                        maxLength={20}
-                        style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
-                      />
-                      <small className="text-muted">{enterpriseForm.callPhoneNumber.length}/20</small>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Website Button Fields */}
-              {enterpriseForm.footerButton === 'Website' && (
-                <div className="border rounded p-3" style={{ backgroundColor: '#f8f9fa' }}>
-                  <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label fw-medium">Type Of Action</label>
-                      <select 
-                        className="form-select"
-                        value="Visit Website"
-                        disabled
-                        style={{ backgroundColor: '#e9ecef', border: '1px solid #ced4da' }}
-                      >
                         <option value="Visit Website">Visit Website</option>
                       </select>
                     </div>
@@ -969,29 +898,74 @@ const WhatsAppTemplate = () => {
                         type="text" 
                         className="form-control" 
                         placeholder="Button Text"
-                        value={enterpriseForm.websiteButtonText}
-                        onChange={(e) => setEnterpriseForm({...enterpriseForm, websiteButtonText: e.target.value})}
+                        value={enterpriseForm.actionType === 'Call Phone Number' ? enterpriseForm.callButtonText : enterpriseForm.websiteButtonText}
+                        onChange={(e) => {
+                          if (enterpriseForm.actionType === 'Call Phone Number') {
+                            setEnterpriseForm({...enterpriseForm, callButtonText: e.target.value});
+                          } else {
+                            setEnterpriseForm({...enterpriseForm, websiteButtonText: e.target.value});
+                          }
+                        }}
                         maxLength={25}
                         style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
                       />
-                      <small className="text-muted">{enterpriseForm.websiteButtonText.length}/25</small>
+                      <small className="text-muted">
+                        {enterpriseForm.actionType === 'Call Phone Number' ? enterpriseForm.callButtonText.length : enterpriseForm.websiteButtonText.length}/25
+                      </small>
                     </div>
                   </div>
-                  <div className="row">
-                    <div className="col-12 mb-3">
-                      <label className="form-label fw-medium">Website URL</label>
-                      <input 
-                        type="url" 
-                        className="form-control" 
-                        placeholder="Website URL"
-                        value={enterpriseForm.websiteURL}
-                        onChange={(e) => setEnterpriseForm({...enterpriseForm, websiteURL: e.target.value})}
-                        maxLength={2000}
-                        style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
-                      />
-                      <small className="text-muted">{enterpriseForm.websiteURL.length}/2000</small>
+                  
+                  {/* Call Phone Number ke fields */}
+                  {enterpriseForm.actionType === 'Call Phone Number' && (
+                    <div className="row">
+                      <div className="col-md-6 mb-3">
+                        <label className="form-label fw-medium">Country</label>
+                        <select 
+                          className="form-select"
+                          value={enterpriseForm.callCountry}
+                          onChange={(e) => setEnterpriseForm({...enterpriseForm, callCountry: e.target.value})}
+                          style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
+                        >
+                          <option value="">Select Country</option>
+                          {availableCountries.map((country, index) => (
+                            <option key={index} value={country}>{country}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-md-6 mb-3">
+                        <label className="form-label fw-medium">Phone Number</label>
+                        <input 
+                          type="tel" 
+                          className="form-control" 
+                          placeholder="Phone Number"
+                          value={enterpriseForm.callPhoneNumber}
+                          onChange={(e) => setEnterpriseForm({...enterpriseForm, callPhoneNumber: e.target.value})}
+                          maxLength={20}
+                          style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
+                        />
+                        <small className="text-muted">{enterpriseForm.callPhoneNumber.length}/20</small>
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {/* Visit Website ke fields */}
+                  {enterpriseForm.actionType === 'Visit Website' && (
+                    <div className="row">
+                      <div className="col-12 mb-3">
+                        <label className="form-label fw-medium">Website URL</label>
+                        <input 
+                          type="url" 
+                          className="form-control" 
+                          placeholder="https://example.com"
+                          value={enterpriseForm.websiteURL}
+                          onChange={(e) => setEnterpriseForm({...enterpriseForm, websiteURL: e.target.value})}
+                          maxLength={2000}
+                          style={{ backgroundColor: 'white', border: '1px solid #ced4da' }}
+                        />
+                        <small className="text-muted">{enterpriseForm.websiteURL.length}/2000</small>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1410,31 +1384,7 @@ const WhatsAppTemplate = () => {
     return renderNonEnterpriseTemplate();
   }
   
-  return (
-    <>
-      {renderTemplateList()}
-      
-      <style jsx>{`
-        
-        .table-hover tbody tr:hover {
-          background-color: #f8f9fa;
-        }
-        
-        .btn:focus {
-          box-shadow: none;
-        }
-        
-        .form-control:focus {
-          border-color: #80bdff;
-          box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-        }
-
-        .dropdown-menu.show {
-          display: block;
-        }
-      `}</style>
-    </>
-  );
+  return renderTemplateList();
 };
 
 export default WhatsAppTemplate;

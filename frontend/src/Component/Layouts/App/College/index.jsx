@@ -426,6 +426,18 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">Status Design</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/institute/whatapp' ? 'active' : ''}`}>
+                    <Link to="/institute/whatapp" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={farBookmark} />
+                      <span className="menu-title">Whatapp</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/whatappTemplate' ? 'active' : ''}`}>
+                    <Link to="/institute/whatappTemplate" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={farBookmark} />
+                      <span className="menu-title">Create Template</span>
+                    </Link>
+                  </li>
 
 
                 </ul>
