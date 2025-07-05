@@ -359,6 +359,10 @@ commonRoutes.post("/applycourse/:id", async (req, res) => {
 		let { id } = req.params;
 		let courseId = id;
 
+		if(typeof courseId === 'string'){
+			courseId = new mongoose.Types.ObjectId(courseId);
+		}
+
 		let validation = { mobile: req.body.mobile }
 
 		let { value, error } = await CandidateValidators.userMobile(validation)
