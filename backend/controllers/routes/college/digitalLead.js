@@ -305,7 +305,7 @@ router.route("/addleaddandcourseapply")
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
 
             if (!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4) {
-                return res.status(400).json({
+                return res.status(200).json({
                     status: false,
                     msg: "All fields are required"
                 });
