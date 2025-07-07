@@ -246,7 +246,7 @@ export default function FacebookWhatsAppConnector() {
   return (
     <div className="min-vh-100" style={{ background: "linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 50%, #fce4ec 100%)" }}>
       {/* Header */}
-      <header className="border-bottom bg-white bg-opacity-90 sticky-top">
+      <header className="border-bottom bg-white bg-opacity-90">
         <div className="container py-3">
           <div className="d-flex align-items-center justify-content-between">
             <div className="d-flex align-items-center gap-3">

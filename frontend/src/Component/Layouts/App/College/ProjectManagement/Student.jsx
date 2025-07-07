@@ -184,9 +184,10 @@ const Student = ({
   const [selectedUploadDate, setSelectedUploadDate] = useState(new Date());
   const [uploadFiles, setUploadFiles] = useState([]);
   const [mediaData, setMediaData] = useState({});
+ 
   const handleUpload = () => {
     if (uploadFiles.length === 0) return;
-
+    console.log("uploadFiles")
     const newFiles = uploadFiles.map((file, index) => ({
       id: Date.now() + index,
       name: file.name,
@@ -200,7 +201,7 @@ const Student = ({
       size: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
       type: file.type.includes('video') ? 'video' : 'image'
     }));
-
+    console.log("newFiles")
     setMediaData(prev => {
       const dateString = new Date(selectedUploadDate).toLocaleDateString('en-GB', {
         day: '2-digit',
@@ -233,6 +234,7 @@ const Student = ({
         return [...prev, newDateEntry].sort((a, b) => new Date(b.date) - new Date(a.date));
       }
     });
+    console.log(mediaData, 'mediaData')
 
     setUploadFiles([]);
     setShowUploadModal(false);
@@ -1524,9 +1526,7 @@ const Student = ({
   };
 
   const handleFileUpload = async () => {
-    if (!selectedFile || !selectedDocumentForUpload) return;
-
-
+    if (!selectedFile) return;
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -1538,32 +1538,48 @@ const Student = ({
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
 
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("doc", selectedDocumentForUpload.docsId);
+      // Create media file object
+      const newFile = {
+        id: Date.now(),
+        name: selectedFile.name,
+        url: URL.createObjectURL(selectedFile),
+        studentName: 'Current User',
+        uploadTime: new Date().toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }),
+        size: (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB',
+        type: selectedFile.type.includes('video') ? 'video' : 'image'
+      };
 
-      const response = await axios.put(
-        `${backendUrl}/college/upload_docs/${selectedProfile._id}`,
-        formData,
-        {
-          headers: {
-            "x-auth": token,
-            "Content-Type": "multipart/form-data",
-          },
+      // Add to mediaData
+      setMediaData(prev => {
+        const dateString = new Date().toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+
+        const existingDateIndex = prev.findIndex(item => item.date === dateString);
+
+        if (existingDateIndex !== -1) {
+          const updated = [...prev];
+          updated[existingDateIndex] = {
+            ...updated[existingDateIndex],
+            files: [...updated[existingDateIndex].files, newFile]
+          };
+          return updated;
+        } else {
+          return [...prev, {
+            date: dateString,
+            files: [newFile]
+          }];
         }
-      );
+      });
 
-
-
-      if (response.data.status) {
-        alert("Document uploaded successfully! Status: Pending Review");
-
-        // Optionally refresh data here
-        closeUploadModal();
-        fetchProfileData();
-      } else {
-        alert("Failed to upload file");
-      }
+      alert("Media uploaded successfully!");
+      closeUploadModal();
     } catch (error) {
       console.error("Upload error:", error);
       alert("Upload failed. Please try again.");
@@ -3939,7 +3955,7 @@ const Student = ({
 
                   {/* ===== BULK ATTENDANCE CONTROLS ===== */}
 
-                  <div className="col-12 mt-3 p-3 bg-light rounded">
+                  {/* <div className="col-12 mt-3 p-3 bg-light rounded">
                     {showAttendanceMode && (
                       <div className="d-flex align-items-center gap-2">
                         <label className="form-label mb-0 small fw-bold">
@@ -4021,7 +4037,7 @@ const Student = ({
 
                       </div>
                     )}
-                  </div>
+                  </div> */}
 
                 </div>
               </div>
