@@ -1773,8 +1773,6 @@ const Student = ({
   const handleFileUpload = async () => {
     if (!selectedFiles || !selectedDocumentForUpload) return;
 
-
-
     setIsUploading(true);
     // setUploadProgress(0);
 
@@ -1789,27 +1787,25 @@ const Student = ({
       formData.append("file", selectedFiles);
       formData.append("doc", selectedDocumentForUpload.docsId);
 
-      const response = await axios.put(
-        `${backendUrl}/college/upload_docs/${selectedProfile._id}`,
-        formData,
-        {
-          headers: {
-            "x-auth": token,
-            "Content-Type": "multipart/form-data",
-          },
+      // Make API call to upload the file
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+      const response = await axios.post(`${backendUrl}/college/upload-document`, formData, {
+        headers: { 
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
         }
-      );
+      });
 
-
-
-      if (response.data.status) {
-        alert("Document uploaded successfully! Status: Pending Review");
-
-        // Optionally refresh data here
+      if (response.data.success) {
+        alert("Document uploaded successfully!");
         closeUploadModal();
-        fetchProfileData();
+        // Refresh document data if needed
+        // await fetchDocuments();
       } else {
-        alert("Failed to upload file");
+        alert("Upload failed. Please try again.");
       }
     } catch (error) {
       console.error("Upload error:", error);
@@ -4229,7 +4225,7 @@ const Student = ({
 
                   {/* ===== BULK ATTENDANCE CONTROLS ===== */}
 
-                  <div className="col-12 mt-3 p-3 bg-light rounded">
+                  {/* <div className="col-12 mt-3 p-3 bg-light rounded">
                     {showAttendanceMode && (
                       <div className="d-flex align-items-center gap-2">
                         <label className="form-label mb-0 small fw-bold">
@@ -4311,7 +4307,7 @@ const Student = ({
 
                       </div>
                     )}
-                  </div>
+                  </div> */}
 
                 </div>
               </div>
