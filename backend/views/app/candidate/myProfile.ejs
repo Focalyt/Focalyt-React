@@ -1031,6 +1031,7 @@
               </div>
             </div>
           </div>
+          <script src="/js/addressUtils.js"></script>
           <script
             src="https://maps.googleapis.com/maps/api/js?key=<%= process.env.AUTH_KEY_GOGGLE%>&callback=initMap&libraries=places&v=weekly"
             defer></script>
@@ -1043,26 +1044,54 @@
                 componentRestrictions: { country: "in" },
                 types: ["establishment"]
               };
+              
+              // Work location autocomplete
               const location = document.getElementById("work-loc")
-              const cllgLocation = document.getElementById("college-loc")
-              const autocomplete = new google.maps.places.Autocomplete(location, options);
-              google.maps.event.addListener(autocomplete, 'place_changed', function () {
-                let place = autocomplete.getPlace();
-                document.getElementById('place').value = location.value;
-                document.getElementById('latitude').value = place.geometry.location.lat();
-                document.getElementById('longitude').value = place.geometry.location.lng();
-              });
+              if (location) {
+                const autocomplete = new google.maps.places.Autocomplete(location, options);
+                google.maps.event.addListener(autocomplete, 'place_changed', function () {
+                  let place = autocomplete.getPlace();
+                  if (isValidPlace(place)) {
+                    const coordinates = getCoordinates(place);
+                    const addressData = parseAddressComponents(place);
+                    
+                    document.getElementById('place').value = location.value;
+                    document.getElementById('latitude').value = coordinates[1]; // latitude
+                    document.getElementById('longitude').value = coordinates[0]; // longitude
+                    
+                    console.log('Work location selected:', {
+                      place: place.name,
+                      coordinates,
+                      addressData
+                    });
+                  }
+                });
+              }
 
+              // College location autocomplete
               $('.qua-row').each(function () {
                 let self = this
                 const collegeLoc = $(this).find('.college-loc')[0]
-                const collegeAutocomplete = new google.maps.places.Autocomplete(collegeLoc, options);
-                google.maps.event.addListener(collegeAutocomplete, 'place_changed', function () {
-                  let place = collegeAutocomplete.getPlace();
-                  $(self).find('.cllgPlace').val(collegeLoc.value);
-                  $(self).find('.cllgLatitude').val(place.geometry.location.lat())
-                  $(self).find('.cllgLongitude').val(place.geometry.location.lng());
-                });
+                if (collegeLoc) {
+                  const collegeAutocomplete = new google.maps.places.Autocomplete(collegeLoc, options);
+                  google.maps.event.addListener(collegeAutocomplete, 'place_changed', function () {
+                    let place = collegeAutocomplete.getPlace();
+                    if (isValidPlace(place)) {
+                      const coordinates = getCoordinates(place);
+                      const addressData = parseAddressComponents(place);
+                      
+                      $(self).find('.cllgPlace').val(collegeLoc.value);
+                      $(self).find('.cllgLatitude').val(coordinates[1]); // latitude
+                      $(self).find('.cllgLongitude').val(coordinates[0]); // longitude
+                      
+                      console.log('College location selected:', {
+                        place: place.name,
+                        coordinates,
+                        addressData
+                      });
+                    }
+                  });
+                }
               })
             }
             window.initMap = initMap;

@@ -19,6 +19,7 @@ const candidateRoutes = require("./candidate");
 const digitalLeadRoutes = require('./digitalLead');
 const leadAssignmentRuleRoutes = require("./leadAssingmentRule");
 const attendanceRoutes = require("./attendance");
+const classroomMediaRoutes = require("./classroomMedia");
 
 
 const batchRoutes = require("./batches");
@@ -36,6 +37,7 @@ const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
 router.use("/attendance", isCollege, attendanceRoutes);
+router.use("/classroom-media", isCollege, classroomMediaRoutes);
 
 router.use("/digitalLead", digitalLeadRoutes);
 router.use("/leadAssignmentRule", isCollege, leadAssignmentRuleRoutes);
