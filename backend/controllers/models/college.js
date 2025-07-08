@@ -62,6 +62,18 @@ const collegeSchema = new Schema({
     city: { type: String },
     state: { type: String },
     fullAddress: { type: String }
+  },
+  
+  // WhatsApp Business API Configuration
+  whatsappConfig: {
+    accessToken: { type: String },
+    businessAccountId: { type: String },
+    phoneNumber: { type: String },
+    lastConnected: { type: Date },
+    lastMessageSent: { type: Date },
+    lastBulkMessageSent: { type: Date },
+    messageCount: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: false }
   }
 }, { timestamps: true });
 

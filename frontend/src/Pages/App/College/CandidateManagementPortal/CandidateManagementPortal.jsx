@@ -343,19 +343,17 @@ const CandidateManagementPortal = () => {
           <div key={vertical.id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`} onClick={() => handleVerticalClick(vertical)} style={{ cursor: 'pointer' }}>
             <div className="card h-100 border rounded shadow-sm folder-card position-relative">
               <div className="card-body">
-                <div className="d-flex justify-content-between align-items-start mb-2">
-                  <div
-                    className="flex-grow-1 cursor-pointer"
-                  >
+                <div className="d-flex justify-content-between align-items-start mb-2 row">
+                  <div className="flex-grow-1 cursor-pointer col-md-9">
                     <i className="bi bi-folder-fill text-warning fs-3"></i>
                     <h3 className="mt-2 mb-1">{vertical.name}</h3>
                     <p className="text-muted mb-1">{vertical.code}</p>
                     <span className={`${vertical.status === 'active' ? 'text-success' : 'text-secondary'}`}>{vertical.status}</span>
                   </div>
-                  <div className="text-end verticalActionBtn">
-                    <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(vertical); }}>
+                  <div className="text-end verticalActionBtn col-md-3">
+                    {/* <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(vertical); }}>
                       <i className="bi bi-share-fill"></i>
-                    </button>
+                    </button> */}
                     <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(vertical); }}>
                       <i className="bi bi-pencil-square"></i>
                     </button>
@@ -365,7 +363,7 @@ const CandidateManagementPortal = () => {
                   </div>
                 </div>
                 <div className="small text-muted mt-3">
-                  <div><i className="bi bi-calendar me-1"></i>Created: <strong>{vertical.createdAt}</strong></div>
+                  <div><i className="bi bi-calendar me-1"></i>Created: <strong>{new Date(vertical.createdAt).toLocaleDateString('en-GB')}</strong></div>
                   {/* <div>
                     <i className="bi bi-clipboard-data me-1"></i>
                     <span

@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react"
-import { MessageCircle, CheckCircle, AlertCircle, Copy } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { MessageCircle, CheckCircle, AlertCircle, Copy, Send, Users, Activity, Wifi, WifiOff } from "lucide-react"
 import axios from "axios"
+import websocketClient from "../../../../utils/websocket"
 import { toast } from "react-toastify"
 
-export default function FacebookWhatsAppConnector() {
+export default function WhatsAppWithWebSocket() {
   const [connectionStep, setConnectionStep] = useState(1)
   const [isConnected, setIsConnected] = useState(false)
   const [accessToken, setAccessToken] = useState("")
@@ -15,21 +16,96 @@ export default function FacebookWhatsAppConnector() {
   const [userInfo, setUserInfo] = useState(null)
   const [sdkLoaded, setSdkLoaded] = useState(false)
   const [activeTab, setActiveTab] = useState("setup")
+  
+  // WebSocket related states
+  const [wsConnected, setWsConnected] = useState(false)
+  const [wsStatus, setWsStatus] = useState("disconnected")
+  const [notifications, setNotifications] = useState([])
+  const [messageHistory, setMessageHistory] = useState([])
+  const [recipientPhone, setRecipientPhone] = useState("")
+  const [messageText, setMessageText] = useState("")
+  const [sendingMessage, setSendingMessage] = useState(false)
+  
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL
+  const token = localStorage.getItem('token')
 
   // Facebook App ID - Replace with your actual App ID
-  const FACEBOOK_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || "YOUR_FACEBOOK_APP_ID"
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:3000'
-  const token = localStorage.getItem('token')
+  const FACEBOOK_APP_ID = "YOUR_FACEBOOK_APP_ID"
+
+  // Initialize WebSocket connection
+  useEffect(() => {
+    if (token) {
+      websocketClient.setToken(token)
+      websocketClient.connect()
+      
+      // Set up WebSocket event handlers
+      websocketClient.onConnection('connected', () => {
+        setWsConnected(true)
+        setWsStatus('connected')
+        toast.success('WebSocket connected successfully')
+      })
+      
+      websocketClient.onConnection('disconnected', () => {
+        setWsConnected(false)
+        setWsStatus('disconnected')
+        toast.warning('WebSocket disconnected')
+      })
+      
+      websocketClient.onConnection('error', (error) => {
+        setWsStatus('error')
+        toast.error('WebSocket connection error')
+      })
+      
+      // Set up message handlers
+      websocketClient.onMessage('whatsapp_notification', (message) => {
+        const { notification } = message
+        setNotifications(prev => [notification, ...prev.slice(0, 9)]) // Keep last 10 notifications
+        
+        // Show toast based on notification type
+        switch (notification.type) {
+          case 'message_sent':
+            toast.success(`Message sent to ${notification.recipientPhone}`)
+            break
+          case 'message_error':
+            toast.error(`Failed to send message: ${notification.error}`)
+            break
+          case 'bulk_message_completed':
+            toast.info(`Bulk message completed: ${notification.successCount} successful, ${notification.failedCount} failed`)
+            break
+          case 'config_updated':
+            toast.success('WhatsApp configuration updated')
+            break
+          default:
+            console.log('WhatsApp notification:', notification)
+        }
+      })
+      
+      websocketClient.onMessage('message_sent', (message) => {
+        setMessageHistory(prev => [{
+          id: message.messageId,
+          type: 'sent',
+          timestamp: message.timestamp,
+          status: 'sent'
+        }, ...prev])
+      })
+      
+      // Start heartbeat
+      websocketClient.startHeartbeat()
+      
+      return () => {
+        websocketClient.disconnect()
+        websocketClient.stopHeartbeat()
+      }
+    }
+  }, [token])
 
   // Load Bootstrap CSS and JS
   useEffect(() => {
-    // Add Bootstrap CSS
     const bootstrapCSS = document.createElement("link")
     bootstrapCSS.rel = "stylesheet"
     bootstrapCSS.href = "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css"
     document.head.appendChild(bootstrapCSS)
 
-    // Add Bootstrap JS
     const bootstrapJS = document.createElement("script")
     bootstrapJS.src = "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"
     document.head.appendChild(bootstrapJS)
@@ -40,23 +116,20 @@ export default function FacebookWhatsAppConnector() {
     }
   }, [])
 
-  // Load Facebook SDK and saved data
+  // Load Facebook SDK
   useEffect(() => {
     const loadFacebookSDK = () => {
-      // Check if SDK is already loaded
       if (window.FB) {
         setSdkLoaded(true)
         return
       }
 
-      // Create script element
       const script = document.createElement("script")
       script.src = "https://connect.facebook.net/en_US/sdk.js"
       script.async = true
       script.defer = true
       script.crossOrigin = "anonymous"
 
-      // Initialize Facebook SDK when loaded
       window.fbAsyncInit = () => {
         window.FB.init({
           appId: FACEBOOK_APP_ID,
@@ -67,7 +140,6 @@ export default function FacebookWhatsAppConnector() {
 
         setSdkLoaded(true)
 
-        // Check if user is already logged in
         window.FB.getLoginStatus((response) => {
           if (response.status === "connected") {
             setFacebookConnected(true)
@@ -81,34 +153,7 @@ export default function FacebookWhatsAppConnector() {
     }
 
     loadFacebookSDK()
-
-    // Load saved Facebook data from backend
-    const loadSavedFacebookData = async () => {
-      if (!token) return
-
-      try {
-        const response = await axios.get(`${backendUrl}/college/whatsapp/facebook-data`, {
-          headers: { 'x-auth': token }
-        })
-
-        if (response.data.status && response.data.data.connected) {
-          const { accessToken, userInfo, businessAccounts } = response.data.data
-          
-          setFacebookConnected(true)
-          setAccessToken(accessToken)
-          setUserInfo(userInfo)
-          setBusinessAccounts(businessAccounts)
-          setConnectionStep(2)
-          
-          console.log('Loaded saved Facebook data:', response.data.data)
-        }
-      } catch (error) {
-        console.error('Error loading saved Facebook data:', error)
-      }
-    }
-
-    loadSavedFacebookData()
-  }, [token])
+  }, [])
 
   // Get user information
   const getUserInfo = (token) => {
@@ -124,7 +169,6 @@ export default function FacebookWhatsAppConnector() {
     try {
       setLoading(true)
 
-      // Get user's businesses
       window.FB.api("/me/businesses", { access_token: token }, (response) => {
         if (response && response.data) {
           const businesses = response.data.map((business) => ({
@@ -133,7 +177,6 @@ export default function FacebookWhatsAppConnector() {
             verification_status: business.verification_status,
           }))
 
-          // For each business, get WhatsApp Business Accounts
           businesses.forEach((business) => {
             window.FB.api(
               `/${business.id}/client_whatsapp_business_accounts`,
@@ -174,111 +217,17 @@ export default function FacebookWhatsAppConnector() {
     setError("")
 
     try {
-      // Facebook login with required permissions
       window.FB.login(
-        async (response) => {
+        (response) => {
           if (response.authResponse) {
             const { accessToken: fbToken } = response.authResponse
 
-            try {
-              // Get user info first
-              const userInfoPromise = new Promise((resolve, reject) => {
-                window.FB.api("/me", { 
-                  fields: "name,email,picture,id",
-                  access_token: fbToken 
-                }, (userResponse) => {
-                  if (userResponse && !userResponse.error) {
-                    resolve(userResponse)
-                  } else {
-                    reject(new Error(userResponse?.error?.message || "Failed to get user info"))
-                  }
-                })
-              })
+            setFacebookConnected(true)
+            setAccessToken(fbToken)
+            setConnectionStep(2)
 
-              const userInfo = await userInfoPromise
-              setUserInfo(userInfo)
-
-              // Get business accounts
-              const businessAccountsPromise = new Promise((resolve, reject) => {
-                window.FB.api("/me/businesses", { 
-                  access_token: fbToken 
-                }, (businessResponse) => {
-                  if (businessResponse && businessResponse.data) {
-                    const businesses = businessResponse.data.map((business) => ({
-                      id: business.id,
-                      name: business.name,
-                      verification_status: business.verification_status,
-                    }))
-
-                    // Get WhatsApp Business Accounts for each business
-                    const wabaPromises = businesses.map(business => 
-                      new Promise((resolveWaba) => {
-                        window.FB.api(
-                          `/${business.id}/client_whatsapp_business_accounts`,
-                          { access_token: fbToken },
-                          (wabaResponse) => {
-                            if (wabaResponse && wabaResponse.data) {
-                              const accounts = wabaResponse.data.map((account) => ({
-                                id: account.id,
-                                name: account.name,
-                                business_id: business.id,
-                                business_name: business.name,
-                                phone: account.phone_number || "Not configured",
-                              }))
-                              resolveWaba(accounts)
-                            } else {
-                              resolveWaba([])
-                            }
-                          }
-                        )
-                      })
-                    )
-
-                    Promise.all(wabaPromises).then(results => {
-                      const allAccounts = results.flat()
-                      resolve(allAccounts)
-                    })
-                  } else {
-                    reject(new Error(businessResponse?.error?.message || "Failed to get business accounts"))
-                  }
-                })
-              })
-
-              const businessAccounts = await businessAccountsPromise
-              setBusinessAccounts(businessAccounts)
-
-              // Store token and user info in backend
-              const token = localStorage.getItem('token')
-              const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:3000'
-              
-              try {
-                const saveResponse = await axios.post(`${backendUrl}/college/whatsapp/save-facebook-token`, {
-                  accessToken: fbToken,
-                  userInfo: userInfo,
-                  businessAccounts: businessAccounts
-                }, {
-                  headers: { 'x-auth': token }
-                })
-
-                if (saveResponse.data.status) {
-                  setFacebookConnected(true)
-                  setAccessToken(fbToken)
-                  setConnectionStep(2)
-                  
-                  // Show success message
-                  toast.success("Facebook connected successfully! ✅")
-                } else {
-                  throw new Error(saveResponse.data.message || "Failed to save token")
-                }
-              } catch (saveError) {
-                console.error("Error saving token:", saveError)
-                setError("Connected to Facebook but failed to save token. Please try again.")
-              }
-
-            } catch (apiError) {
-              console.error("API error:", apiError)
-              setError(apiError.message || "Failed to get user information")
-            }
+            getUserInfo(fbToken)
+            getBusinessAccounts(fbToken)
 
             setLoading(false)
           } else {
@@ -304,7 +253,6 @@ export default function FacebookWhatsAppConnector() {
 
     setLoading(true)
     try {
-      // Exchange short-lived token for long-lived token
       const response = await fetch(
         `https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${FACEBOOK_APP_ID}&client_secret=YOUR_APP_SECRET&fb_exchange_token=${accessToken}`,
       )
@@ -324,20 +272,111 @@ export default function FacebookWhatsAppConnector() {
     setLoading(false)
   }
 
-  // Logout function
-  const handleLogout = async () => {
-    try {
-      // Clear Facebook data from backend
-      if (token) {
-        await axios.post(`${backendUrl}/college/whatsapp/clear-facebook-data`, {}, {
-          headers: { 'x-auth': token }
-        })
-      }
-    } catch (error) {
-      console.error('Error clearing Facebook data:', error)
+  // Save WhatsApp configuration
+  const saveWhatsAppConfig = async () => {
+    if (!accessToken || !selectedAccount) {
+      toast.error("Please complete the setup first")
+      return
     }
 
-    // Clear Facebook session
+    try {
+      setLoading(true)
+      
+      const selectedAccountData = businessAccounts.find(acc => acc.id === selectedAccount)
+      
+      const response = await axios.post(`${backendUrl}/college/whatsapp/save-config`, {
+        accessToken,
+        businessAccountId: selectedAccount,
+        phoneNumber: selectedAccountData?.phone
+      }, {
+        headers: { 'x-auth': token }
+      })
+
+      if (response.data.status) {
+        setIsConnected(true)
+        setConnectionStep(4)
+        toast.success("WhatsApp configuration saved successfully")
+      } else {
+        toast.error(response.data.message)
+      }
+    } catch (error) {
+      console.error("Save config error:", error)
+      toast.error("Failed to save configuration")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Send WhatsApp message
+  const sendWhatsAppMessage = async () => {
+    if (!recipientPhone || !messageText.trim()) {
+      toast.error("Please enter recipient phone and message")
+      return
+    }
+
+    try {
+      setSendingMessage(true)
+      
+      const response = await axios.post(`${backendUrl}/college/whatsapp/send-message`, {
+        recipientPhone,
+        message: messageText,
+        messageType: 'text'
+      }, {
+        headers: { 'x-auth': token }
+      })
+
+      if (response.data.status) {
+        setMessageText("")
+        toast.success("Message sent successfully")
+        
+        // Add to message history
+        setMessageHistory(prev => [{
+          id: response.data.data.messageId,
+          type: 'sent',
+          recipientPhone,
+          message: messageText,
+          timestamp: new Date().toISOString(),
+          status: 'sent'
+        }, ...prev])
+      } else {
+        toast.error(response.data.message)
+      }
+    } catch (error) {
+      console.error("Send message error:", error)
+      toast.error("Failed to send message")
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+
+  // Get WhatsApp status
+  const getWhatsAppStatus = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/whatsapp/status`, {
+        headers: { 'x-auth': token }
+      })
+
+      if (response.data.status) {
+        const status = response.data.data
+        setIsConnected(status.connected)
+        if (status.connected) {
+          setConnectionStep(4)
+        }
+      }
+    } catch (error) {
+      console.error("Get status error:", error)
+    }
+  }
+
+  // Load status on component mount
+  useEffect(() => {
+    if (token) {
+      getWhatsAppStatus()
+    }
+  }, [token])
+
+  // Logout function
+  const handleLogout = () => {
     window.FB.logout(() => {
       setFacebookConnected(false)
       setAccessToken("")
@@ -346,14 +385,13 @@ export default function FacebookWhatsAppConnector() {
       setSelectedAccount("")
       setConnectionStep(1)
       setIsConnected(false)
-      
-      toast.success("Facebook disconnected successfully!")
     })
   }
 
   // Copy to clipboard function
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
+    toast.success("Copied to clipboard")
   }
 
   // Test API connection
@@ -362,7 +400,6 @@ export default function FacebookWhatsAppConnector() {
 
     setLoading(true)
     try {
-      // Test API call to get WhatsApp Business Account info
       window.FB.api(`/${selectedAccount}`, { access_token: accessToken }, (response) => {
         if (response && !response.error) {
           toast.success("Connection successful! ✅")
@@ -397,10 +434,16 @@ export default function FacebookWhatsAppConnector() {
               </div>
               <div>
                 <h1 className="h5 fw-bold text-dark mb-0">WhatsApp Business Connector</h1>
-                <p className="small text-muted mb-0">Facebook Access Token Integration</p>
+                <p className="small text-muted mb-0">Real-time messaging with WebSocket integration</p>
               </div>
             </div>
             <div className="d-flex align-items-center gap-3">
+              {/* WebSocket Status */}
+              <span className={`badge d-flex align-items-center gap-1 ${wsConnected ? "bg-success" : "bg-secondary"}`}>
+                {wsConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+                {wsConnected ? "WebSocket Connected" : "WebSocket Disconnected"}
+              </span>
+              
               <span className={`badge d-flex align-items-center gap-1 ${isConnected ? "bg-success" : "bg-secondary"}`}>
                 <div 
                   className="rounded-circle"
@@ -410,8 +453,9 @@ export default function FacebookWhatsAppConnector() {
                     backgroundColor: isConnected ? "#ffffff" : "#dee2e6" 
                   }}
                 />
-                {isConnected ? "Connected" : "Setup Required"}
+                {isConnected ? "WhatsApp Connected" : "Setup Required"}
               </span>
+              
               {facebookConnected && (
                 <button 
                   onClick={handleLogout}
@@ -443,6 +487,22 @@ export default function FacebookWhatsAppConnector() {
                 className={`nav-link d-flex align-items-center gap-2 ${activeTab === "setup" ? "active" : ""}`}
               >
                 📱 Setup
+              </button>
+            </li>
+            <li className="nav-item">
+              <button 
+                onClick={() => setActiveTab("messaging")}
+                className={`nav-link d-flex align-items-center gap-2 ${activeTab === "messaging" ? "active" : ""}`}
+              >
+                💬 Messaging
+              </button>
+            </li>
+            <li className="nav-item">
+              <button 
+                onClick={() => setActiveTab("notifications")}
+                className={`nav-link d-flex align-items-center gap-2 ${activeTab === "notifications" ? "active" : ""}`}
+              >
+                🔔 Notifications
               </button>
             </li>
             <li className="nav-item">
@@ -665,13 +725,11 @@ export default function FacebookWhatsAppConnector() {
                       </div>
 
                       <button
-                        onClick={() => {
-                          setIsConnected(true)
-                          setConnectionStep(4)
-                        }}
+                        onClick={saveWhatsAppConfig}
+                        disabled={loading}
                         className="btn btn-success w-100"
                       >
-                        Complete Setup
+                        {loading ? "⏳ Saving..." : "Complete Setup"}
                       </button>
                     </div>
                   )}
@@ -694,6 +752,134 @@ export default function FacebookWhatsAppConnector() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Messaging Tab Content */}
+          {activeTab === "messaging" && (
+            <div className="row g-4 mt-3">
+              <div className="col-md-8">
+                <div className="card shadow-sm">
+                  <div className="card-header bg-white">
+                    <h5 className="mb-1 d-flex align-items-center gap-2">
+                      💬 Send WhatsApp Message
+                    </h5>
+                    <p className="text-muted mb-0 small">Send real-time messages to your contacts</p>
+                  </div>
+                  <div className="card-body">
+                    <div className="mb-3">
+                      <label className="form-label">Recipient Phone Number</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="+91XXXXXXXXXX"
+                        value={recipientPhone}
+                        onChange={(e) => setRecipientPhone(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="mb-3">
+                      <label className="form-label">Message</label>
+                      <textarea
+                        className="form-control"
+                        rows="4"
+                        placeholder="Type your message here..."
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                      />
+                    </div>
+                    
+                    <button
+                      onClick={sendWhatsAppMessage}
+                      disabled={!isConnected || !recipientPhone || !messageText.trim() || sendingMessage}
+                      className="btn btn-primary d-flex align-items-center gap-2"
+                    >
+                      {sendingMessage ? "⏳" : <Send size={16} />}
+                      {sendingMessage ? "Sending..." : "Send Message"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="col-md-4">
+                <div className="card shadow-sm">
+                  <div className="card-header bg-white">
+                    <h5 className="mb-1 d-flex align-items-center gap-2">
+                      📋 Message History
+                    </h5>
+                    <p className="text-muted mb-0 small">Recent messages sent</p>
+                  </div>
+                  <div className="card-body">
+                    {messageHistory.length === 0 ? (
+                      <p className="text-muted small">No messages sent yet</p>
+                    ) : (
+                      <div className="d-flex flex-column gap-2">
+                        {messageHistory.slice(0, 5).map((msg) => (
+                          <div key={msg.id} className="p-2 border rounded">
+                            <div className="d-flex justify-content-between align-items-start">
+                              <div className="small">
+                                <strong>{msg.recipientPhone || 'Unknown'}</strong>
+                                <p className="mb-1">{msg.message}</p>
+                              </div>
+                              <span className={`badge ${msg.status === 'sent' ? 'bg-success' : 'bg-warning'}`}>
+                                {msg.status}
+                              </span>
+                            </div>
+                            <small className="text-muted">
+                              {new Date(msg.timestamp).toLocaleString()}
+                            </small>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Notifications Tab Content */}
+          {activeTab === "notifications" && (
+            <div className="card shadow-sm mt-3">
+              <div className="card-header bg-white">
+                <h5 className="mb-1 d-flex align-items-center gap-2">
+                  🔔 Real-time Notifications
+                </h5>
+                <p className="text-muted mb-0 small">Live updates from WebSocket connection</p>
+              </div>
+              <div className="card-body">
+                <div className="mb-3">
+                  <div className="d-flex justify-content-between align-items-center p-3 border rounded mb-3">
+                    <span className="small fw-medium">WebSocket Status</span>
+                    <span className={`badge ${wsConnected ? "bg-success" : "bg-secondary"}`}>
+                      {wsConnected ? "Connected" : "Disconnected"}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="mb-3">
+                  <h6>Recent Notifications</h6>
+                  {notifications.length === 0 ? (
+                    <p className="text-muted small">No notifications yet</p>
+                  ) : (
+                    <div className="d-flex flex-column gap-2">
+                      {notifications.map((notification, index) => (
+                        <div key={index} className="p-3 border rounded">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <strong>{notification.type}</strong>
+                              <p className="mb-1 small">{JSON.stringify(notification, null, 2)}</p>
+                            </div>
+                            <small className="text-muted">
+                              {new Date(notification.timestamp).toLocaleString()}
+                            </small>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -841,6 +1027,13 @@ export default function FacebookWhatsAppConnector() {
                       {selectedAccount ? "Selected" : "Not Selected"}
                     </span>
                   </div>
+
+                  <div className="d-flex justify-content-between align-items-center p-3 border rounded mb-3">
+                    <span className="small fw-medium">WebSocket Connection</span>
+                    <span className={`badge ${wsConnected ? "bg-success" : "bg-secondary"}`}>
+                      {wsConnected ? "Connected" : "Disconnected"}
+                    </span>
+                  </div>
                 </div>
 
                 <button
@@ -857,4 +1050,4 @@ export default function FacebookWhatsAppConnector() {
       </div>
     </div>
   )
-}
+} 
