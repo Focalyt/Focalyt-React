@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
+import { parseAddressComponents, getCoordinates, isValidPlace } from "../../../../utils/addressUtils";
 
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
