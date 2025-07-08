@@ -3,7 +3,6 @@ import axios from 'axios';
 import FrontLayout from '../../../Component/Layouts/Front';
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import "./Community.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShare , faDownload } from '@fortawesome/free-solid-svg-icons';  
 import $ from 'jquery';

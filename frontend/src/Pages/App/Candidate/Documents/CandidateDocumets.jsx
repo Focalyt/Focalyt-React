@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "./CandidatesDocuments.css";
 import {Link} from "react-router-dom";
 import CandidateLayout from "../../../../Component/Layouts/App/Candidates";
 const CandidateDocumets = ({ candidate, documents }) => {

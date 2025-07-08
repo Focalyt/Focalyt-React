@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useLocation, useNavigate } from 'react-router-dom';
-import "./CollegeLogin.css";
+
 import CollegeRegister from '../Register/CollegeRegister';
 
 const CollegeLogin = () => {
@@ -862,6 +862,28 @@ const CollegeLogin = () => {
                 .modal-btn:hover {
                     background-color: #e91e63;
                 }
+
+/* .blank-page{
+  
+  background:url(../../../../../public/Assets/public/images/logo/rename.webp) repeat;
+    background-size: auto;
+  background-size: contain;
+}
+
+.blank-page {
+  margin: 0px !important;
+  height: 100vh!important;
+}   
+
+.text-primary{
+  color: #FC2B5A!important;
+} */
+
+.btn-block {
+  display: block;
+  width: 100%;
+}
+
             `}</style>
         </div>
     );

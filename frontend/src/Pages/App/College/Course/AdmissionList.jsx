@@ -5,8 +5,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import './CourseCrm.css';
-import './crm.css';
+
 
 // Add this at the top of the file, after imports
 const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
@@ -50,6 +49,62 @@ const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
     </div>
   );
 });
+const useNavHeight = (dependencies = []) => {
+  const navRef = useRef(null);
+  const [navHeight, setNavHeight] = useState(140);
+  const [navWidth, setNavWidth] = useState('100%');
+
+  const calculateHeightAndWidth = useCallback(() => {
+    console.log('🔍 Calculating nav height and width...');
+    
+    if (navRef.current) {
+      // Calculate Height
+      const height = navRef.current.offsetHeight;
+      console.log('📏 Found height:', height);
+      
+      if (height > 0) {
+        setNavHeight(height);
+        console.log('✅ Height set to:', height + 'px');
+      }
+
+      // Calculate Width from parent (position-relative container)
+      const parentContainer = navRef.current.closest('.position-relative');
+      if (parentContainer) {
+        const parentWidth = parentContainer.offsetWidth;
+        console.log('📐 Parent width:', parentWidth);
+        
+        if (parentWidth > 0) {
+          setNavWidth(parentWidth + 'px');
+          console.log('✅ Width set to:', parentWidth + 'px');
+        }
+      }
+    } else {
+      console.log('❌ navRef.current is null');
+    }
+  }, []);
+
+  useEffect(() => {
+    // Calculate immediately and with delays
+    calculateHeightAndWidth();
+    setTimeout(calculateHeightAndWidth, 100);
+    setTimeout(calculateHeightAndWidth, 500);
+
+    // Resize listener
+    const handleResize = () => {
+      setTimeout(calculateHeightAndWidth, 100);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calculateHeightAndWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateHeightAndWidth, 100);
+  }, dependencies);
+
+  return { navRef, navHeight, navWidth };
+};
 
 const AdmissionList = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -140,6 +195,7 @@ const AdmissionList = () => {
     { _id: 'alladmission', name: 'All Lists', count: 1480, milestone: '' },
   ]);
 
+  const { navRef, navHeight, navWidth } = useNavHeight([admissionFilters]);
   // open model for upload documents 
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedDocumentForUpload, setSelectedDocumentForUpload] = useState(null);
@@ -2329,7 +2385,7 @@ const AdmissionList = () => {
           <div
             className="flex-grow-1 overflow-auto px-3 py-2"
             style={{
-              maxHeight: isMobile ? '60vh' : '65vh',
+              maxHeight: isMobile ? '30vh' : '65vh',
               minHeight: '200px'
             }}
           >
@@ -2349,7 +2405,7 @@ const AdmissionList = () => {
                     <div className="timeline-content">
                       <div className="card border-0 shadow-sm">
                         <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2">
+                          <div className="d-flex justify-content-between align-items-start mb-2" style={{flexDirection:'column'}}>
                             <span className="bg-light text-dark border">
                               {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
                                 day: '2-digit',
@@ -2510,7 +2566,8 @@ const AdmissionList = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--admission--list--post">
+          <div className="position-relative" >
+          <div ref={navRef} style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${navWidth}`}}>
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
                 <div className="col-md-7 d-md-block d-sm-none">
@@ -2577,25 +2634,12 @@ const AdmissionList = () => {
                       )}
                     </button>
 
-                    <div className="btn-group">
-                      <button
-                        onClick={() => setViewMode('grid')}
-                        className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-th"></i>
-                      </button>
-                      <button
-                        onClick={() => setViewMode('list')}
-                        className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-list"></i>
-                      </button>
-                    </div>
+                   
                   </div>
                 </div>
               </div>
             </div>
-
+          </div>
           </div>
 
           {/* Advanced Filters */}
@@ -2631,7 +2675,7 @@ const AdmissionList = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: '150px' }}>
+          <div className="content-body" style={{ marginTop: `${navHeight + 10}px` }}>
             <section className="list-view">
               <div className='row'>
                 <div>
@@ -2702,7 +2746,7 @@ const AdmissionList = () => {
                                                 width: "100vw",
                                                 height: "100vh",
                                                 backgroundColor: "transparent",
-                                                zIndex: 999,
+                                                zIndex: 8,
                                               }}
                                             ></div>
                                           )}
@@ -2718,7 +2762,7 @@ const AdmissionList = () => {
                                               boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                               borderRadius: "4px",
                                               padding: "8px 0",
-                                              zIndex: 1000,
+                                              zIndex: 9,
                                               transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                               transition: "transform 0.3s ease-in-out",
                                               pointerEvents: showPopup ? "auto" : "none",
@@ -2832,7 +2876,7 @@ const AdmissionList = () => {
                                                 width: "100vw",
                                                 height: "100vh",
                                                 backgroundColor: "transparent",
-                                                zIndex: 999,
+                                                zIndex: 8,
                                               }}
                                             ></div>
                                           )}
@@ -2848,7 +2892,7 @@ const AdmissionList = () => {
                                               boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                               borderRadius: "4px",
                                               padding: "8px 0",
-                                              zIndex: 1000,
+                                              zIndex: 9,
                                               transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                               transition: "transform 0.3s ease-in-out",
                                               pointerEvents: showPopup === profileIndex ? "auto" : "none",
@@ -5515,7 +5559,7 @@ background: #fd2b5a;
 .preview-controls {
     position: absolute;
     bottom: 0px;
-    left: 50%;
+    left: 60%;
     transform: translateX(-50%);
     display: flex;
     gap: 10px;

@@ -41,6 +41,7 @@
     "react-scripts": "^5.0.1",
     "react-select": "^5.10.1",
     "react-slick": "^0.30.3",
+    "react-sticky": "^6.0.3",
     "react-toastify": "^11.0.5",
     "reactflow": "^11.11.4",
     "recharts": "^3.0.0",

@@ -577,8 +577,8 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                     <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
                         <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
                     </button>
-                    <button className="btn btn-primary me-2" onClick={handleAlign}>Align Exsting Center</button>
-                    <button className="btn btn-primary" onClick={handleAdd}>Add New Center</button>
+                    <button className="btn btn-danger me-2" onClick={handleAlign}>Align Exsting Center</button>
+                    <button className="btn btn-danger" onClick={handleAdd}>Add New Center</button>
                 </div>
             </div>
 

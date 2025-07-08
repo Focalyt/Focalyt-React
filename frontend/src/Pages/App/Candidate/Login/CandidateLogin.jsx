@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
-import "./CandidateLogin.css";
+
 
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
@@ -810,6 +810,151 @@ const CandidateLogin = () => {
                     text-align: center;
                 }
                 `}
+            </style>
+            <style>
+                {
+
+                    `
+                    .blank-page{
+   background:url(/Assets/images/logo/rename.webp) repeat; 
+//   background:url(../../../../../public/Assets/public/images/logo/rename.webp) repeat;
+    background-size: auto;
+  background-size: contain!important;
+}
+
+/* .blank-page {
+  margin: 0px !important;
+  height: 100vh!important;
+}    */
+
+.text-primary{
+  color: #FC2B5A!important;
+}
+/* .btn{
+  border: 1px solid #FC2B5A!important;
+} */
+.card-title.text-center.mb-0{
+    border-top: 3px solid #f2f0f8;
+    border-bottom: 3px solid #f2f0f8;
+}
+.carousel-gallery {
+    margin: 20px 0;
+}
+.carousel-gallery img{
+    border-radius: 10px;
+}
+.carousel-gallery .swiper-pagination-horizontal{
+    position: relative;
+    top: 0!important;
+}
+
+.nav.nav-tabs {
+    border: none;
+    margin-bottom: 1rem;
+    position: relative;
+    border-radius: 0;
+}
+
+/* login page slider  */
+
+#login-partner{
+    font-weight: 600;
+    color: #FC2B5A;
+  }
+  .slider {
+    background: transparent;
+    /* height: 60pt!important; */
+    margin: 0 auto;
+    overflow: hidden;
+    position: relative;
+    cursor: default;
+    user-select: none;
+    touch-action: none;
+  }
+  
+  .slider:before {
+    left: 0;
+    top: 0;
+  }
+  .slider:after,
+  .slider:before {
+    background: transparent;
+    content: "";
+    height: auto;
+    position: absolute;
+    width: 200px;
+    z-index: 2;
+  }
+  .slider:after {
+    right: 0;
+    top: 0;
+    transform: rotateZ(180deg);
+  }
+  .slider:after,
+  .slider:before {
+    background: transparent;
+    content: "";
+    height: auto;
+    position: absolute;
+    width: 200px;
+    z-index: 2;
+  }
+  
+  .slider .slide-track-1 {
+    animation: scroll-l 37s linear infinite;
+    display: flex;
+    width: 3500px;
+  }
+  .slider .slide-track-2 {
+    animation: scroll-r 30s linear infinite;
+    display: flex;
+    width: 3500px;
+  }
+  
+  .slider .slide {
+    height: 45pt;
+    width: 180px!important;
+    display: flex;
+    align-items: center;
+    text-align: center;
+  }
+  .slider .slide img {
+    width: 150px;
+    padding: 0px 10px;
+    vertical-align: middle;
+    margin: 0 auto;
+    display: inline-block;
+    max-width: 100%;
+    height: auto;
+  }
+  
+  @keyframes scroll-l {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(calc(-250px * 7));
+    }
+  }
+  @keyframes scroll-r {
+    100% {
+        transform: translateX(0);
+    }
+    0% {
+        transform: translateX(calc(-250px * 7));
+    }
+  }
+  /* login page slider end */
+  .card-title.text-center.mb-0 {
+    border-top: 3px solid #f2f0f8;
+    border-bottom: 3px solid #f2f0f8;
+  }
+  .readyMinds{
+    margin: 0;
+    padding-block: 5px;
+  }
+                    `
+                }
             </style>
         </div>
     );

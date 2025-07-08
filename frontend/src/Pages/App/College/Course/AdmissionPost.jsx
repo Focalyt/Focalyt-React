@@ -7,8 +7,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import './CourseCrm.css';
-import './crm.css';
+
 
 // Add this at the top of the file, after imports
 const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
@@ -52,6 +51,49 @@ const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
     </div>
   );
 });
+
+const useNavHeight = (dependencies = []) => {
+    const navRef = useRef(null);
+    const [navHeight, setNavHeight] = useState(140); // Default fallback
+  
+    const calculateHeight = useCallback(() => {
+      console.log('🔍 Calculating nav height...');
+      
+      if (navRef.current) {
+        const height = navRef.current.offsetHeight;
+        console.log('📏 Found height:', height);
+        
+        if (height > 0) {
+          setNavHeight(height);
+          console.log('✅ Height set to:', height + 'px');
+        }
+      } else {
+        console.log('❌ navRef.current is null');
+      }
+    }, []);
+  
+    useEffect(() => {
+      // Calculate immediately and with delays
+      calculateHeight();
+      setTimeout(calculateHeight, 100);
+      setTimeout(calculateHeight, 500);
+  
+      // Resize listener
+      const handleResize = () => {
+        setTimeout(calculateHeight, 100);
+      };
+  
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }, [calculateHeight]);
+  
+    // Recalculate when dependencies change
+    useEffect(() => {
+      setTimeout(calculateHeight, 100);
+    }, dependencies);
+  
+    return { navRef, navHeight };
+  };
 
 const CRMDashboard = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -97,7 +139,7 @@ const CRMDashboard = () => {
   const fileInputRef = useRef(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
-
+  const { navRef, navHeight } = useNavHeight([mainTab]);
  
 
   // ========================================
@@ -141,7 +183,9 @@ const CRMDashboard = () => {
       <div className="row">
         <div className={`${isMobile ? 'col-12' : mainContentClass} mobileResponsive`}>
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--admissions--posts">
+          <div className='position-relative' >
+          <div ref={navRef} className="bg-white shadow-sm border-bottom mb-3 
+        " style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed'}}>
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
                 <div className="col-md-12 d-md-block d-sm-none">
@@ -181,9 +225,9 @@ const CRMDashboard = () => {
 
             
           </div>
-
+          </div>
           {/* Main Content */}
-          <div className="main-content">
+          <div className="main-content" style={{marginTop: `${navHeight + 30}px`}}>
             {renderMainTabContent()}
           </div>
         </div>

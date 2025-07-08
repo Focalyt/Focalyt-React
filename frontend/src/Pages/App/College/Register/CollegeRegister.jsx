@@ -3,7 +3,6 @@ import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
-import './CollegeRegister.css';
 
 const CollegeRegister = ({ embedded = false }) => {
     const urlLocation = useLocation();
@@ -742,7 +741,26 @@ height: 100dvh;}
 html body .content {
     margin-left: 0!important;
 }
+    .form-label-group {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+.collegeRegistration input {
+    margin: 0px !important;
+}
+.collegeRegistration .row fieldset:nth-of-type(1), .collegeRegistration .row fieldset:nth-of-type(2), .collegeRegistration .row fieldset:nth-of-type(3){
+    margin: 0px;
+}
+.sendOTP{
+    height: 40px;
+    border-top-left-radius: 0px!important;
+    border-bottom-left-radius: 0px!important;
+}
+.brand-custom {
+    width: 30% !important;
+}
         `
+        
                 }
             </style>
 

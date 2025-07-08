@@ -1,5 +1,4 @@
 import React , {useState,useEffect} from 'react'
-import "./Contact.css"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHome, faPhone, faEnvelope } from '@fortawesome/free-solid-svg-icons';
 import { faFacebook, faInstagram, faYoutube, faLinkedin } from '@fortawesome/free-brands-svg-icons';
@@ -94,6 +93,65 @@ function Contact() {
             referrerpolicy="no-referrer-when-downgrade">
         </iframe>    
       </section>
+      <style>
+        {
+          `
+          .contact-form .form-group .form-contro {
+    border: 1px solid #666762;
+    background-color: #fff;
+    transition: .2s ease-in-out;
+}
+.contact-form input[type="text"],
+.contact-form input[type="password"],
+.contact-form input[type="email"],
+.contact-form textarea {
+    background: #e4e4e4 none repeat scroll 0 0;
+    border: none;
+    float: left;
+    font-size: 12px;
+    font-weight: 400;
+    margin-bottom: 20px;
+    padding: 19px 28px;
+    width: 100%;
+}
+
+.distance-btn {
+    background-color: #FC2B5A !important;
+    color: #fff;
+    justify-content: center;
+}
+.distance-btn:hover {
+    background-color: white !important;
+    color: #FC2B5A !important;
+    border: 1px solid #FC2B5A !important;
+}
+.contact-form .form-group .form-contro {
+    border: 1px solid #666762;
+    background-color: #fff;
+}
+.contact-form .form-group .form-contro {
+    border: 1px solid #666762;
+    background-color: #fff;
+    transition: .2s ease-in-out;
+}
+.contact-form .form-group .form-contro:hover {
+    border: 1px solid #FC2B5A !important;
+    box-shadow: 2px 5px #FC2B5A !important;
+    transition: .3s ease-in;
+    cursor: pointer;
+}
+.distance-color:hover {
+    color: #FC2B5A !important;
+}
+.contact a:hover {
+    color: #FC2B5A !important;
+}
+.contact a{
+    color: rgba(10, 16, 47, 0.8);
+}
+          `
+        }
+      </style>
 </FrontLayout>
     </>
   )

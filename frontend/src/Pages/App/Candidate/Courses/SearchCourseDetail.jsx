@@ -3,7 +3,6 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
 import moment from 'moment';
-import "./SearchCoursesDetail.css";
 import PopupModelApply from "../../../../Component/Layouts/App/Candidates/PopupModelApply/PopupModelApply"
 const CourseDetails = () => {
 
@@ -1449,6 +1448,142 @@ const CourseDetails = () => {
     .carousel-indicators{
            transform: translate(10px, 10px);
     }
+           .cr_nw_in {
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0px 4px 25px 0px rgba(0, 0, 0, 0.1);
+    transition: all .3sease-in-out;
+    margin: 15px 0px;
+    position: relative;
+}
+.right_obj {
+    color: #FC2B5A;
+    background: #fff;
+    width: fit-content;
+    padding: 2px 10px;
+    position: absolute;
+    top: 30px;
+    right: 17px;
+    box-shadow: 0.5px 0px 2px rgba(0, 0, 0, 0.30);
+    font-weight: 700;
+    font-family: inter;
+    border-bottom-left-radius: 15px;
+    border: 1px dashed #FFD542;
+    outline: 3px solid #FFF;
+    border-right: 0px;
+    z-index: 1;
+}
+.cr_nw_in img.video_thum {
+    border-radius: 8px 8px 0px 0px;
+    width: 100%;
+}
+.video-bttn:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 1;
+    margin-left: -20px;
+    margin-top: -20px;
+    /* background-image: url(../images/icon-play.png); */
+    background-size: contain;
+    display: block;
+    width: 44px;
+    height: 44px;
+    box-shadow: 0 .5rem 1rem rgb(252 43 90 / 39%) !important;
+    border-radius: 50px;
+}
+.course_inf {
+    padding: 15px;
+}
+.course_inf h5 {
+    font-size: 17px;
+    text-transform: capitalize;
+    font-weight: 600;
+    line-height: 24px;
+    color: #000;
+}
+.course_inf span.job_cate {
+    background: #1b95391a;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    color: #1b9539;
+    border: solid 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    display: inline-table;
+    width: fit-content;
+    overflow: auto;
+    word-wrap: break-word;
+}
+.course_spec {
+    display: flex
+;
+    margin-top: 20px;
+    color: #000;
+}
+.course_spec .spe_icon {
+    margin-right: 10px;
+}
+.width {
+    width: 30px;
+}
+.apply-thisjob {
+    background-color: #FC2B5A;
+    float: left;
+    width: calc(100% - 30px);
+    border: 2px solid #FC2B5A;
+    text-align: center;
+    color: #fff;
+    -webkit-border-radius: 8px;
+    -moz-border-radius: 8px;
+    -ms-border-radius: 8px;
+    -o-border-radius: 8px;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 12px;
+    font-family: Open Sans;
+    font-weight: bold;
+}
+.apply-thisjob:hover {
+    border: 2px solid #FC2B5A;
+    background: #fff;
+    color: #FC2B5A!important;
+    text-decoration: none;
+}
+.ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  
+  .para_ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .course_spec .spe_icon {
+    margin-right: 10px;
+}
+.video-fluid{
+    width: 100%;
+}
+
+@media screen and (max-width: 1261px) {
+    .apply-thisjob {
+        width: 100% !important;
+    }
+}
+@media screen and (max-width: 992px) {
+    .apply-thisjob {
+        width: 100% !important;
+    }
+}
     `
         }
       </style>
