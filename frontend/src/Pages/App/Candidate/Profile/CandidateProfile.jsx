@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
+import { parseAddressComponents, getCoordinates, isValidPlace } from "../../../../utils/addressUtils";
 
 const CandidateProfile = () => {
   // State for resume data
@@ -654,23 +655,10 @@ const CandidateProfile = () => {
 
         autocomplete.addListener('place_changed', () => {
           const place = autocomplete.getPlace();
-          if (!place || !place.geometry || !place.geometry.location) return;
+          if (!isValidPlace(place)) return;
 
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const fullAddress = place.formatted_address || place.name || inputElement.value;
-
-          let city = '', state = '', pincode = '';
-
-          if (Array.isArray(place.address_components)) {
-            place.address_components.forEach((component) => {
-              const types = component.types.join(',');
-              if (types.includes("postal_code")) pincode = component.long_name;
-              if (types.includes("locality")) city = component.long_name;
-              if (types.includes("administrative_area_level_1")) state = component.long_name;
-              if (!city && types.includes("sublocality_level_1")) city = component.long_name;
-            });
-          }
+          const coordinates = getCoordinates(place);
+          const addressData = parseAddressComponents(place);
 
           // Set name and location
           stateUpdater(prev => {
@@ -684,14 +672,21 @@ const CandidateProfile = () => {
             if (locationKey) {
               updated[index][locationKey] = {
                 type: 'Point',
-                coordinates: [lng, lat],
-                city,
-                state,
-                fullAddress
+                coordinates: coordinates, // Already in [lng, lat] format
+                city: addressData.city,
+                state: addressData.state,
+                fullAddress: addressData.fullAddress
               };
             }
 
             return updated;
+          });
+
+          // Debug logging
+          console.log(`Autocomplete for ${inputId}:`, {
+            place: place.name,
+            coordinates,
+            addressData
           });
         });
 
@@ -821,28 +816,21 @@ const CandidateProfile = () => {
         console.log("Place changed event fired");
         const place = autocomplete.getPlace();
 
-        if (!place || !place.geometry || !place.geometry.location) {
+        if (!isValidPlace(place)) {
           console.warn('Invalid place data selected.');
           return;
         }
 
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-        const fullAddress = place.formatted_address || place.name || input.value;
+        const coordinates = getCoordinates(place);
+        const addressData = parseAddressComponents(place);
 
-        let city = '', state = '', pincode = '';
-
-        if (Array.isArray(place.address_components)) {
-          place.address_components.forEach((component) => {
-            const types = component.types.join(',');
-            if (types.includes("postal_code")) pincode = component.long_name;
-            if (types.includes("locality")) city = component.long_name;
-            if (types.includes("administrative_area_level_1")) state = component.long_name;
-            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
-          });
-        }
-
-        console.log("Extracted data:", { fullAddress, city, state, pincode, lat, lng });
+        console.log("Extracted data:", { 
+          fullAddress: addressData.fullAddress, 
+          city: addressData.city, 
+          state: addressData.state, 
+          pincode: addressData.pincode, 
+          coordinates 
+        });
 
         // 👇 Set directly into certificates[index]
         setCertificates(prev => {
@@ -852,10 +840,10 @@ const CandidateProfile = () => {
             orgName: place.name || '', // ✅ Set orgName
             orgLocation: {
               type: 'Point',
-              coordinates: [lng, lat],
-              city,
-              state,
-              fullAddress
+              coordinates: coordinates, // Already in [lng, lat] format
+              city: addressData.city,
+              state: addressData.state,
+              fullAddress: addressData.fullAddress
             }
           };
           return updated;
@@ -902,42 +890,35 @@ const CandidateProfile = () => {
         console.log("Place changed event fired");
         const place = autocomplete.getPlace();
 
-        if (!place || !place.geometry || !place.geometry.location) {
+        if (!isValidPlace(place)) {
           console.warn('Invalid place data selected.');
           return;
         }
 
         console.log("Selected place:", place);
 
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-        const fullAddress = place.formatted_address || place.name || input.value;
+        const coordinates = getCoordinates(place);
+        const addressData = parseAddressComponents(place);
 
-        let city = '', state = '', pincode = '';
-
-        if (Array.isArray(place.address_components)) {
-          place.address_components.forEach((component) => {
-            const types = component.types.join(',');
-            if (types.includes("postal_code")) pincode = component.long_name;
-            if (types.includes("locality")) city = component.long_name;
-            if (types.includes("administrative_area_level_1")) state = component.long_name;
-            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
-          });
-        }
-
-        console.log("Extracted data:", { fullAddress, city, state, pincode, lat, lng });
+        console.log("Extracted data:", { 
+          fullAddress: addressData.fullAddress, 
+          city: addressData.city, 
+          state: addressData.state, 
+          pincode: addressData.pincode, 
+          coordinates 
+        });
 
         setProfileData(prev => ({
           ...prev,
           personalInfo: {
             ...(prev.personalInfo || {}),
             currentAddress: {
-              fullAddress,
-              state,
-              city,
-              pincode,
-              latitude: lat,
-              longitude: lng
+              fullAddress: addressData.fullAddress,
+              state: addressData.state,
+              city: addressData.city,
+              pincode: addressData.pincode,
+              latitude: coordinates[1], // latitude
+              longitude: coordinates[0] // longitude
             }
           }
         }));
@@ -977,42 +958,35 @@ const CandidateProfile = () => {
         console.log("Place changed event fired");
         const place = autocomplete.getPlace();
 
-        if (!place || !place.geometry || !place.geometry.location) {
+        if (!isValidPlace(place)) {
           console.warn('Invalid place data selected.');
           return;
         }
 
         console.log("Selected place:", place);
 
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-        const fullAddress = place.formatted_address || place.name || input.value;
+        const coordinates = getCoordinates(place);
+        const addressData = parseAddressComponents(place);
 
-        let city = '', state = '', pincode = '';
-
-        if (Array.isArray(place.address_components)) {
-          place.address_components.forEach((component) => {
-            const types = component.types.join(',');
-            if (types.includes("postal_code")) pincode = component.long_name;
-            if (types.includes("locality")) city = component.long_name;
-            if (types.includes("administrative_area_level_1")) state = component.long_name;
-            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
-          });
-        }
-
-        console.log("Extracted data:", { fullAddress, city, state, pincode, lat, lng });
+        console.log("Extracted data:", { 
+          fullAddress: addressData.fullAddress, 
+          city: addressData.city, 
+          state: addressData.state, 
+          pincode: addressData.pincode, 
+          coordinates 
+        });
 
         setProfileData(prev => ({
           ...prev,
           personalInfo: {
             ...(prev.personalInfo || {}),
             permanentAddress: {
-              fullAddress,
-              state,
-              city,
-              pincode,
-              latitude: lat,
-              longitude: lng
+              fullAddress: addressData.fullAddress,
+              state: addressData.state,
+              city: addressData.city,
+              pincode: addressData.pincode,
+              latitude: coordinates[1], // latitude
+              longitude: coordinates[0] // longitude
             }
           }
         }));

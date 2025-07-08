@@ -811,24 +811,15 @@ const AdmissionList = () => {
     setSelectedStatus(e.target.value);
   };
 
-  const handleMoveToAdmission = async(profile) => {
+ 
+
+  const handleDownloadAdmissionForm = async(profile) => {
     try {
       if (!profile || !profile._id) {
         alert('No profile selected');
         return;
       }
 
-      // Check if all documents are verified using docCounts
-      if (profile.docCounts.verifiedCount !== profile.docCounts.totalRequired) {
-        alert('All documents must be verified before moving to admission list');
-        return;
-      }
-
-      // Show confirmation dialog
-      const confirmMove = window.confirm('Do you really want to move this profile to admission list?');
-      if (!confirmMove) {
-        return;
-      }
 
       // Check if backend URL and token exist
       if (!backendUrl) {
@@ -842,22 +833,17 @@ const AdmissionList = () => {
       }
 
       // Send PUT request to backend API to update status
-      const response = await axios.put(
-        `${backendUrl}/college/update/${profile._id}`,
-        {
-          admissionDone: true, // Set admission as done
-          remarks: 'Moved to admission'
-        },
+      const response = await axios.get(
+        `${backendUrl}/college/generate-application-form/${profile._id}`,
         {
           headers: {
             'x-auth': token,
-            'Content-Type': 'application/json'
           }
         }
       );
 
       if (response.data.success) {
-        alert('Profile moved to admission successfully!');
+        alert('Admission form downloaded successfully!');
         // Refresh the profile data
         await fetchProfileData();
       } else {
@@ -2781,9 +2767,9 @@ const AdmissionList = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
-                                              onClick={() => handleMoveToAdmission(profile)}
+                                              onClick={() => handleDownloadAdmissionForm(profile)}
                                             >
-                                              Move to Admission
+                                              Download Admission Form
                                             </button>
                                             <button
                                               className="dropdown-item"
@@ -2911,9 +2897,9 @@ const AdmissionList = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
-                                              onClick={() => handleMoveToAdmission(profile)}
+                                              onClick={() => handleDownloadAdmissionForm(profile)}
                                             >
-                                              Move to Admission
+                                              Download Admission Form
                                             </button>
                                             <button
                                               className="dropdown-item"

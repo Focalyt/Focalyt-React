@@ -33,6 +33,13 @@ const {
  
 const app = express();
 const server = http.createServer(app);
+
+// Initialize WebSocket server
+const WebSocketServer = require('./websocket');
+const wsServer = new WebSocketServer(server);
+
+// Make WebSocket server globally available
+global.wsServer = wsServer;
 const sess = {
 	maxAge: 1000 * 60 * 60 * 24 * 30,
 	keys: [cookieSecret]

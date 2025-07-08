@@ -5663,10 +5663,10 @@ const CRMDashboard = () => {
 
                             {openModalId === profile._id && (
                               <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                                <div className="modal-dialog modal-dialog-scrollable mt-2 m-0">
+                                <div className="modal-dialog modal-dialog-scrollable m-0 mt-2">
                                   <div className="modal-content new-modal-content">
                                     <div className="modal-header">
-                                      <h1 className="modal-title fs-5">Modal title</h1>
+                                      <h1 className="modal-title fs-5">Candidate Profile</h1>
                                       <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                                     </div>
                                     <div className="modal-body">

@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
 
-
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import { Pagination, Autoplay } from 'swiper/modules';
@@ -83,36 +82,37 @@ const CandidateLogin = () => {
 
                     autocomplete.addListener('place_changed', () => {
                         const place = autocomplete.getPlace();
-                        if (!place || !place.geometry || !place.geometry.location) return;
+                        if (!isValidPlace(place)) return;
 
-                        const lat = place.geometry.location.lat();
-                        const lng = place.geometry.location.lng();
-                        let fullAddress = place.formatted_address || place.name || input.value;
+                        const coordinates = getCoordinates(place);
+                        const addressData = parseAddressComponents(place);
 
-                        let city = '', state = '', pincode = '';
-                        place.address_components?.forEach((component) => {
-                            const types = component.types.join(',');
-                            if (types.includes("postal_code")) pincode = component.long_name;
-                            if (types.includes("locality")) city = component.long_name;
-                            if (types.includes("administrative_area_level_1")) state = component.long_name;
-                            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+                        setAddress(addressData.fullAddress);
+                        setCity(addressData.city);
+                        setState(addressData.state);
+                        setPC(addressData.pincode);
+                        setLatitude(coordinates[1]); // latitude
+                        setLongitude(coordinates[0]); // longitude
+                        setLocation({ place: place.name || '', lat: coordinates[1], lng: coordinates[0] });
+
+                        // Debug logging
+                        console.log('Address Parsed:', {
+                            fullAddress: addressData.fullAddress,
+                            city: addressData.city,
+                            state: addressData.state,
+                            pincode: addressData.pincode,
+                            coordinates: coordinates,
+                            latitude: coordinates[1],
+                            longitude: coordinates[0]
                         });
 
-                        setAddress(fullAddress);
-                        setCity(city);
-                        setState(state);
-                        setPC(pincode);
-                        setLatitude(lat);
-                        setLongitude(lng);
-                        setLocation({ place: place.name || '', lat, lng });
-
                         if (sameAddress) {
-                            setPermanentAddress(fullAddress);
-                            setPermanentCity(city);
-                            setPermanentState(state);
-                            setPermanentPincode(pincode);
-                            setPermanentLat(lat);
-                            setPermanentLng(lng);
+                            setPermanentAddress(addressData.fullAddress);
+                            setPermanentCity(addressData.city);
+                            setPermanentState(addressData.state);
+                            setPermanentPincode(addressData.pincode);
+                            setPermanentLat(coordinates[1]);
+                            setPermanentLng(coordinates[0]);
                         }
                     });
                 }
@@ -126,27 +126,17 @@ const CandidateLogin = () => {
 
                     autocompletePermanent.addListener('place_changed', () => {
                         const place = autocompletePermanent.getPlace();
-                        if (!place || !place.geometry || !place.geometry.location) return;
+                        if (!isValidPlace(place)) return;
 
-                        const lat = place.geometry.location.lat();
-                        const lng = place.geometry.location.lng();
-                        let fullAddress = place.formatted_address || place.name || permanentInput.value;
+                        const coordinates = getCoordinates(place);
+                        const addressData = parseAddressComponents(place);
 
-                        let city = '', state = '', pincode = '';
-                        place.address_components?.forEach((component) => {
-                            const types = component.types.join(',');
-                            if (types.includes("postal_code")) pincode = component.long_name;
-                            if (types.includes("locality")) city = component.long_name;
-                            if (types.includes("administrative_area_level_1")) state = component.long_name;
-                            if (!city && types.includes("sublocality_level_1")) city = component.long_name;
-                        });
-
-                        setPermanentAddress(fullAddress);
-                        setPermanentLat(lat);
-                        setPermanentLng(lng);
-                        setPermanentCity(city);
-                        setPermanentState(state);
-                        setPermanentPincode(pincode);
+                        setPermanentAddress(addressData.fullAddress);
+                        setPermanentLat(coordinates[1]); // latitude
+                        setPermanentLng(coordinates[0]); // longitude
+                        setPermanentCity(addressData.city);
+                        setPermanentState(addressData.state);
+                        setPermanentPincode(addressData.pincode);
                     });
                 }
             } else {
@@ -273,21 +263,23 @@ const CandidateLogin = () => {
                         personalInfo: {
                             currentAddress: {
                                 type: "Point",
-                                coordinates: [parseFloat(longitude) || 0, parseFloat(latitude) || 0],
+                                coordinates: [parseFloat(longitude) || 0, parseFloat(latitude) || 0], // [lng, lat] for MongoDB
                                 city,
                                 state,
                                 fullAddress: address,
                                 latitude: String(latitude),
-                                longitude: String(longitude)
+                                longitude: String(longitude),
+                                pincode: pincode
                             },
                             permanentAddress: {
                                 type: "Point",
-                                coordinates: [parseFloat(permanentLng) || 0, parseFloat(permanentLat) || 0],
+                                coordinates: [parseFloat(permanentLng) || 0, parseFloat(permanentLat) || 0], // [lng, lat] for MongoDB
                                 fullAddress: permanentAddress,
                                 latitude: String(permanentLat),
                                 longitude: String(permanentLng),
                                 city: permanentCity,
-                                state: permanentState
+                                state: permanentState,
+                                pincode: permanentPincode
                             }
                         }
                     };

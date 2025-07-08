@@ -144,9 +144,8 @@ const Student = ({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedDocumentForUpload, setSelectedDocumentForUpload] =
     useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploadPreview, setUploadPreview] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -181,64 +180,310 @@ const Student = ({
 
   const [showImageModal, setShowImageModal] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showClassroomMediaModal, setShowClassroomMediaModal] = useState(false);
   const [selectedUploadDate, setSelectedUploadDate] = useState(new Date());
   const [uploadFiles, setUploadFiles] = useState([]);
   const [mediaData, setMediaData] = useState({});
- 
-  const handleUpload = () => {
-    if (uploadFiles.length === 0) return;
-    console.log("uploadFiles")
-    const newFiles = uploadFiles.map((file, index) => ({
-      id: Date.now() + index,
-      name: file.name,
-      url: URL.createObjectURL(file),
-      studentName: 'Current User',
-      uploadTime: new Date().toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }),
-      size: (file.size / (1024 * 1024)).toFixed(1) + ' MB',
-      type: file.type.includes('video') ? 'video' : 'image'
-    }));
-    console.log("newFiles")
-    setMediaData(prev => {
-      const dateString = new Date(selectedUploadDate).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
+  const [selectedMediaType, setSelectedMediaType] = useState('all'); // 'all', 'images', 'videos', 'documents'
+  const [selectedMediaDate, setSelectedMediaDate] = useState(null);
+  const [mediaFilter, setMediaFilter] = useState('all'); // 'all', 'today', 'week', 'month'
+  const [mediaSearchQuery, setMediaSearchQuery] = useState('');
+  const [selectedMediaItem, setSelectedMediaItem] = useState(null);
+  const [mediaViewMode, setMediaViewMode] = useState('grid'); // 'grid', 'list'
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+
+  // Classroom Media Upload Functions
+  const [classroomMediaData, setClassroomMediaData] = useState([]);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadDescription, setUploadDescription] = useState('');
+
+  const downloadImage = (fileUrl, fileName) => {
+    try {
+      // Create download link
+      const link = document.createElement('a');
+      
+      // Set URL
+    
+      
+      link.href = fileUrl;
+      link.download = fileName || 'download';
+      
+      // Force download attributes
+      link.setAttribute('download', fileName || 'download');
+      link.setAttribute('target', '_blank');
+      link.style.display = 'none';
+      
+      // Add to DOM, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback: open in new tab
+      window.open(fileUrl, '_blank');
+    }
+  };
+
+  // Fetch classroom media data
+  const fetchClassroomMedia = async () => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+      const response = await axios.get(`${backendUrl}/college/classroom-media`, {
+        headers: { 'x-auth': token },
+        params: {
+          batchId: selectedBatch?._id,
+          page: 1,
+          limit: 100
+        }
+      });
+      console.log('response', response);
+      console.log('response.data', response.data);
+      console.log('response.data.data', response.data.data);
+
+      if (response.data.success) {
+        setClassroomMediaData(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching classroom media:', error);
+    }
+  };
+
+  // Upload files
+  const uploadClassroomMedia = async (files) => {
+    try {
+      setIsUploadingMedia(true);
+
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+      // Files को upload करने से पहले log करें
+      console.log('Selected files:', files);
+      console.log('Files array length:', files.length);
+
+      // हर file को individually check करें
+      files.forEach((file, index) => {
+        console.log(`File ${index + 1}:`, {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified
+        });
       });
 
-      const existingDateIndex = prev.findIndex(item => item.date === dateString);
+      const formData = new FormData();
 
-      if (existingDateIndex !== -1) {
-        const updated = [...prev];
-        updated[existingDateIndex] = {
-          ...updated[existingDateIndex],
-          images: [
-            ...(updated[existingDateIndex].images || []),
-            ...newFiles.filter(file => file.type === 'image')
-          ],
-          videos: [
-            ...(updated[existingDateIndex].videos || []),
-            ...newFiles.filter(file => file.type === 'video')
-          ]
-        };
-        return updated;
-      } else {
-        const newDateEntry = {
-          date: dateString,
-          images: newFiles.filter(file => file.type === 'image'),
-          videos: newFiles.filter(file => file.type === 'video')
-        };
-        return [...prev, newDateEntry].sort((a, b) => new Date(b.date) - new Date(a.date));
+      // Files append करते समय भी log करें
+      files.forEach((file, index) => {
+        console.log(`Appending file ${index + 1}: ${file.name}`);
+        formData.append('mediaFiles', file);
+      });
+
+      // FormData entries check करें
+      console.log('FormData entries:');
+      for (let [key, value] of formData.entries()) {
+        console.log(key, value);
+      };
+      formData.append('batchId', selectedBatch?._id);
+      formData.append('description', uploadDescription);
+      formData.append('date', selectedUploadDate.toISOString().split('T')[0]);
+
+      const response = await axios.post(`${backendUrl}/college/classroom-media/upload`, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          // setUploadProgress(progress);
+        }
+      });
+
+      if (response.data.success) {
+        // Refresh media data
+        await fetchClassroomMedia();
+        setUploadDescription('');
+        // setSelectedUploadDate(new Date());
+        // setUploadProgress(0);
+        return true;
       }
-    });
-    console.log(mediaData, 'mediaData')
+    } catch (error) {
+      console.error('Error uploading classroom media:', error);
+      return false;
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
 
-    setUploadFiles([]);
-    setShowUploadModal(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+
+
+  // Download classroom media file
+  const downloadClassroomMedia = async (mediaId, fileIndex) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+      const response = await axios.get(`${backendUrl}/college/classroom-media/${mediaId}/download/${fileIndex}`, {
+        headers: { 'x-auth': token },
+        responseType: 'blob'
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', response.headers['content-disposition']?.split('filename=')[1] || 'file');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading classroom media:', error);
+    }
+  };
+
+  // Delete classroom media
+  const deleteClassroomMedia = async (mediaId) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+      const response = await axios.delete(`${backendUrl}/college/classroom-media/${mediaId}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        // Refresh media data
+        await fetchClassroomMedia();
+        return true;
+      }
+    } catch (error) {
+      console.error('Error deleting classroom media:', error);
+      return false;
+    }
+  };
+
+  // Update classroom media
+  const updateClassroomMedia = async (mediaId, updateData) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+      const response = await axios.put(`${backendUrl}/college/classroom-media/${mediaId}`, updateData, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        // Refresh media data
+        await fetchClassroomMedia();
+        return true;
+      }
+    } catch (error) {
+      console.error('Error updating classroom media:', error);
+      return false;
+    }
+  };
+
+  // Get file type icon
+  const getFileTypeIcon = (mediaType) => {
+    switch (mediaType) {
+      case 'image':
+        return 'bi-image';
+      case 'video':
+        return 'bi-camera-video';
+      case 'audio':
+        return 'bi-music-note';
+      case 'document':
+        return 'bi-file-text';
+      case 'presentation':
+        return 'bi-file-slides';
+      default:
+        return 'bi-file';
+    }
+  };
+
+  // Format file size
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Filter classroom media
+  const getFilteredClassroomMedia = () => {
+    let filtered = classroomMediaData;
+
+    // Filter by date
+    if (mediaFilter === 'today') {
+      const today = new Date().toISOString().split('T')[0];
+      filtered = filtered.filter(item =>
+        new Date(item.date).toISOString().split('T')[0] === today
+      );
+    } else if (mediaFilter === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      filtered = filtered.filter(item => new Date(item.date) >= weekAgo);
+    } else if (mediaFilter === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      filtered = filtered.filter(item => new Date(item.date) >= monthAgo);
+    }
+
+    // Filter by search query
+    if (mediaSearchQuery) {
+      filtered = filtered.filter(item =>
+        item.description.toLowerCase().includes(mediaSearchQuery.toLowerCase()) ||
+        item.files.some(file =>
+          file.originalFileName.toLowerCase().includes(mediaSearchQuery.toLowerCase())
+        )
+      );
+    }
+
+    return filtered;
+  };
+
+  // Load classroom media on component mount
+  useEffect(() => {
+    if (selectedBatch?._id) {
+      fetchClassroomMedia();
+    }
+  }, [selectedBatch?._id]);
+
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) return;
+
+    try {
+      setIsUploadingMedia(true);
+
+      // Use classroom media upload function for all files
+      const success = await uploadClassroomMedia(selectedFiles);
+      if (success) {
+        alert(selectedFiles.length === 1 ? 'File uploaded successfully!' : 'Files uploaded successfully!');
+      } else {
+        alert('Failed to upload files. Please try again.');
+      }
+
+      setSelectedFiles([]);
+      setShowUploadModal(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setUploadDescription('');
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploadingMedia(false);
+    }
   };
 
   useEffect(() => {
@@ -1526,60 +1771,42 @@ const Student = ({
   };
 
   const handleFileUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFiles || !selectedDocumentForUpload) return;
 
     setIsUploading(true);
-    setUploadProgress(0);
+    // setUploadProgress(0);
 
     try {
       // Simulate upload progress
       for (let i = 0; i <= 100; i += 10) {
-        setUploadProgress(i);
+        // setUploadProgress(i);
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
 
-      // Create media file object
-      const newFile = {
-        id: Date.now(),
-        name: selectedFile.name,
-        url: URL.createObjectURL(selectedFile),
-        studentName: 'Current User',
-        uploadTime: new Date().toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        }),
-        size: (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB',
-        type: selectedFile.type.includes('video') ? 'video' : 'image'
-      };
+      const formData = new FormData();
+      formData.append("file", selectedFiles);
+      formData.append("doc", selectedDocumentForUpload.docsId);
 
-      // Add to mediaData
-      setMediaData(prev => {
-        const dateString = new Date().toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric'
-        });
+      // Make API call to upload the file
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-        const existingDateIndex = prev.findIndex(item => item.date === dateString);
-
-        if (existingDateIndex !== -1) {
-          const updated = [...prev];
-          updated[existingDateIndex] = {
-            ...updated[existingDateIndex],
-            files: [...updated[existingDateIndex].files, newFile]
-          };
-          return updated;
-        } else {
-          return [...prev, {
-            date: dateString,
-            files: [newFile]
-          }];
+      const response = await axios.post(`${backendUrl}/college/upload-document`, formData, {
+        headers: { 
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
         }
       });
 
-      alert("Media uploaded successfully!");
-      closeUploadModal();
+      if (response.data.success) {
+        alert("Document uploaded successfully!");
+        closeUploadModal();
+        // Refresh document data if needed
+        // await fetchDocuments();
+      } else {
+        alert("Upload failed. Please try again.");
+      }
     } catch (error) {
       console.error("Upload error:", error);
       alert("Upload failed. Please try again.");
@@ -1816,9 +2043,10 @@ const Student = ({
     }
   };
   const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
+    const files = Array.from(event.target.files);
+    console.log('files', files);
+    if (!files) return;
+    files.forEach(file => {
     // Validate file type (images and PDFs)
     const allowedTypes = [
       "image/jpeg",
@@ -1826,6 +2054,13 @@ const Student = ({
       "image/png",
       "image/gif",
       "application/pdf",
+      "video/mp4",
+      "video/avi",
+      "video/mov",
+      "video/wmv",
+      "video/flv",
+      "video/webm",
+      "video/mkv",
     ];
     if (!allowedTypes.includes(file.type)) {
       alert("Please select a valid file (JPG, PNG, GIF, or PDF)");
@@ -1833,25 +2068,21 @@ const Student = ({
     }
 
     // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 20 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
-      alert("File size should be less than 10MB");
+      alert("File size should be less than 20MB");
       return;
     }
+    console.log('file', file);
 
-    setSelectedFile(file);
+    setSelectedFiles([...selectedFiles, file]);
 
-    // Create preview for images
-    if (file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setUploadPreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setUploadPreview(null);
-    }
+    
+    });
   };
+  useEffect(() => {
+    console.log('selectedFiles', selectedFiles);
+  }, [selectedFiles]);
 
   const formatDate = (date) => {
     // If the date is not a valid Date object, try to convert it
@@ -3101,7 +3332,7 @@ const Student = ({
           <div className="upload-modal-header">
             <h3>
               <i className="fas fa-cloud-upload-alt me-2"></i>
-              Upload {selectedDocumentForUpload.Name}
+              Upload Classroom Media
             </h3>
             <button className="close-btn" onClick={closeUploadModal}>
               &times;
@@ -3110,20 +3341,49 @@ const Student = ({
 
           <div className="upload-modal-body">
             <div className="upload-section">
-              {!selectedFile ? (
+              {/* Description Field */}
+              <div className="mb-3">
+                <label htmlFor="uploadDescription" className="form-label">
+                  Description (Optional)
+                </label>
+                <textarea
+                  id="uploadDescription"
+                  className="form-control"
+                  rows="3"
+                  placeholder="Enter description for the uploaded files..."
+                  value={uploadDescription}
+                  onChange={(e) => setUploadDescription(e.target.value)}
+                />
+              </div>
+
+              {/* Date Field */}
+              <div className="mb-3">
+                <label htmlFor="uploadDate" className="form-label">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  id="uploadDate"
+                  className="form-control"
+                  value={selectedUploadDate ? selectedUploadDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setSelectedUploadDate(new Date(e.target.value))}
+                />
+              </div>
+              {selectedFiles.length === 0 ? (
                 <div className="file-drop-zone">
                   <div className="drop-zone-content">
                     <i className="fas fa-cloud-upload-alt upload-icon"></i>
                     <h4>Choose a file to upload</h4>
                     <p>Drag and drop a file here, or click to select</p>
                     <div className="file-types">
-                      <span>Supported: JPG, PNG, GIF, PDF</span>
-                      <span>Max size: 10MB</span>
+                      <span>Supported: Images, Videos, Documents, Audio</span>
+                      <span>Max size: 100MB per file</span>
                     </div>
                     <input
                       type="file"
                       id="file-input"
-                      accept=".jpg,.jpeg,.png,.gif,.pdf"
+                      multiple
+                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.ppt,.pptx"
                       onChange={handleFileSelect}
                       style={{ display: "none" }}
                     />
@@ -3134,39 +3394,48 @@ const Student = ({
                       }
                     >
                       <i className="fas fa-folder-open me-2"></i>
-                      Choose File
+                      Choose Files
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="file-preview-section">
                   <div className="selected-file-info">
-                    <h4>Selected File:</h4>
-                    <div className="file-details">
-                      <div className="file-icon">
-                        <i
-                          className={`fas ${selectedFile.type.startsWith("image/")
-                            ? "fa-image"
-                            : "fa-file-pdf"
-                            }`}
-                        ></i>
+                    <h4>Selected Files ({selectedFiles.length}):</h4>
+                    {selectedFiles.map((file, index) => (
+                      <div key={index} className="file-details">
+                        <div className="file-icon">
+                          <i
+                            className={`fas ${file.type.startsWith("image/")
+                              ? "fa-image"
+                              : file.type.startsWith("video/")
+                                ? "fa-video"
+                                : file.type.startsWith("audio/")
+                                  ? "fa-music"
+                                  : "fa-file"
+                              }`}
+                          ></i>
+                        </div>
+                        <div className="file-info">
+                          <p className="file-name">{file.name}</p>
+                          <p className="file-size">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => {
+                            const newFiles = selectedFiles.filter((_, i) => i !== index);
+                            setSelectedFiles(newFiles);
+                            if (newFiles.length === 0) {
+                              setUploadPreview(null);
+                            }
+                          }}
+                        >
+                          <i className="fas fa-trash"></i>
+                        </button>
                       </div>
-                      <div className="file-info">
-                        <p className="file-name">{selectedFile.name}</p>
-                        <p className="file-size">
-                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        onClick={() => {
-                          setSelectedFile(null);
-                          setUploadPreview(null);
-                        }}
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
+                    ))}
                   </div>
 
                   {uploadPreview && (
@@ -3186,10 +3455,10 @@ const Student = ({
                       <div className="progress-bar-container">
                         <div
                           className="progress-bar"
-                          style={{ width: `${uploadProgress}%` }}
+                          style={{ width: `0%` }}
                         ></div>
                       </div>
-                      <p>{uploadProgress}% Complete</p>
+                      <p>0% Complete</p>
                     </div>
                   )}
                 </div>
@@ -3207,10 +3476,10 @@ const Student = ({
             </button>
             <button
               className="btn btn-primary"
-              onClick={handleFileUpload}
-              disabled={!selectedFile || isUploading}
+              onClick={handleUpload}
+              disabled={selectedFiles.length === 0 || isUploadingMedia}
             >
-              {isUploading ? (
+              {isUploadingMedia ? (
                 <>
                   <i className="fas fa-spinner fa-spin me-2"></i>
                   Uploading...
@@ -3218,7 +3487,7 @@ const Student = ({
               ) : (
                 <>
                   <i className="fas fa-upload me-2"></i>
-                  Upload Document
+                  Upload Classroom Media
                 </>
               )}
             </button>
@@ -3231,18 +3500,18 @@ const Student = ({
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
     setShowUploadModal(true);
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setUploadPreview(null);
-    setUploadProgress(0);
+    // setUploadProgress(0);
     setIsUploading(false);
   };
 
   const closeUploadModal = () => {
     setShowUploadModal(false);
     setSelectedDocumentForUpload(null);
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setUploadPreview(null);
-    setUploadProgress(0);
+    // setUploadProgress(0);
     setIsUploading(false);
   };
 
@@ -3254,7 +3523,8 @@ const Student = ({
   }, [selectedCourse, selectedCenter, currentPage, activeTab, searchQuery, filterData]);
 
 
-  const handleImagesClick = (date, images) => {
+  const handleImagesClick = (date, files) => {
+    setSelectedImage(files[0]?.fileUrl);
     setSelectedDate(date);
     setShowImageModal(true);
   };
@@ -3265,13 +3535,13 @@ const Student = ({
   };
 
   const getImagesForDate = (date) => {
-    const dayData = mediaData.find(item => item.date === date);
-    return dayData && dayData.images ? dayData.images : [];
+    const dayData = classroomMediaData.find(item => item.date === date);
+    return dayData && dayData.files.filter(file => file.mediaType === 'image') ? dayData.files.filter(file => file.mediaType === 'image') : [];
   };
 
   const getVideosForDate = (date) => {
-    const dayData = mediaData.find(item => item.date === date);
-    return dayData && dayData.videos ? dayData.videos : [];
+    const dayData = classroomMediaData.find(item => item.date === date);
+    return dayData && dayData.files.filter(file => file.mediaType === 'video') ? dayData.files.filter(file => file.mediaType === 'video') : [];
   };
 
   // ===== ATTENDANCE FUNCTIONS =====
@@ -4166,7 +4436,7 @@ const Student = ({
               </div>
             )}
 
-         
+
           </div>
 
           {/* Main Content - Enhanced Students Cards */}
@@ -4197,52 +4467,52 @@ const Student = ({
 
                       {/* Media Cards by Date */}
                       <div className="row justify-content-center">
-                        {mediaData.length > 0 ? (
-                          mediaData.map((dayData, index) => (
+                        {classroomMediaData.length > 0 ? (
+                          classroomMediaData.map((mediaData, index) => (
                             <div className="col-md-4 col-sm-6 mb-3" key={index}>
                               <div className="card h-100 shadow-sm">
                                 <div className="card-body">
                                   <div className="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 className="card-title mb-0 fw-bold">Media Upload</h6>
+                                    <h6 className="card-title mb-0 fw-bold">Date</h6>
                                     <span className="badge bg-light text-dark">
                                       <i className="fas fa-calendar me-1"></i>
-                                      {dayData.date}
+                                      {new Date(mediaData.date).toLocaleDateString('en-GB')}
                                     </span>
                                   </div>
 
                                   {/* Images Section */}
-                                  {dayData.images && dayData.images.length > 0 && (
+                                  {mediaData.files && mediaData.files.some(file => file.mediaType === 'image') && (
                                     <div className="mb-2">
                                       <button
                                         className="btn btn-link p-0 text-decoration-none border-0"
-                                        onClick={() => handleImagesClick(dayData.date, dayData.images)}
+                                        onClick={() => handleImagesClick(mediaData.date, mediaData.files.filter(file => file.mediaType === 'image'))}
                                       >
                                         <span className="text-primary">
                                           <i className="fas fa-image me-1 text-info"></i>
-                                          {dayData.images.length} Images
+                                          {mediaData.files.filter(file => file.mediaType === 'image').length} Images
                                         </span>
                                       </button>
                                     </div>
                                   )}
 
                                   {/* Videos Section */}
-                                  {dayData.videos && dayData.videos.length > 0 && (
+                                  {mediaData.files && mediaData.files.some(file => file.mediaType === 'video') && (
                                     <div className="mb-2">
                                       <button
                                         className="btn btn-link p-0 text-decoration-none border-0"
-                                        onClick={() => handleVideosClick(dayData.date, dayData.videos)}
+                                        onClick={() => handleVideosClick(mediaData.date, mediaData.files.filter(file => file.mediaType === 'video'))}
                                       >
                                         <span className="text-primary">
                                           <i className="fas fa-video me-1 text-danger"></i>
-                                          {dayData.videos.length} Videos
+                                          {mediaData.files.filter(file => file.mediaType === 'video').length} Videos
                                         </span>
                                       </button>
                                     </div>
                                   )}
 
                                   {/* No Media Message */}
-                                  {(!dayData.images || dayData.images.length === 0) &&
-                                    (!dayData.videos || dayData.videos.length === 0) && (
+                                  {(!mediaData.files || mediaData.files.length === 0) &&
+                                    (!mediaData.files || mediaData.files.length === 0) && (
                                       <p className="text-muted mb-0">
                                         <i className="fas fa-folder-open me-1"></i>
                                         No media uploaded
@@ -4252,7 +4522,7 @@ const Student = ({
                                   {/* Quick Preview */}
                                   <div className="mt-3">
                                     <small className="text-muted">
-                                      Total: {(dayData.images?.length || 0) + (dayData.videos?.length || 0)} files
+                                      Total: {(mediaData.files.filter(file => file.mediaType === 'image').length || 0) + (mediaData.files.filter(file => file.mediaType === 'video').length || 0)} files
                                     </small>
                                   </div>
                                 </div>
@@ -4268,12 +4538,12 @@ const Student = ({
 
                                 </div>
                                 <div className="mb-2">
-                                  
-                                    <span className="text-primary">
-                                      <i className="fas fa-image me-1 text-info"></i>
-                                      No Media Uploaded Yet
-                                    </span>
-                                 
+
+                                  <span className="text-primary">
+                                    <i className="fas fa-image me-1 text-info"></i>
+                                    No Media Uploaded Yet
+                                  </span>
+
                                 </div>
                               </div>
                             </div>
@@ -4285,7 +4555,7 @@ const Student = ({
                 </div>
               </section>
             ) : (
-            
+
               <section className="list-view">
                 <div className="row">
                   <div className="col-12 rounded equal-height-2 coloumn-2">
@@ -6133,16 +6403,45 @@ const Student = ({
                 ></button>
               </div>
               <div className="modal-body">
+                <div className="d-flex justify-content-center align-items-center mb-3">
+                  <img src={selectedImage} alt="" style={{ width: '100%', height: '300px', objectFit: 'contain' }} />
+                </div>
                 <div className="row">
                   {getImagesForDate(selectedDate).map((image) => (
                     <div className="col-md-4 mb-3" key={image.id}>
                       <div className="card">
-                        <img
-                          src={image.url}
-                          className="card-img-top"
-                          alt={image.name}
-                          style={{ height: '200px', objectFit: 'cover' }}
-                        />
+                        <div className="position-relative">
+                          <i 
+                            className="fas fa-download position-absolute" 
+                            style={{ 
+                              top: '10px', 
+                              right: '10px', 
+                              zIndex: 10,
+                              cursor: 'pointer',
+                              color: 'white',
+                              backgroundColor: 'rgba(0,0,0,0.5)',
+                              padding: '5px',
+                              borderRadius: '3px'
+                            }}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const fullUrl = image?.fileUrl;
+                                
+                                await downloadImage(fullUrl, image.originalFileName || image.name || 'download.jpg');
+                              } catch (error) {
+                                console.error('Download failed:', error);
+                                alert('Download failed. Please try again.');
+                              }
+                            }}
+                          ></i>
+                          <img
+                            src={image.fileUrl}
+                            className="card-img-top"
+                            onClick={() => setSelectedImage(image.fileUrl)}
+                            alt={image.name}
+                          />
+                        </div>
                         <div className="card-body p-2">
                           <small className="text-muted">{image.name}</small>
                         </div>
@@ -6167,7 +6466,7 @@ const Student = ({
           <div className="modal-dialog modal-lg w-100 d-flex justify-content-center">
             <div className="modal-content p-0">
               <div className="modal-header">
-                <h5 className="modal-title">Videos - {selectedDate}</h5>
+                <h5 className="modal-title">Videos - {new Date(selectedDate).toLocaleDateString('en-GB')}</h5>
                 <button
                   type="button"
                   className="btn-close"
@@ -6176,12 +6475,18 @@ const Student = ({
               </div>
               <div className="modal-body">
                 <div className="row">
+
+                <div className="d-flex justify-content-center align-items-center mb-3">
+                  <video src={selectedVideo} alt="" style={{ width: '100%', height: '300px', objectFit: 'contain' }} controls />
+                </div>
+
                   {getVideosForDate(selectedDate).map((video) => (
                     <div className="col-md-6 mb-3" key={video.id}>
                       <div className="card">
-                        <div className="position-relative">
+                        <div className="position-relative" onClick={() => setSelectedVideo(video.fileUrl)}>
 
-                          <video src={video.url} controls className="card-img-top" style={{ height: '200px', objectFit: 'cover' }} />
+                          <video src={video.fileUrl} className="card-img-top" />
+                          
                         </div>
                         <div className="card-body p-2">
                           <small className="text-muted">{video.name}</small>
@@ -6208,7 +6513,7 @@ const Student = ({
             <div className="modal-content p-0">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  Upload {activeTab.includes('Images') ? 'Images' : 'Videos'}
+                  Upload Files
                 </h5>
                 <button
                   type="button"
@@ -6236,7 +6541,7 @@ const Student = ({
 
                 <div className="mb-3">
                   <label className="form-label">
-                    Choose {activeTab.includes('Images') ? 'Images' : 'Videos'}
+                    Choose Media
                   </label>
                   <input
                     ref={fileInputRef}
@@ -6296,7 +6601,7 @@ const Student = ({
                   type="button"
                   className="btn btn-primary"
                   onClick={handleUpload}
-                  disabled={uploadFiles.length === 0}
+                  disabled={selectedFiles.length === 0}
                 >
                   Upload Files
                 </button>
