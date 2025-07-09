@@ -139,7 +139,7 @@ const Layout = () => {
         <Route exact path="/joblisting" element={<Jobs />} />
         <Route exact path="/contact" element={<Contact />} />
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
-        <Route exact path="/company/login" element={<CompanyLogin />} />
+        <Route exact path="/cmp/login" element={<CompanyLogin />} />
         <Route exact path="/community" element={<Community />} />
         <Route path="/socialimpact" element={<SocialImpact />} />
         <Route path="/stulabs" element={<StuLabs />} />
@@ -179,9 +179,9 @@ const Layout = () => {
           <Route path='candidateevent' element={<CandidatesEvents />} />
           <Route path='appliedevents' element={<AppliedEvents/>}/>
         </Route>
-        <Route path='/admin' element={<AdminLayout />}>
+      
 
-        </Route>
+       
 
         {/*  college views  */}
 
@@ -220,10 +220,10 @@ const Layout = () => {
 
         {/* company  */}
 
-        <Route path="/company/login" element={<CompanyLogin />} />
-        <Route path="/company/register" element={<CompanyRegister />} />
+        <Route path="/cmp/login" element={<CompanyLogin />} />
+        <Route path="/cmp/register" element={<CompanyRegister />} />
        
-        <Route path="/company" element={<CompanyLayout />}>
+        <Route path="/cmp" element={<CompanyLayout />}>
         <Route path="dashboard" element={<CompanyDashboard />} />
         <Route path="myProfile" element={<CompanyProfile />} /> 
         <Route path="list/jobs" element={<AllJd />} />

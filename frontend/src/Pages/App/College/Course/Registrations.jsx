@@ -5,8 +5,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import './CourseCrm.css';
-import './crm.css';
+
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
 const MultiSelectCheckbox = ({
@@ -123,6 +122,531 @@ const MultiSelectCheckbox = ({
     </div>
   );
 };
+
+const DocumentModal = memo(({
+  showDocumentModal,
+  selectedDocument,
+  closeDocumentModal,
+  updateDocumentStatus,
+  getFileType
+}) => {
+  const [showRejectionForm, setShowRejectionForm] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [documentZoom, setDocumentZoom] = useState(1);
+  const [documentRotation, setDocumentRotation] = useState(0);
+  const getStatusBadgeClass = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending': return 'text-dark';
+      case 'verified': return 'text-sucess';
+      case 'rejected': return 'text-danger';
+      default: return 'text-secondary';
+    }
+  };
+  const latestUpload = useMemo(() => {
+    if (!selectedDocument) return null;
+    return selectedDocument.uploads && selectedDocument.uploads.length > 0
+      ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+      : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+  }, [selectedDocument]);
+
+  const handleZoomIn = useCallback(() => {
+    setDocumentZoom(prev => Math.min(prev + 0.1, 2));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
+  }, []);
+
+  const handleRotate = useCallback(() => {
+    setDocumentRotation(prev => (prev + 90) % 360);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setDocumentZoom(1);
+    setDocumentRotation(0);
+  }, []);
+
+  const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  const fileType = fileUrl ? getFileType(fileUrl) : null;
+
+  const handleRejectClick = useCallback(() => {
+    setShowRejectionForm(true);
+  }, []);
+
+  const handleCancelRejection = useCallback(() => {
+    setShowRejectionForm(false);
+    setRejectionReason('');
+  }, []);
+
+  const handleConfirmRejection = useCallback(() => {
+    if (rejectionReason.trim()) {
+      updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
+      handleCancelRejection();
+    }
+  }, [latestUpload, selectedDocument, rejectionReason, updateDocumentStatus, handleCancelRejection]);
+
+  if (!showDocumentModal || !selectedDocument) return null;
+
+  // Fixed renderDocumentThumbnail - removed setCurrentPreviewUpload calls
+  const renderDocumentThumbnail = (upload, isSmall = true) => {
+    const fileUrl = upload?.fileUrl;
+    if (!fileUrl) {
+      return (
+        <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f8f9fa',
+          border: '1px solid #dee2e6',
+          borderRadius: '4px',
+          width: isSmall ? '100%' : '150px',
+          height: isSmall ? 'auto' : '100px',
+          minHeight: '50px',
+          fontSize: isSmall ? '16px' : '24px',
+          color: '#6c757d'
+        }}>
+          📄
+        </div>
+      );
+    }
+
+    const fileType = getFileType(fileUrl);
+
+    if (fileType === 'image') {
+      return (
+        <img
+          src={fileUrl}
+          alt="Document Preview"
+          className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+          style={{
+            width: isSmall ? '100%' : '150px',
+            height: 'auto',
+            maxWidth: '100%',
+            objectFit: 'contain',
+            borderRadius: '4px',
+            border: '1px solid #dee2e6',
+            backgroundColor: '#f8f9fa',
+            display: 'block',
+            // Remove cursor pointer to indicate it's not clickable
+            cursor: 'default'
+          }}
+        // Remove onClick handler
+        />
+      );
+    } else if (fileType === 'pdf') {
+      return (
+        <div style={{
+          position: 'relative',
+          overflow: 'visible',
+          width: isSmall ? '100%' : '150px',
+          height: 'auto'
+        }}>
+          <iframe
+            src={fileUrl + '#navpanes=0&toolbar=0'}
+            className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+            style={{
+              width: '100%',
+              height: isSmall ? 'auto' : '100px',
+              minHeight: isSmall ? '300px' : '100px',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              backgroundColor: '#f8f9fa',
+              // Disable pointer events to prevent clicks
+              pointerEvents: 'none'
+            }}
+            title="Document"
+            scrolling={isSmall ? 'auto' : 'no'}
+          />
+          {!isSmall && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 123, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#007bff',
+              fontSize: '24px',
+              borderRadius: '4px',
+              // Remove cursor pointer
+              cursor: 'default',
+              // Disable pointer events
+              pointerEvents: 'none'
+            }}>
+              {fileType === 'document' ? '📄' :
+                fileType === 'spreadsheet' ? '📊' : '📁'}
+            </div>
+          )}
+        </div>
+      );
+    }
+  };
+
+  return (
+    <div className="document-modal-overlay" onClick={closeDocumentModal}>
+      <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{selectedDocument.Name} Verification</h3>
+          <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="document-preview-section">
+            <div className="document-preview-container" style={{ height: 'auto' }}>
+              {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
+                (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
+                <>
+                  {(() => {
+                    console.log('selectedDocument:', selectedDocument);
+                    console.log('latestUpload:', latestUpload);
+
+                    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+                    const hasDocument = fileUrl ||
+                      (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
+
+                    console.log('fileUrl:', fileUrl);
+                    console.log('hasDocument:', hasDocument);
+
+                    if (hasDocument) {
+                      // If we have a file URL, show the appropriate viewer
+                      if (fileUrl) {
+                        const fileType = getFileType(fileUrl);
+
+                        if (fileType === 'image') {
+                          return (
+                            <img
+                              src={fileUrl}
+                              alt="Document Preview"
+                              style={{
+                                transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                                transition: 'transform 0.3s ease',
+                                maxWidth: '100%',
+                                objectFit: 'contain'
+                              }}
+                            />
+                          );
+                        } else if (fileType === 'pdf') {
+                          return (
+                            <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
+                              <iframe
+                                src={fileUrl + '#navpanes=0&toolbar=0'}
+                                width="100%"
+                                height="100%"
+                                style={{
+                                  border: 'none',
+                                  transform: `scale(${documentZoom})`,
+                                  transformOrigin: 'top left',
+                                  transition: 'transform 0.3s ease'
+                                }}
+                                title="PDF Document"
+                              />
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>
+                                {fileType === 'document' ? '📄' :
+                                  fileType === 'spreadsheet' ? '📊' : '📁'}
+                              </div>
+                              <h4>Document Preview</h4>
+                              <p>Click download to view this file</p>
+                              {fileUrl ? (
+                                <a
+                                  href={fileUrl}
+                                  download
+                                  className="btn btn-primary"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <i className="fas fa-download me-2"></i>
+                                  Download & View
+                                </a>
+                              ) : (
+                                <button
+                                  className="btn btn-secondary"
+                                  disabled
+                                  title="File URL not available"
+                                >
+                                  <i className="fas fa-download me-2"></i>
+                                  File Not Available
+                                </button>
+                              )}
+                            </div>
+                          );
+                        }
+                      } else {
+                        // Document exists but no file URL - show document uploaded message
+                        return (
+                          <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+                            <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+                            <h4>Document Uploaded</h4>
+                            <p>Document is available for verification</p>
+                            <p><strong>Status:</strong> {selectedDocument?.status}</p>
+                          </div>
+                        );
+                      }
+                    } else {
+                      return (
+                        <div className="no-document">
+                          <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+                          <p>No document uploaded</p>
+                        </div>
+                      );
+                    }
+                  })()}
+                 {fileUrl && (
+              <div className="preview-controls">
+                <button className="control-btn" onClick={handleZoomIn}>
+                  <i className="fas fa-search-plus"></i>
+                </button>
+                <button className="control-btn" onClick={handleZoomOut}>
+                  <i className="fas fa-search-minus"></i>
+                </button>
+                <button className="control-btn" onClick={handleRotate}>
+                  <i className="fas fa-redo"></i>
+                </button>
+                <button className="control-btn" onClick={handleReset}>
+                  <i className="fas fa-compress"></i>
+                </button>
+              </div>
+            )}
+                </>
+              ) : (
+                <div className="no-document">
+                  <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+                  <p>No document uploaded</p>
+                </div>
+              )}
+            </div>
+
+            {/* document preview container  */}
+
+            {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+              <div className="info-card mt-4">
+                <h4>Document History</h4>
+                <div className="document-history">
+                  {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
+                    <div key={index} className="history-item" style={{
+                      display: 'block',
+                      padding: '12px',
+                      marginBottom: '8px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      border: '1px solid #e9ecef'
+                    }}>
+                      {/* Document Preview Thumbnail using iframe/img */}
+                      <div className="history-preview" style={{ marginRight: '0px' }}>
+                        {renderDocumentThumbnail(upload, true)}
+                      </div>
+
+                      {/* Document Info */}
+                      <div className="history-info" style={{ flex: 1 }}>
+                        {/* <div className="history-date" style={{
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          color: '#495057',
+                          marginBottom: '4px'
+                        }}>
+                          {formatDate(upload.uploadedAt)}
+                        </div> */}
+                        <div className="history-status">
+                          <span className={`${getStatusBadgeClass(upload.status)}`} style={{
+                            fontSize: '12px',
+                            padding: '4px 8px'
+                          }}>
+                            {upload.status}
+                          </span>
+                        </div>
+                        {upload.fileUrl && (
+                          <div className="history-actions" style={{ marginTop: '8px' }}>
+                            <a
+                              href={upload.fileUrl}
+                              download
+                              className="btn btn-sm btn-outline-primary"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                textDecoration: 'none'
+                              }}
+                            >
+                              <i className="fas fa-download me-1"></i>
+                              Download
+                            </a>
+                            {/* <button
+                              className="btn btn-sm btn-outline-secondary ms-2"
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 8px'
+                              }}
+                              onClick={() => {
+                                
+                                setCurrentPreviewUpload(upload);
+                              }}
+                            >
+                              <i className="fas fa-eye me-1"></i>
+                              Preview
+                            </button> */}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="document-info-section">
+            <div className="info-card">
+              <h4>Document Information</h4>
+              <div className="info-row">
+                <strong>Document Name:</strong> {selectedDocument.Name}
+              </div>
+              <div className="info-row">
+                <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
+                  new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                  }) : 'N/A'}
+              </div>
+              <div className="info-row">
+                <strong>Status:</strong>
+                <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
+                  {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+                </span>
+              </div>
+            </div>
+
+
+
+
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+const useNavHeight = (dependencies = []) => {
+  const navRef = useRef(null);
+  const [navHeight, setNavHeight] = useState(140); // Default fallback
+  const widthRef = useRef(null);
+  const [width, setWidth] = useState(0);
+
+  const calculateHeight = useCallback(() => {
+    if (navRef.current) {
+      const height = navRef.current.offsetHeight;
+      setNavHeight(height);
+      console.log('Nav height updated:', height + 'px');
+    }
+  }, []);
+
+  const calculateWidth = useCallback(() => {
+
+    if (widthRef.current) {
+      const width = widthRef.current.offsetWidth;
+      setWidth(width);
+      console.log('Width updated:', width + 'px');
+    }
+  }, []);
+
+
+  useEffect(() => {
+    // Initial calculation
+    calculateHeight();
+    calculateWidth();
+    // Resize listener
+    const handleResize = () => {
+      setTimeout(calculateHeight, 100);
+      setTimeout(calculateWidth, 100);
+    };
+
+    // Mutation observer for nav content changes
+    const observer = new MutationObserver(() => {
+      setTimeout(calculateHeight, 50);
+      setTimeout(calculateWidth, 50);
+    });
+
+    window.addEventListener('resize', handleResize);
+    
+    if (navRef.current) {
+      observer.observe(navRef.current, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true 
+      });
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      observer.disconnect();
+    };
+  }, [calculateHeight, calculateWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateHeight, 50);
+    setTimeout(calculateWidth, 50);
+  }, dependencies);
+
+  return { navRef, navHeight, calculateHeight, width };
+};
+const useMainWidth = (dependencies = []) => {// Default fallback
+  const widthRef = useRef(null);
+  const [width, setWidth] = useState(0);
+
+  const calculateWidth = useCallback(() => {
+
+    if (widthRef.current) {
+      const width = widthRef.current.offsetWidth;
+      setWidth(width);
+      console.log('Width updated:', width + 'px');
+    }
+  }, []);
+
+
+  useEffect(() => {
+    calculateWidth();
+    // Resize listener
+    const handleResize = () => {
+      setTimeout(calculateWidth, 100);
+    };
+
+    // Mutation observer for nav content changes
+    const observer = new MutationObserver(() => {
+      setTimeout(calculateWidth, 50);
+    });
+
+    window.addEventListener('resize', handleResize);
+    
+    if (widthRef.current) {
+      observer.observe(widthRef.current, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true 
+      });
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      observer.disconnect();
+    };
+  }, [calculateWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateWidth, 50);
+  }, dependencies); 
+
+  return { widthRef, width };
+};
+
 const CRMDashboard = () => {
 
   const candidateRef = useRef();
@@ -328,7 +852,7 @@ const CRMDashboard = () => {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('doc', selectedDocumentForUpload._id);
-console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
+      console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
 
       const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
         headers: {
@@ -340,10 +864,14 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
       console.log('response', response)
 
       if (response.data.status) {
+
         alert('Document uploaded successfully! Status: Pending Review');
 
         // Optionally refresh data here
-        closeUploadModal();
+        const closeButton = document.querySelector('#staticBackdrop .btn-close');
+      if (closeButton) {
+        closeButton.click();
+      }
         fetchProfileData()
       } else {
         alert('Failed to upload file');
@@ -378,18 +906,24 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
       setIsNewModalOpen(false);
     }
 
-    document.body?.classNameList.add('no-scroll');
+    document.body?.classList.add('no-scroll');
   };
 
-  const closeDocumentModal = () => {
+  const closeDocumentModal = useCallback(() => {
     setShowDocumentModal(false);
     setSelectedDocument(null);
-
-    setIsNewModalOpen(false);
-    // // Only reset when actually closing modal
     setDocumentZoom(1);
     setDocumentRotation(0);
-  };
+  }, []);
+  // const closeDocumentModal = () => {
+  //   setShowDocumentModal(false);
+  //   setSelectedDocument(null);
+
+  //   setIsNewModalOpen(false);
+  //   // // Only reset when actually closing modal
+  //   setDocumentZoom(1);
+  //   setDocumentRotation(0);
+  // };
 
   const zoomIn = () => {
     setDocumentZoom(prev => Math.min(prev + 0.1, 3)); // Max zoom 3x
@@ -408,26 +942,28 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
     setDocumentRotation(0);
   };
 
-
-  const updateDocumentStatus = (uploadId, status) => {
-    // In real app, this would make an API call
+  const updateDocumentStatus = useCallback((uploadId, status, reason) => {
     console.log(`Updating document ${uploadId} to ${status}`);
-    if (status === 'Rejected' && !rejectionReason.trim()) {
+    if (status === 'Rejected' && !reason?.trim()) {
       alert('Please provide a rejection reason');
       return;
     }
     alert(`Document ${status} successfully!`);
     closeDocumentModal();
-  };
+  }, [closeDocumentModal]);
+  
+  // const updateDocumentStatus = (uploadId, status) => {
+  //   // In real app, this would make an API call
+  //   console.log(`Updating document ${uploadId} to ${status}`);
+  //   if (status === 'Rejected' && !rejectionReason.trim()) {
+  //     alert('Please provide a rejection reason');
+  //     return;
+  //   }
+  //   alert(`Document ${status} successfully!`);
+  //   closeDocumentModal();
+  // };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return 'text-dark';
-      case 'verified': return 'text-sucess';
-      case 'rejected': return 'text-danger';
-      default: return 'text-secondary';
-    }
-  };
+
 
   const getFileType = (fileUrl) => {
     if (!fileUrl) return 'unknown';
@@ -647,419 +1183,506 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
   const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
 
   // Document Modal Component
-  const DocumentModal = () => {
-    const [showRejectionForm, setShowRejectionForm] = useState(false);
-    const [rejectionReason, setRejectionReason] = useState('');
-    const [documentZoom, setDocumentZoom] = useState(1);
-    const [documentRotation, setDocumentRotation] = useState(0);
 
-    const latestUpload = useMemo(() => {
-      if (!selectedDocument) return null;
-      return selectedDocument.uploads && selectedDocument.uploads.length > 0
-        ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-        : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
-    }, [selectedDocument]);
+  // const DocumentModal = () => {
+  //   const [showRejectionForm, setShowRejectionForm] = useState(false);
+  //   const [rejectionReason, setRejectionReason] = useState('');
+  //   const [documentZoom, setDocumentZoom] = useState(1);
+  //   const [documentRotation, setDocumentRotation] = useState(0);
 
-    const handleZoomIn = useCallback(() => {
-      setDocumentZoom(prev => Math.min(prev + 0.1, 2));
-    }, []);
+  //   const latestUpload = useMemo(() => {
+  //     if (!selectedDocument) return null;
+  //     return selectedDocument.uploads && selectedDocument.uploads.length > 0
+  //       ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+  //       : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+  //   }, [selectedDocument]);
 
-    const handleZoomOut = useCallback(() => {
-      setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
-    }, []);
+  //   const handleZoomIn = useCallback(() => {
+  //     setDocumentZoom(prev => Math.min(prev + 0.1, 2));
+  //   }, []);
 
-    const handleRotate = useCallback(() => {
-      setDocumentRotation(prev => (prev + 90) % 360);
-    }, []);
+  //   const handleZoomOut = useCallback(() => {
+  //     setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
+  //   }, []);
 
-    const handleReset = useCallback(() => {
-      setDocumentZoom(1);
-      setDocumentRotation(0);
-    }, []);
+  //   const handleRotate = useCallback(() => {
+  //     setDocumentRotation(prev => (prev + 90) % 360);
+  //   }, []);
 
-    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-    const fileType = fileUrl ? getFileType(fileUrl) : null;
+  //   const handleReset = useCallback(() => {
+  //     setDocumentZoom(1);
+  //     setDocumentRotation(0);
+  //   }, []);
 
-    const handleRejectClick = useCallback(() => {
-      setShowRejectionForm(true);
-    }, []);
+  //   const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  //   const fileType = fileUrl ? getFileType(fileUrl) : null;
 
-    const handleCancelRejection = useCallback(() => {
-      setShowRejectionForm(false);
-      setRejectionReason('');
-    }, []);
+  //   const handleRejectClick = useCallback(() => {
+  //     setShowRejectionForm(true);
+  //   }, []);
 
-    const handleConfirmRejection = useCallback(() => {
-      if (rejectionReason.trim()) {
-        updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
-        handleCancelRejection();
-      }
-    }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
+  //   const handleCancelRejection = useCallback(() => {
+  //     setShowRejectionForm(false);
+  //     setRejectionReason('');
+  //   }, []);
 
-    if (!showDocumentModal || !selectedDocument) return null;
+  //   const handleConfirmRejection = useCallback(() => {
+  //     if (rejectionReason.trim()) {
+  //       updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
+  //       handleCancelRejection();
+  //     }
+  //   }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
 
-    // Helper function to render document preview thumbnail using iframe/img
-    const renderDocumentThumbnail = (upload, isSmall = true) => {
-      const fileUrl = upload?.fileUrl;
-      if (!fileUrl) {
-        return (
-          <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#f8f9fa',
-            border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            width: isSmall ? '100%' : '150px',
-            height: isSmall ? '100%' : '100px',
-            fontSize: isSmall ? '16px' : '24px',
-            color: '#6c757d'
-          }}>
-            📄
-          </div>
-        );
-      }
+  //   if (!showDocumentModal || !selectedDocument) return null;
 
-      const fileType = getFileType(fileUrl);
+  //   // Helper function to render document preview thumbnail using iframe/img
+  //   // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
+  //   const renderDocumentThumbnail = (upload, isSmall = true) => {
+  //     const fileUrl = upload?.fileUrl;
+  //     if (!fileUrl) {
+  //       return (
+  //         <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+  //           display: 'flex',
+  //           alignItems: 'center',
+  //           justifyContent: 'center',
+  //           backgroundColor: '#f8f9fa',
+  //           border: '1px solid #dee2e6',
+  //           borderRadius: '4px',
+  //           width: isSmall ? '100%' : '150px',
+  //           height: isSmall ? 'auto' : '100px',
+  //           minHeight: '50px',
+  //           fontSize: isSmall ? '16px' : '24px',
+  //           color: '#6c757d'
+  //         }}>
+  //           📄
+  //         </div>
+  //       );
+  //     }
 
-      if (fileType === 'image') {
-        return (
-          <img
-            src={fileUrl}
-            alt="Document Preview"
-            className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-            style={{
-              width: isSmall ? '100%' : '150px',
-              height: isSmall ? '100%' : '100px',
-              objectFit: 'cover',
-              borderRadius: '4px',
-              border: '1px solid #dee2e6',
-              cursor: 'pointer'
-            }}
-            onClick={() => {
-              if (isSmall) {
-                // Set this upload as the current preview
-                setCurrentPreviewUpload(upload);
-              }
-            }}
-          />
-        );
-      } else if (fileType === 'pdf') {
-        return (
-          <div style={{ position: 'relative', overflow: 'hidden', height: '100%' }}>
-            <iframe
-              src={fileUrl + '#navpanes=0&toolbar=0'}
-              className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
-              style={{
-                width: isSmall ? '100%' : '150px',
-                height: isSmall ? '100%' : '100px',
-                border: '1px solid #dee2e6',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                pointerEvents: 'none',
-                transformOrigin: 'top left',
-                overflow: 'hidden'
-              }}
-              title="PDF Thumbnail"
-              onClick={() => {
-                if (isSmall) {
-                  setCurrentPreviewUpload(upload);
-                }
-              }}
-            />
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#dc3545',
-              fontSize: isSmall ? '10px' : '12px',
-              fontWeight: 'bold',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-              onClick={() => {
-                if (isSmall) {
-                  setCurrentPreviewUpload(upload);
-                }
-              }}>
-              PDF
-            </div>
-          </div>
-        );
-      } else {
-        // For other document types, try to use iframe as well
-        return (
-          <div style={{ position: 'relative' }}>
-            <iframe
-              src={fileUrl + '#navpanes=0&toolbar=0'}
-              className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-              style={{
-                width: isSmall ? '100%' : '150px',
-                height: isSmall ? '100%' : '100px',
-                border: '1px solid #dee2e6',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                pointerEvents: 'none',
-                backgroundColor: '#f8f9fa'
-              }}
-              title="Document Thumbnail"
-              onClick={() => {
-                if (isSmall) {
-                  setCurrentPreviewUpload(upload);
-                }
-              }}
-            />
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 123, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#007bff',
-              fontSize: isSmall ? '16px' : '24px',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-              onClick={() => {
-                if (isSmall) {
-                  setCurrentPreviewUpload(upload);
-                }
-              }}>
-              {fileType === 'document' ? '📄' :
-                fileType === 'spreadsheet' ? '📊' : '📁'}
-            </div>
-          </div>
-        );
-      }
-    };
+  //     const fileType = getFileType(fileUrl);
+
+  //     if (fileType === 'image') {
+  //       return (
+  //         <img
+  //           src={fileUrl}
+  //           alt="Document Preview"
+  //           className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+  //           style={{
+  //             width: isSmall ? '100%' : '150px',
+  //             height: 'auto', // Completely auto height
+  //             maxWidth: '100%',
+  //             objectFit: 'contain',
+  //             borderRadius: '4px',
+  //             border: '1px solid #dee2e6',
+  //             cursor: 'pointer',
+  //             backgroundColor: '#f8f9fa',
+  //             display: 'block'
+  //           }}
+  //           onClick={() => {
+  //             if (isSmall) {
+  //               setCurrentPreviewUpload(upload);
+  //             }
+  //           }}
+  //         />
+  //       );
+  //     } else if (fileType === 'pdf') {
+  //       return (
+  //         <div style={{
+  //           position: 'relative',
+  //           overflow: 'visible', // Allow content to expand
+  //           width: isSmall ? '100%' : '150px',
+  //           height: 'auto' // Auto height for container
+  //         }}>
+  //           <iframe
+  //             src={fileUrl + '#navpanes=0&toolbar=0'} // Add FitH parameter for better PDF display
+  //             className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+  //             style={{
+  //               width: '100%',
+  //               height: isSmall ? 'auto' : '100px', // Use viewport height for history
+  //               maxHeight: isSmall ? '600px' : '100px',
+  //               border: '1px solid #dee2e6',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer',
+  //               pointerEvents: isSmall ? 'auto' : 'none',
+  //               transform: isSmall ? 'scale(1)' : 'scale(0.3)',
+  //               transformOrigin: 'top left',
+  //               backgroundColor: '#fff'
+  //             }}
+  //             title="PDF Document"
+  //             onClick={() => {
+  //               if (isSmall) {
+  //                 setCurrentPreviewUpload(upload);
+  //               }
+  //             }}
+  //             scrolling={isSmall ? 'auto' : 'no'}
+  //           />
+  //           {!isSmall && (
+  //             <div style={{
+  //               position: 'absolute',
+  //               top: 0,
+  //               left: 0,
+  //               right: 0,
+  //               bottom: 0,
+  //               backgroundColor: 'rgba(220, 53, 69, 0.1)',
+  //               display: 'flex',
+  //               alignItems: 'center',
+  //               justifyContent: 'center',
+  //               color: '#dc3545',
+  //               fontSize: '12px',
+  //               fontWeight: 'bold',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer'
+  //             }}
+  //               onClick={() => {
+  //                 setCurrentPreviewUpload(upload);
+  //               }}>
+  //               PDF
+  //             </div>
+  //           )}
+  //         </div>
+  //       );
+  //     } else {
+  //       return (
+  //         <div style={{
+  //           position: 'relative',
+  //           width: isSmall ? '100%' : '150px',
+  //           height: 'auto' // Auto height
+  //         }}>
+  //           <iframe
+  //             src={fileUrl}
+  //             className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+  //             style={{
+  //               width: '100%',
+  //               height: isSmall ? 'auto' : '100px',
+  //               minHeight: isSmall ? '300px' : '100px',
+  //               border: '1px solid #dee2e6',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer',
+  //               pointerEvents: isSmall ? 'auto' : 'none',
+  //               backgroundColor: '#f8f9fa'
+  //             }}
+  //             title="Document"
+  //             onClick={() => {
+  //               if (isSmall) {
+  //                 setCurrentPreviewUpload(upload);
+  //               }
+  //             }}
+  //             scrolling={isSmall ? 'auto' : 'no'}
+  //           />
+  //           {!isSmall && (
+  //             <div style={{
+  //               position: 'absolute',
+  //               top: 0,
+  //               left: 0,
+  //               right: 0,
+  //               bottom: 0,
+  //               backgroundColor: 'rgba(0, 123, 255, 0.1)',
+  //               display: 'flex',
+  //               alignItems: 'center',
+  //               justifyContent: 'center',
+  //               color: '#007bff',
+  //               fontSize: '24px',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer'
+  //             }}
+  //               onClick={() => {
+  //                 setCurrentPreviewUpload(upload);
+  //               }}>
+  //               {fileType === 'document' ? '📄' :
+  //                 fileType === 'spreadsheet' ? '📊' : '📁'}
+  //             </div>
+  //           )}
+  //         </div>
+  //       );
+  //     }
+  //   };
 
 
-    return (
-      <div className="document-modal-overlay" onClick={closeDocumentModal}>
-        <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h3>{selectedDocument.Name} Verification</h3>
-            <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
-          </div>
 
-          <div className="modal-body">
-            <div className="document-preview-section">
-              <div className="document-preview-container">
-                {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
-                  (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
-                  <>
-                    {(() => {
-                      console.log('selectedDocument:', selectedDocument);
-                      console.log('latestUpload:', latestUpload);
+  //   return (
+  //     <div className="document-modal-overlay" onClick={closeDocumentModal}>
+  //       <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
+  //         <div className="modal-header">
+  //           <h3>{selectedDocument.Name} Verification</h3>
+  //           <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
+  //         </div>
 
-                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-                      const hasDocument = fileUrl ||
-                        (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
+  //         <div className="modal-body">
+  //           <div className="document-preview-section">
+  //             <div className="document-preview-container" style={{ height: 'auto' }}>
+  //               {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
+  //                 (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
+  //                 <>
+  //                   {(() => {
+  //                     console.log('selectedDocument:', selectedDocument);
+  //                     console.log('latestUpload:', latestUpload);
 
-                      console.log('fileUrl:', fileUrl);
-                      console.log('hasDocument:', hasDocument);
+  //                     const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  //                     const hasDocument = fileUrl ||
+  //                       (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
-                      if (hasDocument) {
-                        // If we have a file URL, show the appropriate viewer
-                        if (fileUrl) {
-                          const fileType = getFileType(fileUrl);
+  //                     console.log('fileUrl:', fileUrl);
+  //                     console.log('hasDocument:', hasDocument);
 
-                          if (fileType === 'image') {
-                            return (
-                              <img
-                                src={fileUrl}
-                                alt="Document Preview"
-                                style={{
-                                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                                  transition: 'transform 0.3s ease',
-                                  maxWidth: '100%',
-                                  objectFit: 'contain'
-                                }}
-                              />
-                            );
-                          } else if (fileType === 'pdf') {
-                            return (
-                              <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
-                                <iframe
-                                  src={fileUrl + '#navpanes=0&toolbar=0'}
-                                  width="100%"
-                                  height="100%"
-                                  style={{
-                                    border: 'none',
-                                    transform: `scale(${documentZoom})`,
-                                    transformOrigin: 'center center',
-                                    transition: 'transform 0.3s ease',
-                                  }}
-                                  title="PDF Document"
-                                />
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                                <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                                  {fileType === 'document' ? '📄' :
-                                    fileType === 'spreadsheet' ? '📊' : '📁'}
-                                </div>
-                                <h4>Document Preview</h4>
-                                <p>Click download to view this file</p>
-                                {fileUrl ? (
-                                  <a
-                                    href={fileUrl}
-                                    download
-                                    className="btn btn-primary"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <i className="fas fa-download me-2"></i>
-                                    Download & View
-                                  </a>
-                                ) : (
-                                  <button
-                                    className="btn btn-secondary"
-                                    disabled
-                                    title="File URL not available"
-                                  >
-                                    <i className="fas fa-download me-2"></i>
-                                    File Not Available
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          }
-                        } else {
-                          // Document exists but no file URL - show document uploaded message
-                          return (
-                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
-                              <h4>Document Uploaded</h4>
-                              <p>Document is available for verification</p>
-                              <p><strong>Status:</strong> {selectedDocument?.status}</p>
-                            </div>
-                          );
-                        }
-                      } else {
-                        return (
-                          <div className="no-document">
-                            <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                            <p>No document uploaded</p>
-                          </div>
-                        );
-                      }
-                    })()}
-                    <DocumentControls
-                      onZoomIn={handleZoomIn}
-                      onZoomOut={handleZoomOut}
-                      onRotate={handleRotate}
-                      onReset={handleReset}
-                      onDownload={fileUrl}
-                      zoomLevel={documentZoom}
-                      fileType={fileType}
-                    />
-                  </>
-                ) : (
-                  <div className="no-document">
-                    <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                    <p>No document uploaded</p>
-                  </div>
-                )}
-              </div>
+  //                     if (hasDocument) {
+  //                       // If we have a file URL, show the appropriate viewer
+  //                       if (fileUrl) {
+  //                         const fileType = getFileType(fileUrl);
 
-              {/* document preview container  */}
+  //                         if (fileType === 'image') {
+  //                           return (
+  //                             <img
+  //                               src={fileUrl}
+  //                               alt="Document Preview"
+  //                               style={{
+  //                                 transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+  //                                 transition: 'transform 0.3s ease',
+  //                                 maxWidth: '100%',
+  //                                 objectFit: 'contain'
+  //                               }}
+  //                             />
+  //                           );
+  //                         } else if (fileType === 'pdf') {
+  //                           return (
+  //                             <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
+  //                               <iframe
+  //                                 src={fileUrl + '#navpanes=0&toolbar=0'}
+  //                                 width="100%"
+  //                                 height="100%"
+  //                                 style={{
+  //                                   border: 'none',
+  //                                   transform: `scale(${documentZoom})`,
+  //                                   transformOrigin: 'top left',
+  //                                   transition: 'transform 0.3s ease'
+  //                                 }}
+  //                                 title="PDF Document"
+  //                               />
+  //                             </div>
+  //                           );
+  //                         } else {
+  //                           return (
+  //                             <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+  //                               <div style={{ fontSize: '60px', marginBottom: '20px' }}>
+  //                                 {fileType === 'document' ? '📄' :
+  //                                   fileType === 'spreadsheet' ? '📊' : '📁'}
+  //                               </div>
+  //                               <h4>Document Preview</h4>
+  //                               <p>Click download to view this file</p>
+  //                               {fileUrl ? (
+  //                                 <a
+  //                                   href={fileUrl}
+  //                                   download
+  //                                   className="btn btn-primary"
+  //                                   target="_blank"
+  //                                   rel="noopener noreferrer"
+  //                                 >
+  //                                   <i className="fas fa-download me-2"></i>
+  //                                   Download & View
+  //                                 </a>
+  //                               ) : (
+  //                                 <button
+  //                                   className="btn btn-secondary"
+  //                                   disabled
+  //                                   title="File URL not available"
+  //                                 >
+  //                                   <i className="fas fa-download me-2"></i>
+  //                                   File Not Available
+  //                                 </button>
+  //                               )}
+  //                             </div>
+  //                           );
+  //                         }
+  //                       } else {
+  //                         // Document exists but no file URL - show document uploaded message
+  //                         return (
+  //                           <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+  //                             <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+  //                             <h4>Document Uploaded</h4>
+  //                             <p>Document is available for verification</p>
+  //                             <p><strong>Status:</strong> {selectedDocument?.status}</p>
+  //                           </div>
+  //                         );
+  //                       }
+  //                     } else {
+  //                       return (
+  //                         <div className="no-document">
+  //                           <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+  //                           <p>No document uploaded</p>
+  //                         </div>
+  //                       );
+  //                     }
+  //                   })()}
+  //                   <DocumentControls
+  //                     onZoomIn={handleZoomIn}
+  //                     onZoomOut={handleZoomOut}
+  //                     onRotate={handleRotate}
+  //                     onReset={handleReset}
+  //                     onDownload={fileUrl}
+  //                     zoomLevel={documentZoom}
+  //                     fileType={fileType}
+  //                   />
+  //                 </>
+  //               ) : (
+  //                 <div className="no-document">
+  //                   <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+  //                   <p>No document uploaded</p>
+  //                 </div>
+  //               )}
+  //             </div>
 
-              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-                <div className="info-card mt-4">
-                  <h4>Document History</h4>
-                  <div className="document-history">
-                    {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
-                      <div key={index} className="history-item" style={{
-                        display: 'block',
-                        padding: '12px',
-                        marginBottom: '8px',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef'
-                      }}>
-                        {/* Document Preview Thumbnail using iframe/img */}
-                        <div className="history-preview" style={{ marginRight: '0px' }}>
-                          {renderDocumentThumbnail(upload, true)}
-                        </div>
+  //             {/* document preview container  */}
 
-                        {/* Document Info */}
-                        <div className="history-info" style={{ flex: 1 }}>
-                          <div className="history-date" style={{
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            color: '#495057',
-                            marginBottom: '4px'
-                          }}>
-                            {formatDate(upload.uploadedAt)}
-                          </div>
-                          <div className="history-status">
-                            <span className={`${getStatusBadgeClass(upload.status)}`} style={{
-                              fontSize: '25px',
-                              padding: '4px 8px'
-                            }}>
-                              {upload.status}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+  //             {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+  //               <div className="info-card mt-4">
+  //                 <h4>Document History</h4>
+  //                 <div className="document-history">
+  //                   {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
+  //                     <div key={index} className="history-item" style={{
+  //                       display: 'block',
+  //                       padding: '12px',
+  //                       marginBottom: '8px',
+  //                       backgroundColor: '#f8f9fa',
+  //                       borderRadius: '8px',
+  //                       border: '1px solid #e9ecef'
+  //                     }}>
+  //                       {/* Document Preview Thumbnail using iframe/img */}
+  //                       <div className="history-preview" style={{ marginRight: '0px' }}>
+  //                         {renderDocumentThumbnail(upload, true)}
+  //                       </div>
 
-            <div className="document-info-section">
-              <div className="info-card">
-                <h4>Document Information</h4>
-                <div className="info-row">
-                  <strong>Document Name:</strong> {selectedDocument.Name}
-                </div>
-                <div className="info-row">
-                  <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
-                    new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric'
-                    }) : 'N/A'}
-                </div>
-                <div className="info-row">
-                  <strong>Status:</strong>
-                  <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
-                    {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
-                  </span>
-                </div>
+  //                       {/* Document Info */}
+  //                       <div className="history-info" style={{ flex: 1 }}>
+  //                         <div className="history-date" style={{
+  //                           fontSize: '14px',
+  //                           fontWeight: '500',
+  //                           color: '#495057',
+  //                           marginBottom: '4px'
+  //                         }}>
+  //                           {formatDate(upload.uploadedAt)}
+  //                         </div>
+  //                         <div className="history-status">
+  //                           <span className={`${getStatusBadgeClass(upload.status)}`} style={{
+  //                             fontSize: '12px',
+  //                             padding: '4px 8px'
+  //                           }}>
+  //                             {upload.status}
+  //                           </span>
+  //                         </div>
+  //                         {upload.fileUrl && (
+  //                           <div className="history-actions" style={{ marginTop: '8px' }}>
+  //                             <a
+  //                               href={upload.fileUrl}
+  //                               download
+  //                               className="btn btn-sm btn-outline-primary"
+  //                               target="_blank"
+  //                               rel="noopener noreferrer"
+  //                               style={{
+  //                                 fontSize: '11px',
+  //                                 padding: '2px 8px',
+  //                                 textDecoration: 'none'
+  //                               }}
+  //                             >
+  //                               <i className="fas fa-download me-1"></i>
+  //                               Download
+  //                             </a>
+  //                             <button
+  //                               className="btn btn-sm btn-outline-secondary ms-2"
+  //                               style={{
+  //                                 fontSize: '11px',
+  //                                 padding: '2px 8px'
+  //                               }}
+  //                               onClick={() => {
+  //                                 // Switch main preview to this upload
+  //                                 setCurrentPreviewUpload(upload);
+  //                               }}
+  //                             >
+  //                               <i className="fas fa-eye me-1"></i>
+  //                               Preview
+  //                             </button>
+  //                           </div>
+  //                         )}
+  //                       </div>
+  //                     </div>
+  //                   ))}
+  //                 </div>
+  //               </div>
+  //             )}
+  //           </div>
 
-                <button
-                  className="action-btn upload-btn"
-                  title="Upload Document"
-                  data-bs-toggle="modal" data-bs-target="#staticBackdrop"
-                  onClick={() => {
-                    openUploadModal(selectedDocument);   // Just pass the selectedDocument
-                  }}
-                >
-                  <i className="fas fa-cloud-upload-alt"></i>
-                  Upload
-                </button>
+  //           <div className="document-info-section">
+  //             <div className="info-card">
+  //               <h4>Document Information</h4>
+  //               <div className="info-row">
+  //                 <strong>Document Name:</strong> {selectedDocument.Name}
+  //               </div>
+  //               <div className="info-row">
+  //                 <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
+  //                   new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
+  //                     day: '2-digit',
+  //                     month: 'short',
+  //                     year: 'numeric'
+  //                   }) : 'N/A'}
+  //               </div>
+  //               <div className="info-row">
+  //                 <strong>Status:</strong>
+  //                 <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
+  //                   {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+  //                 </span>
+  //               </div>
+  //             </div>
 
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  //             {/* Document Actions */}
+  //             {(latestUpload?.status || selectedDocument?.status) === 'Pending' && (
+  //               <div className="document-actions mt-4">
+  //                 {!showRejectionForm ? (
+  //                   <div className="action-buttons">
+  //                     <button
+  //                       className="btn btn-success me-2"
+  //                       onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
+  //                     >
+  //                       <i className="fas fa-check"></i> Approve Document
+  //                     </button>
+  //                     <button
+  //                       className="btn btn-danger"
+  //                       onClick={handleRejectClick}
+  //                     >
+  //                       <i className="fas fa-times"></i> Reject Document
+  //                     </button>
+  //                   </div>
+  //                 ) : (
+  //                   <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+  //                     <textarea
+  //                       value={rejectionReason}
+  //                       onChange={(e) => setRejectionReason(e.target.value)}
+  //                       placeholder="Please provide a detailed reason for rejection..."
+  //                       rows="8"
+  //                       className="form-control mb-3"
+  //                     />
+  //                     <div className="d-flex gap-2">
+  //                       <button
+  //                         className="btn btn-danger"
+  //                         onClick={handleConfirmRejection}
+  //                       >
+  //                         Confirm Rejection
+  //                       </button>
+  //                       <button
+  //                         className="btn btn-secondary"
+  //                         onClick={handleCancelRejection}
+  //                       >
+  //                         Cancel
+  //                       </button>
+  //                     </div>
+  //                   </div>
+  //                 )}
+  //               </div>)}
+
+
+  //           </div>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // };
 
 
   const UploadModal = () => {
@@ -1271,7 +1894,8 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
-
+  const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
+  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters]);
   const tabs = [
     'Lead Details',
     'Profile',
@@ -2816,8 +3440,9 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
 
-          <div className="position-relative">
-            <div className="site-header--sticky--register">
+          <div className="position-relative" ref={widthRef} >
+            <nav ref={navRef}  className="" style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${width}px`}}
+            >
               <div className="container-fluid">
                 <div className="row align-items-center">
                   <div className="col-md-6 d-md-block d-sm-none">
@@ -2876,20 +3501,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                         )}
                       </button>
 
-                      <div className="btn-group">
-                        <button
-                          onClick={() => setViewMode('grid')}
-                          className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                        >
-                          <i className="fas fa-th"></i>
-                        </button>
-                        <button
-                          onClick={() => setViewMode('list')}
-                          className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                        >
-                          <i className="fas fa-list"></i>
-                        </button>
-                      </div>
+                    
                     </div>
                   </div>
 
@@ -2930,7 +3542,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                   </div>
                 </div>
               </div>
-            </div>
+            </nav>
           </div>
 
           {/* Advanced Filters */}
@@ -3341,7 +3953,10 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
 
 
           {/* Main Content */}
-          <div className="content-body marginTopMobile" style={{ marginTop: '185px' }}>
+          <div className="content-body marginTopMobile" style={{ 
+              marginTop: `${navHeight + 10}px`,
+              transition: 'margin-top 0.2s ease-in-out'
+            }}>
             <section className="list-view">
               <div className="row">
                 <div className="d-flex justify-content-end gap-2">
@@ -3380,8 +3995,8 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                     <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
                     Bulk Action
                   </button>
-                  
-                  
+
+
                 </div>
               </div>
               <div className='row'>
@@ -3523,7 +4138,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                               width: "100vw",
                                               height: "100vh",
                                               backgroundColor: "transparent",
-                                              zIndex: 999,
+                                              zIndex: 8,
                                             }}
                                           ></div>
                                         )}
@@ -3539,7 +4154,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                             borderRadius: "4px",
                                             padding: "8px 0",
-                                            zIndex: 1000,
+                                            zIndex: 9,
                                             transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                             transition: "transform 0.3s ease-in-out",
                                             pointerEvents: showPopup ? "auto" : "none",
@@ -3699,7 +4314,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                               width: "100vw",
                                               height: "100vh",
                                               backgroundColor: "transparent",
-                                              zIndex: 999,
+                                              zIndex: 8,
                                             }}
                                           ></div>
                                         )}
@@ -3715,7 +4330,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                             borderRadius: "4px",
                                             padding: "8px 0",
-                                            zIndex: 1000,
+                                            zIndex: 9,
                                             transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                             transition: "transform 0.3s ease-in-out",
                                             pointerEvents: showPopup === profileIndex ? "auto" : "none",
@@ -4369,9 +4984,9 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                                           <div className="resume-skill-bar-container">
                                                             <div
                                                               className="resume-skill-bar"
-                                                              style={{ width: `${skill?.skillPercent||0}%` }}
+                                                              style={{ width: `${skill?.skillPercent || 0}%` }}
                                                             ></div>
-                                                            <span className="resume-skill-percent">{skill?.skillPercent||0}%</span>
+                                                            <span className="resume-skill-percent">{skill?.skillPercent || 0}%</span>
                                                           </div>
                                                         )}
                                                       </div>
@@ -4887,124 +5502,133 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
                                               })()}
                                             </div>
 
-                                            <DocumentModal />
+                                            {/* <DocumentModal /> */}
+                                            {showDocumentModal && (
+                                              <DocumentModal
+                                                showDocumentModal={showDocumentModal}
+                                                selectedDocument={selectedDocument}
+                                                closeDocumentModal={closeDocumentModal}
+                                                updateDocumentStatus={updateDocumentStatus}
+                                                getFileType={getFileType}
+                                              />
+                                            )}
                                             <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
                                               <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
                                                 <div className="modal-content p-0 w-100">
                                                   <div className="modal-header">
-                                                  <h3>
-                                                          <i className="fas fa-cloud-upload-alt me-2"></i>
-                                                          Upload {selectedDocumentForUpload?.Name || 'Document'}
-                                                        </h3>
-                                                        <button  type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
+                                                    <h3>
+                                                      <i className="fas fa-cloud-upload-alt me-2"></i>
+                                                      Upload {selectedDocumentForUpload?.Name || 'Document'}
+                                                    </h3>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
                                                   </div>
                                                   <div className="modal-body">
-                                                   
 
-                                                    
-                                                        <div className="upload-section">
-                                                          {!selectedFile ? (
-                                                            <div className="file-drop-zone">
-                                                              <div className="drop-zone-content">
-                                                                <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                                                                <h4>Choose a file to upload</h4>
-                                                                <p>Drag and drop a file here, or click to select</p>
-                                                                <div className="file-types">
-                                                                  <span>Supported: JPG, PNG, GIF, PDF</span>
-                                                                  <span>Max size: 10MB</span>
-                                                                </div>
-                                                                <input
-                                                                  type="file"
-                                                                  id="file-input"
-                                                                  accept=".jpg,.jpeg,.png,.gif,.pdf"
-                                                                  onChange={handleFileSelect}
-                                                                  style={{ display: 'none' }}
-                                                                />
-                                                                <button
-                                                                  className="btn btn-primary"
 
-                                                                  onClick={() => document.getElementById('file-input').click()}
-                                                                >
-                                                                  <i className="fas fa-folder-open me-2"></i>
-                                                                  Choose File
-                                                                </button>
-                                                              </div>
+
+                                                    <div className="upload-section">
+                                                      {!selectedFile ? (
+                                                        <div className="file-drop-zone">
+                                                          <div className="drop-zone-content">
+                                                            <i className="fas fa-cloud-upload-alt upload-icon"></i>
+                                                            <h4>Choose a file to upload</h4>
+                                                            <p>Drag and drop a file here, or click to select</p>
+                                                            <div className="file-types">
+                                                              <span>Supported: JPG, PNG, GIF, PDF</span>
+                                                              <span>Max size: 10MB</span>
                                                             </div>
-                                                          ) : (
-                                                            <div className="file-preview-section">
-                                                              <div className="selected-file-info">
-                                                                <h4>Selected File:</h4>
-                                                                <div className="file-details">
-                                                                  <div className="file-icon">
-                                                                    <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
-                                                                  </div>
-                                                                  <div className="file-info">
-                                                                    <p className="file-name">{selectedFile.name}</p>
-                                                                    <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                                  </div>
-                                                                  <button
-                                                                    className="btn btn-sm btn-outline-secondary"
-                                                                    onClick={() => {
-                                                                      setSelectedFile(null);
-                                                                      setUploadPreview(null);
-                                                                    }}
-                                                                  >
-                                                                    <i className="fas fa-trash"></i>
-                                                                  </button>
-                                                                </div>
+                                                            <input
+                                                              type="file"
+                                                              id="file-input"
+                                                              accept=".jpg,.jpeg,.png,.gif,.pdf"
+                                                              onChange={handleFileSelect}
+                                                              style={{ display: 'none' }}
+                                                            />
+                                                            <button
+                                                              className="btn btn-primary"
+
+                                                              onClick={() => document.getElementById('file-input').click()}
+                                                            >
+                                                              <i className="fas fa-folder-open me-2"></i>
+                                                              Choose File
+                                                            </button>
+                                                          </div>
+                                                        </div>
+                                                      ) : (
+                                                        <div className="file-preview-section">
+                                                          <div className="selected-file-info">
+                                                            <h4>Selected File:</h4>
+                                                            <div className="file-details">
+                                                              <div className="file-icon">
+                                                                <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
                                                               </div>
+                                                              <div className="file-info">
+                                                                <p className="file-name">{selectedFile.name}</p>
+                                                                <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                              </div>
+                                                              <button
+                                                                className="btn btn-sm btn-outline-secondary"
+                                                                onClick={() => {
+                                                                  setSelectedFile(null);
+                                                                  setUploadPreview(null);
+                                                                }}
+                                                              >
+                                                                <i className="fas fa-trash"></i>
+                                                              </button>
+                                                            </div>
+                                                          </div>
 
-                                                              {uploadPreview && (
-                                                                <div className="upload-preview">
-                                                                  <h5>Preview:</h5>
-                                                                  <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                                                                </div>
-                                                              )}
+                                                          {uploadPreview && (
+                                                            <div className="upload-preview">
+                                                              <h5>Preview:</h5>
+                                                              <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
+                                                            </div>
+                                                          )}
 
-                                                              {isUploading && (
-                                                                <div className="upload-progress-section">
-                                                                  <h5>Uploading...</h5>
-                                                                  <div className="progress-bar-container">
-                                                                    <div
-                                                                      className="progress-bar"
-                                                                      style={{ width: `${uploadProgress}%` }}
-                                                                    ></div>
-                                                                  </div>
-                                                                  <p>{uploadProgress}% Complete</p>
-                                                                </div>
-                                                              )}
+                                                          {isUploading && (
+                                                            <div className="upload-progress-section">
+                                                              <h5>Uploading...</h5>
+                                                              <div className="progress-bar-container">
+                                                                <div
+                                                                  className="progress-bar"
+                                                                  style={{ width: `${uploadProgress}%` }}
+                                                                ></div>
+                                                              </div>
+                                                              <p>{uploadProgress}% Complete</p>
                                                             </div>
                                                           )}
                                                         </div>
-                                                     
+                                                      )}
+                                                    </div>
 
-                                                   
+
+
                                                   </div>
                                                   <div className="modal-footer">
-                                                  <button
-                                                          className="btn btn-secondary"
-                                                          onClick={closeUploadModal}
-                                                          disabled={isUploading}
-                                                        >
-                                                          Cancel
-                                                        </button>
-                                                        <button
-                                                          className="btn btn-primary"
-                                                          onClick={handleFileUpload}
-                                                          disabled={!selectedFile || isUploading}
-                                                        >
-                                                          {isUploading ? (
-                                                            <>
-                                                              <i className="fas fa-spinner fa-spin me-2"></i>
-                                                              Uploading...
-                                                            </>
-                                                          ) : (
-                                                            <>
-                                                              <i className="fas fa-upload me-2"></i>
-                                                              Upload Document
-                                                            </>
-                                                          )}
-                                                        </button>
+                                                    <button
+                                                      className="btn btn-secondary"
+                                                      onClick={closeUploadModal}
+                                                      disabled={isUploading}
+                                                    >
+                                                      Cancel
+                                                    </button>
+                                                    <button
+                                                      className="btn btn-primary"
+                                                      onClick={handleFileUpload}
+                                                      disabled={!selectedFile || isUploading}
+                                                    >
+                                                      {isUploading ? (
+                                                        <>
+                                                          <i className="fas fa-spinner fa-spin me-2"></i>
+                                                          Uploading...
+                                                        </>
+                                                      ) : (
+                                                        <>
+                                                          <i className="fas fa-upload me-2"></i>
+                                                          Upload Document
+                                                        </>
+                                                      )}
+                                                    </button>
                                                   </div>
                                                 </div>
                                               </div>
@@ -5017,7 +5641,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
 
                                 </div>
                               )}
-                            </div>                          
+                            </div>
 
                             {/* <div class="modal fade" id={`profileModal-${profile._id}`} data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby={`profileModalLabel-${profile._id}`} aria-hidden="true">
                               <div class="modal-dialog modal-dialog-scrollable">
@@ -5154,7 +5778,11 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row site-header--sticky--register--panels w-25">
+            <div className="row " style={{ 
+              marginTop: `${navHeight + 12}px`,
+              transition: 'margin-top 0.2s ease-in-out',
+              position: 'fixed'
+            }}>
               {renderEditPanel()}
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
@@ -5170,7 +5798,7 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
         {isMobile && renderLeadHistoryPanel()}
 
       </div>
-       <UploadModal />
+      <UploadModal />
 
       {/* <div style={{ background: 'rgba(0, 0, 0, 0.5)', width: '100%', position: 'absolute', minHeight: '100vh', top: '0', zIndex: '13', position: 'fixed' }}>
         <div className='card' style={{ border: '1px solid red', width: '70%', height: '100%' }}>
@@ -5184,18 +5812,18 @@ console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
 
 
       <style>
-        {
-          `
-
-    /* Clean Sticky Header CSS - Replace your entire style section with this */
-
-/* Main wrapper styling */
-html body .content .content-wrapper {
-    padding: calc(0.9rem - 0.1rem) 1.2rem;
-    overflow: visible !important;
+        {`
+        /* Existing styles */
+        html body .content .content-wrapper {
+          padding: calc(0.9rem - 0.1rem) 1.2rem
+        }
+.modal-header {
+    background-color: #fc2b5a;
+    border-bottom: none;
+    color: #fff;
 }
 
-.bg-gradient-primary {
+        .bg-gradient-primary {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
@@ -5405,6 +6033,64 @@ html body .content .content-wrapper {
           align-items: center;
           justify-content: center;
           height: 100%;
+        }
+        @media (max-width: 767px) {
+          .scrollable-container {
+            display: block;
+            width: 100%;
+            overflow: hidden;
+            padding: 10px 0;
+          }
+
+          .desktop-view {
+            display: none;
+          }
+
+          .scrollable-content {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scroll-behavior: smooth;
+            padding: 10px 0;
+          }
+
+          .info-card {
+            flex: 0 0 auto;
+            scroll-snap-align: start;
+            margin-right: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #eaeaea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            background: #fff;
+          }
+
+          .scroll-arrow {
+            display: flex;
+          }
+
+          .scrollable-content::-webkit-scrollbar {
+            height: 4px;
+          }
+
+          .scrollable-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+          }
+
+          .scrollable-content::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+          }
+
+          .btn-group {
+            flex-wrap: wrap;
+          }
+          
+          .btn-group .btn {
+            margin-bottom: 0.25rem;
+          }
         }
 
         .whatsapp-chat {
@@ -5944,6 +6630,39 @@ background: #fd2b5a;
           color: #007bff;
           font-weight: bold;
         }
+
+        @media (max-width: 768px) {
+          .resume-document-body {
+            flex-direction: column;
+          }
+          
+          .resume-profile-section {
+            flex-direction: column;
+            text-align: center;
+          }
+          
+          .resume-contact-details {
+            justify-content: center;
+          }
+            .info-group{
+            border: none;
+            }
+              .info-card {
+
+                    flex: 0 0 auto;
+                    scroll-snap-align: start;
+                    margin-right: 15px;
+                    padding: 15px;
+                    border-radius: 8px;
+                    border: 1px solid #eaeaea;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                    background: #fff;
+                }
+                    .input-height{
+                    height: 40px;
+                    }
+                }
+
                 
 /* Mobile Modal Styles */
 
@@ -6161,6 +6880,37 @@ background: #fd2b5a;
     padding: 8px;
 }
 
+/* Responsive adjustments */
+@media (max-width: 768px) {
+
+    .whatsapp-chat  {
+        height: 90vh;
+    }
+
+    .nav-pills {
+        flex-wrap: wrap;
+    }
+
+    .nav-pills .nav-link {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
+    }
+}
+
+/* Additional mobile optimizations */
+@media (max-width: 576px) {
+
+
+    .btn-group {
+        flex-wrap: wrap;
+    }
+
+    .input-group {
+        max-width: 100% !important;
+        margin-bottom: 0.5rem;
+    }
+}
+
 /* Add this to your existing style tag or CSS file */
 .react-date-picker__wrapper {
     border: 1px solid #ced4da !important;
@@ -6196,6 +6946,7 @@ background: #fd2b5a;
 .no-scroll {
     overflow: hidden;
 }
+
 
 .doc-iframe {
     transform-origin: top left;
@@ -6465,6 +7216,9 @@ background: #fd2b5a;
     transition: background-color 0.2s;
 }
 
+.document-modal-content .close-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
 
 
 .document-preview-section {
@@ -6647,6 +7401,29 @@ background: #fd2b5a;
     top:10px
 }
 
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .document-modal-content {
+        width: 98%;
+        margin: 1rem;
+        max-height: 95vh;
+    }
+
+
+    .document-preview-section {
+        min-width: auto;
+        overflow-y: auto;
+    }
+
+    .document-preview-container {
+        height: 300px;
+    }
+
+    .document-info-section {
+        min-width: auto;
+    }
+}
+
 .m-c {
     background-color: white;
     border-radius: 8px;
@@ -6673,7 +7450,6 @@ background: #fd2b5a;
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: #777;
 }
 
 .m-b {
@@ -6765,6 +7541,12 @@ background: #fd2b5a;
     color: #777;
 }
 
+.modal-actions {
+    margin-top: 30px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
 
 .rejection-form {
     margin-top: 20px;
@@ -7397,434 +8179,15 @@ background: #fd2b5a;
 .meta-text {
     color: #333;
 }
-
-/* Sticky Header Container */
-.sticky-header-container {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 1020 !important;
-    background-color: white !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
-    width: 100% !important;
-    margin-bottom: 1rem !important;
-}
-
-/* Header Content Styling */
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-}
-
-/* Secondary Sticky Elements (Side Panels) */
-.stickyBreakpoints {
-    position: sticky !important;
-    top: 120px !important;
-    z-index: 11 !important;
-}
-
-/* Date Picker Styles */
-.react-date-picker__wrapper {
-    border: none;
-}
-
-.react-date-picker__inputGroup input {
-    border: none !important;
-}
-
-.react-date-picker__inputGroup {
-    width: 100%;
-    white-space: nowrap;
-    background: transparent;
-    border: none;
-}
-
-.react-date-picker__clear-button {
-    display: none;
-}
-.react-date-picker__calendar.react-date-picker__calendar--open{
-    inset: 0 !important;
-    width: 300px !important;
-}
-
-html body .content .content-wrapper {
-    padding: calc(0.9rem - 0.1rem) 1.2rem;
-    overflow: visible !important;
-}
-
-
-/* ========== STICKY HEADER STYLES ========== */
-.sticky-header-container {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 1020 !important;
-    background-color: white !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
-    width: 100% !important;
-    margin-bottom: 1rem !important;
-}
-
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-}
-.site-header--sticky--register:not(.mobile-sticky-enable) {
-    /* position: absolute !important; */
-    top: 97px;
-    z-index: 10;
-}
-    .site-header--sticky--register--panels{
-     top: 258px;
-    z-index: 10;
-    }
-
-.stickyBreakpoints {
-    position: sticky !important;
-    top: 120px !important;
-    z-index: 11 !important;
-}
-
-/* ========== DATE PICKER STYLES ========== */
-.react-date-picker__wrapper {
-    border: none;
-}
-
-.react-date-picker__inputGroup input {
-    border: none !important;
-}
-
-.react-date-picker__inputGroup {
-    width: 100%;
-    white-space: nowrap;
-    background: transparent;
-    border: none;
-}
-
-.react-date-picker__clear-button {
-    display: none;
-}
-
-/* ========== UPLOAD MODAL STYLES ========== */
-.upload-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1050;
-    backdrop-filter: blur(2px);
-}
-
-.upload-modal-content {
-    background-color: white;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    position: relative;
-}
-
-.upload-modal-header {
-    padding: 24px 24px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.upload-modal-body {
-    padding: 24px;
-}
-
-.upload-modal-footer {
-    padding: 16px 24px 24px;
-    border-top: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-}
-
-.file-drop-zone {
-    border: 2px dashed #d1d5db;
-    border-radius: 8px;
-    padding: 48px 24px;
-    text-align: center;
-    background-color: #f9fafb;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.file-drop-zone:hover {
-    border-color: #3b82f6;
-    background-color: #eff6ff;
-}
-
-.drop-zone-content .upload-icon {
-    font-size: 48px;
-    color: #3b82f6;
-    margin-bottom: 16px;
-    display: block;
-}
-
-.file-details {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background-color: #f3f4f6;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-}
-
-.file-icon {
-    width: 48px;
-    height: 48px;
-    background-color: #3b82f6;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 20px;
-}
-
-.file-info {
-    flex: 1;
-}
-
-.file-name {
-    margin: 0 0 4px;
-    font-weight: 500;
-    color: #1f2937;
-    font-size: 0.875rem;
-}
-
-.file-size {
-    margin: 0;
-    color: #6b7280;
-    font-size: 0.75rem;
-}
-
-.preview-image {
-    max-width: 100%;
-    max-height: 200px;
-    object-fit: contain;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-}
-
-.progress-bar-container {
-    width: 100%;
-    height: 8px;
-    background-color: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 8px;
-}
-
-.progress-bar {
-    height: 100%;
-    background-color: #3b82f6;
-    transition: width 0.3s ease;
-    border-radius: 4px;
-}
-
-/* ========== DOCUMENT MODAL STYLES ========== */
-.document-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1500;
-    backdrop-filter: blur(2px);
-}
-
-.document-modal-content {
-    background-color: white;
-    border-radius: 12px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    position: relative;
-    z-index: 1501;
-}
-    #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
-}
-@media (max-width: 1920px) {
-    .stickyBreakpoints {
-        top: 120px !important;
-    }
-}
-
-@media (max-width: 1400px) {
-    .stickyBreakpoints {
-        top: 110px !important;
-    }
-}
-
-@media (max-width: 1200px) {
+  /* Responsive Design */
+  @media (max-width: 1200px) {
     .document-history .history-preview iframe.pdf-thumbnail {
-        height: auto !important;
-        max-height: 600px;
+      height: auto !important;
+      max-height: 600px;
     }
-}
-
-@media (min-width: 992px) {
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-    }
-
-    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-    }
-}
+  }
 
 @media (max-width: 768px) {
-    .scrollable-container {
-        display: block;
-        width: 100%;
-        overflow: hidden;
-        padding: 10px 0;
-    }
-
-    .desktop-view {
-        display: none;
-    }
-
-    .scrollable-content {
-        display: flex;
-        overflow-x: auto;
-        scroll-snap-type: x mandatory;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: thin;
-        scroll-behavior: smooth;
-        padding: 10px 0;
-    }
-
-    .info-card {
-        flex: 0 0 auto;
-        scroll-snap-align: start;
-        margin-right: 15px;
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid #eaeaea;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        background: #fff;
-    }
-
-    .scroll-arrow {
-        display: flex;
-    }
-
-    .scrollable-content::-webkit-scrollbar {
-        height: 4px;
-    }
-
-    .scrollable-content::-webkit-scrollbar-track {
-        background: #f1f1f1;
-    }
-
-    .scrollable-content::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 10px;
-    }
-
-    .btn-group {
-        flex-wrap: wrap;
-    }
-
-    .btn-group .btn {
-        margin-bottom: 0.25rem;
-    }
-
-    .resume-document-body {
-        flex-direction: column;
-    }
-
-    .resume-profile-section {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    .resume-contact-details {
-        justify-content: center;
-    }
-
-    .info-group {
-        border: none;
-    }
-
-    .info-card {
-
-        flex: 0 0 auto;
-        scroll-snap-align: start;
-        margin-right: 15px;
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid #eaeaea;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        background: #fff;
-    }
-
-    .input-height {
-        height: 40px;
-    }
-
-
-
-    .whatsapp-chat{
-        height: 90vh;
-    }
-
-
-    .nav-pills {
-        flex-wrap: wrap;
-    }
-
-    .nav-pills .nav-link {
-        font-size: 0.9rem;
-        padding: 0.5rem 0.75rem;
-    }
-
-
-
-    .document-modal-content {
-        width: 98%;
-        margin: 1rem;
-        max-height: 95vh;
-    }
-
-
-    .document-preview-section {
-        min-width: auto;
-        overflow-y: auto;
-    }
-
-    .document-preview-container {
-        height: 300px;
-    }
-
-    .document-info-section {
-        min-width: auto;
-    }
-
     .enhanced-documents-panel {
         padding: 1rem;
     }
@@ -7865,18 +8228,22 @@ html body .content .content-wrapper {
         width: 100%;
         justify-content: center;
     }
+}
 
+@media (max-width: 768px) {
     .document-history .history-preview iframe.pdf-thumbnail {
-        height: 50vh !important;
-        min-height: 300px;
-        max-height: 500px;
+      height: 50vh !important;
+      min-height: 300px;
+      max-height: 500px;
     }
-
+    
     .document-history .history-item {
-        padding: 12px;
-        margin-bottom: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
     }
+  }
 
+@media (max-width: 768px) {
     .panel-header {
         flex-direction: column;
         align-items: stretch;
@@ -7903,97 +8270,668 @@ html body .content .content-wrapper {
     .filter-select {
         width: 100%;
     }
-
-    .sticky-header-container {
-        position: sticky !important;
-        top: 0 !important;
+}
+@media (max-width: 480px) {
+    .document-history .history-preview iframe,
+    .document-history .history-preview img {
+      max-height: 300px;
+      min-height: 150px;
     }
-
-    .stickyBreakpoints {
-        position: relative !important;
+    
+    .document-history .history-preview iframe.pdf-thumbnail {
+      height: 40vh !important;
+      min-height: 200px;
     }
+  }
 
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
-
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-        width: 100%;
-        left: 0;
-        right: 0;
-    }
-
+        .stickyBreakpoints {
+          position: sticky;
+          top: 20px;
+          z-index: 11;
+        }
+          .site-header--sticky--register--panels {
+    top: 258px;
+    z-index: 10;
+}
+           #editFollowupPanel {
+    max-height: calc(100vh - 220px); /* Adjust based on your header height */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+}
+@media (min-width: 992px) {
     .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
         position: fixed !important;
         transition: 0.4s;
         background: white;
-        width: 100%;
-        left: 0;
-        right: 0;
     }
+        }
+        .react-date-picker__wrapper {
+          border: none;
+        }
 
-    /* Adjust content margin to avoid overlap */
-    .content-body {
-        margin-top: 120px;
-        /* Adjust based on your header height */
-    }
+        .react-date-picker__inputGroup input {
+          border: none !important
+        }
 
-    .sticky-header-container {
-        position: sticky !important;
-        top: 0 !important;
-    }
+        .react-date-picker__inputGroup {
+          width: 100%;
+          white-space: nowrap;
+          background: transparent;
+          border: none;
+        }
 
-    .stickyBreakpoints {
-        position: relative !important;
-    }
+        .react-date-picker__clear-button {
+          display: none;
+        }
 
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
+        /* Main Tabs Styling */
+        .main-tabs-container {
+          border-bottom: 1px solid #dee2e6;
+          margin-bottom: 0;
+        }
+
+        .nav-tabs-main {
+          border-bottom: none;
+        }
+
+        .nav-link.main-tab {
+          background: none;
+          border: none;
+          color: #6c757d;
+          font-weight: 600;
+          font-size: 16px;
+          padding: 15px 25px;
+          border-bottom: 3px solid transparent;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .nav-link.main-tab:hover {
+          color: #0d6efd;
+          background-color: rgba(13, 110, 253, 0.05);
+          border-bottom-color: rgba(13, 110, 253, 0.3);
+        }
+
+        .nav-link.main-tab.active {
+          color: #0d6efd;
+          background-color: rgba(13, 110, 253, 0.1)!important;
+          border-bottom-color: #0d6efd;
+        }
+
+        /* Tab Badge Styling */
+        .tab-badge {
+          background: linear-gradient(45deg, #fd7e14, #e8590c);
+          color: white;
+          font-size: 11px;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-weight: 600;
+          min-width: 20px;
+          text-align: center;
+        }
+
+        .nav-link.main-tab.active .tab-badge {
+          background: linear-gradient(45deg, #0d6efd, #0b5ed7);
+        }
+
+        /* Enhanced Button Styling */
+        .btn-sm {
+          font-size: 13px;
+          padding: 6px 12px;
+        }
+
+        .btn-primary {
+          background: linear-gradient(45deg, #0d6efd, #0b5ed7);
+          border: none;
+        }
+
+        .btn-outline-secondary {
+          border-color: #dee2e6;
+          color: #6c757d;
+        }
+
+        .btn-outline-secondary:hover {
+          background-color: #f8f9fa;
+          border-color: #dee2e6;
+          color: #495057;
+        }
+
+
+.upload-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
 }
 
-@media (max-width: 576px) {
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
+.upload-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
 
-    .btn-group {
-        flex-wrap: wrap;
-    }
+.upload-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
 
-    .input-group {
-        max-width: 100% !important;
-        margin-bottom: 0.5rem;
-    }
+.upload-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
 
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.3s;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.upload-modal-body {
+  padding: 25px;
+}
+
+.file-drop-zone {
+  border: 3px dashed #ddd;
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  background: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.file-drop-zone:hover {
+  border-color: #007bff;
+  background: #f0f8ff;
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #007bff;
+  margin-bottom: 10px;
+}
+
+.drop-zone-content h4 {
+  margin: 0;
+  color: #333;
+  font-weight: 600;
+}
+
+.drop-zone-content p {
+  margin: 0;
+  color: #666;
+}
+
+.file-types {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.file-types span {
+  font-size: 12px;
+  color: #999;
+}
+
+.file-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.selected-file-info h4 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.file-details {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.file-icon {
+  width: 50px;
+  height: 50px;
+  background: #007bff;
+  color: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.file-info {
+  flex: 1;
+}
+
+.file-name {
+  margin: 0;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.file-size {
+  margin: 5px 0 0 0;
+  color: #666;
+  font-size: 12px;
+}
+
+.upload-preview {
+  text-align: center;
+}
+
+.upload-preview h5 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  border: 2px solid #eee;
+}
+
+.upload-progress-section {
+  text-align: center;
+}
+
+.upload-progress-section h5 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  transition: width 0.3s ease;
+}
+
+.upload-modal-footer {
+  padding: 20px 25px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #fafafa;
+  border-radius: 0 0 12px 12px;
+}
+
+@media (max-width: 768px) {
+  .upload-modal-content {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .upload-modal-header {
+    padding: 15px 20px;
+  }
+  
+  .upload-modal-body {
+    padding: 20px;
+  }
+  
+  .file-drop-zone {
+    padding: 30px 15px;
+  }
+}
+
+
+        /* ========================================
+           🎯 NEW: Responsive Design (ADD THESE STYLES)
+           ======================================== */
+        /* Responsive Design */
+        @media(max-width:1920px) {
+          .stickyBreakpoints {
+            top: 20%
+          }
+        }
+
+        @media(max-width:1400px) {
+          .stickyBreakpoints {
+            top: 17%
+          }
+        }
+
+        @media(max-width: 768px) {
+          .mbResponsive{        
+            flex-direction:column;
+            align-items:flex-start!important;
+          }
+          .milestoneResponsive{        
+            right:-17px;
+            top:0px !important;
+            transform: translate(-45%, -100%)!important;
+          }
+          .nav-link.main-tab {
+            font-size: 14px;
+            padding: 12px 15px;
+          }
+          
+          .tab-badge {
+            font-size: 10px;
+            padding: 1px 6px;
+          }
+          .content-body{
+          margin-top: 30px!important;
+          }
+        }
+
+
+
+
+        /* Document History Auto Height CSS - Add to your existing styles */
+
+/* Document History Container */
+.document-history {
+  width: 100%;
+  max-height: 1000px;
+  height: auto !important;
+  padding: 0;
+}
+
+/* History Item Styling */
+.document-history .history-item {
+  display: block !important;
+  padding: 15px;
+  margin-bottom: 15px;
+  backgroundColor: #f8f9fa;
+  borderRadius: 12px;
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.document-history .history-item:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+  border-color: #007bff;
+}
+
+/* History Preview Container */
+.document-history .history-preview {
+  margin-bottom: 15px;
+  width: 100%;
+  overflow: visible;
+}
+
+/* Auto Height for All Document Types */
+.document-history .history-preview img {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background-color: #fff;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.document-history .history-preview img:hover {
+  transform: scale(1.02);
+}
+
+/* PDF Auto Height */
+.document-history .history-preview iframe.pdf-thumbnail {
+  width: 100% !important;
+  height: fit-content !important;
+  min-height: 750px;
+  
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background-color: #fff;
+  cursor: pointer;
+}
+
+/* Other Document Types Auto Height */
+
+
+
+
+/* History Info Section */
+.document-history .history-info {
+  padding-top: 15px;
+  border-top: 2px solid #e9ecef;
+  margin-top: 10px;
+}
+
+.document-history .history-date {
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-history .history-status {
+  margin-bottom: 12px;
+}
+
+.document-history .history-status span {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Action Buttons */
+.document-history .history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.document-history .history-actions .btn {
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.document-history .history-actions .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.document-history .history-actions .btn-outline-primary {
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.document-history .history-actions .btn-outline-primary:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+.document-history .history-actions .btn-outline-secondary {
+  border-color: #6c757d;
+  color: #6c757d;
+}
+
+.document-history .history-actions .btn-outline-secondary:hover {
+  background-color: #6c757d;
+  color: white;
+}
+
+/* Rejection Reason Styling */
+.document-history .rejection-reason {
+  margin-top: 10px;
+  padding: 8px 0;
+}
+
+.document-history .rejection-reason strong {
+  color: #856404;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.document-history .rejection-reason p {
+  margin: 0;
+  padding: 8px 12px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #856404;
+  line-height: 1.4;
+}
+
+/* Loading Animation */
+.document-history .history-preview iframe,
+.document-history .history-preview img {
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.document-history .history-preview iframe[src],
+.document-history .history-preview img[src] {
+  opacity: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .document-history .history-preview iframe.pdf-thumbnail {
+    height: auto !important;
+    max-height: 600px;
+  }
+  
+  .document-history .history-preview iframe:not(.pdf-thumbnail) {
+    height: auto !important;
+    max-height: 600px;
+  }
+}
+
+@media (max-width: 768px) {
+  .document-history .history-preview iframe.pdf-thumbnail {
+    height: 50vh !important;
+    min-height: 300px;
+    max-height: 500px;
+  }
+  
+  .document-history .history-preview iframe:not(.pdf-thumbnail) {
+    height: 40vh !important;
+    min-height: 200px;
+    max-height: 400px;
+  }
+  
+  .document-history .history-item {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .document-history .history-actions {
+    flex-direction: column;
+  }
+  
+  .document-history .history-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 480px) {
-    .document-history .history-preview iframe,
-    .document-history .history-preview img {
-        max-height: 300px;
-        min-height: 150px;
-    }
-
-    .document-history .history-preview iframe.pdf-thumbnail {
-        height: 40vh !important;
-        min-height: 200px;
-    }
+  .document-history .history-preview iframe,
+  .document-history .history-preview img {
+    max-height: 300px;
+    min-height: 150px;
+  }
+  
+  .document-history .history-preview iframe.pdf-thumbnail {
+    height: 40vh !important;
+    min-height: 200px;
+  }
 }
 
-    
-    `
-        }
+/* Smooth Hover Effects */
+.document-history .history-item {
+  background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+}
+
+.document-history .history-item:hover {
+  background: linear-gradient(145deg, #e9ecef, #f8f9fa);
+}
+    .react-date-picker__calendar react-date-picker__calendar--open{
+    inset: 0 !important;
+    width: 300px !important;
+    }
+        `}
       </style>
       <style>
         {
+
           `
+          
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
   position: relative;
@@ -8290,9 +9228,4053 @@ height:min-content !important;
   .marginTopMobile {
     margin-top: 340px !important;
   }
+   .nav-tabs-main{
+                  white-space: nowrap;
+                  flex-wrap: nowrap;
+                  overflow: scroll;
+                  scrollbar-width: none;
+                  -ms-overflow-style: none;
+                  &::-webkit-scrollbar {
+                    display: none;
+                  }
+              }
+              .nav-tabs-main > li > button{
+              padding: 15px 9px;
+              }
 }
 
-    `
+    
+            `
+        }
+
+      </style>
+      <style> {
+        ` .bg-gradient-primary {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+
+          .transition-all {
+              transition: all 0.3s ease;
+          }
+
+          .nav-pills-sm .nav-link {
+              padding: 0.375rem 0.75rem;
+              font-size: 0.875rem;
+          }
+
+          .sticky-top {
+              position: sticky !important;
+          }
+
+          .btn-group .btn {
+              border-radius: 0.375rem;
+          }
+
+          .btn-group .btn:not(:last-child) {
+              margin-right: 0.25rem;
+          }
+
+          .card {
+              transition: box-shadow 0.15s ease-in-out;
+          }
+
+
+          .text-truncate {
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+          }
+
+          .circular-progress-container {
+              position: relative;
+              width: 40px;
+              height: 40px;
+          }
+
+          .circular-progress-container svg {
+              transform: rotate(-90deg);
+          }
+
+          .circle-bg {
+              fill: none;
+              stroke: #e6e6e6;
+              stroke-width: 4;
+          }
+
+          .circle-progress {
+              fill: none;
+              stroke: #FC2B5A;
+              stroke-width: 4;
+              stroke-linecap: round;
+              transition: stroke-dashoffset 0.5s ease;
+          }
+
+          .circular-progress-container .progress-text {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              font-size: 10px;
+              color: #333;
+          }
+
+          .contact-row {
+              border: 1px solid #e0e0e0;
+              border-radius: 2px;
+              padding: 10px 15px;
+              background-color: #fff;
+          }
+
+          .userCheckbox {
+              display: flex;
+              align-items: center;
+              gap: 20px;
+          }
+
+          .contact-checkbox {
+              display: flex;
+              align-items: center;
+          }
+
+          .contact-name {
+              font-weight: 500;
+              margin-bottom: 0;
+          }
+
+          .contact-number {
+              color: #888;
+              font-size: 0.85rem;
+          }
+
+          .transition-col {
+              transition: all 0.3s ease-in-out;
+          }
+
+          .leadsStatus {
+              width: 100%;
+              border-bottom: 1px solid #e0e0e0;
+          }
+
+          .leadsDetails {
+              display: flex;
+              list-style: none;
+              margin: 0;
+              padding: 0;
+              overflow-x: auto;
+              white-space: nowrap;
+          }
+
+          .leadsDetails .status {
+              padding: 12px 16px;
+              font-size: 14px;
+              color: #555;
+              cursor: pointer;
+              position: relative;
+              transition: all 0.2s ease;
+          }
+
+          .leadsDetails .status:hover {
+              color: #000;
+          }
+
+          .leadsDetails .status.active {
+              color: #333;
+              font-weight: 500;
+          }
+
+          .leadsDetails .status.active::after {
+              content: '';
+              position: absolute;
+              bottom: -1px;
+              left: 0;
+              width: 100%;
+              height: 2px;
+              background-color: #007bff;
+          }
+
+          .tab-pane {
+              display: none;
+          }
+
+          .tab-pane.active {
+              display: block;
+          }
+
+          .info-section {
+              background: #f8f9fa;
+              border-radius: 8px;
+              padding: 20px;
+              margin-bottom: 20px;
+          }
+
+          .section-title {
+              color: #495057;
+              font-weight: 600;
+              margin-bottom: 15px;
+              padding-bottom: 10px;
+              border-bottom: 2px solid #dee2e6;
+          }
+
+
+          .tab-pane {
+              padding: 0;
+              position: relative;
+          }
+
+          .scrollable-container {
+              display: none;
+          }
+
+          .desktop-view {
+              display: block;
+          }
+
+          .scroll-arrow {
+              display: none;
+              position: absolute;
+              top: 50%;
+              transform: translateY(-50%);
+              width: 30px;
+              height: 30px;
+              background: rgba(255, 255, 255, 0.9);
+              border-radius: 50%;
+              align-items: center;
+              justify-content: center;
+              cursor: pointer;
+              z-index: 9;
+              box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+              border: 1px solid #eaeaea;
+          }
+
+          .scroll-left {
+              left: 5px;
+          }
+
+          .scroll-right {
+              right: 5px;
+          }
+
+          .document-preview-icon {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100%;
+          }
+
+
+
+          .whatsapp-chat {
+              height: 100%;
+              min-width: 300px;
+              box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.12), 0px 1px 10px rgba(0, 0, 0, 0.12), 0px 2px 4px rgba(0, 0, 0, 0.2);
+              display: flex;
+              flex-direction: column;
+          }
+
+          .right-side-panel {
+              background: #ffffff !important;
+              box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.12), 0px 1px 10px rgba(0, 0, 0, 0.12), 0px 2px 4px rgba(0, 0, 0, 0.04);
+              width: 100%;
+              height: 73dvh;
+          }
+
+          .whatsapp-chat .topbar-container {
+              background-color: #fff;
+              padding: 8px 16px;
+              display: flex;
+              /* height: 8%; */
+              min-height: 43px;
+              align-items: center;
+              position: relative;
+              justify-content: space-between;
+          }
+
+          .whatsapp-chat .topbar-container .left-topbar {
+              display: flex;
+              align-items: center;
+              justify-content: flex-start;
+              cursor: pointer;
+          }
+
+          .whatsapp-chat .topbar-container .left-topbar .img-container {
+              margin-right: 12px;
+          }
+
+          .whatsapp-chat .topbar-container .left-topbar .selected-number {
+              font-size: 12px;
+              color: #393939;
+          }
+
+          .small-avatar {
+              background: #f17e33;
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              color: white;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              text-transform: uppercase;
+              font-size: 14px;
+          }
+
+          .whatsapp-chat .chat-view {
+              background: #E6DDD4;
+              flex: 1;
+              position: relative;
+          }
+
+          .whatsapp-chat .chat-view .chat-container {
+              list-style-type: none;
+              padding: 18px 10px;
+              position: absolute;
+              bottom: 0;
+              display: flex;
+              flex-direction: column;
+              padding-right: 15px;
+              overflow-x: hidden;
+              max-height: 100%;
+              margin-bottom: 0px;
+              padding-bottom: 12px;
+              overflow-y: scroll;
+              width: 100%;
+          }
+
+          .whatsapp-chat .chat-view .counselor-msg-container {
+              display: flex;
+              flex-direction: column;
+              align-items: end;
+          }
+
+          .whatsapp-chat .chat-view .chat-container .chatgroupdate {
+              width: 92px;
+              height: 24px;
+              background: #DCF3FB;
+              border-radius: 4px;
+              margin-top: 51px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-left: auto;
+              margin-right: auto;
+          }
+
+          .whatsapp-chat .chat-view .chat-container .chatgroupdate span {
+              font-size: 13px;
+              color: #393939;
+          }
+
+          .whatsapp-chat .chat-view .counselor-msg {
+              float: right;
+              background: #D8FFC0;
+              padding-right: 0;
+          }
+
+          .whatsapp-chat .chat-view .macro {
+              margin-top: 12px;
+              max-width: 92%;
+              border-radius: 4px;
+              padding: 8px;
+              display: flex;
+              padding-bottom: 2px;
+              min-width: 22%;
+              transform: scale(0);
+              animation: message 0.15s ease-out 0s forwards;
+          }
+
+          @keyframes message {
+              to {
+                  transform: scale(1);
+              }
+          }
+
+          .whatsapp-chat .chat-view .text-r {
+              float: right;
+          }
+
+          .whatsapp-chat .chat-view .text {
+              width: 100%;
+              display: flex;
+              flex-direction: column;
+              color: #4A4A4A;
+              font-size: 12px;
+          }
+
+          .whatsapp-chat .chat-view .student-messages {
+              color: #F17E33;
+          }
+
+          .whatsapp-chat .chat-view .message-header-name {
+              font-weight: 600;
+              font-size: 12px;
+              line-height: 18px;
+              color: #F17E33;
+              position: relative;
+              bottom: 4px;
+              opacity: 0.9;
+          }
+
+          .whatsapp-chat .chat-view .text-message {
+              width: 100%;
+              margin-top: 0;
+              margin-bottom: 2px;
+              line-height: 16px;
+              font-size: 12px;
+              word-break: break-word;
+          }
+
+          .whatsapp-chat .chat-view pre {
+              white-space: pre-wrap;
+              padding: unset !important;
+              font-size: unset !important;
+              line-height: normal !important;
+              color: #4A4A4A !important;
+              overflow: unset !important;
+              background-color: transparent !important;
+              border: none !important;
+              border-radius: unset !important;
+              font-family: unset !important;
+          }
+
+          .whatsapp-chat .footer-container {
+              background-color: #F5F6F6;
+              box-shadow: 0px -2px 4px rgba(0, 0, 0, 0.09);
+              padding: 0;
+              height: auto;
+              align-items: center;
+              border: none !important;
+          }
+
+          .whatsapp-chat .footer-container .footer-box {
+              padding: 16px;
+              background: #F5F6F6;
+              border-radius: 6px;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .message-container {
+              color: black;
+              position: relative;
+              height: 40px;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .message-container .message-input {
+              background: #FFFFFF;
+              border-radius: 6px 6px 0 0 !important;
+              width: 100%;
+              min-height: 36px;
+              padding: 0px 12px;
+              font-size: 12px;
+              resize: none;
+              position: absolute;
+              bottom: 0px;
+              line-height: 20px;
+              padding-top: 8px;
+              border: #fff;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .divider {
+              border: 1px solid #D8D8D8;
+              margin-bottom: 0.8px !important;
+              margin-top: -0.8px !important;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .message-container-input {
+              display: flex;
+              background: #FFFFFF;
+              height: 32px;
+              border-radius: 0 0 6px 6px !important;
+              justify-content: space-between;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer {
+              display: flex;
+              justify-content: flex-start;
+              align-items: center;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-bottom-5 {
+              margin-bottom: 5px;
+              margin-right: 15px;
+              margin-left: 10px;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-right-10 {
+              margin-right: 10px;
+          }
+
+          .input-template {
+              margin-bottom: 5px;
+              margin-left: 15px;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .message-container-input .right-footer .send-button {
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 32px;
+              height: 32px;
+              color: #666;
+          }
+
+          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .fileUploadIcon {
+              cursor: pointer;
+              color: #666;
+              transform: translateY(15px);
+          }
+
+          .sessionExpiredMsg {
+              background: #fff3cd;
+              border: 1px solid #ffeaa7;
+              border-radius: 4px;
+              padding: 8px 12px;
+              margin: 10px 0;
+              font-size: 12px;
+              color: #856404;
+              text-align: center;
+          }
+
+          .followUp {
+              font-size: 13px;
+              font-weight: 500;
+              padding-left: 10px;
+          }
+
+          .section-card {
+              padding: 5px;
+              border-radius: 8px;
+          }
+
+          .section-title {
+              color: #333;
+              font-weight: 600;
+              margin-bottom: 20px;
+              padding-bottom: 10px;
+              border-bottom: 2px solid #f0f0f0;
+          }
+
+          .nav-pills .nav-link.active {
+              background: #fd2b5a;
+          }
+
+          .resume-document {
+              max-width: 1200px;
+              margin: 0 auto;
+              background: white;
+              padding: 20px;
+              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+              border-radius: 8px;
+          }
+
+          .resume-document-header {
+              margin-bottom: 30px;
+          }
+
+          .resume-profile-section {
+              display: flex;
+              align-items: center;
+              margin-bottom: 20px;
+          }
+
+          .resume-profile-placeholder {
+              width: 100px;
+              height: 100px;
+              border-radius: 50%;
+              background: #f0f0f0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-right: 20px;
+              font-size: 40px;
+              color: #999;
+          }
+
+          .resume-profile-image {
+              width: 100px;
+              height: 100px;
+              border-radius: 50%;
+              object-fit: cover;
+              margin-right: 20px;
+          }
+
+          .resume-header-content {
+              flex: 1;
+          }
+
+          .resume-name {
+              font-size: 28px;
+              font-weight: bold;
+              margin-bottom: 5px;
+              color: #333;
+          }
+
+          .resume-title {
+              font-size: 16px;
+              color: #666;
+              margin-bottom: 10px;
+          }
+
+          .resume-contact-details {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 15px;
+          }
+
+          .resume-contact-item {
+              display: flex;
+              align-items: center;
+              gap: 5px;
+              font-size: 14px;
+              color: #555;
+          }
+
+          .resume-summary {
+              background: #f8f9fa;
+              padding: 15px;
+              border-radius: 8px;
+          }
+
+          .resume-section-title {
+              font-size: 18px;
+              font-weight: bold;
+              color: #333;
+              margin-bottom: 15px;
+              border-bottom: 2px solid #007bff;
+              padding-bottom: 5px;
+          }
+
+          .resume-document-body {
+              display: flex;
+              gap: 30px;
+          }
+
+          .resume-column {
+              flex: 1;
+          }
+
+          .resume-section {
+              margin-bottom: 25px;
+          }
+
+          .resume-experience-item,
+          .resume-education-item,
+          .resume-project-item {
+              margin-bottom: 20px;
+              padding-bottom: 15px;
+              border-bottom: 1px solid #eee;
+          }
+
+          .resume-item-header {
+              margin-bottom: 10px;
+          }
+
+          .resume-item-title {
+              font-size: 16px;
+              font-weight: bold;
+              color: #333;
+              margin-bottom: 5px;
+          }
+
+          .resume-item-subtitle {
+              font-size: 14px;
+              color: #666;
+              margin-bottom: 3px;
+          }
+
+          .resume-item-period {
+              font-size: 13px;
+              color: #888;
+              font-style: italic;
+          }
+
+          .resume-item-content {
+              font-size: 14px;
+              color: #555;
+              line-height: 1.5;
+          }
+
+          .resume-skills-list {
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+          }
+
+          .resume-skill-item {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+          }
+
+          .resume-skill-name {
+              flex: 1;
+              font-size: 14px;
+              color: #333;
+          }
+
+          .resume-skill-bar-container {
+              flex: 2;
+              height: 8px;
+              background: #e0e0e0;
+              border-radius: 4px;
+              overflow: hidden;
+          }
+
+          .resume-skill-bar {
+              height: 100%;
+              background: #007bff;
+              border-radius: 4px;
+          }
+
+          .resume-languages-list {
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+          }
+
+          .resume-language-item {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+          }
+
+          .resume-language-name {
+              font-size: 14px;
+              color: #333;
+          }
+
+          .resume-language-level {
+              display: flex;
+              gap: 3px;
+          }
+
+          .resume-level-dot {
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: #e0e0e0;
+          }
+
+          .resume-level-dot.filled {
+              background: #007bff;
+          }
+
+          .resume-certifications-list {
+              list-style: none;
+              padding: 0;
+          }
+
+          .resume-certification-item {
+              margin-bottom: 10px;
+              font-size: 14px;
+              color: #333;
+          }
+
+          .resume-cert-org {
+              color: #666;
+          }
+
+          .resume-cert-date {
+              color: #888;
+              font-style: italic;
+          }
+
+          .resume-interests-tags {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px;
+          }
+
+          .resume-interest-tag {
+              background: #f0f0f0;
+              padding: 5px 10px;
+              border-radius: 15px;
+              font-size: 12px;
+              color: #333;
+          }
+
+          .resume-declaration {
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #eee;
+          }
+
+          .highlight-text {
+              color: #007bff;
+              font-weight: bold;
+          }
+
+
+
+          /* WhatsApp Panel Mobile Styles */
+          .whatsapp-chat {
+              height: 100%;
+              display: flex;
+              flex-direction: column;
+          }
+
+          .topbar-container {
+              flex-shrink: 0;
+              padding: 1rem;
+              border-bottom: 1px solid #e0e0e0;
+              background-color: #f8f9fa;
+          }
+
+          .left-topbar {
+              display: flex;
+              align-items: center;
+              gap: 1rem;
+          }
+
+          .small-avatar {
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              background-color: #007bff;
+              color: white;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+          }
+
+          .lead-name {
+              font-weight: 600;
+              font-size: 1rem;
+          }
+
+          .selected-number {
+              color: #666;
+              font-size: 0.9rem;
+          }
+
+          .right-topbar {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              margin-top: 0.5rem;
+          }
+
+          .chat-view {
+              flex: 1;
+              overflow-y: auto;
+              padding: 1rem;
+              background-color: #f0f0f0;
+          }
+
+          .chat-container {
+              list-style: none;
+              padding: 0;
+              margin: 0;
+          }
+
+          .counselor-msg-container {
+              margin-bottom: 1.5rem;
+          }
+
+          .chatgroupdate {
+              text-align: center;
+              margin-bottom: 1rem;
+          }
+
+          .chatgroupdate span {
+              background-color: #e3f2fd;
+              padding: 0.25rem 0.75rem;
+              border-radius: 1rem;
+              font-size: 0.8rem;
+              color: #666;
+          }
+
+          .counselor-msg {
+              background-color: #dcf8c6;
+              padding: 0.75rem;
+              border-radius: 0.5rem;
+              margin-bottom: 0.5rem;
+              max-width: 80%;
+              margin-left: auto;
+          }
+
+          .text-message {
+              white-space: pre-wrap;
+              margin: 0;
+              font-family: inherit;
+          }
+
+          .message-header-name {
+              font-weight: 600;
+              color: #1976d2;
+          }
+
+          .student-messages {
+              color: #2e7d32;
+          }
+
+          .messageTime {
+              font-size: 0.75rem;
+              color: #666;
+              display: block;
+              text-align: right;
+          }
+
+          .sessionExpiredMsg {
+              text-align: center;
+              padding: 1rem;
+              background-color: #fff3cd;
+              border: 1px solid #ffeaa7;
+              border-radius: 0.5rem;
+              margin-top: 1rem;
+              color: #856404;
+          }
+
+          .footer-container {
+              flex-shrink: 0;
+              border-top: 1px solid #e0e0e0;
+              background-color: white;
+          }
+
+          .footer-box {
+              padding: 1rem;
+          }
+
+          .message-container {
+              margin-bottom: 0.5rem;
+          }
+
+          .message-input {
+              width: 100%;
+              border: 1px solid #ddd;
+              border-radius: 0.5rem;
+              padding: 0.5rem;
+              resize: none;
+              background-color: #f8f9fa;
+          }
+
+          .disabled-style {
+              opacity: 0.6;
+          }
+
+          .divider {
+              margin: 0.5rem 0;
+              border-color: #e0e0e0;
+          }
+
+          .message-container-input {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+          }
+
+          .bgcolor {
+              background-color: #f1f2f6 !important;
+          }
+
+          .left-footer {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+          }
+
+          .margin-right-10 {
+              margin-right: 10px;
+          }
+
+          .margin-bottom-5 {
+              margin-bottom: 5px;
+          }
+
+          .margin-horizontal-4 {
+              margin: 0 4px;
+          }
+
+          .margin-horizontal-5 {
+              margin: 0 5px;
+          }
+
+          .fileUploadIcon {
+              width: 20px;
+              height: 20px;
+              opacity: 0;
+              position: absolute;
+              cursor: pointer;
+          }
+
+          .input-template {
+              cursor: pointer;
+          }
+
+          .send-button {
+              text-decoration: none;
+          }
+
+          .send-img {
+              width: 20px;
+              height: 20px;
+          }
+
+          #whatsappPanel {
+              height: 73dvh;
+          }
+
+          .info-group {
+              padding: 8px;
+          }
+
+          /* Responsive adjustments */
+
+
+          /* Add this to your existing style tag or CSS file */
+          .react-date-picker__wrapper {
+              border: 1px solid #ced4da !important;
+              border-radius: 0.375rem !important;
+          }
+
+          .react-date-picker__inputGroup input {
+              border: none !important;
+              outline: none !important;
+          }
+
+          .react-date-picker__clear-button {
+              display: none !important;
+          }
+
+          .react-date-picker__calendar-button {
+              padding: 4px !important;
+          }
+
+          /* Additional styling for better appearance */
+          .react-date-picker__inputGroup {
+              width: 100%;
+              white-space: nowrap;
+              background: transparent;
+              border: none;
+          }
+
+          .react-date-picker__wrapper {
+              background: white !important;
+          }
+
+
+          .no-scroll {
+              overflow: hidden;
+          }
+
+
+          .doc-iframe {
+              transform-origin: top left;
+              transition: transform 0.3s ease;
+              width: 100%;
+              height: 100%;
+              overflow: hidden;
+          }
+
+          .admin-document-panel {
+              margin: 20px;
+              background-color: white;
+              border-radius: 8px;
+              box-shadow: var(--shadow);
+              overflow: hidden;
+          }
+
+          .panel-header {
+              padding: 20px;
+              border-bottom: 1px solid var(--border-color);
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: space-between;
+              align-items: center;
+              gap: 15px;
+              background-color: #4a6fdc;
+              color: white;
+          }
+
+          .panel-header h2 {
+              color: white;
+              font-size: 1.5rem;
+              margin: 0;
+          }
+
+          .user-selector {
+              padding: 8px 12px;
+              border: 1px solid var(--border-color);
+              border-radius: 4px;
+              font-size: 14px;
+              min-width: 200px;
+          }
+
+          .candidate-info {
+              background-color: #e9f0fd;
+              padding: 20px;
+              border-radius: 6px;
+              margin: 20px;
+              display: flex;
+              align-items: center;
+              box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+          }
+
+          .candidate-avatar {
+              width: 70px;
+              height: 70px;
+              border-radius: 50%;
+              background-color: #4a6fdc;
+              color: white;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              font-weight: bold;
+              font-size: 24px;
+              margin-right: 20px;
+          }
+
+          .candidate-details {
+              flex-grow: 1;
+          }
+
+          .candidate-details h3 {
+              margin: 0 0 5px 0;
+              font-size: 22px;
+              color: #333;
+          }
+
+          .candidate-details p {
+              margin: 0 0 5px 0;
+              color: #555;
+          }
+
+          .candidate-stats {
+              display: flex;
+              margin-top: 15px;
+              flex-wrap: wrap;
+              gap: 15px;
+          }
+
+          .stat-box {
+              background: white;
+              border-radius: 4px;
+              padding: 10px 15px;
+              min-width: 120px;
+              text-align: center;
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+          }
+
+          .stat-box h4 {
+              margin: 0 0 5px 0;
+              font-size: 14px;
+              color: #666;
+          }
+
+          .stat-box p {
+              margin: 0;
+              font-size: 20px;
+              font-weight: bold;
+          }
+
+          .document-list {
+              overflow-x: auto;
+              margin: 0 20px 20px 20px;
+          }
+
+          .document-table {
+              width: 100%;
+              border-collapse: collapse;
+          }
+
+          .document-table th {
+              background-color: var(--gray-light);
+              padding: 12px 15px;
+              text-align: left;
+              font-weight: 600;
+              color: #444;
+              border-bottom: 2px solid var(--border-color);
+              white-space: nowrap;
+          }
+
+
+
+          .document-table tbody tr:hover {
+              background-color: #f8f9fa;
+          }
+
+          .document-table td {
+              padding: 12px 15px;
+              vertical-align: middle;
+          }
+
+          .status-badges {
+              display: inline-block;
+              padding: 5px 10px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+          }
+
+          .status-pending {
+              background-color: #fff3cd;
+              color: #856404;
+          }
+
+          .status-approved {
+              background-color: #d4edda;
+              color: #155724;
+          }
+
+          .status-rejected {
+              background-color: #f8d7da;
+              color: #721c24;
+          }
+
+          .action-btn {
+              background: none;
+              border: none;
+              cursor: pointer;
+              padding: 5px 8px;
+              border-radius: 4px;
+              transition: background-color 0.2s;
+          }
+
+          .view-btn {
+              color: var(--primary-color);
+          }
+
+          .view-btn:hover {
+              background-color: rgba(74, 111, 220, 0.1);
+          }
+
+          .approve-btn {
+              color: var(--success-color);
+              background-color: #d4edda;
+              border: none;
+              border-radius: 4px;
+              padding: 8px 12px;
+              cursor: pointer;
+              font-weight: 600;
+              transition: all 0.2s;
+          }
+
+          .approve-btn:hover {
+              background-color: #c3e6cb;
+          }
+
+          .reject-btn {
+              color: var(--danger-color);
+              background-color: #f8d7da;
+              border: none;
+              border-radius: 4px;
+              padding: 8px 12px;
+              cursor: pointer;
+              font-weight: 600;
+              transition: all 0.2s;
+          }
+
+          .reject-btn:hover {
+              background-color: #f5c6cb;
+          }
+
+          .document-modal-overlay {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100vw;
+              height: 100vh;
+              background-color: rgba(0, 0, 0, 0.7);
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              z-index: 9999;
+              backdrop-filter: blur(5px);
+          }
+
+          .document-modal-content {
+              background: white;
+              border-radius: 12px;
+              width: 70%;
+              max-height: 90vh;
+              overflow: hidden;
+              box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+              display: flex;
+              flex-direction: column;
+              animation: modalSlideIn 0.3s ease-out;
+          }
+
+          @keyframes modalSlideIn {
+              from {
+                  opacity: 0;
+                  transform: scale(0.9) translateY(-20px);
+              }
+
+              to {
+                  opacity: 1;
+                  transform: scale(1) translateY(0);
+              }
+          }
+
+          .document-modal-content .modal-header {
+              padding: 1.5rem 2rem;
+              border-bottom: 1px solid #e9ecef;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+          }
+
+          .document-modal-content .modal-header h3 {
+              margin: 0;
+              font-size: 1.25rem;
+              font-weight: 600;
+              color: white;
+          }
+
+          .document-modal-content .close-btn {
+              background: none;
+              border: none;
+              color: white;
+              font-size: 1.5rem;
+              cursor: pointer;
+              padding: 0;
+              width: 30px;
+              height: 30px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border-radius: 50%;
+              transition: background-color 0.2s;
+          }
+
+          .document-modal-content .close-btn:hover {
+              background-color: rgba(255, 255, 255, 0.2);
+          }
+
+          .document-modal-content .modal-body {
+              padding: 2rem;
+              display: flex;
+              gap: 2rem;
+              overflow-y: auto;
+          }
+
+          .document-preview-section {
+              flex: 2;
+              min-width: 400px;
+          }
+
+          .document-preview-container {
+              background: #f8f9fa;
+              border-radius: 8px;
+              height: 500px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              position: relative;
+              border: 2px dashed #dee2e6;
+          }
+
+          .document-preview-container img {
+              max-width: 100%;
+              max-height: 90%;
+              object-fit: contain;
+              border-radius: 4px;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          }
+
+          .preview-controls {
+              position: absolute;
+              bottom: 0px;
+              left: 50%;
+              transform: translateX(-50%);
+              display: flex;
+              gap: 10px;
+              background: rgba(255, 255, 255, 0.9);
+              padding: 10px 15px;
+              border-radius: 25px;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          }
+
+          .control-btn {
+              background: #007bff;
+              color: white;
+              border: none;
+              padding: 8px 12px;
+              border-radius: 20px;
+              cursor: pointer;
+              font-size: 0.85rem;
+              display: flex;
+              align-items: center;
+              gap: 5px;
+              transition: all 0.2s;
+          }
+
+          .control-btn:hover {
+              background: #0056b3;
+              transform: translateY(-1px);
+          }
+
+          .no-document {
+              text-align: center;
+              color: #6c757d;
+          }
+
+          .document-info-section {
+              flex: 1;
+              /* min-width: 300px; */
+          }
+
+          .info-card {
+              background: #f8f9fa;
+              border-radius: 8px;
+              padding: 1.5rem;
+              margin-bottom: 1.5rem;
+              border: 1px solid #e9ecef;
+          }
+
+          .info-card h4 {
+              margin: 0 0 1rem 0;
+              color: #495057;
+              font-size: 1.1rem;
+              font-weight: 600;
+              border-bottom: 2px solid #007bff;
+              padding-bottom: 0.5rem;
+          }
+
+          .info-row {
+              margin-bottom: 0.75rem;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+          }
+
+          .info-row strong {
+              color: #495057;
+              min-width: 120px;
+          }
+
+          .verification-section {
+              margin-top: 1.5rem;
+          }
+
+          .verification-steps {
+              margin: 0;
+              padding-left: 1.5rem;
+          }
+
+          .verification-steps li {
+              margin-bottom: 0.5rem;
+              color: #6c757d;
+              line-height: 1.5;
+          }
+
+          .action-buttons {
+              margin-top: 1.5rem;
+              display: flex;
+              gap: 10px;
+          }
+
+          .action-buttons .btn {
+              padding: 10px 20px;
+              border-radius: 6px;
+              font-weight: 500;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              transition: all 0.2s;
+          }
+
+          .rejection-form {
+              background: #fff3cd;
+              border: 1px solid #ffeaa7;
+              border-radius: 8px;
+              padding: 1.5rem;
+              margin-top: 1.5rem;
+          }
+
+          .rejection-form h4 {
+              color: #856404;
+              margin: 0 0 1rem 0;
+          }
+
+          .rejection-form textarea {
+              width: 100%;
+              min-height: 100px !important;
+              padding: 10px;
+              border: 1px solid #ffeaa7;
+              border-radius: 4px;
+              resize: vertical;
+          }
+
+          /* .document-history {
+    overflow-y: auto;
+} */
+
+          .history-item {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 0.75rem 0;
+              border-bottom: 1px solid #e9ecef;
+          }
+
+          .history-item:last-child {
+              border-bottom: none;
+          }
+
+          .history-date {
+              font-size: 0.9rem;
+              color: #6c757d;
+              position: absolute;
+              top: 20px;
+              right: 20px;
+          }
+
+          .history-status {
+              font-size: 0.85rem;
+              font-weight: 500;
+              position: absolute;
+              top: 10px
+          }
+
+
+
+
+          .m-c {
+              background-color: white;
+              border-radius: 8px;
+              width: 90%;
+              max-width: 1000px;
+              max-height: 90vh;
+              overflow: hidden;
+              display: flex;
+              flex-direction: column;
+              box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+          }
+
+          .m-h {
+              padding: 15px 20px;
+              border-bottom: 1px solid var(--border-color);
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              background-color: #f8f9fa;
+          }
+
+          .close-btn {
+              background: none;
+              border: none;
+              font-size: 1.5rem;
+              cursor: pointer;
+              color: #777;
+          }
+
+          .m-b {
+              padding: 20px;
+              display: flex;
+              gap: 20px;
+              flex-wrap: wrap;
+              overflow-y: auto;
+          }
+
+          .document-preview {
+              flex: 2;
+              min-width: 400px;
+              background-color: var(--gray-light);
+              border-radius: 4px;
+              height: 500px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              position: relative;
+              flex-direction: column;
+
+          }
+
+          .document-preview img {
+              width: 100%;
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+          }
+
+          .preview-controls {
+              text-align: center;
+              background-color: rgba(255, 255, 255, 0.8);
+              padding: 8px;
+              border-radius: 4px;
+          }
+
+          .preview-controls button {
+              background-color: #4a6fdc;
+              color: white;
+              border: none;
+              padding: 5px 10px;
+              border-radius: 4px;
+              margin: 0 5px;
+              cursor: pointer;
+          }
+
+          .document-info {
+              flex: 1;
+              min-width: 300px;
+          }
+
+          .info-section {
+              background-color: #f8f9fa;
+              border-radius: 6px;
+              padding: 15px;
+              margin-bottom: 20px;
+          }
+
+          .info-section h4 {
+              margin-top: 0;
+              margin-bottom: 10px;
+              color: #4a6fdc;
+              border-bottom: 1px solid #e0e0e0;
+              padding-bottom: 8px;
+          }
+
+          .document-info p {
+              margin-bottom: 10px;
+          }
+
+          .document-history {
+              margin-top: 20px;
+          }
+
+          .history-item {
+              margin-bottom: 10px;
+              padding-bottom: 10px;
+              border-bottom: 1px dashed #e0e0e0;
+          }
+
+          .history-item:last-child {
+              border-bottom: none;
+          }
+
+          .history-item .date {
+              font-size: 12px;
+              color: #777;
+          }
+
+          .modal-actions {
+              margin-top: 30px;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 10px;
+          }
+
+          .rejection-form {
+              margin-top: 20px;
+              display: none;
+              background-color: #f8f9fa;
+              padding: 15px;
+              border-radius: 6px;
+              border-left: 4px solid #dc3545;
+          }
+
+          .rejection-form h4 {
+              margin-top: 0;
+              color: #721c24;
+          }
+
+          .rejection-form textarea {
+              width: 100%;
+              padding: 10px;
+              border: 1px solid var(--border-color);
+              border-radius: 4px;
+              margin-bottom: 10px;
+              min-height: 100px;
+              resize: vertical;
+          }
+
+          .rejection-form button {
+              margin-right: 10px;
+          }
+
+          .filter-bar {
+              margin: 0 20px 20px 20px;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 15px;
+              padding: 15px;
+              background-color: #f8f9fa;
+              border-radius: 6px;
+              align-items: center;
+          }
+
+          .filter-label {
+              font-weight: 600;
+              color: #555;
+          }
+
+          .filter-select {
+              padding: 8px 12px;
+              border: 1px solid var(--border-color);
+              border-radius: 4px;
+              min-width: 150px;
+          }
+
+
+          .page-btn {
+              background-color: white;
+              border: 1px solid var(--border-color);
+              border-radius: 4px;
+              padding: 5px 10px;
+              cursor: pointer;
+              transition: all 0.2s;
+          }
+
+          .page-btn:hover,
+          .page-btn.active {
+              background-color: #4a6fdc;
+              color: white;
+          }
+
+          /* Document History Container */
+          .document-history {
+              width: 100%;
+              max-height: 1000px;
+              height: auto !important;
+              padding: 0;
+              position: relative;
+          }
+
+          /* History Item Styling */
+          .document-history .history-item {
+              display: block !important;
+              padding: 15px;
+              margin-bottom: 15px;
+              background-color: #f8f9fa;
+              border-radius: 12px;
+              border: 1px solid #e9ecef;
+              transition: all 0.3s ease;
+              overflow: hidden;
+          }
+
+          .document-history .history-item:hover {
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+              transform: translateY(-2px);
+              border-color: #007bff;
+          }
+
+          /* History Preview Container */
+          .document-history .history-preview {
+              margin-bottom: 15px;
+              width: 100%;
+              overflow: visible;
+          }
+
+          /* Auto Height for All Document Types */
+          .document-history .history-preview img {
+              width: 100% !important;
+              height: auto !important;
+              max-width: 100%;
+              object-fit: contain;
+              border-radius: 8px;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+              background-color: #fff;
+              cursor: pointer;
+              transition: transform 0.3s ease;
+          }
+
+          .document-history .history-preview img:hover {
+              transform: scale(1.02);
+          }
+
+          /* PDF Auto Height */
+          .document-history .history-preview iframe.pdf-thumbnail {
+              width: 100% !important;
+              height: fit-content !important;
+              min-height: 750px;
+              border-radius: 8px;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+              background-color: #fff;
+              cursor: pointer;
+          }
+
+          /* History Info Section */
+          .document-history .history-info {
+              padding-top: 15px;
+              border-top: 2px solid #e9ecef;
+              margin-top: 10px;
+          }
+
+
+          .enhanced-documents-panel {
+              background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+              min-height: 100vh;
+              padding: 1.5rem;
+              border-radius: 15px;
+          }
+
+          .candidate-header-section {
+              margin-bottom: 2rem;
+          }
+
+          .candidate-info-card {
+              background: white;
+              border-radius: 20px;
+              padding: 2rem;
+              box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+              display: flex;
+              align-items: center;
+              gap: 2rem;
+              position: relative;
+              overflow: hidden;
+          }
+
+          .candidate-info-card::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 4px;
+              background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+          }
+
+          .candidate-avatar-large {
+              width: 80px;
+              height: 80px;
+              border-radius: 50%;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 2rem;
+              font-weight: bold;
+              box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+          }
+
+          .candidate-details h3 {
+              margin: 0 0 0.5rem 0;
+              color: #333;
+              font-size: 1.5rem;
+              font-weight: 700;
+          }
+
+          .contact-details {
+              display: flex;
+              flex-direction: column;
+              gap: 0.5rem;
+          }
+
+          .contact-details span {
+              color: #666;
+              font-size: 0.9rem;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+          }
+
+          .completion-ring {
+              margin-left: auto;
+              position: relative;
+          }
+
+          .circular-progress {
+              position: relative;
+          }
+
+          .percentage-text {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              text-align: center;
+          }
+
+          .percentage {
+              display: block;
+              font-size: 1.2rem;
+              font-weight: bold;
+              color: #4facfe;
+          }
+
+          .label {
+              font-size: 0.7rem;
+              color: #666;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+          }
+
+          .progress-bar {
+              transition: stroke-dasharray 1s ease-in-out;
+          }
+
+          .stats-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 1.5rem;
+              margin-bottom: 2rem;
+          }
+
+          .stat-card {
+              background: white;
+              border-radius: 15px;
+              padding: 1.5rem;
+              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+              display: flex;
+              align-items: center;
+              gap: 1rem;
+              transition: all 0.3s ease;
+              position: relative;
+              overflow: hidden;
+          }
+
+          .stat-card::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 3px;
+              transition: all 0.3s ease;
+          }
+
+          .stat-card.total-docs::before {
+              background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+          }
+
+          .stat-card.uploaded-docs::before {
+              background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+          }
+
+          .stat-card.pending-docs::before {
+              background: linear-gradient(90deg, #fa709a 0%, #fee140 100%);
+          }
+
+          .stat-card.verified-docs::before {
+              background: linear-gradient(90deg, #a8edea 0%, #fed6e3 100%);
+          }
+
+          .stat-card.rejected-docs::before {
+              background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 100%);
+          }
+
+          .stat-card:hover {
+              transform: translateY(-5px);
+              box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+          }
+
+          .stat-icon {
+              width: 50px;
+              height: 50px;
+              border-radius: 10px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 1.5rem;
+              color: white;
+          }
+
+          .total-docs .stat-icon {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+
+          .uploaded-docs .stat-icon {
+              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+          }
+
+          .pending-docs .stat-icon {
+              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+          }
+
+          .verified-docs .stat-icon {
+              background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+          }
+
+          .rejected-docs .stat-icon {
+              background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+          }
+
+          .stat-info h4 {
+              margin: 0;
+              font-size: 1.8rem;
+              font-weight: bold;
+              color: #333;
+          }
+
+          .stat-info p {
+              margin: 0;
+              color: #666;
+              font-size: 0.9rem;
+          }
+
+          .stat-trend {
+              margin-left: auto;
+              font-size: 1.2rem;
+              color: #4facfe;
+          }
+
+          .filter-section-enhanced {
+              background: white;
+              border-radius: 15px;
+              padding: 1.5rem;
+              margin-bottom: 2rem;
+              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+          }
+
+          .filter-title {
+              margin: 0 0 1rem 0;
+              color: #333;
+              font-weight: 600;
+          }
+
+          .filter-tabs {
+              display: flex;
+              gap: 1rem;
+              flex-wrap: wrap;
+          }
+
+          .filter-btn {
+              background: #f8f9fa;
+              border: 2px solid transparent;
+              border-radius: 25px;
+              padding: 0.75rem 1.5rem;
+              color: #666;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              position: relative;
+          }
+
+          .filter-btn .badges {
+              background: #dee2e6;
+              color: #495057;
+              border-radius: 10px;
+              padding: 0.25rem 0.5rem;
+              font-size: 0.75rem;
+              margin-left: 0.5rem;
+          }
+
+          .filter-btn:hover {
+              background: #e9ecef;
+              transform: translateY(-2px);
+          }
+
+          .filter-btn.active {
+              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+              color: white;
+              border-color: #4facfe;
+              box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+          }
+
+          .filter-btn.active .badges {
+              background: rgba(255, 255, 255, 0.2);
+              color: #fc2b5a;
+          }
+
+          .filter-btn.pending.active {
+              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+              box-shadow: 0 5px 15px rgba(250, 112, 154, 0.4);
+          }
+
+          .filter-btn.verified.active {
+              background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+              color: #2d7d32;
+              box-shadow: 0 5px 15px rgba(168, 237, 234, 0.4);
+          }
+
+          .filter-btn.rejected.active {
+              background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+              color: #c62828;
+              box-shadow: 0 5px 15px rgba(255, 154, 158, 0.4);
+          }
+
+          .documents-grid-enhanced {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+              gap: 2rem;
+          }
+
+          .document-card-enhanced {
+              background: white;
+              border-radius: 20px;
+              overflow: hidden;
+              box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+              transition: all 0.3s ease;
+              position: relative;
+          }
+
+          .document-card-enhanced:hover {
+              transform: translateY(-10px);
+              box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+          }
+
+          .document-image-container {
+              position: relative;
+              height: 200px;
+              overflow: hidden;
+              background: #f8f9fa;
+          }
+
+          .document-image {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              transition: transform 0.3s ease;
+          }
+
+          .document-card-enhanced:hover .document-image {
+              transform: scale(1.05);
+          }
+
+          .image-overlay {
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: rgba(0, 0, 0, 0.7);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              opacity: 0;
+              transition: opacity 0.3s ease;
+          }
+
+          .document-card-enhanced:hover .image-overlay {
+              opacity: 1;
+          }
+
+          .preview-btn {
+              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+              border: none;
+              border-radius: 25px;
+              padding: 0.75rem 1.5rem;
+              color: white;
+              font-weight: 600;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              transition: all 0.3s ease;
+              box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+          }
+
+          .preview-btn:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 10px 25px rgba(79, 172, 254, 0.6);
+          }
+
+          .no-document-placeholder {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100%;
+              color: #ccc;
+              font-size: 3rem;
+          }
+
+          .no-document-placeholder p {
+              margin-top: 1rem;
+              font-size: 1rem;
+              color: #999;
+          }
+
+          .status-badges-overlay {
+              position: absolute;
+              top: 15px;
+              right: 15px;
+          }
+
+          .status-badges-new {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.5rem;
+              padding: 0.5rem 1rem;
+              border-radius: 20px;
+              font-size: 0.8rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+          }
+
+          .status-badges-new.pending {
+              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+              color: white;
+          }
+
+          .status-badges-new.verified {
+              background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+              color: #2d7d32;
+          }
+
+          .status-badges-new.rejected {
+              background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+              color: #c62828;
+          }
+
+          .status-badges-new.not-uploaded {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+          }
+
+          .document-info-section {
+              padding: 1.5rem;
+          }
+
+          .document-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 1rem;
+          }
+
+          .document-title {
+              margin: 0;
+              color: #333;
+              font-size: 0.9rem;
+              font-weight: 700;
+              flex: 1;
+          }
+
+          .document-actions {
+              margin-left: 1rem;
+          }
+
+          .action-btn {
+              border: none;
+              border-radius: 20px;
+              padding: 0.5rem 1rem;
+              font-size: 0.8rem;
+              font-weight: 600;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              transition: all 0.3s ease;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+          }
+
+          .upload-btn {
+              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+              color: white;
+              box-shadow: 0 3px 10px rgba(250, 112, 154, 0.4);
+          }
+
+          .verify-btn {
+              background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+              color: #c62828;
+              box-shadow: 0 3px 10px rgba(255, 154, 158, 0.4);
+          }
+
+          .view-btn {
+              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+              color: white;
+              box-shadow: 0 3px 10px rgba(79, 172, 254, 0.4);
+          }
+
+          .action-btn:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+          }
+
+          .document-meta {
+              display: flex;
+              gap: 1rem;
+              flex-wrap: wrap;
+          }
+
+          .meta-item {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              color: #666;
+              font-size: 0.9rem;
+          }
+
+          .meta-text {
+              color: #333;
+          }
+
+          /* Responsive Design */
+
+          .react-date-picker__calendar.react-date-picker__calendar--open {
+              inset: 0 !important;
+              width: 300px !important;
+          }
+
+          
+          .site-header--sticky--register:not(.mobile-sticky-enable) {
+    /* position: absolute !important; */
+    top: 97px;
+    z-index: 10;
+}
+    .breadcrumb-item a, .card-body a {
+    color: #fc2b5a;
+}
+
+          @media (max-width: 1200px) {
+              .document-history .history-preview iframe.pdf-thumbnail {
+                  height: auto !important;
+                  max-height: 600px;
+              }
+          }
+@media (min-width: 992px) {
+    .site-header--sticky--register:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        background: white;
+    }
+}
+          @media (max-width: 768px) {
+
+              .enhanced-documents-panel {
+                  padding: 1rem;
+              }
+
+              .candidate-info-card {
+                  flex-direction: column;
+                  text-align: center;
+                  gap: 1rem;
+              }
+
+              .completion-ring {
+                  margin-left: 0;
+              }
+
+              .stats-grid {
+                  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+              }
+
+              .documents-grid-enhanced {
+                  grid-template-columns: 1fr;
+              }
+
+              .filter-tabs {
+                  justify-content: center;
+              }
+
+              .document-header {
+                  flex-direction: column;
+                  gap: 1rem;
+              }
+
+              .document-actions {
+                  margin-left: 0;
+                  align-self: stretch;
+              }
+
+              .action-btn {
+                  width: 100%;
+                  justify-content: center;
+              }
+
+              .document-history .history-preview iframe.pdf-thumbnail {
+                  height: 50vh !important;
+                  min-height: 300px;
+                  max-height: 500px;
+              }
+
+              .document-history .history-item {
+                  padding: 12px;
+                  margin-bottom: 12px;
+              }
+
+              .scrollable-container {
+                  display: block;
+                  width: 100%;
+                  overflow: hidden;
+                  padding: 10px 0;
+              }
+
+              .desktop-view {
+                  display: none;
+              }
+
+              .scrollable-content {
+                  display: flex;
+                  overflow-x: auto;
+                  scroll-snap-type: x mandatory;
+                  -webkit-overflow-scrolling: touch;
+                  scrollbar-width: thin;
+                  scroll-behavior: smooth;
+                  padding: 10px 0;
+              }
+
+              .info-card {
+                  flex: 0 0 auto;
+                  scroll-snap-align: start;
+                  margin-right: 15px;
+                  padding: 15px;
+                  border-radius: 8px;
+                  border: 1px solid #eaeaea;
+                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                  background: #fff;
+              }
+
+              .scroll-arrow {
+                  display: flex;
+              }
+
+              .scrollable-content::-webkit-scrollbar {
+                  height: 4px;
+              }
+
+              .scrollable-content::-webkit-scrollbar-track {
+                  background: #f1f1f1;
+              }
+
+              .scrollable-content::-webkit-scrollbar-thumb {
+                  background: #888;
+                  border-radius: 10px;
+              }
+
+              .btn-group {
+                  flex-wrap: wrap;
+              }
+
+              .btn-group .btn {
+                  margin-bottom: 0.25rem;
+              }
+
+              .resume-document-body {
+                  flex-direction: column;
+              }
+
+              .resume-profile-section {
+                  flex-direction: column;
+                  text-align: center;
+              }
+
+              .resume-contact-details {
+                  justify-content: center;
+              }
+
+              .info-group {
+                  border: none;
+              }
+
+              .info-card {
+
+                  flex: 0 0 auto;
+                  scroll-snap-align: start;
+                  margin-right: 15px;
+                  padding: 15px;
+                  border-radius: 8px;
+                  border: 1px solid #eaeaea;
+                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                  background: #fff;
+              }
+
+              .input-height {
+                  height: 40px;
+              }
+
+              .whatsapp-chat {
+                  height: 90vh;
+              }
+
+
+              .nav-pills {
+                  flex-wrap: wrap;
+              }
+
+              .nav-pills .nav-link {
+                  font-size: 0.9rem;
+                  padding: 0.5rem 0.75rem;
+              }
+
+              .document-modal-content {
+                  width: 98%;
+                  margin: 1rem;
+                  max-height: 95vh;
+              }
+
+              .document-modal-content .modal-body {
+                  flex-direction: column;
+                  padding: 1rem;
+                  gap: 1rem;
+              }
+
+              .document-preview-section {
+                  min-width: auto;
+                  overflow-y: auto;
+              }
+
+              .document-preview-container {
+                  height: 300px;
+              }
+
+              .document-info-section {
+                  min-width: auto;
+              }
+              .admissionMobileResponsive{
+              padding: 0;
+              }
+              .mobileResponsive{
+              padding: 0;
+              }
+              .content-body{
+               margin-top: 30px!important;
+              }
+              .nav-tabs-main{
+                  white-space: nowrap;
+                  flex-wrap: nowrap;
+                  overflow: scroll;
+                  scrollbar-width: none;
+                  -ms-overflow-style: none;
+                  &::-webkit-scrollbar {
+                    display: none;
+                  }
+              }
+              .nav-tabs-main > li > button{
+              padding: 15px 9px;
+              }
+          }
+
+          @media (max-width: 576px) {
+
+
+              .btn-group {
+                  flex-wrap: wrap;
+              }
+
+              .input-group {
+                  max-width: 100% !important;
+                  margin-bottom: 0.5rem;
+              }
+          }
+
+
+          @media (max-width: 480px) {
+
+              .document-history .history-preview iframe,
+              .document-history .history-preview img {
+                  max-height: 300px;
+                  min-height: 150px;
+              }
+
+              .document-history .history-preview iframe.pdf-thumbnail {
+                  height: 40vh !important;
+                  min-height: 200px;
+              }
+          }
+
+          `
+      }
+
+      </style>
+
+      <style>
+        {
+          `
+          input[type="text"], 
+input[type="email"], 
+input[type="number"],
+input[type="tel"],
+input[type="date"],
+select {
+  background-color: transparent !important;
+  border: var(--bs-border-width) solid var(--bs-border-color);
+}
+.card {
+    margin-bottom: 2.2rem;
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0px 4px 25px 0px rgba(0, 0, 0, 0.1);
+    transition: all .3sease-in-out;
+}
+.card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    word-wrap: break-word;
+    background-color: #fff;
+    background-clip: border-box;
+    border: 1px solid rgba(34, 41, 47, 0.125);
+    border-radius: 0.5rem;
+}
+.bg-intext {
+    background-color: #FC2B5A;
+}
+.new-bg-text {
+    background-color: #FC2B5A !important;
+    border-top-right-radius: 0px !important;
+    border-bottom-right-radius: 0px !important;
+}
+.float-left {
+    float: left !important;
+}
+/* .breadcrumb .breadcrumb-item+.breadcrumb-item:before {
+    content: "\e847";
+    font-family: 'feather';
+    color: #626262;
+} */
+.breadcrumb .breadcrumb-item+.breadcrumb-item:before {
+    content: "\f105"; /* Arrow Right */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900; /* Solid icons = 900, Regular = 400 */
+  color: #626262;
+}
+.breadcrumb-item+.breadcrumb-item::before {
+    display: inline-block;
+    padding-right: 0.5rem;
+    color: #b8c2cc;
+    content: "/";
+}
+.breadcrumb .breadcrumb-item+.breadcrumb-item {
+    padding-left: 0;
+}
+.breadcrumb {
+    font-size: 1rem;
+    font-family: "Montserrat", Helvetica, Arial, serif;
+    background-color: transparent;
+    padding: 0.5rem 0 0.5rem 1rem !important;
+    border-left: 1px solid #d6dce1;
+    border-radius: 0;
+}
+.breadcrumbs-top .breadcrumb {
+    margin: 0;
+    padding: 0;
+}
+
+.breadcrumb>li+li::before {
+    padding-right: .6rem;
+    padding-left: .6rem;
+}
+a {
+    color: #FC2B5A;
+    text-decoration: none;
+    background-color: transparent;
+}
+.mandatory {
+    color: red;
+}
+label {
+    font-size: 0.80rem !important;
+}
+.input-group {
+    position: relative;
+    display: flex
+;
+    flex-wrap: wrap;
+    align-items: stretch;
+    width: 100%;
+}
+#siteforcomp {
+    height: 29px;
+
+}
+
+/* Floating Audio Button */
+.floating-audio-btn {
+position: absolute;
+bottom: 0px;
+right: 20px;
+background-color: #fc2b5a;
+color: white;
+width: 130px;
+height: 45px;
+border-radius: 40px;
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 8px;
+cursor: pointer;
+box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+z-index: 100;
+transition: all 0.2s;
+}
+
+.floating-audio-btn:hover {
+transform: translateY(-3px);
+box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
+}
+
+.floating-audio-btn i {
+font-size: 18px;
+}
+
+/* Recording Modal Styles */
+.recording-modal-overlay {
+position: fixed;
+top: 0;
+left: 0;
+right: 0;
+bottom: 0;
+background-color: rgba(0, 0, 0, 0.5);
+display: flex;
+align-items: center;
+justify-content: center;
+z-index: 1000;
+}
+
+.recording-modal {
+background-color: white;
+border-radius: 10px;
+width: 90%;
+max-width: 600px;
+max-height: 90vh;
+overflow: hidden;
+display: flex;
+flex-direction: column;
+box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.recording-modal .modal-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 15px 20px;
+border-bottom: 1px solid #eee;
+}
+
+.recording-modal .modal-header h5 {
+font-size: 18px;
+margin: 0;
+font-weight: 600;
+}
+
+.recording-modal .close-modal {
+background: none;
+border: none;
+color: #555;
+cursor: pointer;
+font-size: 18px;
+}
+
+.recording-modal .modal-body {
+padding: 20px;
+flex: 1;
+overflow-y: auto;
+}
+
+.recording-modal .modal-footer {
+padding: 15px 20px;
+border-top: 1px solid #eee;
+text-align: right;
+}
+
+.btn-done {
+background-color: #fc2b5a;
+color: white;
+border: none;
+padding: 8px 20px;
+border-radius: 4px;
+cursor: pointer;
+}
+
+.btn-done:hover {
+background-color: #e6255c;
+}
+
+/* The remaining recording controls and recording items
+can use the same CSS you already have */
+
+  /* Resume Builder Container */
+.resume-builder-container {
+max-width: 1200px;
+margin: 0 auto;
+padding: 30px;
+background-color: #f9f9f9;
+border-radius: 10px;
+box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+}
+
+/* Header */
+.resume-builder-header {
+text-align: center;
+padding-bottom: 20px;
+border-bottom: 1px solid #eee;
+}
+
+.resume-builder-title {
+font-size: 28px;
+font-weight: 700;
+color: #333;
+margin-bottom: 15px;
+}
+
+/* Profile Strength Meter */
+.profile-strength-meter {
+max-width: 600px;
+margin: 20px auto;
+padding: 15px;
+background-color: #fff;
+border-radius: 8px;
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.strength-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 10px;
+}
+
+.strength-label {
+font-size: 16px;
+font-weight: 500;
+color: #333;
+}
+
+.strength-badge {
+font-size: 18px;
+font-weight: 700;
+color: #fc2b5a;
+}
+
+.strength-level {
+font-size: 14px;
+color: #666;
+}
+
+.progress {
+height: 10px;
+background-color: #e9ecef;
+border-radius: 5px;
+overflow: hidden;
+}
+
+.progress-bar {
+height: 100%;
+border-radius: 5px;
+transition: width 0.3s ease;
+}
+
+/* Navigation Tabs */
+.resume-tabs {
+margin-bottom: 25px;
+}
+
+.nav-tabs {
+border-bottom: 1px solid #ddd;
+}
+
+.nav-tabs .nav-link {
+border: none;
+border-bottom: 3px solid transparent;
+border-radius: 0;
+color: #555;
+font-weight: 500;
+padding: 12px 20px;
+transition: all 0.2s;
+}
+
+.nav-tabs .nav-link:hover {
+border-color: transparent;
+color: #fc2b5a;
+background: none;
+}
+
+.nav-tabs .nav-link.active {
+color: #fc2b5a;
+border-color: #fc2b5a;
+background: none;
+}
+
+/* Resume Content */
+/* .resume-section {
+display: none;
+} */
+
+.resume-section.active {
+display: block;
+}
+
+.resume-paper {
+background-color: #fff;
+border-radius: 8px;
+padding: 30px;
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+}
+
+.section-title {
+font-size: 20px;
+font-weight: 600;
+color: #333;
+margin-bottom: 25px;
+padding-bottom: 10px;
+border-bottom: 2px solid #f1f1f1;
+}
+
+/* Personal Info */
+.resume-header {
+display: flex;
+gap: 30px;
+margin-bottom: 30px;
+}
+
+.profile-image-container {
+flex-shrink: 0;
+}
+
+.profile-image {
+width: 150px;
+height: 150px;
+border-radius: 50%;
+overflow: hidden;
+background-color: #f1f1f1;
+display: flex;
+align-items: center;
+justify-content: center;
+position: relative;
+border: 3px solid #fff;
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-image img {
+width: 100%;
+height: 100%;
+object-fit: cover;
+}
+
+.profile-placeholder {
+font-size: 60px;
+color: #ccc;
+}
+
+.image-upload-overlay {
+position: absolute;
+bottom: 0;
+left: 0;
+right: 0;
+background: rgba(0, 0, 0, 0.6);
+color: white;
+padding: 5px 0;
+text-align: center;
+cursor: pointer;
+opacity: 0;
+transition: opacity 0.3s;
+}
+
+.profile-image:hover .image-upload-overlay {
+opacity: 1;
+}
+
+.profile-info {
+flex: 1;
+}
+
+.profile-name {
+font-size: 26px;
+font-weight: 700;
+color: #333;
+margin-bottom: 8px;
+}
+
+.profile-title {
+font-size: 18px;
+color: #555;
+margin-bottom: 15px;
+}
+
+.profile-summary {
+font-size: 15px;
+line-height: 1.5;
+color: #666;
+margin-bottom: 20px;
+}
+
+.contact-info {
+display: flex;
+flex-wrap: wrap;
+gap: 15px;
+}
+
+.contact-item {
+display: flex;
+align-items: center;
+gap: 8px;
+font-size: 14px;
+color: #555;
+}
+
+.contact-item i {
+color: #fc2b5a;
+}
+
+/* Experience Section */
+.experience-item, .education-item {
+position: relative;
+padding: 20px;
+margin-bottom: 20px;
+background-color: #f9f9f9;
+border-radius: 8px;
+border-left: 3px solid #fc2b5a;
+}
+
+.item-controls {
+position: absolute;
+top: 0px;
+right: 10px;
+}
+
+.remove-button {
+background: none;
+border: none;
+color: #dc3545;
+cursor: pointer;
+font-size: 16px;
+}
+
+.remove-button:hover {
+color: #bd2130;
+}
+
+.job-title, .degree-select {
+font-size: 18px;
+font-weight: 600;
+color: #333;
+margin-bottom: 5px;
+}
+
+.company-name, .university {
+font-size: 16px;
+color: #555;
+margin-bottom: 10px;
+}
+
+.date-range, .passing-year {
+font-size: 14px;
+color: #777;
+margin-bottom: 15px;
+display: flex;
+align-items: center;
+flex-wrap: wrap;
+gap: 10px;
+}
+
+.date-label {
+font-weight: 500;
+}
+
+.date-input {
+border: 1px solid #ddd;
+padding: 5px 10px;
+border-radius: 4px;
+}
+
+.job-description, .additional-info {
+background-color: #fff;
+padding: 15px;
+border-radius: 6px;
+font-size: 14px;
+line-height: 1.5;
+color: #555;
+}
+
+/* Skills Section */
+.skills-grid {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+gap: 20px;
+margin-bottom: 20px;
+}
+
+.skill-item {
+padding: 15px;
+background-color: #f9f9f9;
+border-radius: 8px;
+}
+
+.skill-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 10px;
+}
+
+.skill-edit {
+display: flex;
+justify-content: space-between;
+width: 100%;
+margin-right: 10px;
+}
+
+.skill-name {
+font-weight: 500;
+color: #333;
+}
+
+.skill-level {
+font-size: 14px;
+color: #666;
+}
+
+.remove-skill {
+background: none;
+border: none;
+color: #dc3545;
+cursor: pointer !important;
+font-size: 24px;
+position: absolute;
+top: -6px;
+right: 0;
+}
+
+.skill-slider {
+width: 100%;
+}
+
+/* Additional Sections */
+.extras-section {
+display: flex;
+flex-direction: column;
+gap: 30px;
+}
+
+.extra-category {
+margin-bottom: 25px;
+}
+
+.category-title {
+font-size: 18px;
+font-weight: 600;
+color: #333;
+margin-bottom: 15px;
+padding-bottom: 8px;
+border-bottom: 1px solid #eee;
+}
+
+/* Languages */
+.languages-list {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+gap: 15px;
+margin-bottom: 20px;
+}
+
+.language-item {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 12px 15px;
+background-color: #f9f9f9;
+border-radius: 8px;
+}
+
+.language-details {
+flex: 1;
+}
+
+.language-proficiency {
+display: flex;
+gap: 5px;
+margin-top: 5px;
+}
+
+.proficiency-dot {
+width: 12px;
+height: 12px;
+border-radius: 50%;
+background-color: #ddd;
+cursor: pointer;
+}
+
+.proficiency-dot.filled {
+background-color: #fc2b5a;
+}
+
+.remove-language {
+background: none;
+border: none;
+color: #dc3545;
+cursor: pointer !important;
+font-size: 24px;
+position: absolute;
+top: -6px;
+right: 0;
+}
+
+/* Certifications */
+.certifications-list {
+display: flex;
+flex-direction: column;
+gap: 15px;
+margin-bottom: 20px;
+}
+
+.certificate-item {
+display: flex;
+justify-content: space-between;
+align-items: flex-start;
+padding-inline: 15px;
+background-color: #f9f9f9;
+border-radius: 8px;
+}
+
+.certificate-details {
+flex: 1;
+}
+
+.certificate-name {
+font-weight: 500;
+margin-bottom: 5px;
+}
+
+.certificate-issuer {
+font-size: 14px;
+color: #666;
+}
+
+.remove-certificate {
+background: none;
+border: none;
+color: #dc3545;
+cursor: pointer !important;
+font-size: 24px;
+position: absolute;
+top: -6px;
+right: 0;
+}
+
+/* Projects */
+.projects-list {
+display: flex;
+flex-direction: column;
+gap: 15px;
+margin-bottom: 20px;
+}
+
+.project-item {
+display: flex;
+justify-content: space-between;
+padding: 15px;
+background-color: #f9f9f9;
+border-radius: 8px;
+}
+
+.project-details {
+flex: 1;
+}
+
+.project-header {
+display: flex;
+justify-content: space-between;
+margin-bottom: 10px;
+}
+
+.project-name {
+font-weight: 500;
+}
+
+.project-year {
+font-size: 14px;
+color: #777;
+}
+
+.project-description {
+font-size: 14px;
+line-height: 1.5;
+color: #555;
+}
+
+.remove-project {
+background: none;
+border: none;
+color: #dc3545;
+cursor: pointer !important;
+font-size: 24px;
+position: absolute;
+top: -6px;
+right: 0;
+}
+
+/* Interests */
+.interests-container {
+margin-bottom: 20px;
+}
+
+.interests-tags {
+display: flex;
+flex-wrap: wrap;
+gap: 10px;
+margin-bottom: 15px;
+}
+
+.interest-tag {
+display: flex;
+align-items: center;
+background-color: #f1f1f1;
+border-radius: 30px;
+padding: 6px 15px;
+font-size: 14px;
+}
+
+.remove-interest {
+
+margin-left: 8px;
+background: none;
+border: none;
+color: #dc3545;
+cursor: pointer !important;
+font-size: 18px;
+position: absolute;
+top: -6px;
+right: 0px;
+}
+
+/* Declaration */
+.declaration-container {
+padding: 15px;
+background-color: #f9f9f9;
+border-radius: 8px;
+}
+
+.declaration-content {
+font-size: 14px;
+line-height: 1.5;
+color: #555;
+min-height: 60px;
+}
+
+/* Voice Recording */
+.recording-container {
+padding: 20px;
+background-color: #f9f9f9;
+border-radius: 8px;
+}
+
+.recording-controls {
+text-align: center;
+margin-bottom: 30px;
+}
+
+.recording-timer {
+font-size: 36px;
+font-weight: 700;
+margin-bottom: 10px;
+}
+
+.recording-status {
+margin-bottom: 20px;
+color: #666;
+min-height: 20px;
+}
+
+.control-buttons {
+display: flex;
+justify-content: center;
+gap: 15px;
+}
+
+.record-button {
+padding: 10px 20px;
+background-color: #fc2b5a;
+color: white;
+border: none;
+border-radius: 30px;
+cursor: pointer;
+display: flex;
+align-items: center;
+gap: 8px;
+transition: all 0.2s;
+}
+
+.record-button:hover {
+background-color: #e6255c;
+}
+
+.record-button.recording {
+background-color: #dc3545;
+animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+0% { transform: scale(1); }
+50% { transform: scale(1.05); }
+100% { transform: scale(1); }
+}
+
+.recordings-list {
+margin-top: 30px;
+}
+
+.recordings-list h5 {
+margin-bottom: 15px;
+font-size: 18px;
+}
+
+.no-recordings {
+text-align: center;
+padding: 20px;
+color: #777;
+font-style: italic;
+}
+
+.recording-item {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 15px;
+background-color: #fff;
+border-radius: 8px;
+margin-bottom: 10px;
+box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.recording-info {
+flex: 1;
+}
+
+.recording-name {
+font-weight: 500;
+margin-bottom: 5px;
+}
+
+.recording-timestamp {
+font-size: 12px;
+color: #777;
+}
+
+.recording-actions {
+display: flex;
+align-items: center;
+gap: 15px;
+}
+
+.audio-player {
+height: 30px;
+}
+
+.delete-recording {
+background: none;
+border: none;
+color: #dc3545;
+cursor: pointer;
+}
+
+/* Add Button */
+.add-button {
+padding: 8px 16px;
+background-color: #fc2b5a;
+color: white;
+border: none;
+border-radius: 30px;
+cursor: pointer;
+font-size: 14px;
+display: inline-flex;
+align-items: center;
+gap: 8px;
+transition: all 0.2s;
+}
+
+.add-button:hover {
+background-color: #e6255c;
+}
+
+/* Action Buttons */
+.resume-actions {
+margin-top: 30px;
+display: flex;
+justify-content: flex-end;
+gap: 15px;
+}
+
+.upload-resume, .save-resume, .preview-resume {
+padding: 10px 20px;
+border-radius: 30px;
+cursor: pointer;
+font-size: 15px;
+font-weight: 500;
+display: flex;
+align-items: center;
+gap: 8px;
+transition: all 0.2s;
+}
+
+.upload-resume {
+background-color: #f8f9fa;
+color: #333;
+border: 1px solid #ddd;
+}
+
+.upload-resume:hover {
+background-color: #e9ecef;
+}
+
+.save-resume {
+background-color: #28a745;
+color: white;
+border: none;
+}
+
+.save-resume:hover {
+background-color: #218838;
+}
+
+.preview-resume {
+background-color: #fc2b5a;
+color: white;
+border: none;
+}
+
+.preview-resume:hover {
+background-color: #e6255c;
+}
+
+/* Editable Content */
+[contenteditable=true] {
+min-height: 20px;
+border: 1px solid transparent;
+padding: 3px;
+border-radius: 4px;
+transition: border 0.2s;
+min-width: 10%;
+border: 1px solid #ddd;
+}
+
+[contenteditable=true]:hover {
+border-color: #ddd;
+}
+
+[contenteditable=true]:focus {
+outline: none;
+border-color: #fc2b5a;
+background-color: rgba(252, 43, 90, 0.05);
+}
+
+[contenteditable=true]:empty:before {
+content: attr(data-placeholder);
+color: #aaa;
+cursor: text;
+}
+/* Remove Field Option Styling */
+.field-container {
+position: relative;
+}
+
+.remove-field-btn {
+position: absolute;
+top: 8px;
+right: 8px;
+background: none;
+border: none;
+color: #dc3545;
+cursor: pointer;
+font-size: 16px;
+width: 24px;
+height: 24px;
+display: flex;
+align-items: center;
+justify-content: center;
+border-radius: 50%;
+opacity: 0;
+transition: opacity 0.2s, background-color 0.2s;
+}
+
+.field-container:hover .remove-field-btn {
+opacity: 1;
+}
+
+.remove-field-btn:hover {
+background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Add this to the existing field items */
+.experience-item,
+.education-item,
+.skill-item,
+.certificate-item,
+.language-item,
+.project-item,
+.interest-tag {
+position: relative;
+}
+/* Responsive Fixes */
+@media (max-width: 768px) {
+    .floating-audio-btn{
+        top:-85px;
+        right: 5px;
+    }
+.resume-builder-container {
+padding: 15px;
+}
+
+.resume-header {
+flex-direction: column;
+align-items: center;
+}
+
+.profile-image-container {
+margin-bottom: 20px;
+}
+
+.profile-info {
+text-align: center;
+}
+
+.contact-info {
+justify-content: center;
+}
+
+.skills-grid, .languages-list {
+grid-template-columns: 1fr;
+}
+
+.recording-item {
+flex-direction: column;
+align-items: flex-start;
+}
+
+.recording-actions {
+margin-top: 10px;
+width: 100%;
+}
+
+.audio-player {
+width: 100%;
+}
+
+.resume-actions {
+flex-direction: column;
+}
+
+.upload-resume, .save-resume, .preview-resume {
+width: 100%;
+justify-content: center;
+}
+.field-wrapper {
+position: relative;
+}
+
+.remove-btn {
+position: absolute;
+top: 6px;
+right: 6px;
+background: transparent;
+border: none;
+color: #dc3545;
+font-size: 16px;
+padding: 2px 6px;
+border-radius: 50%;
+opacity: 0;
+transition: all 0.2s ease-in-out;
+}
+
+.field-wrapper:hover .remove-btn {
+opacity: 1;
+background-color: rgba(220, 53, 69, 0.1);
+}
+.resume-preview-modal {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.6);
+z-index: 999;
+display: flex;
+justify-content: center;
+align-items: center;
+}
+
+.resume-preview-content {
+background-color: white;
+padding: 30px;
+border-radius: 12px;
+max-height: 80vh;
+overflow-y: auto;
+width: 90%;
+max-width: 600px;
+}
+
+
+}
+/* Resume Preview Modal */
+.resume-preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  .resume-preview-content {
+    background-color: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 900px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+  }
+  
+  .resume-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .resume-preview-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  
+  .close-preview {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #555;
+  }
+  
+  .resume-preview-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: #f5f5f5;
+  }
+  
+  .resume-preview-actions {
+    padding: 15px 20px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+  }
+  
+  .download-resume-btn, .close-preview-btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .download-resume-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+  }
+  
+  .close-preview-btn {
+    background-color: #f8f9fa;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+  
+  /* Resume Document Styling */
+  .resume-document {
+    background-color: white;
+    padding: 40px;
+    max-width: 800px;
+    margin: 0 auto;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    font-family: 'Roboto', Arial, sans-serif;
+  }
+  
+  .resume-document-header {
+    margin-bottom: 30px;
+  }
+  
+  .resume-profile-section {
+    display: flex;
+    gap: 25px;
+    margin-bottom: 25px;
+  }
+  
+  .resume-profile-image {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #f0f0f0;
+  }
+  
+  .resume-profile-placeholder {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0;
+    font-size: 50px;
+    color: #aaa;
+  }
+  
+  .resume-header-content {
+    flex: 1;
+  }
+  
+  .resume-name {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 5px 0;
+    color: #333;
+  }
+  
+  .resume-title {
+    font-size: 18px;
+    color: #666;
+    margin: 0 0 15px 0;
+  }
+  
+  .resume-contact-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  
+  .resume-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #555;
+  }
+  
+  .resume-contact-item i {
+    color: #fc2b5a;
+    font-size: 16px;
+  }
+  
+  .resume-summary {
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 6px;
+    margin-bottom: 30px;
+  }
+  
+  .resume-summary p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #555;
+  }
+  
+  .resume-document-body {
+    display: flex;
+    gap: 30px;
+  }
+  
+  .resume-column {
+    flex: 1;
+  }
+  
+  .resume-left-column {
+    border-right: 1px solid #eee;
+    padding-right: 25px;
+  }
+  
+  .resume-right-column {
+    padding-left: 5px;
+  }
+  
+  .resume-section {
+    margin-bottom: 25px;
+  }
+  
+  .resume-section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fc2b5a;
+    margin: 0 0 15px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .resume-experience-item, .resume-education-item, .resume-project-item {
+    margin-bottom: 20px;
+  }
+  
+  .resume-item-header {
+    margin-bottom: 8px;
+  }
+  
+  .resume-item-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 3px 0;
+    color: #333;
+  }
+  
+  .resume-item-subtitle {
+    font-size: 14px;
+    color: #666;
+    margin: 0 0 3px 0;
+  }
+  
+  .resume-item-period {
+    font-size: 12px;
+    color: #888;
+    margin: 0;
+  }
+  
+  .resume-item-content {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.5;
+  }
+  
+  .resume-skills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .resume-skill-item {
+    margin-bottom: 8px;
+  }
+  
+  .resume-skill-name {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  
+  .resume-skill-bar-container {
+    height: 6px;
+    background-color: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  
+  .resume-skill-bar {
+    height: 100%;
+    background-color: #fc2b5a;
+    border-radius: 3px;
+  }
+  
+  .resume-languages-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .resume-language-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .resume-language-name {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .resume-language-level {
+    display: flex;
+    gap: 3px;
+  }
+  
+  .resume-level-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #f0f0f0;
+  }
+  
+  .resume-level-dot.filled {
+    background-color: #fc2b5a;
+  }
+  
+  .resume-certifications-list {
+    padding-left: 20px;
+    margin: 0;
+    font-size: 14px;
+    color: #555;
+  }
+  
+  .resume-certifications-list li {
+    margin-bottom: 8px;
+  }
+  
+  .resume-project-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 5px 0;
+  }
+  
+  .resume-project-year {
+    font-size: 14px;
+    font-weight: normal;
+    color: #777;
+  }
+  
+  .resume-interests-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .resume-interest-tag {
+    display: inline-block;
+    padding: 5px 12px;
+    background-color: #f5f5f5;
+    border-radius: 20px;
+    font-size: 13px;
+    color: #555;
+  }
+  
+  .resume-declaration {
+    border-top: 1px solid #eee;
+    margin-top: 30px;
+    padding-top: 20px;
+  }
+  
+  .resume-declaration p {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.5;
+    font-style: italic;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .resume-document {
+      padding: 20px;
+    }
+    
+    .resume-profile-section {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    
+    .resume-contact-details {
+      justify-content: center;
+    }
+    
+    .resume-document-body {
+      flex-direction: column;
+    }
+    
+    .resume-left-column {
+      border-right: none;
+      padding-right: 0;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .resume-right-column {
+      padding-left: 0;
+    }
+  }
+ 
+
+  .pac-container {
+    z-index: 10000 !important;
+  }
+
+  
+          `
         }
       </style>
     </div>

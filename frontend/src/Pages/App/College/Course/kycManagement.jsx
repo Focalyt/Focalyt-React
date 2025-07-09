@@ -5,51 +5,8 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import './CourseCrm.css';
-import './crm.css';
 
-// Add this at the top of the file, after imports
-const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
-  const [reason, setReason] = useState('');
-  const reasonRef = useRef('');
 
-  const handleReasonChange = (e) => {
-    reasonRef.current = e.target.value;
-    setReason(e.target.value);
-  };
-
-  const handleConfirm = () => {
-    onConfirm(reasonRef.current);
-  };
-
-  return (
-    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
-      <h4>Provide Rejection Reason</h4>
-      <textarea
-        value={reason}
-        onChange={handleReasonChange}
-        placeholder="Please provide a detailed reason for rejection..."
-        rows="8"
-        className="form-control mb-3"
-      />
-      <div className="d-flex gap-2">
-        <button
-          className="btn btn-danger"
-          onClick={handleConfirm}
-          disabled={!reason.trim()}
-        >
-          Confirm Rejection
-        </button>
-        <button
-          className="btn btn-secondary"
-          onClick={onCancel}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-});
 
 const MultiSelectCheckbox = ({
   title,
@@ -166,6 +123,63 @@ const MultiSelectCheckbox = ({
   );
 };
 
+const useNavHeight = (dependencies = []) => {
+  const navRef = useRef(null);
+  const [navHeight, setNavHeight] = useState(140);
+  const [navWidth, setNavWidth] = useState('100%');
+
+  const calculateHeightAndWidth = useCallback(() => {
+    console.log('🔍 Calculating nav height and width...');
+    
+    if (navRef.current) {
+      // Calculate Height
+      const height = navRef.current.offsetHeight;
+      console.log('📏 Found height:', height);
+      
+      if (height > 0) {
+        setNavHeight(height);
+        console.log('✅ Height set to:', height + 'px');
+      }
+
+      // Calculate Width from parent (position-relative container)
+      const parentContainer = navRef.current.closest('.position-relative');
+      if (parentContainer) {
+        const parentWidth = parentContainer.offsetWidth;
+        console.log('📐 Parent width:', parentWidth);
+        
+        if (parentWidth > 0) {
+          setNavWidth(parentWidth + 'px');
+          console.log('✅ Width set to:', parentWidth + 'px');
+        }
+      }
+    } else {
+      console.log('❌ navRef.current is null');
+    }
+  }, []);
+
+  useEffect(() => {
+    // Calculate immediately and with delays
+    calculateHeightAndWidth();
+    setTimeout(calculateHeightAndWidth, 100);
+    setTimeout(calculateHeightAndWidth, 500);
+
+    // Resize listener
+    const handleResize = () => {
+      setTimeout(calculateHeightAndWidth, 100);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calculateHeightAndWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateHeightAndWidth, 100);
+  }, dependencies);
+
+  return { navRef, navHeight, navWidth };
+};
+
 const KYCManagement = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -197,7 +211,6 @@ const KYCManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedProfile, setSelectedProfile] = useState(null);
-
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
@@ -253,6 +266,8 @@ const KYCManagement = () => {
     { _id: 'All', name: 'All', count: 0, milestone: '' }
 
   ]);
+  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters]);
+
 
   // ========================================
   // 🎯 All Admission Filters Configuration
@@ -474,22 +489,7 @@ const KYCManagement = () => {
     document.body?.classList.remove('no-scroll');
   };
 
-  const zoomIn = () => {
-    setDocumentZoom(prev => Math.min(prev + 0.1, 3)); // Max zoom 3x
-  };
-
-  const zoomOut = () => {
-    setDocumentZoom(prev => Math.max(prev - 0.1, 0.5)); // Min zoom 0.5x
-  };
-
-  const rotateDocument = () => {
-    setDocumentRotation(prev => (prev + 90) % 360);
-  };
-
-  const resetView = () => {
-    setDocumentZoom(1);
-    setDocumentRotation(0);
-  };
+  
 
   const updateDocumentStatus = async (uploadId, status, rejectionReason) => {
     try {
@@ -2604,11 +2604,12 @@ const KYCManagement = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--admission--post">
+          <div className="position-relative" >
+          <div  className="" ref={navRef} style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${navWidth}`}}>
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
                 <div className="col-md-6 d-md-block d-sm-none">
-                  <div className="main-tabs-container sticky-top" style={{ zIndex: 10, background: '#fff' }}>
+                  <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
                     <div className="btn-group" role="group" aria-label="eKYC Filters">
                       {ekycFilters.map((filter, index) => (
                         <div key={filter._id} className="position-relative d-inline-block me-2">
@@ -2688,20 +2689,7 @@ const KYCManagement = () => {
                       )}
                     </button>
 
-                    <div className="btn-group">
-                      <button
-                        onClick={() => setViewMode('grid')}
-                        className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-th"></i>
-                      </button>
-                      <button
-                        onClick={() => setViewMode('list')}
-                        className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        <i className="fas fa-list"></i>
-                      </button>
-                    </div>
+                   
                   </div>
                 </div>
               </div>
@@ -2709,7 +2697,7 @@ const KYCManagement = () => {
 
 
           </div>
-
+          </div>
           {!isFilterCollapsed && (
             <div
               className="modal show fade d-block"
@@ -3116,7 +3104,7 @@ const KYCManagement = () => {
           )}
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: '155px' }}>
+          <div className="content-body" style={{ marginTop: `${navHeight + 10}px` }}>
             <section className="list-view">
               <div className='row'>
                 <div>
@@ -3199,7 +3187,7 @@ const KYCManagement = () => {
                                                     width: "100vw",
                                                     height: "100vh",
                                                     backgroundColor: "transparent",
-                                                    zIndex: 999,
+                                                    zIndex: 8,
                                                   }}
                                                 ></div>
                                               )}
@@ -3215,7 +3203,7 @@ const KYCManagement = () => {
                                                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                                   borderRadius: "4px",
                                                   padding: "8px 0",
-                                                  zIndex: 1000,
+                                                  zIndex: 9,
                                                   transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                                   transition: "transform 0.3s ease-in-out",
                                                   pointerEvents: showPopup ? "auto" : "none",
@@ -3330,7 +3318,7 @@ const KYCManagement = () => {
                                                     width: "100vw",
                                                     height: "100vh",
                                                     backgroundColor: "transparent",
-                                                    zIndex: 999,
+                                                    zIndex: 8,
                                                   }}
                                                 ></div>
                                               )}
@@ -3346,7 +3334,7 @@ const KYCManagement = () => {
                                                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                                   borderRadius: "4px",
                                                   padding: "8px 0",
-                                                  zIndex: 1000,
+                                                  zIndex: 9,
                                                   transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                                   transition: "transform 0.3s ease-in-out",
                                                   pointerEvents: showPopup === profileIndex ? "auto" : "none",
@@ -4539,10 +4527,6 @@ const KYCManagement = () => {
         .nav-pills-sm .nav-link {
           padding: 0.375rem 0.75rem;
           font-size: 0.875rem;
-        }
-
-        .sticky-top {
-          position: sticky !important;
         }
 
         .btn-group .btn {
@@ -7049,7 +7033,6 @@ background: #fd2b5a;
 
         /* Main Tabs Styling */
         .main-tabs-container {
-          border-bottom: 1px solid #dee2e6;
           margin-bottom: 0;
         }
 
@@ -7062,8 +7045,7 @@ background: #fd2b5a;
           border: none;
           color: #6c757d;
           font-weight: 600;
-          font-size: 16px;
-          padding: 15px 25px;
+          font-size: 14px;
           border-bottom: 3px solid transparent;
           transition: all 0.3s ease;
           display: flex;
@@ -7652,7 +7634,7 @@ background: #fd2b5a;
           {
             
             `
-            <style>
+          
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
   position: relative;
@@ -7964,7 +7946,7 @@ height:min-content !important;
               }
 }
 
-    </style>
+   
             `
           }
 

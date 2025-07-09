@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import "./Candidate.css"
 const CandidateShare = () => {
   const [preloaderVisible, setPreloaderVisible] = useState(false);
 
@@ -89,7 +88,31 @@ ${url}`;
         </section>
       </div>
 
-
+<style>
+  {
+    `
+    .both-border {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+.btn{
+    display: inline-block;
+    font-weight: 400;
+    color: #626262;
+    text-align: center;
+    vertical-align: middle;
+    user-select: none;
+    background-color: transparent;
+    border: 0 solid transparent;
+    padding: 0.9rem 2rem;
+    font-size: 1rem;
+    line-height: 1;
+    border-radius: 0.4285rem;
+    transition: color 0.15sease-in-out, background-color 0.15sease-in-out, border-color 0.15sease-in-out, box-shadow 0.15sease-in-out
+}
+    `
+  }
+</style>
 
     </>
   );

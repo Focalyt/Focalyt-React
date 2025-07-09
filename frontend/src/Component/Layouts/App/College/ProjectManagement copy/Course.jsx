@@ -412,7 +412,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
           <button className="btn btn-outline-secondary me-2 border-0 bg-transparent" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
-          <button className="btn btn-info bg-transparent" onClick={handleAdd}>Add Course</button>
+          <button className="btn btn-danger" onClick={handleAdd}>Add Course</button>
         </div>
       </div>
 

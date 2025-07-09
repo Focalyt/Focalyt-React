@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import "./Labs.css";
 import FrontLayout from '../../../Component/Layouts/Front';
 import axios from 'axios';
 function Labs() {
@@ -134,7 +133,7 @@ function Labs() {
                         <div className="modal-dialog new-model-dialog">
                           <div className="modal-content">
                             <div className="modal-header">
-                              <h5 className="modal-title" id="staticBackdropLabel">Book your Free Demo Today!</h5>
+                              <h5 className="modal-title text-white" id="staticBackdropLabel">Book your Free Demo Today!</h5>
                               <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div className="modal-body new-modal-body">
@@ -1119,7 +1118,801 @@ useful in their future prospect.
             </div>
           </div>
         </section>
+<style>
+  {
+    `
+    .images{
+    display: flex;
+    gap: 20px;
+      /* opacity: 0; */
+      transform: translateY(20px);
+      /* animation: fadeIn 0.8s ease-out forwards 0.6s; */
+  }
+  .images img{
+    /* padding-left: 10px; */
+    width: 70px;
+    height: 70px;
+    /* height: ; */
+    transition: transform 0.3s ease;
+  }
+  .images img:hover {
+    transform: scale(1.1);
+  }
+  .drone-path {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+  .elementor-widget-left-side{
+    display: flex;
+      flex-direction: column;
+      gap: 80px;
+  }
+  .lobs_logo{
+    margin-bottom: 40px;
+  }
+  .labs_logo figure img{
+    width: 50%;
+  }
+  .elementor-widget-header h2{
+    font-weight: 700;
+      font-size: 50px;
+      margin-bottom: 25px;
+  }
+  .elementor-widget-header h3{
+    font-weight: 500;
+      font-size: 22px;
+      margin-bottom: 25px;
+  }
+  .book_a_demo a{
+    font-weight: 800;
+      font-size: 16px;
+      background: #FC2B5A;
+      border-radius: 30px;
+      padding: 15px;
+      color: #fff;
+  }
+  .plan--demo{
+    margin-top: 40px;
+  }
+  .elementor_widget_image figure img{
+    width: 100%;
+  }
+  #products{
+    background: rgb(239, 239, 239);
+    overflow-x: hidden;
+  }
+  .products{
+    font-size: 45px;
+    font-weight: 700;
+    line-height: 50px;
+  }
+  .pro_labs{
+  font-size: 20px;
+  font-weight: 500;
+  }
+  .ar_labs{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 25px;
+    background: rgb(255, 255, 255);
+    border-radius: 40px;
+    padding: 20px 20px;
+    height: 100%;
+    transition: transform 0.4s ease, filter 0.4s ease;
+  }
+  .ar_labs h4{
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+  }
+  .ar_labs figure img{
+    width: 100%;
+  }
+  .ar_labs:hover {
+    transform: scale(1.1);
+    z-index: 2;
+  }
+  .ar_labs:hover .ar_labs:not(:hover) {
+    filter: blur(5px);
+    opacity: 0.6;
+  }
+  .row:not(:hover) .ar_labs {
+    filter: none;
+    opacity: 1;
+  }
+  .labs-desc{
+    display: flex;
+    width: 100%;
+    padding-block: 40px;
+  }
+  .desc_img{
+    width: 80%;
+    padding: 20px;
+  }
+  .desc_img_content{
+    width: 100%;
+    padding: 20px;
+  }
+  .desc_header{
+    font-size: 35px;
+      font-weight: 800;
+      color: #FC2B5A;
+      padding-bottom: 20px;
+  }
+  .desc_sub_header{
+    font-size: 20px;
+    font-weight: 800;
+    color: #FC2B5A;
+  }
+  .desc_img figure img{
+    width: 100%;
+    border-radius: 40px;
+  }
+  .desc_img_content > div {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  
+  .elementory-left-inner-heading{
+    font-size: 35px;
+    font-weight: 400;
+  }
+  .elementory-left-inner-sub-heading{
+    font-size: 70px;
+    font-weight: 400;
+  }
+  .gradient-left-section{
+    font-size: 30px;
+    font-weight: 400;
+  }
+  
+  
+  .flex-img figure {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .flex-img img {
+    width: 100%;
+    max-width: 400px;
+    border-radius: 12px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Text Content Styling */
+  .flex-img-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  
+  .felx-header {
+    font-size: 32px;
+    font-weight: bold;
+    color: #121212;
+    margin-bottom: 20px;
+  }
+  
+  /* Inner Flex Blocks */
+  .inner-flex {
+    background: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    text-align: left;
+    width: 100%;
+  }
+  
+  /* hardware  */
+  .hardware{
+    background-image: url(../../../../public/Assets/public_assets/images/newpage/index/bg-stipes.jpg);
+      background-color: #FFFFFF;
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center center;
+  }
+  
+  .hardware h1 {
+    text-align: center;
+    font-size: 2.5rem;
+    padding-block: 3rem;
+  color: #FC2B5A;
+  font-weight: 700;
+  }
+  
+  .challenges-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    padding: 1rem;
+  }
+  
+  .challenge-card {
+    position: relative;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    background: rgba( 255, 255, 255, 0.4 );
+  box-shadow: 0 8px 32px 0 rgba( 31, 38, 135, 0.37 );
+  backdrop-filter: blur( 10px );
+  -webkit-backdrop-filter: blur( 10px );
+    /* background: linear-gradient(rgb(0, 0, 0), rgb(0, 0, 0)) padding-box,
+    linear-gradient(to right, rgb(151, 71, 255), rgb(252, 43, 90)) border-box; */
+    transition: transform 0.3s ease, border-color 0.3s ease;
+  border: 3px solid transparent;
+  border-color: rgba(255, 255, 255, 0.4);
+  }
+  
+  .challenge-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+  
+  
+  
+  .icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .challenge-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    background: linear-gradient(45deg, #8b5cf6, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .challenge-description {
+    color: #fc2b5a;
+    margin-bottom: 1rem;
+  }
+  
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent);
+    margin: 1rem 0;
+  }
+  
+  .solution {
+    color: #101010;
+    font-size: 0.875rem;
+  }
+  
+  .cta-button {
+    display: block;
+    width: fit-content;
+    margin: 3rem auto 0;
+    padding: 1rem 2rem;
+    border-radius: 2rem;
+    background: linear-gradient(45deg, #8b5cf6, #ec4899);
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+  }
+  
+  .elementory-left-team-section {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 20px;
+  }
+  
+/* Gradient Text */
+.gradient-left-section {
+    color: #FC2B5A;
+      transition: .4s ease-in;
+  }
+  
+  /* Right Image Section */
+  .elementory-right-team-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .elementory-right-team-section figure {
+    margin: 0;
+  }
+  
+  .elementory-right-team-section img {
+    width: 100%;
+    max-width: 350px;
+    border-radius: 12px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+  }
+  
+.benefits-container {
+    margin: 0 auto;
+    padding: 4rem 2rem;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  }
+  
+  .main-title {
+    text-align: center;
+    color: #fc2b5a;
+    margin-bottom: 4rem;
+    font-size: 2.5rem;
+    font-weight: 800;
+    /* background: linear-gradient(45deg, #2c5282, #4299e1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent; */
+  }
+  
+  .benefits-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4rem;
+  }
+  
+  .benefit-item {
+    display: flex;
+    align-items: center;
+    gap: 3rem;
+    position: relative;
+    padding: 2rem;
+    transition: transform 0.3s ease;
+  }
+  
+  .benefit-item:hover {
+    transform: translateX(10px);
+  }
+  
+  .benefit-item.reverse {
+    flex-direction: row-reverse;
+  }
+  
+  .benefit-item.reverse:hover {
+    transform: translateX(-10px);
+  }
+  
+  .icon-wrapper {
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
+   background: linear-gradient(135deg, #fc2b5a 0%, #feafc1 90%);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+  }
+  
+  .content {
+    flex: 1;
+  }
+  
+  .content h2 {
+    color: #2d3748;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  
+  .content p {
+    color: #4a5568;
+    /* line-height: 1.7; */
+    font-size: 1.1rem;
+  }
+  
+  .icon-container {
+    position: relative;
+    cursor: pointer;
+  }
+  #careerForm .form-control,
+#careerForm .form-select {
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background: transparent;
+}
 
+/* Style focus state */
+#careerForm .form-control:focus,
+#careerForm .form-select:focus {
+    border-color: #FC2B5A;
+    box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.1);
+    outline: none;
+}
+
+/* Style checkbox specifically */
+#careerForm .form-check-input {
+    border: 2px solid #FC2B5A;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+#careerForm .form-check-input:checked {
+    background-color: #FC2B5A;
+    border-color: #FC2B5A;
+}
+.bg-btn-color{
+  background: #FC2B5A!important;
+}
+/* Style file input */
+#careerForm input[type="file"].form-control::file-selector-button {
+    padding: 8px 16px;
+    margin-right: 16px;
+    background-color: #f5f5f5;
+    border: none;
+    border-radius: 4px;
+    color: #333;
+}
+
+/* Textarea specific styling to match other inputs */
+#careerForm textarea.form-control {
+    min-height: 120px;
+    resize: vertical;
+}
+#careerModal .modal-xl {
+max-width: 530px;
+}
+
+#careerModal .hero-section {
+/* background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://source.unsplash.com/random/1200x600/?office'); */
+background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 1080' preserveAspectRatio='none'><defs><linearGradient id='bgGradient' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%230D47A1'/><stop offset='100%' stop-color='%2364B5F6'/></linearGradient></defs><rect width='1920' height='1080' fill='url(%23bgGradient)'/><g opacity='0.2'><line x1='100' y1='200' x2='400' y2='200' stroke='%23ffffff' stroke-width='2'/><line x1='400' y1='200' x2='400' y2='500' stroke='%23ffffff' stroke-width='2'/><circle cx='100' cy='200' r='5' fill='%23ffffff'/><circle cx='400' cy='200' r='5' fill='%23ffffff'/><circle cx='400' cy='500' r='5' fill='%23ffffff'/><circle cx='1600' cy='300' r='60' fill='%23ffffff' opacity='0.1'/><circle cx='1700' cy='700' r='80' fill='%23ffffff' opacity='0.1'/></g><g opacity='0.1'><polygon points='800,100 900,300 700,300' fill='%23ffffff'/><polygon points='1200,800 1300,1000 1100,1000' fill='%23ffffff'/></g></svg>") no-repeat center center/cover;
+background-size: cover;
+background-position: center;
+color: white;
+padding: 100px 0;
+}
+
+#careerModal .benefit-card {
+transition: transform 0.3s ease;
+}
+
+#careerModal .benefit-card:hover {
+transform: translateY(-5px);
+}
+
+#careerModal .icon-large {
+font-size: 2.5rem;
+color: #FC2B5A;
+}
+
+#careerModal .required-field::after {
+content: "*";
+color: red;
+margin-left: 4px;
+}
+
+#careerModal .career-form {
+max-width: 800px;
+margin: 0 auto;
+padding: 1.2rem;
+}
+
+#careerModal .form-label {
+font-weight: 500;
+}
+
+#careerModal .form-control:focus,
+#careerModal .form-select:focus {
+border-color: #FC2B5A;
+box-shadow: 0 0 0 0.25rem rgba(252, 43, 90, 0.25);
+}
+
+#careerModal .btn-primary {
+padding: 0.8rem 2rem;
+font-weight: 500;
+}
+
+#careerModal .form-check-input:checked {
+background-color: #FC2B5A;
+border-color: #FC2B5A;
+}
+
+/* Success Message Styles */
+.form-success-message {
+display: none;
+position: fixed;
+top: 20px;
+right: 20px;
+background-color: #28a745;
+color: white;
+padding: 1rem 2rem;
+border-radius: 4px;
+box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+z-index: 1060;
+animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-out 2.5s forwards;
+}
+.submit_btnn {
+    display: inline;
+    padding-block: 10px;
+    border-radius: 20px;
+    border: none;
+    width: 50%;
+    text-align: center;
+    align-content: center;
+    margin: auto;
+    background-color: #FC2B5A;
+    color: #fff;
+    transition: 0.5s ease;
+    border: 1px solid #FC2B5A;
+}
+.submit_btnn:hover {
+    border: 1px solid #FC2B5A;
+    background-color: transparent;
+    color: #000;
+    transition: 0.5s ease-out;
+}
+.model_btn {
+    display: inline;
+    padding: 10px;
+    border-radius: 20px;
+    border: none;
+    /* width: 50%; */
+    text-align: center;
+    align-content: center;
+    margin: auto;
+    background-color: #FC2B5A;
+    color: #fff;
+    transition: 0.5s ease;
+    border: 1px solid #FC2B5A;
+}
+.plan--demo {
+    margin-top: 40px;
+}
+
+
+/* form section in lab page  */
+.form_name {
+    display: flex
+;
+    width: 100%;
+    gap: 30px;
+}
+.first_name, .email {
+    width: 100%;
+    display: flex
+;
+    flex-direction: column;
+    position: relative;
+}
+.demoForm input[type="text"], .demoForm input[type="password"], .demoForm input[type="email"], .demoForm textarea {
+    background: transparent;
+    border: 1px solid black;
+    padding: 18px 8px;
+    border-radius: 10px;
+    outline: none;
+    width: 100%;
+    position: relative;
+}
+input[type="text"], input[type="password"], input[type="email"], textarea {
+    margin-bottom: 20px;    
+}
+.textarea-container textarea{
+    margin-bottom: 20px;
+}
+
+@keyframes slideIn {
+from {
+transform: translateX(100%);
+opacity: 0;
+}
+to {
+transform: translateX(0);
+opacity: 1;
+}
+}
+
+@keyframes fadeOut {
+from {
+opacity: 1;
+}
+to {
+opacity: 0;
+}
+}
+
+/* Print Styles */
+@media print {
+#careerModal .modal-dialog {
+max-width: 100%;
+margin: 0;
+}
+
+#careerModal .btn-close,
+#careerModal .modal-footer {
+display: none;
+}
+}
+
+@media (max-width: 768px) {
+  .images {
+    gap: 3px;
+  }
+    .ar_labs figure{
+      display: flex;
+      align-items: center;
+      text-align: center;
+      justify-content: center;
+    }
+    .ar_labs figure img{
+      width: 55%;
+    }
+    a.mobile-tech-area.slick-slide{
+      margin: 10px;
+    }
+    .new {
+    font-size: 25px;
+    }
+    .font-size{
+      font-size: 25px!important;
+    }
+    .hardware h1{
+      font-size: 1.2rem;
+    }
+    #earning-option .container {
+      flex-direction: column;
+      text-align: center;
+  }
+  
+  .flex-img img {
+      max-width: 80%;
+  }
+  
+  .flex-img-content {
+      padding: 10px;
+  }
+    .benefit-item, 
+    .benefit-item.reverse {
+      flex-direction: column;
+      text-align: center;
+      gap: 1.5rem;
+    }
+  
+    .benefits-container {
+      padding: 2rem 1rem;
+    }
+  
+    .main-title {
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+    }
+    .labs-desc{
+      flex-direction: column;
+      padding: 0px;
+    }
+    .desc_img{
+      width: 100%;
+    }
+    .desc_header{
+      font-size: 22px;
+    }
+    .benefits-wrapper{
+      gap: 0px;
+    }
+    .icon-wrapper {
+      margin: 0 auto;
+    }
+  
+    .benefit-item:hover,
+    .benefit-item.reverse:hover {
+      transform: translateY(-5px);
+    }
+    .section-padding-120 .container {
+      flex-direction: column;
+      text-align: center;
+  }
+  
+  .elementory-left-team-section {
+      padding: 10px;
+  }
+  
+  .elementory-left-inner-sub-heading {
+      /* font-size: 32px; */
+      font-size:50px;
+      padding-bottom: 20px;
+  }
+  
+  .elementory-right-team-section img {
+      max-width: 80%;
+  }
+  
+    .leftSidebar {
+      display: none;
+    }
+  
+    .user__name {
+      word-spacing: 1.1px;
+    }
+  
+    .mainContent {
+      height: 100vh;
+      overflow-y: auto;
+    }
+  
+    .card-header {
+      padding: 5px 20px;
+    }
+  
+    .card-content {
+      padding: 0px 20px;
+    }
+  
+    .blog--card {
+      max-height: calc(100vh - 20px);
+      overflow-y: auto;
+    }
+  
+    .card-content {
+      max-height: calc(100vh - 150px);
+      overflow-y: auto;
+    }
+  
+    #blog--images .happy_candidate_images img,
+    .blog--images .happy_candidate_images img,
+    .video_height {
+      /* max-height: 200px;  */
+      max-height: 154px;
+      object-fit: contain;
+    }
+  
+    .hidden-text {
+      font-size: 16px;
+      line-height: 1.4em;
+      -webkit-line-clamp: 3;
+      max-height: calc(3 * 1.4em);
+    }
+  
+    .toggle-more {
+      font-size: 12px;
+    }
+  
+    #blog--images .slick-dots,
+    .blog--images .slick-dots {
+      bottom: -25px;
+    }
+    #careerModal .hero-section {
+      padding: 60px 0;
+      }
+      
+      #careerModal .career-form {
+      padding: 1rem;
+      }
+  
+  }
+    .modal-header {
+      background-color: #FC2B5A;
+      border-bottom: none;
+    }
+  .modal-title {
+    font-weight: 600;
+}
+    .select-container label {
+  position: absolute;
+  left: 15px;
+  top: 10px; /* Initial position of the label */
+  font-size: 14px;
+  color: #000;
+  background-color: transparent; /* Optional for better readability */
+  padding: 0 5px;
+  transition: transform 0.3s ease, font-size 0.3s ease, color 0.3s ease;
+  pointer-events: none; /* Prevent label from blocking interaction */
+}
+    `
+  }
+</style>
       </FrontLayout>
 
     </>

@@ -560,7 +560,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
           <button className="btn btn-outline-secondary me-2 border-0" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
-          <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleAdd}>Add Project</button>
+          <button className="btn btn-danger" style={{ whiteSpace: 'nowrap' }} onClick={handleAdd}>Add Project</button>
         </div>
       </div>
 
@@ -796,6 +796,23 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
 
       <style>
         {`
+.btn-danger {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #dc3545;
+    --bs-btn-border-color: #dc3545;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #bb2d3b;
+    --bs-btn-hover-border-color: #b02a37;
+    --bs-btn-focus-shadow-rgb: 225, 83, 97;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #b02a37;
+    --bs-btn-active-border-color: #a52834;
+    --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: #dc3545;
+    --bs-btn-disabled-border-color: #dc3545;
+}
+
           @media(max-width:768px){
             .verticals{
               font-size:15px;

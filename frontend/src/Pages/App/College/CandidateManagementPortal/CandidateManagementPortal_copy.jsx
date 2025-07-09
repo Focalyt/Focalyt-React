@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Project from '../../../../Component/Layouts/App/College/ProjectManagement copy/Project';
 import axios from 'axios'
-import "./CandidateManagment.css";
 
 const CandidateManagementPortal_copy = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -610,7 +609,17 @@ const CandidateManagementPortal_copy = () => {
           </div>
         </div>
       )}
+      <style>
+        {
+          `
+          .nav-pills .nav-link.active, .nav-pills .show>.nav-link {
+    background-color: #fc2b5a;
+}
+          `
+        }
+      </style>
     </div>
+
   );
 };
 

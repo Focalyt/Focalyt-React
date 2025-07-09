@@ -1496,19 +1496,19 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
             <div className='d-flex align-items-center'>
               <h5 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="mb-0" aria-current="page">
                 {selectedProject.name} Project
               </h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCenters} className="mb-0" aria-current="page">
                 {selectedCenter.name} Centers
               </h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCourses} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCourses} className="mb-0" aria-current="page">
                 {selectedCourse.name} Centers
               </h5>
               <span className="mx-2"> &gt; </span>
-              <h5 className="breadcrumb-item mb-0" aria-current="page">
+              <h5 className="mb-0" aria-current="page">
                 All Batches
               </h5>
             </div>
@@ -1525,7 +1525,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
             <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
           </button>
           {mainTab === 'Batches' && (
-            <button className="btn btn-warning" onClick={handleAdd}>Add Batch</button>
+            <button className="btn btn-danger" onClick={handleAdd}>Add Batch</button>
           )}
         </div>
       </div>

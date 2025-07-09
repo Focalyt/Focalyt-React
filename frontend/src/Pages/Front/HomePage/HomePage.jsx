@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import FrontLayout from '../../../Component/Layouts/Front/index'
-import "./HomePage.css";
 import $ from 'jquery';
 import 'slick-carousel';
 import "slick-carousel/slick/slick.css";
@@ -94,19 +93,19 @@ const HomePage = () => {
                 </div>
                 <div className="images">
                   <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/drone.png" alt="drone" className="img1" />
+                    <img src="/Assets/public_assets/images/icons/drone.png" alt="drone" className="img1" />
                   </a>
                   <a href="/candidate/login">'
-                  <img src="/Assets/public_assets/images/icons/ai.png" alt="ai" className="img1" />
+                    <img src="/Assets/public_assets/images/icons/ai.png" alt="ai" className="img1" />
                   </a>
                   <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/robotic.png" alt="robotic" className="img1" />
+                    <img src="/Assets/public_assets/images/icons/robotic.png" alt="robotic" className="img1" />
                   </a>
                   <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/iot.png" alt="iot" className="img1" />
+                    <img src="/Assets/public_assets/images/icons/iot.png" alt="iot" className="img1" />
                   </a>
                   <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/ar_vr.png" alt="ar vr" className="img1" />
+                    <img src="/Assets/public_assets/images/icons/ar_vr.png" alt="ar vr" className="img1" />
                   </a>
                 </div>
               </div>
@@ -203,20 +202,20 @@ const HomePage = () => {
                   </h2>
                 </div>
                 <div className="images">
-                <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/drone.png" alt="drone" className="img1" />
+                  <a href="/candidate/login">
+                    <img src="/Assets/public_assets/images/icons/drone.png" alt="drone" className="img1" />
                   </a>
                   <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/ai.png" alt="ai" className="img1" /></a>
-                  
+                    <img src="/Assets/public_assets/images/icons/ai.png" alt="ai" className="img1" /></a>
+
                   <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/robotic.png" alt="robotic" className="img1" />
+                    <img src="/Assets/public_assets/images/icons/robotic.png" alt="robotic" className="img1" />
                   </a>
                   <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/iot.png" alt="iot" className="img1" />
+                    <img src="/Assets/public_assets/images/icons/iot.png" alt="iot" className="img1" />
                   </a>
                   <a href="/candidate/login">
-                  <img src="/Assets/public_assets/images/icons/ar_vr.png" alt="ar vr" className="img1" />
+                    <img src="/Assets/public_assets/images/icons/ar_vr.png" alt="ar vr" className="img1" />
                   </a>
                 </div>
               </div>
@@ -295,7 +294,7 @@ const HomePage = () => {
         </div>
 
       </section>
-  
+
 
       <section id="how">
 
@@ -557,66 +556,66 @@ const HomePage = () => {
         </div>
       </section>
 
-   {/* <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      {/* <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Home  : Future Technolody Labs Section
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ --> */}
       <section class="">
         <div class="container">
-            <h2 class="section-title py-md-4 text-center">Empowering Minds Through Future Technology</h2>
-            <div class="row g-4">
-              
-                <div class="col-md-5 large-images">
-                    <div class="row g-4">
-                        <div class="col-12">
-                            <div class="lab-gallery-item">
-                                <img src="/Assets/images/homepage/home1.jpg" alt="Robotics Workshop" class="img-fluid"/>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="lab-gallery-item">
-                                <img src="/Assets/images/homepage/home2.jpg" alt="Coding Session" class="img-fluid"/>
-                            </div>
-                        </div>
-                    </div>
+          <h2 class="section-title py-md-4 text-center">Empowering Minds Through Future Technology</h2>
+          <div class="row g-4">
+
+            <div class="col-md-5 large-images">
+              <div class="row g-4">
+                <div class="col-12">
+                  <div class="lab-gallery-item">
+                    <img src="/Assets/images/homepage/home1.jpg" alt="Robotics Workshop" class="img-fluid" />
+                  </div>
                 </div>
-                
-                <div class="col-md-7 small-images">
-                    <div class="row g-4">
-                        <div class="col-md-6">
-                            <div class="lab-gallery-item">
-                                <img src="/Assets/images/homepage/home3.jpg" alt="AI Research" class="img-fluid"/>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="lab-gallery-item">
-                                <img src="/Assets/images/homepage/home4.jpg" alt="Machine Learning" class="img-fluid"/>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="lab-gallery-item">
-                                <img src="/Assets/images/homepage/home5.jpg" alt="Coding Challenge" class="img-fluid"/>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="lab-gallery-item">
-                                <img src="/Assets/images/homepage/home6.jpg" alt="Tech Seminar" class="img-fluid"/>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="lab-gallery-item">
-                                <img src="/Assets/images/homepage/home7.jpg" alt="Team Project" class="img-fluid"/>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="lab-gallery-item">
-                                <img src="/Assets/images/homepage/home8.jpg" alt="Innovation Lab" class="img-fluid"/>
-                            </div>
-                        </div>
-                    </div>
+                <div class="col-12">
+                  <div class="lab-gallery-item">
+                    <img src="/Assets/images/homepage/home2.jpg" alt="Coding Session" class="img-fluid" />
+                  </div>
                 </div>
+              </div>
             </div>
+
+            <div class="col-md-7 small-images">
+              <div class="row g-4">
+                <div class="col-md-6">
+                  <div class="lab-gallery-item">
+                    <img src="/Assets/images/homepage/home3.jpg" alt="AI Research" class="img-fluid" />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="lab-gallery-item">
+                    <img src="/Assets/images/homepage/home4.jpg" alt="Machine Learning" class="img-fluid" />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="lab-gallery-item">
+                    <img src="/Assets/images/homepage/home5.jpg" alt="Coding Challenge" class="img-fluid" />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="lab-gallery-item">
+                    <img src="/Assets/images/homepage/home6.jpg" alt="Tech Seminar" class="img-fluid" />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="lab-gallery-item">
+                    <img src="/Assets/images/homepage/home7.jpg" alt="Team Project" class="img-fluid" />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="lab-gallery-item">
+                    <img src="/Assets/images/homepage/home8.jpg" alt="Innovation Lab" class="img-fluid" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-    </section>
+      </section>
 
       {/* <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Home 2 : Feature Section
@@ -1262,7 +1261,7 @@ const HomePage = () => {
                       {/* <!-- <h4 className="reach_header">
                       Google Review
                     </h4> --> */}
-                      <a href="#"><figure> <img src="/Assets/public_assets/images/icons/google.avif" style={{width:"100%"}}/></figure></a>
+                      <a href="#"><figure> <img src="/Assets/public_assets/images/icons/google.avif" style={{ width: "100%" }} /></figure></a>
                       <div className="review-box">
                         <p> <span id="rating"></span> out of 5 stars from <sapn id="reviews"></sapn> reviews</p>
                       </div>
@@ -1274,15 +1273,873 @@ const HomePage = () => {
           </div>
         </div>
       </section>
-<style>
-  {
-    `
+      <style>
+        {
+          `
     .images a{
     color : transparent;
     }
     `
+        }
+      </style>
+      <style>
+        {
+          `
+    
+/* Hero section  */
+
+.home-2_hero-section .row--custom {
+    --bs-gutter-x: 24px;
+    --bs-gutter-y: 35px;
+    justify-content: center;
+    align-items: center;
   }
-</style>
+  
+  /* .home-2_hero-image-block {
+    position: relative;
+    margin-left: 27px;
+  } */
+  .home-2_hero-image img {
+    width: 100%;
+  }
+  .home-2_hero-image-shape {
+    position: absolute;
+    right: -9%;
+    top: -14%;
+    width: 17%;
+  }
+  .home-2_hero-image-man-1 {
+    position: absolute;
+    left: -7%;
+    top: 30%;
+    width: 13.3%;
+  }
+  .home-2_hero-image-man-1 img {
+    width: 100%;
+  }
+  .home-2_hero-image-man-2 {
+    position: absolute;
+    right: -7%;
+    bottom: 8%;
+    width: 15%;
+  }
+  .home-2_hero-image-man-2 img {
+    width: 100%;
+  }
+  .home-2_hero-content {
+    max-width: 681px;
+  }
+  .home-2_hero-content-text {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  .home-2_hero-content-text p {
+    max-width: 590px;
+  }
+
+  
+  .home-2_hero-button-group {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    column-gap: 20px;
+    row-gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .home-2_hero-button-group .btn-outline {
+    width: 239px;
+  }
+  
+  .home-2_hero-content-button__bottom-text span {
+    display: flex;
+    justify-content: center;
+    column-gap: 10px;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #0A102F;
+  }
+
+  .home-2_hero-content-text h4 {
+    color: #FFD542;
+    font-size: 30px;
+    font-weight: 300;
+    word-wrap: break-word;
+    word-spacing: 5px;
+    text-align: start;
+    margin: 0;
+    
+}
+.home-2_hero-content-text h1 {
+   background: -webkit-linear-gradient(99deg, rgba(255,42,86,1) 0%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 35%, rgba(255,255,255,1) 75%, rgba(255,255,255,1) 100%);
+   background: -o-linear-gradient(99deg, rgba(255,42,86,1) 0%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 35%, rgba(255,255,255,1) 75%, rgba(255,255,255,1) 100%);
+   background: -moz-linear-gradient(99deg, rgba(255,42,86,1) 0%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 35%, rgba(255,255,255,1) 75%, rgba(255,255,255,1) 100%);
+   background: linear-gradient(99deg, rgba(255,42,86,1) 0%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 35%, rgba(255,255,255,1) 75%, rgba(255,255,255,1) 100%); 
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: .4s ease-in;
+}
+.home-2_hero-content-text h1:hover {
+    background: -webkit-linear-gradient(99deg, rgba(255,255,255,1) 0%, rgba(255,255,255,1) 0%, rgba(255,42,86,1) 35%, rgba(255,42,86,1) 75%, rgba(255,42,86,1) 100%);
+    background: -o-linear-gradient(99deg, rgba(255,255,255,1) 0%, rgba(255,255,255,1) 0%, rgba(255,42,86,1) 35%, rgba(255,42,86,1) 75%, rgba(255,42,86,1) 100%);;
+    background: -moz-linear-gradient(99deg, rgba(255,255,255,1) 0%, rgba(255,255,255,1) 0%, rgba(255,42,86,1) 35%, rgba(255,42,86,1) 75%, rgba(255,42,86,1) 100%);;
+    background: linear-gradient(99deg, rgba(255,255,255,1) 0%, rgba(255,255,255,1) 0%, rgba(255,42,86,1) 35%, rgba(255,42,86,1) 75%, rgba(255,42,86,1) 100%);; 
+   -webkit-background-clip: text;
+   -webkit-text-fill-color: transparent;
+   transition: .8s ease-out;
+ }
+.last_cta h3 {
+    word-spacing: 4px;
+}
+div#features_cta img {
+    width: 100px;
+    height: auto;
+    text-align: center;
+    margin: 0 auto
+}
+div#features_cta h4 {
+    font-size: 14px;
+    color: #fff;
+    text-align: center;
+    font-weight: 300;
+    word-wrap: break-word;
+    transition: .3s;
+}
+.cta_cols:hover h4.head {
+    transition: .5s!important;
+    color: #FFD542!important;
+}
+.figure {
+    position: relative;
+    /* width: 360px; */
+    /* max-width: 100%; */
+  }
+  .figure img.Sirv.image-hover {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .figure:hover img.Sirv.image-hover {
+    opacity: 1;
+  }
+div#features_cta figure {
+    margin: 0;
+}
+.primary-gradient {
+    background-image: linear-gradient(to right, rgba(255,42,86,1) 30%, rgba(255,42,86,1) 0%, rgba(255,255,255,1) 47%, rgba(255,255,255,1) 100%);
+    -webkit-background-clip: text; /* For older versions of Safari/Chrome */
+    background-clip: text;
+    color: transparent; /* Make text transparent */
+    /* font-size: 60px; */
+}
+.color-pink {
+    color: #FC2B5A !important;
+}
+.border_cta {
+    padding: 10px 25px;
+    border-width: 3px !important;
+    border-style: solid !important;
+    background: linear-gradient(rgba(0, 0, 0, 1), rgba(0, 0, 0, 1)) padding-box, linear-gradient(to right, rgba(151, 71, 255, 1), rgba(252, 43, 90, 1)) border-box;
+    border-radius: 15px !important;
+    border: 2px solid transparent !important;
+    width: fit-content;
+}
+
+  
+  /* hero end section  */
+
+  /* HomePage specific styles */
+
+.home-2_hero-section {
+  padding-top: 100px;
+  padding-bottom: 60px;
+  background-color: #121212;
+  overflow: hidden;
+  position: relative;
+}
+
+
+
+.home-2_hero-content {
+  display: flex;
+  /* flex-direction: column; */
+  /* align-items: center; */
+  row-gap: 30px;
+  text-align: center;
+}
+
+.hero-content__title {
+  color: #fff;
+  margin-bottom: 24px;
+  font-style: normal;
+  line-height: 1.04;
+}
+
+.tagline {
+  font-size: 60px;
+  font-weight: 700;
+  padding-bottom: 20px;
+  color: #FFD542;
+  transform: translateY(20px);
+  animation: slideUp 0.8s ease-out forwards 0.3s;
+}
+
+.images {
+  display: flex;
+  gap: 20px;
+  transform: translateY(20px);
+  justify-content: space-between;
+}
+
+.images img {
+  width: 70px;
+  height: 70px;
+  transition: transform 0.3s ease;
+}
+
+.images img:hover {
+  transform: scale(1.1);
+}
+
+.partner_col.tech_area_img {
+  height: 100%;
+  padding-block: 14px;
+  /* width: 299px; */
+}
+
+.tech_area_img img {
+  width: 25%;
+}
+
+.color-pink {
+  color: #FC2B5A;
+}
+
+/* CTA Styles */
+#features_cta .cta_cols {
+  text-align: center;
+}
+
+#features_cta .figure {
+  margin-bottom: 15px;
+}
+
+#features_cta .head {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.hidden {
+  display: none;
+}
+
+.tech_area_img {
+  padding: 1rem;
+  text-align: center;
+}
+
+.tech_area_img img {
+  max-width: 100%;
+  height: auto;
+  margin-bottom: 1rem;
+}
+
+.mobile-tech-area {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+#about .feature-widget-7 {
+  transition: .4s ease;
+}
+#about .active .feature-widget-7 {
+  z-index: 1;
+  background-color: #fff;
+  box-shadow: 0 12px 40px rgba(105,131,160,.2);
+  border-radius: 20px;
+  width: 100%;
+  padding: 10px 20px;
+  transition: .3s ease;
+}
+#about .feature-widget-7:hover {
+  z-index: 1;
+  background-color: #fff;
+  box-shadow: 0 12px 40px rgba(105,131,160,.2);
+  border-radius: 20px;
+  width: 100%;
+  padding: 10px 20px;
+  transition: .3s ease;
+}
+.active .feature-widget-7__icon-wrapper h5 {
+  /* width: 2.175rem;
+  height: 2.175rem; */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  text-align: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: .999rem;
+  -webkit-user-select: none;
+  user-select: none;
+  /* color: #fff!important; */
+  margin: 0 auto!important;
+  /* border: 1px solid #fc2b5a!important; */
+  transition: .3s ease!important;
+  /* border-radius: 50%;
+  background: #fc2b5a; */
+  transition: .3s ease;
+}
+#about .feature-widget-7{
+  padding: 10px 20px;
+}
+.feature-widget-7 {
+  grid-column-gap: 20px;
+  grid-row-gap: 20px;
+  border-radius: 15px;
+  grid-template-rows: auto;
+  grid-template-columns: 40px 1fr;
+  grid-auto-columns: 1fr;
+  align-items: center;
+  padding: 10px 20px;
+  /* padding: 15px 20px; */
+  display: grid;
+}
+.accordion-style-7-wrapper {
+  display: flex
+;
+  flex-direction: column;
+}
+.robo_img figure img {
+  border-radius: 20px;
+  box-shadow: 10px -10px 10px rgba(128, 128, 128, 0.5);
+}
+.accordion-style-7-wrapper img {
+  width: 80%;
+}
+#how, #earning-option {
+   background-image: url(../../Assets/public_assets/images/newpage/index/bg-stipes.jpg); 
+  // background-image: url(../../../../public/Assets/public_assets/images/newpage/index/bg-stipes.jpg);
+  background-color: #FFFFFF;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+#skills, #whychoose, .earning-option, #team {
+  background-image: url(/Assets/public_assets/images/newpage/index/bg_texture.png);
+  // background-image: url(../../../../public/Assets/public_assets/images/newpage/index/bg_texture.png);
+  background-color: rgb(244, 250, 250);
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+/* skills section  */
+#skills .role {
+  position: relative;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  /* opacity: 0; */
+  transform: translateY(50px);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#student.role {
+  background: rgb(225, 240, 238);
+  transition: 0.3s;
+}
+#student.role:hover {
+  box-shadow: rgb(165, 214, 208) 5px 5px;
+  border-radius: 10px;
+}
+/* #skills .role:hover {
+  transform: scale(1.05);
+} */
+/* #skills .role:hover {
+  transform: scale(1.05) rotateX(5deg) rotateY(5deg);
+} */
+.role {
+  text-align: center;
+  height: 100%;
+  border-radius: 20px;
+  margin: 0px auto;
+  padding: 20px 0px;
+}
+.role {
+  position: relative;
+}
+#skills .role::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+  transition: opacity 0.3s;
+}
+.role p {
+  height: 50px;
+}
+.role h5 {
+  font-size: 16px;
+}
+.color-pink {
+  color: rgb(252, 43, 90) !important;
+}
+#employer.role {
+  background: rgb(191, 206, 255);
+  transition: 0.3s;
+}
+#employer.role:hover {
+  box-shadow: rgb(134, 145, 181) 5px 5px;
+  border-radius: 10px;
+}
+#employee.role {
+  background: rgb(240, 234, 234);
+  transition: 0.3s;
+}
+#employee.role:hover {
+  box-shadow: rgb(184, 158, 158) 5px 5px;
+  border-radius: 10px;
+}
+#institute.role:hover {
+  box-shadow: rgb(171, 157, 157) 5px 5px;
+  border-radius: 10px;
+}
+#institute.role {
+  background: rgb(221, 221, 221);
+  transition: 0.3s;
+}
+#educator.role {
+  background: rgb(241, 221, 221);
+  transition: 0.3s;
+}
+#educator.role:hover {
+  box-shadow: rgb(174, 141, 141) 5px 5px;
+  border-radius: 10px;
+}
+.new_link {
+  width: 50%;
+  margin: auto;
+  background: #FC2B5A;
+  border-radius: 10px;
+  padding: 10px 20px;
+  border: 1px solid #fc2b5a;
+  color: #fff;
+}
+.new_link a {
+  color: #fff;
+  font-weight: 500;
+  /* font-family: 'Inter", sans-serif'; */
+  transition: .8s ease;
+}
+.new_link:hover {
+  border: 1px solid #fc2b5a;
+  color: #000;
+  transition: 0.5s ease;
+  background: transparent;
+}
+.new_link:hover a{
+  color: #000;
+}
+
+/* why choose focalyt  */
+
+
+#whychoose .whychoosefocal {
+  /* opacity: 0;
+  transform: scale(0); */
+  transition: 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.whychoosefocal {
+  margin-bottom: 40px;
+  font-weight: 700;
+}
+.why_choose_sec {
+  /* box-shadow: 0px 0px 36px 8px rgba(0, 0, 0, 0.37); */
+  border-radius: 22px;
+  padding:20px;
+  min-height: 205px;
+  transition: .5s;
+  /* height: 200px; */
+}
+.why_choose_sec p.text-white {
+  font-size: 16px;
+  font-weight: 300;
+}
+#whychoose .why_choose_sec p.text-white{
+  font-size: 20px;
+  font-weight: 300;
+}
+#whychoose .program-description{
+  /* color: #fc2b5a; */
+  font-weight: 600;
+}
+.why_choose_sec:hover {
+  box-shadow: 5px 5px rgb(188, 197, 196);
+  transition: .3s ease;
+}
+#whychoose .col-md-4:nth-child(1) .why_choose_sec {
+  background-color: #E1F0EE;
+}
+#whychoose .col-md-4:nth-child(2) .why_choose_sec {
+  background-color: #BFCEFE;
+}
+#whychoose .col-md-4:nth-child(3) .why_choose_sec {
+  background-color: #ded9ff;
+}
+#whychoose .col-md-4:nth-child(4) .why_choose_sec {
+  background-color: #F0EAEA;
+}
+#whychoose .col-md-4:nth-child(5) .why_choose_sec {
+  background-color: #DDDDDD;
+}
+#whychoose .col-md-4:nth-child(6) .why_choose_sec {
+  background-color: #F1DDDD;
+}
+#whychoose .col-md-4:nth-child(1) .why_choose_sec:hover {
+  box-shadow: 0px 5px 15px #E1F0EE;
+  transition: all 0.3s ease;
+}
+#whychoose .col-md-4:nth-child(2) .why_choose_sec:hover {
+  box-shadow: 0px 5px 15px #BFCEFE;
+  transition: all 0.3s ease;
+}
+#whychoose .col-md-4:nth-child(3) .why_choose_sec:hover {
+  /* box-shadow: 0px 5px 15px #ded9ff; */
+  box-shadow: 0px 0px 36px 8px rgba(0,0,0,0,0.3);
+  transition: all 0.3s ease;
+}
+#whychoose .col-md-4:nth-child(4) .why_choose_sec:hover {
+  /* box-shadow: 0px 5px 15px #F0EAEA; */
+  box-shadow: 0px 0px 36px 8px rgba(0,0,0,0,0.3);
+  transition: all 0.3s ease;
+}
+#whychoose .col-md-4:nth-child(5) .why_choose_sec:hover {
+  box-shadow: 0px 0px 36px 8px rgba(0,0,0,0,0.3);
+  /* box-shadow: 0px 5px 15px #DDDDDD; */
+  transition: all 0.3s ease;
+}
+#whychoose .col-md-4:nth-child(6) .why_choose_sec:hover {
+  box-shadow: 0px 0px 36px 8px rgba(0,0,0,0,0.3);
+  /* box-shadow: 0px 5px 15px #F1DDDD; */
+  transition: all 0.3s ease;
+}
+
+/* reach us  */
+.content h2 {
+    color: #2d3748;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.globe-background {
+  /* background-image: url(../../../../Assets/public_assets/images/globe.avif); */
+  background-image: url(/Assets/public_assets/images/globe.avif);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 150%;
+  z-index: 10;
+  opacity: 0.2;
+}
+.tabs--menu{
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+section#hero_sm .home-2_hero-content-text h1 {
+  font-size: 55px;
+  background: -webkit-linear-gradient(99deg, rgba(255, 42, 86, 1) 0%, rgba(255, 42, 86, 1) 30%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 75%, rgba(255, 255, 255, 1) 100%);
+  background: -o-linear-gradient(99deg, rgba(255, 42, 86, 1) 0%, rgba(255, 42, 86, 1) 30%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 75%, rgba(255, 255, 255, 1) 100%);
+  background: -moz-linear-gradient(99deg, rgba(255, 42, 86, 1) 0%, rgba(255, 42, 86, 1) 30%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 75%, rgba(255, 255, 255, 1) 100%);
+  background: linear-gradient(99deg, rgba(255, 42, 86, 1) 0%, rgba(255, 42, 86, 1) 20%, rgba(255, 42, 86, 1) 0%, rgba(255, 255, 255, 1) 75%, rgba(255, 255, 255, 1) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: .4sease-in;
+  margin-top: 10px;
+}
+
+/* gallery  */
+.lab-gallery {
+  background-color: #f4f7f6;
+  padding: 60px 0;
+}
+
+.lab-gallery-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.lab-gallery-item:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.lab-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.lab-gallery-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent 70%, rgba(0,0,0,0.6));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.lab-gallery-item:hover::before {
+  opacity: 1;
+}
+
+.large-images .lab-gallery-item {
+  height: 100%;
+}
+
+.small-images .lab-gallery-item {
+  height: 100%;
+  /* height: 395px; */
+}
+
+
+@media screen and (max-width: 1440px) {
+  .role p {
+      font-size: 13px;
+  }
+}
+@media screen and (max-width: 1366px) {
+  .role p {
+      font-size: 13px;
+  }
+}
+@media screen and (max-width: 1199px) {
+  .role p {
+      font-size: 11px;
+  }
+}
+@media(max-width:992px){
+  .tagline{
+    font-size: 45px;
+  }
+  .home-2_hero-content-text h4 {
+    font-size: 55px;
+    text-align: center;
+  }
+  .home-2_hero-content-text h1:hover{
+    font-size: 60px;
+  }
+  .border_cta{
+    display: flex
+    ;
+        align-items: center;
+        text-align: center;
+        justify-content: center;
+        margin-left: 25%;
+        margin-right: 25%;
+  }
+  .last_cta{
+    text-align: center;
+  }
+  #features_cta{
+    justify-content: center!important;
+  }
+  .home-2_hero-content-text {
+    text-align: initial;
+  }
+.home-2_hero-content-text {
+    margin-bottom: 20px;
+  }
+.home-2_hero-button-group {
+    justify-content: initial;
+    margin-bottom: 20px;
+  }
+.home-2_hero-content-button__bottom-text span {
+  justify-content: initial;
+}
+.home-2_hero-section .row--custom {
+    flex-direction: row-reverse;
+    justify-content: space-between;
+  }
+  .home-2_hero-section {
+    padding-top: 90px;
+    padding-bottom: 40px;
+  }
+   .home-2_hero-content-text h1 {
+    font-size: 60px;
+    text-align: center;
+  }
+
+  .images .home_images {
+    width: 50px;
+    margin: 8px;
+  }
+
+  #features_cta img {
+    width: 80px;
+  }
+
+  .cta_cols {
+    padding: 15px;
+  }
+
+  .cta_cols h4 {
+    font-size: 13px;
+  }
+
+  .border_cta {
+    padding: 10px 20px;
+  }
+
+  .border_cta p {
+    font-size: 15px;
+  }
+
+  .last_cta h3 {
+    font-size: 22px;
+  }
+  .home-2_hero-content{
+    flex-direction: column;
+  }
+}
+@media  (max-width: 992px) {
+  
+}
+@media (min-width: 992px) {
+  .home-2_hero-section .row--custom {
+      flex-direction: row-reverse;
+      justify-content: space-between;
+  }
+}
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .home-2_hero-content-text h4 {
+    font-size: 40px;
+    text-align: center;
+  }
+  section#hero_sm .home-2_hero-content-text h1 {
+    font-size: 40px;
+  }
+  .home-2_hero-content{
+    justify-content: center;
+  }
+  .home-2_hero-section .row--custom{
+    justify-content: start;
+    flex-direction: column-reverse;
+  }
+    .tagline {
+    font-size: 25px;
+    padding-block: 20px;
+  }
+  .tech_area_img img {
+    width: 100%;
+  }
+  .slider_images {
+    width: 90%;
+    margin: 0 auto;
+  }
+
+  .slider_images img {
+    width: 100%;
+  }
+  .border_cta{
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+@media (max-width: 768px) {
+  .large-images .lab-gallery-item,
+  .small-images .lab-gallery-item {
+      /* height: auto; */
+      margin-bottom: 20px;
+  }
+}
+@media (max-width: 576px) {
+  .home-2_hero-button-group .btn-outline {
+    width: initial;
+  }
+  .home-2_hero-content-text h4 {
+    font-size: 24px;
+  }
+
+  .home-2_hero-content-text h1 {
+    font-size: 36px;
+  }
+
+  .images .home_images {
+    width: 40px;
+    margin: 5px;
+  }
+
+  #features_cta img {
+    width: 60px;
+  }
+
+  .cta_cols {
+    padding: 10px;
+  }
+
+  .cta_cols h4 {
+    font-size: 12px;
+  }
+
+  .border_cta {
+    padding: 8px 15px;
+  }
+
+  .border_cta p {
+    font-size: 14px;
+  }
+
+  .last_cta h3 {
+    font-size: 20px;
+  }
+
+  
+  /* Show mobile view */
+ .home-2_hero-section {
+    padding-top: 120px;
+    padding-bottom: 80px;
+  }
+}
+@media screen and (max-width: 480px) {
+  .slider_images {
+    width: 100%;
+  }
+}
+
+    `
+        }
+      </style>
     </FrontLayout>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import "./Jobs.css";
+
 import moment from 'moment';
 import axios from 'axios';
 import ReCAPTCHA from "react-google-recaptcha";
@@ -754,6 +754,550 @@ function Jobs() {
             </div>
           </div>
         </div>
+        <style>
+          {
+            `
+            
+.bg-img {
+    position: relative;
+    border-radius: 11px;
+    border: 1px solid #ffffff;
+    box-shadow: rgb(227, 59, 22, 77%) 0px 0px 0.25em, rgba(24, 86, 201, 0.05) 0px 0.25em 1em;
+}
+img.group1 {
+    width: 75px !important;
+    height: auto;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.course_card_footer img {
+    width: 20px;
+}
+.courses_features p {
+    line-height: normal;
+    font-size: 12px;
+}
+.color-yellow {
+    color: #FFD542;
+}
+.btn.shr--width{
+  width: 100%;
+}
+.btn.cta-callnow {
+    background: #fff;
+    color: #FC2B5A;
+    font-family: inter;
+    border-radius: 50px;
+    font-weight: 500;
+    padding: 10px 4px;
+    width: 120%;
+    font-size: 12px;
+    letter-spacing: 1px;
+    transition: .3s;
+}
+.btn.cta-callnow:hover {
+    transition: .5s;
+    background: #FC2B5A;
+    color: #fff;
+}
+.learnn{
+  padding: 10px 14px;
+}
+.course_card_footer {
+    background: #FC2B5A;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+.jobs h1 {
+    color: #FC2B5A;
+    font-size: 45px;
+    font-weight: 700;
+    font-family: 'INTER', sans-serif;
+}
+
+.courseCard{
+  border-radius: 12px!important;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+video#courseVid {
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+}
+.smallText{
+  color: #fff;
+  background-color: #FC2B5A!important;
+}
+button.close {
+    z-index: 9;
+    background: #fff;
+    border: 2px solid #FC2B5A !important;
+    font-size: 19px;
+    border-radius: 100px;
+    height: 38px;
+    opacity: 1;
+    padding: 0;
+    position: absolute;
+    /* right: -13px; */
+    right: 0px;
+    /* top: -12px; */
+    top: 0px;
+    width: 38px;
+    -webkit-appearance: none;
+    -moz-box-shadow: none;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    font-weight: 400;
+    transition: .3s;
+    font-weight: 900;
+    color:#000!important;
+}
+button.close span {
+    font-size: 30px;
+    line-height: 30px;
+    color: #FC2B5A;
+    font-weight: 400;
+}
+.sector--select{
+  display: flex;
+  align-items: center;
+
+}
+
+@media only screen and (max-width: 1199px) {
+    .card {
+        width: 100%;
+    }
+    .card-padd {
+        display: flex
+;
+        justify-content: center;
+        padding-left: 0 !important;
+    }
+}
+@media only screen and (max-width: 768px) {
+.sector--select{
+  display: none;
+}
+  .jobs-heading {
+        font-size: 30px !important;
+    }
+    .card {
+        width: 95% !important;
+    }
+    
+    .jobs-heading {
+        font-size: 22px;
+    }
+}
+@media only screen and (max-width: 700px) {
+    .card {
+        width: 95% !important;
+    }
+}
+@media (max-width: 578px) {
+ 
+    .jobs-heading {
+        font-size: 27px !important;
+    }
+}
+@media (max-width: 432px) {
+    .jobs-heading {
+        font-size: 25px !important;
+    }
+}
+@media (max-width: 392px) {
+   
+    .courses_features p{
+        font-size: 14px;
+    }
+}
+@media (max-width: 375px) {
+   
+    
+}
+
+
+/* Course.css */
+
+/* Filter Styles */
+.filter-container {
+    margin: auto;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+  }
+  
+  .filter-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    color: #6b7280;
+    font-weight: 500;
+  }
+  
+  .filter-buttons {
+    display: flex;
+    overflow-y: hidden;
+    overflow-x: auto;
+    gap: 12px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 8px;
+  }
+  
+  .filter-buttons::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .filter-button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 20px;
+    font-weight: 500;
+    border: 1px solid #e5e7eb;
+    background: white;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+  }
+  
+  .filter-button:hover {
+    border-color: #ec4899;
+  }
+  
+  .filter-button.active {
+    background: #ec4899;
+    color: white;
+    transform: scale(1.05);
+  }
+  
+  .count {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    color: #374151;
+  }
+  
+  .filter-button.active .count {
+    background: #db2777;
+    color: white;
+  }
+  
+  .active-indicator {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px;
+    height: 8px;
+    background: #ec4899;
+  }
+  
+  /* Course Card Styles */
+  .courseCard {
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+    height: 100%;
+  }
+  
+  .courseCard:hover {
+    transform: translateY(-5px);
+  }
+  
+  .bg-img {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .bg-img img.digi {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+  }
+  
+  .right_obj {
+    position: absolute;
+    top: 10px;
+    background-color: #ec4899;
+    color: white;
+    padding: 5px 10px;
+    /* border-radius: 20px; */
+    /* font-size: 0.8rem; */
+    font-weight: bold;
+  }
+  
+  .group1 {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    opacity: 0.8;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  
+  .bg-img:hover .group1 {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  
+  .ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  
+  .para_ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  
+  .courses_features {
+    font-size: 0.85rem;
+  }
+  
+  .sub_head {
+    opacity: 0.8;
+    font-size: 0.75rem;
+  }
+  
+  .color-yellow {
+    color: #ffc107;
+  }
+  
+  
+  .btn-bg-color {
+    background-color: #ec4899;
+    color: white;
+    border: none;
+  }
+  
+  .btn-bg-color:hover {
+    background-color: #db2777;
+    color: white;
+  }
+  
+  .cta-callnow {
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  .cta-callnow:hover {
+    transform: translateY(-2px);
+  }
+  
+  /* Section Styles */
+  .section-padding-60 {
+    padding: 60px 0;
+  }
+  
+  .jobs-heading {
+    color: #333;
+    font-weight: 700;
+    position: relative;
+  }
+  .search-container{
+    position: relative;
+  }
+  .search-icon {
+    position: absolute;
+    left: 5px;
+    /* top: 15px; */
+    font-size: 16px;
+  }
+  /* .jobs-heading:after {
+    content: '';
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 4px;
+    background-color: #ec4899;
+    border-radius: 2px;
+  }
+   */
+  /* Modal Styles */
+  .modal-content {
+    border: none !important;
+    border-radius: 12px;
+    /* overflow: hidden; */
+  }
+  
+  .modal-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  .modal-footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  .submit_btn {
+    background-color: #ec4899;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  .submit_btn:hover {
+    background-color: #db2777;
+  }
+.new_img{
+    width: 20px!important;
+}
+.apply_date{
+    font-size: 16px;
+}
+
+#callbackForm input , #callbackForm select{
+  background-color: transparent;
+  padding: 7px 12px;
+  border: 1px solid ;
+  height: 37px;
+}
+#callbackForm textarea{
+  margin-bottom: 20px;
+  border: 1px solid ;
+}
+#callbackForm button{
+  border: 1px solid #fc2b5a;
+  transition: 0.4s ease-in-out;
+}
+#callbackForm button:hover{
+  border: 1px solid #FC2B5A;
+  color: #FC2B5A;
+  font-weight: bold;
+  background: transparent!important;
+  scale: 1.1;
+}
+.newWidth{
+  width: 30%!important;
+}
+
+.companyname{
+  font-size: 12px;
+}
+@media (max-width:992px){
+  .newWidth{
+    width: 100%!important;
+  }
+}
+@media(max-width:768px){
+  .mobileJobs{
+    justify-content: center;
+  }
+}
+            `
+          }
+        </style>
+
+
+<style>
+  {
+
+`
+.filter-buttonss {
+    display: flex;
+    overflow-y: hidden;
+    overflow-x: auto;
+    gap: 12px;
+    /* scrollbar-width: none; */
+    /* -ms-overflow-style: none; */
+    padding-bottom: 8px;
+  } 
+  /* .filter-buttons{
+    
+    scrollbar-width: 1px;
+    -ms-overflow-style: none;
+    padding-bottom: 8px;
+
+    
+  } */
+  
+ 
+  /* .filter-buttons::-webkit-scrollbar {
+    display: none;
+  } */
+  .filter-button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 20px;
+    font-weight: 500;
+    border: 1px solid #e5e7eb;
+    background: white;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+  }
+  
+  .filter-button:hover {
+    border-color: #ec4899;
+  }
+  
+  .filter-button.active {
+    background: #ec4899;
+    color: white;
+    transform: scale(1.05);
+  }
+  
+  .count {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    color: #374151;
+  }
+  
+  .filter-button.active .count {
+    background: #db2777;
+    color: white;
+  }
+  
+  .active-indicator {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px;
+    height: 8px;
+    background: #ec4899;
+  }
+`
+
+  }
+</style>
       </FrontLayout>
 
     </>

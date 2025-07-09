@@ -6,7 +6,7 @@ import ReCAPTCHA from "react-google-recaptcha";
 import FrontLayout from '../../../Component/Layouts/Front';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
-import "./Event.css"
+import styles from './Event.module.css';
 
 function Event() {
   const [events, setEvents] = useState([]);
@@ -111,11 +111,11 @@ function Event() {
         </section>
 
         {/* events Section */}
-        <section className="jobs section-padding-60">
+        <section className="styles.jobs section-padding-60">
           <div className="container">
             <div className="row">
               <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mx-auto mt-xxl-5 mt-xl-3 mt-lg-3 mt-md-3 mt-sm-3 mt-3">
-                <div className="row my-xl-5 my-lg-5 my-md-3 my-sm-3 my-5">
+                <div className="row my-xl-5 my-lg-5 my-md-3 my-sm-3 my-5 eventMobile">
                   <h1 className="text-center text-uppercase jobs-heading pb-4">Events</h1>
 
                   {/* event Cards */}
@@ -136,7 +136,7 @@ function Event() {
                                     e.preventDefault(); // ✅ Prevents default link behavior
                                     setVideoSrc(event.video);
                                   }}
-                                  className="pointer img-fluid"
+                                  className="pointer img-fluid" 
                                 >
                                   <img
                                     src={event.thumbnail}
@@ -147,12 +147,12 @@ function Event() {
                                 </a>
 
                                 <div className="flag">
-                                  <h4
+                                  {/* <h4
                                     className="text-center text-black fw-bolder mb-2 mx-auto text-capitalize ellipsis"
                                     title={event.eventTitle}
                                   >
                                     {event.eventType}
-                                  </h4>
+                                  </h4> */}
                                 </div>
                                 <div className="share-Event">
                                   <div className="tooltip-container">
@@ -455,6 +455,927 @@ function Event() {
 }
 
         `}
+      </style>
+      <style>
+        {
+          `
+          .op-Reg{
+    color: #fff;
+}
+.flag{
+    position: absolute;
+    top: 2px;
+    left: 10px;
+}
+.flag h4{
+  font-size: 15px;
+}
+.share-Event{
+    position: absolute;
+    top: 5px;
+    right: 10px;
+}
+.openRegistration{
+    position: absolute;
+    bottom: 20px;
+    text-align: center;
+    color: #fff;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+}
+.op-Reg-p{
+    color: #fff;
+    font-weight: 500;
+    font-size: 16px;
+}
+
+/* From Uiverse.io by Mohammad-Rahme-576 */ 
+/* Container Styles */
+.share-Event .tooltip-container {
+    position: relative;
+    display: inline-block;
+    font-family: "Arial", sans-serif;
+    overflow: visible;
+  }
+  
+  /* Button Styles */
+ .share-Event  .button-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6e8efb, #a777e3);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 50px;
+    cursor: pointer;
+    transition:
+      background 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+      transform 0.3s ease,
+      box-shadow 0.4s ease;
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 10;
+    overflow: hidden;
+  }
+  
+ .share-Event  .button-content::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(110, 142, 251, 0.4),
+      rgba(167, 119, 227, 0.4)
+    );
+    filter: blur(15px);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: -1;
+  }
+  
+  .share-Event .button-content::after {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.3) 0%,
+      rgba(255, 255, 255, 0) 70%
+    );
+    transform: scale(0);
+    transition: transform 0.6s ease-out;
+    z-index: -1;
+  }
+  
+  .share-Event .button-content:hover::before {
+    opacity: 1;
+  }
+  
+  .share-Event .button-content:hover::after {
+    transform: scale(1);
+  }
+  
+  .share-Event .button-content:hover {
+    background: linear-gradient(135deg, #a777e3, #6e8efb);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+    transform: translateY(-4px) scale(1.03);
+  }
+  
+  .share-Event .button-content:active {
+    transform: translateY(-2px) scale(0.98);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
+  }
+  
+  .share-Event .text {
+    font-size: 13px;
+    font-weight: 600;
+    margin-right: 2px;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    transition: letter-spacing 0.3s ease;
+  }
+  
+  .share-Event .button-content:hover .text {
+    letter-spacing: 1px;
+  }
+  
+  .share-Event .share-icon {
+    fill: white;
+    transition:
+      transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+      fill 0.3s ease;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+  }
+  
+  .share-Event .button-content:hover .share-icon {
+    transform: rotate(180deg) scale(1.1);
+    fill: #ffffff;
+  }
+  
+  /* Tooltip Styles */
+  /* .share-Event .tooltip-content {
+    position: absolute;
+    top: 71%;
+    left: 50%;
+    transform: translateX(-50%) scale(0.8);
+    background: white;
+    border-radius: 15px;
+    padding: 22px;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+      transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+      visibility 0.5s ease;
+    z-index: 100;
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.9);
+  } */
+  
+  .share-Event .tooltip-content {
+    position: absolute;
+    top: 71%;
+    left: 50%;
+    transform: translateX(-50%) scale(0.8);
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    padding: 22px;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    visibility: hidden;
+    transition: 
+      opacity 0.4s ease,
+      transform 0.4s ease,
+      visibility 0.4s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  
+  .share-Event .tooltip-container:hover .tooltip-content {
+    opacity: 1;
+    visibility: visible;
+    left: 0;
+    transform: translateX(-50%) scale(0.8);
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+  .share-Event .tooltip-content {
+    transition:  opacity 0.4s ease,
+    visibility 0.4s;
+    transition-delay: 0s;
+  }
+  /* Social Icons Styles */
+  .share-Event .social-icons {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+  }
+  
+  .share-Event .social-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #f0f0f0;
+    transition:
+      transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+      background 0.3s ease,
+      box-shadow 0.4s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .share-Event .social-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at center,
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(255, 255, 255, 0) 70%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  
+  .share-Event .social-icon:hover::before {
+    opacity: 1;
+  }
+  
+  .share-Event .social-icon svg {
+    width: 24px;
+    height: 24px;
+    fill: #333;
+    transition:
+      transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+      fill 0.3s ease;
+    z-index: 1;
+  }
+  
+  .share-Event .social-icon:hover {
+    transform: translateY(-5px) scale(1.1);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  }
+  
+  .share-Event .social-icon:active {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .share-Event .social-icon:hover svg {
+    transform: scale(1.2);
+    fill: white;
+  }
+  
+  .share-Event .social-icon.twitter:hover {
+    background: linear-gradient(135deg, #1da1f2, #1a91da);
+  }
+  
+  .share-Event .social-icon.facebook:hover {
+    background: linear-gradient(135deg, #1877f2, #165ed0);
+  }
+  
+  .share-Event .social-icon.linkedin:hover {
+    background: linear-gradient(135deg, #0077b5, #005e94);
+  }
+  
+  /* Animation for Pulse Effect */
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(110, 142, 251, 0.4);
+    }
+    70% {
+      box-shadow: 0 0 0 20px rgba(110, 142, 251, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(110, 142, 251, 0);
+    }
+  }
+  
+  .share-Event .button-content {
+    animation: pulse 3s infinite;
+  }
+  
+  /* Hover Ripple Effect */
+  @keyframes ripple {
+    0% {
+      transform: scale(0);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(4);
+      opacity: 0;
+    }
+  }
+  
+  .share-Event .button-content::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: inherit;
+    transform: scale(0);
+    opacity: 0;
+  }
+  
+  .share-Event .button-content:active::before {
+    animation: ripple 0.6s linear;
+  }
+  
+  /* Tooltip Arrow */
+  .share-Event .tooltip-content::before {
+    content: "";
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 0 10px 10px 10px;
+    border-style: solid;
+    border-color: transparent transparent rgba(255, 255, 255, 0.9) transparent;
+    filter: drop-shadow(0 -3px 3px rgba(0, 0, 0, 0.1));
+  }
+  
+  /* Accessibility */
+  .share-Event .button-content:focus {
+    outline: none;
+    box-shadow:
+      0 0 0 3px rgba(110, 142, 251, 0.5),
+      0 8px 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  .share-Event .button-content:focus:not(:focus-visible) {
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .share-Event .button-content {
+      padding: 12px 24px;
+      border-radius: 40px;
+    }
+  
+    .text {
+      font-size: 16px;
+    }
+  
+    .share-Event .tooltip-content {
+      width: 240px;
+      padding: 18px;
+    }
+  
+    .share-Event .social-icon {
+      width: 44px;
+      height: 44px;
+    }
+  
+    .share-Event .social-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .share-Event .button-content {
+      padding: 10px 20px;
+    }
+  
+    .share-Event .text {
+      font-size: 14px;
+    }
+  
+    .share-Event .tooltip-content {
+      width: 200px;
+      padding: 15px;
+    }
+  
+    .share-Event .social-icon {
+      width: 40px;
+      height: 40px;
+    }
+  
+    .share-Event .social-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+  
+  /* Dark Mode Support */
+  @media (prefers-color-scheme: dark) {
+    .share-Event .tooltip-content {
+      background: rgba(30, 30, 30, 0.9);
+      color: white;
+    }
+  
+    .share-Event .tooltip-content::before {
+      border-color: transparent transparent rgba(30, 30, 30, 0.9) transparent;
+    }
+  
+    .share-Event .social-icon {
+      background: #2a2a2a;
+    }
+  
+    .share-Event .social-icon svg {
+      fill: #e0e0e0;
+    }
+  }
+  
+  /* Print Styles */
+  @media print {
+    .share-Event .tooltip-container {
+      display: none;
+    }
+  }
+  
+  /* Reduced Motion */
+  @media (prefers-reduced-motion: reduce) {
+    .share-Event .button-content,
+    .share-Event .share-icon,
+    .share-Event .social-icon,
+    .share-Event .tooltip-content {
+      transition: none;
+    }
+  
+    .share-Event .button-content {
+      animation: none;
+    }
+  }
+  
+  /* Custom Scrollbar for Tooltip Content */
+  .share-Event .tooltip-content::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .share-Event .tooltip-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  .share-Event .tooltip-content::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+  }
+  
+  .share-Event .tooltip-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+  
+          `
+        }
+      </style>
+
+      <style>
+        {
+`
+
+.bg-img {
+  position: relative;
+  border-radius: 11px;
+  border: 1px solid #ffffff;
+  box-shadow: rgb(227, 59, 22, 77%) 0px 0px 0.25em, rgba(24, 86, 201, 0.05) 0px 0.25em 1em;
+}
+img.group1 {
+  width: 75px !important;
+  height: auto;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.course_card_footer img {
+  width: 20px;
+}
+.courses_features p {
+  line-height: normal;
+  font-size: 12px;
+}
+.color-yellow {
+  color: #FFD542;
+}
+.btn.shr--width{
+width: 100%;
+}
+.btn.cta-callnow {
+  background: #fff;
+  color: #FC2B5A;
+  font-family: inter;
+  border-radius: 50px;
+  font-weight: 500;
+  padding: 10px 4px;
+  width: 120%;
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: .3s;
+}
+.btn.cta-callnow:hover {
+  transition: .5s;
+  background: #FC2B5A;
+  color: #fff;
+}
+.learnn{
+padding: 10px 14px;
+}
+.course_card_footer {
+  background: #FC2B5A;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+.jobs h1 {
+  color: #FC2B5A;
+  font-size: 45px;
+  font-weight: 700;
+  font-family: 'INTER', sans-serif;
+}
+
+.courseCard{
+border-radius: 12px!important;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+video#courseVid {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+.smallText{
+color: #fff;
+background-color: #FC2B5A!important;
+}
+button.close {
+  z-index: 9;
+  background: #fff;
+  border: 2px solid #FC2B5A !important;
+  font-size: 19px;
+  border-radius: 100px;
+  height: 38px;
+  opacity: 1;
+  padding: 0;
+  position: absolute;
+  /* right: -13px; */
+  right: 0px;
+  /* top: -12px; */
+  top: 0px;
+  width: 38px;
+  -webkit-appearance: none;
+  -moz-box-shadow: none;
+  -webkit-box-shadow: none;
+  box-shadow: none;
+  font-weight: 400;
+  transition: .3s;
+  font-weight: 900;
+  color:#000!important;
+}
+button.close span {
+  font-size: 30px;
+  line-height: 30px;
+  color: #FC2B5A;
+  font-weight: 400;
+}
+.sector--select{
+display: flex;
+align-items: center;
+
+}
+
+@media only screen and (max-width: 1199px) {
+  .card {
+      width: 100%;
+  }
+  .card-padd {
+      display: flex
+;
+      justify-content: center;
+      padding-left: 0 !important;
+  }
+}
+@media only screen and (max-width: 768px) {
+.sector--select{
+display: none;
+}
+.jobs-heading {
+      font-size: 30px !important;
+  }
+  .card {
+      width: 95% !important;
+  }
+  
+  .jobs-heading {
+      font-size: 22px;
+  }
+}
+@media only screen and (max-width: 700px) {
+  .card {
+      width: 95% !important;
+  }
+}
+@media (max-width: 578px) {
+
+  .jobs-heading {
+      font-size: 27px !important;
+  }
+}
+@media (max-width: 432px) {
+  .jobs-heading {
+      font-size: 25px !important;
+  }
+}
+@media (max-width: 392px) {
+ 
+  .courses_features p{
+      font-size: 14px;
+  }
+}
+@media (max-width: 375px) {
+ 
+  
+}
+
+
+/* Course.css */
+
+/* Filter Styles */
+.filter-container {
+  margin: auto;
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.filter-buttons {
+  display: flex;
+  overflow-y: hidden;
+  overflow-x: auto;
+  gap: 12px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 8px;
+}
+
+.filter-buttons::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 20px;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.filter-button:hover {
+  border-color: #ec4899;
+}
+
+.filter-button.active {
+  background: #ec4899;
+  color: white;
+  transform: scale(1.05);
+}
+
+.count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.filter-button.active .count {
+  background: #db2777;
+  color: white;
+}
+
+.active-indicator {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 8px;
+  height: 8px;
+  background: #ec4899;
+}
+
+/* Course Card Styles */
+.courseCard {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.3s ease;
+  height: 100%;
+}
+
+.courseCard:hover {
+  transform: translateY(-5px);
+}
+
+.bg-img {
+  position: relative;
+  overflow: hidden;
+}
+
+.bg-img img.digi {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.right_obj {
+  position: absolute;
+  top: 10px;
+  background-color: #ec4899;
+  color: white;
+  padding: 5px 10px;
+  /* border-radius: 20px; */
+  /* font-size: 0.8rem; */
+  font-weight: bold;
+}
+
+.group1 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  opacity: 0.8;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.bg-img:hover .group1 {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.para_ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.courses_features {
+  font-size: 0.85rem;
+}
+
+.sub_head {
+  opacity: 0.8;
+  font-size: 0.75rem;
+}
+
+.color-yellow {
+  color: #ffc107;
+}
+
+
+.btn-bg-color {
+  background-color: #ec4899;
+  color: white;
+  border: none;
+}
+
+.btn-bg-color:hover {
+  background-color: #db2777;
+  color: white;
+}
+
+.cta-callnow {
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.cta-callnow:hover {
+  transform: translateY(-2px);
+}
+
+/* Section Styles */
+.section-padding-60 {
+  padding: 60px 0;
+}
+
+.jobs-heading {
+  color: #333;
+  font-weight: 700;
+  position: relative;
+}
+.search-container{
+  position: relative;
+}
+.search-icon {
+  position: absolute;
+  left: 5px;
+  /* top: 15px; */
+  font-size: 16px;
+}
+/* .jobs-heading:after {
+  content: '';
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 4px;
+  background-color: #ec4899;
+  border-radius: 2px;
+}
+ */
+/* Modal Styles */
+.modal-content {
+  border: none !important;
+  border-radius: 12px;
+  /* overflow: hidden; */
+}
+
+.modal-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.modal-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.submit_btn {
+  background-color: #ec4899;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.submit_btn:hover {
+  background-color: #db2777;
+}
+.new_img{
+  width: 20px!important;
+}
+.apply_date{
+  font-size: 16px;
+}
+
+#callbackForm input , #callbackForm select{
+background-color: transparent;
+padding: 7px 12px;
+border: 1px solid ;
+height: 37px;
+}
+#callbackForm textarea{
+margin-bottom: 20px;
+border: 1px solid ;
+}
+#callbackForm button{
+border: 1px solid #fc2b5a;
+transition: 0.4s ease-in-out;
+}
+#callbackForm button:hover{
+border: 1px solid #FC2B5A;
+color: #FC2B5A;
+font-weight: bold;
+background: transparent!important;
+scale: 1.1;
+}
+.newWidth{
+width: 30%!important;
+}
+
+.companyname{
+font-size: 12px;
+}
+@media (max-width:992px){
+.newWidth{
+  width: 100%!important;
+}
+}
+@media(max-width:768px){
+.mobileJobs{
+  justify-content: center;
+}
+.eventMobile{
+justify-content: center;
+}
+}
+`
+
+        }
       </style>
     </>
   );
