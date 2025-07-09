@@ -52,20 +52,35 @@ const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
   );
 });
 
-const useNavHeight = (dependencies = []) => {
+
+  const useNavHeight = (dependencies = []) => {
     const navRef = useRef(null);
-    const [navHeight, setNavHeight] = useState(140); // Default fallback
+    const [navHeight, setNavHeight] = useState(140);
+    const [navWidth, setNavWidth] = useState('100%');
   
-    const calculateHeight = useCallback(() => {
-      console.log('🔍 Calculating nav height...');
+    const calculateHeightAndWidth = useCallback(() => {
+      console.log('🔍 Calculating nav height and width...');
       
       if (navRef.current) {
+        // Calculate Height
         const height = navRef.current.offsetHeight;
         console.log('📏 Found height:', height);
         
         if (height > 0) {
           setNavHeight(height);
           console.log('✅ Height set to:', height + 'px');
+        }
+  
+        // Calculate Width from parent (position-relative container)
+        const parentContainer = navRef.current.closest('.position-relative');
+        if (parentContainer) {
+          const parentWidth = parentContainer.offsetWidth;
+          console.log('📐 Parent width:', parentWidth);
+          
+          if (parentWidth > 0) {
+            setNavWidth(parentWidth + 'px');
+            console.log('✅ Width set to:', parentWidth + 'px');
+          }
         }
       } else {
         console.log('❌ navRef.current is null');
@@ -74,25 +89,61 @@ const useNavHeight = (dependencies = []) => {
   
     useEffect(() => {
       // Calculate immediately and with delays
-      calculateHeight();
-      setTimeout(calculateHeight, 100);
-      setTimeout(calculateHeight, 500);
+      calculateHeightAndWidth();
+      setTimeout(calculateHeightAndWidth, 100);
+      setTimeout(calculateHeightAndWidth, 500);
   
       // Resize listener
       const handleResize = () => {
-        setTimeout(calculateHeight, 100);
+        setTimeout(calculateHeightAndWidth, 100);
       };
   
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
-    }, [calculateHeight]);
+    }, [calculateHeightAndWidth]);
   
     // Recalculate when dependencies change
     useEffect(() => {
-      setTimeout(calculateHeight, 100);
+      setTimeout(calculateHeightAndWidth, 100);
     }, dependencies);
   
-    return { navRef, navHeight };
+    return { navRef, navHeight, navWidth };
+  };
+  const useScrollBlur = (navbarHeight = 140) => {
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [scrollY, setScrollY] = useState(0);
+    const contentRef = useRef(null);
+  
+    useEffect(() => {
+      const handleScroll = () => {
+        const currentScrollY = window.pageYOffset;
+        const shouldBlur = currentScrollY > navbarHeight / 3;
+        
+        setIsScrolled(shouldBlur);
+        setScrollY(currentScrollY);
+      };
+  
+      // Throttle scroll event for better performance
+      let ticking = false;
+      const throttledScroll = () => {
+        if (!ticking) {
+          requestAnimationFrame(() => {
+            handleScroll();
+            ticking = false;
+          });
+          ticking = true;
+        }
+      };
+  
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+      handleScroll(); // Initial check
+  
+      return () => {
+        window.removeEventListener('scroll', throttledScroll);
+      };
+    }, [navbarHeight]);
+  
+    return { isScrolled, scrollY, contentRef };
   };
 
 const CRMDashboard = () => {
@@ -139,9 +190,10 @@ const CRMDashboard = () => {
   const fileInputRef = useRef(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
-  const { navRef, navHeight } = useNavHeight([mainTab]);
- 
-
+  const { navRef, navHeight, navWidth } = useNavHeight([mainTab]);
+  const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
+  const blurIntensity = Math.min(scrollY / 10, 15);
+  const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
   // ========================================
   // 🎯 Main Tab Change Handler
   // ========================================
@@ -183,9 +235,37 @@ const CRMDashboard = () => {
       <div className="row">
         <div className={`${isMobile ? 'col-12' : mainContentClass} mobileResponsive`}>
           {/* Header */}
+          <div 
+            className="content-blur-overlay"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: `${navHeight + 50}px`,
+              background: `linear-gradient(
+                180deg,
+                rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
+                rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
+                rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
+                transparent 100%
+              )`,
+              backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+              WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+              pointerEvents: 'none',
+              zIndex: 9,
+              transition: 'all 0.3s ease',
+              opacity: isScrolled ? 1 : 0
+            }}
+          />
           <div className='position-relative' >
           <div ref={navRef} className="bg-white shadow-sm border-bottom mb-3 
-        " style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed'}}>
+        " style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${navWidth}` ,backdropFilter: `blur(${blurIntensity}px)`,
+        WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+        boxShadow: isScrolled 
+          ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)' 
+          : '0 4px 25px 0 #0000001a',paddingBlock: '10px',
+          transition: 'all 0.3s ease',}}>
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
                 <div className="col-md-12 d-md-block d-sm-none">
@@ -2709,9 +2789,7 @@ const CRMDashboard = () => {
               .mobileResponsive{
               padding: 0;
               }
-              .content-body{
-               margin-top: 30px!important;
-              }
+
               .nav-tabs-main{
                   white-space: nowrap;
                   flex-wrap: nowrap;

@@ -11,7 +11,107 @@ import 'react-calendar/dist/Calendar.css';
 import axios from "axios";
 import moment from "moment";
 
+const useNavHeight = (dependencies = []) => {
+  const navRef = useRef(null);
+  const [navHeight, setNavHeight] = useState(0);
+  const [navWidth, setNavWidth] = useState('100%');
+  const [subTabsHeight, setSubTabsHeight] = useState(0);
+  const [contentMarginTop, setContentMarginTop] = useState(0);
 
+  const calculateHeightAndWidth = useCallback(() => {
+    console.log('🔍 Calculating nav height and width...');
+    
+    if (navRef.current) {
+      // Calculate Height
+      const height = navRef.current.offsetHeight;
+      console.log('📏 Found nav height:', height);
+      
+      if (height > 0) {
+        setNavHeight(height);
+        console.log('✅ Nav height set to:', height + 'px');
+      }
+
+      // Calculate Width from parent (position-relative container)
+      const parentContainer = navRef.current.closest('.position-relative');
+      if (parentContainer) {
+        const parentWidth = parentContainer.offsetWidth;
+        console.log('📐 Parent width:', parentWidth);
+        
+        if (parentWidth > 0) {
+          setNavWidth(parentWidth + 'px');
+          console.log('✅ Width set to:', parentWidth + 'px');
+        }
+      }
+
+      // Calculate SubTabs Height if visible
+      const subTabsElement = document.querySelector('.subViewTabs');
+      if (subTabsElement) {
+        const subTabsElementHeight = subTabsElement.offsetHeight;
+        setSubTabsHeight(subTabsElementHeight);
+        console.log('📏 SubTabs height:', subTabsElementHeight);
+      }
+
+      // Calculate total margin-top for content-body
+      const totalMarginTop = height + (subTabsElement ? subTabsElement.offsetHeight : 0);
+      setContentMarginTop(totalMarginTop);
+      console.log('📏 Total margin-top for content:', totalMarginTop);
+    } else {
+      console.log('❌ navRef.current is null');
+    }
+  }, []);
+
+  useEffect(() => {
+    // Calculate immediately and with delays
+    calculateHeightAndWidth();
+    
+    // Use ResizeObserver for better performance
+    const resizeObserver = new ResizeObserver(() => {
+      calculateHeightAndWidth();
+    });
+
+    if (navRef.current) {
+      resizeObserver.observe(navRef.current);
+    }
+
+    // Also observe subtabs if they exist
+    const subTabsElement = document.querySelector('.subViewTabs');
+    if (subTabsElement) {
+      resizeObserver.observe(subTabsElement);
+    }
+
+    // Fallback timeouts
+    const timeouts = [
+      setTimeout(calculateHeightAndWidth, 100),
+      setTimeout(calculateHeightAndWidth, 500)
+    ];
+
+    // Resize listener
+    const handleResize = () => {
+      calculateHeightAndWidth();
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      timeouts.forEach(timeout => clearTimeout(timeout));
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [calculateHeightAndWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateHeightAndWidth, 100);
+  }, dependencies);
+
+  return { 
+    navRef, 
+    navHeight, 
+    navWidth, 
+    subTabsHeight, 
+    contentMarginTop 
+  };
+};
 
 const Student = ({
   selectedBatch = null,
@@ -21,7 +121,6 @@ const Student = ({
   selectedCenter = null,
   onBackToCenters = null,
 }) => {
-
   useEffect(() => {
     const handleClick = (event) => {
       const className = event.target?.__reactProps$qsrhagrkar?.className || event.target?.className || "";
@@ -86,6 +185,13 @@ const Student = ({
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+  const { 
+    navRef, 
+    navHeight, 
+    navWidth, 
+    subTabsHeight, 
+    contentMarginTop 
+  } = useNavHeight([activeTab, activeSubTab]);    
 
   // ===== ENHANCED ATTENDANCE STATE =====
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -4011,7 +4117,7 @@ const Student = ({
         <div className="col-12">
           {/* Enhanced Header */}
           <div className="position-relative">
-            <div className="site-header--sticky--register">
+            <div className="" ref={navRef} style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${navWidth}` , boxShadow: '0 4px 25px 0 #0000001a' , paddingBottom: '15px'}}>
               <div className="container-fluid">
                 <div className="row align-items-center">
                   <div className="col-md-5 d-md-block d-sm-none">
@@ -4398,7 +4504,7 @@ const Student = ({
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            marginTop: '70px',
+            marginTop: `${navHeight}px`,
             background: 'white',
             padding: '15px',
             borderRadius: '8px',
@@ -4408,7 +4514,6 @@ const Student = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                marginTop: '70px',
                 background: 'white',
                 padding: '15px',
                 borderRadius: '8px',
@@ -4442,14 +4547,6 @@ const Student = ({
           {/* Main Content - Enhanced Students Cards */}
           <div
             className="content-body"
-            style={{
-              marginTop:
-                showBulkControls && showAttendanceMode
-                  ? "320px"
-                  : showAttendanceMode
-                    ? "150px"
-                    : activeSubTab === "classroommedia" ? "0px" : "40px",
-            }}
           >
             {activeSubTab === "classroommedia" ? (
               <section className="MediaGallery">

@@ -97,6 +97,8 @@ import ResumeTest from './Pages/Front/Resume/Resume';
 import AttendanceManagement from './Component/Layouts/App/College/ProjectManagement/AttendanceManagement';
 import Whatapp from './Pages/App/College/Whatapp/Whatapp';
 import WhatappTemplate from './Pages/App/College/Whatapp/WhatappTemplate';
+import B2BSales from './Pages/App/College/Course/B2BSales';
+import StatusB2C from './Pages/App/College/Status/statusB2C';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -216,6 +218,8 @@ const Layout = () => {
           <Route path='attendance' element={<AttendanceManagement/>}/>
           <Route path='whatapp' element={<Whatapp/>}/>
           <Route path='whatappTemplate' element={<WhatappTemplate/>}/>
+          <Route path='sales' element={<B2BSales/>}/>
+          <Route path='statusdesignb2c' element={<StatusB2C/>}/>
         </Route>
 
         {/* company  */}

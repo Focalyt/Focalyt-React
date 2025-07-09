@@ -2011,7 +2011,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
   return (
     <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      <div  className="d-flex justify-content-between align-items-center mb-3">
         <div>
           <div className="d-flex align-items-center gap-3">
 
@@ -4992,18 +4992,7 @@ background: #fd2b5a;
 
 /* Additional mobile optimizations */
 @media (max-width: 576px) {
-    .container-fluid.py-2 {
-        padding: 0.5rem !important;
-    }
 
-    .card-body.px-1.py-0.my-2 {
-        padding: 0.5rem !important;
-    }
-
-    .d-flex.align-items-center {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
 
     .btn-group {
         flex-wrap: wrap;
@@ -6448,9 +6437,7 @@ width:100%;
 }
 
 /* Header Content Styling */
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-}
+
 
 /* Secondary Sticky Elements (Side Panels) */
 .stickyBreakpoints {
@@ -6661,15 +6648,7 @@ width:100%;
         position: relative !important;
     }
     
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
-}
 
-@media (max-width: 576px) {
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
 }
 
     /* Final Complete CSS - Replace entire <style> section with this */
@@ -6691,9 +6670,6 @@ html body .content .content-wrapper {
     margin-bottom: 1rem !important;
 }
 
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-}
 .site-header--sticky--register:not(.mobile-sticky-enable) {
     /* position: absolute !important; */
     top: 97px;
@@ -6956,16 +6932,10 @@ html body .content .content-wrapper {
         position: relative !important;
     }
     
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
+
 }
 
-@media (max-width: 576px) {
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
-}
+
     
     `
         }

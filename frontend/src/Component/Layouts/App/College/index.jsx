@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNavigate } from "react-router-dom";
 
 import {
-  faChartLine, faUser, faSearch, faClipboardList, faChevronRight, faPlusCircle, faForward, faCoins, faGraduationCap, faBuilding, faBookOpen, faTasks
+  faChartLine, faUser, faSearch, faClipboardList, faChevronRight, faPlusCircle, faForward, faCoins, faGraduationCap, faBuilding, faBookOpen, faTasks ,faCogs, faWhatsapp, faFileAlt
 } from "@fortawesome/free-solid-svg-icons";
 
 import {
@@ -278,7 +278,7 @@ function CollegeLayout({ children }) {
                 <a href="#" onClick={() => toggleSubmenu('sales')}>
                   <FontAwesomeIcon icon={faBookOpen} />
                   {/* <i class="fas fa-list"></i> */}
-                  <span className="menu-title">Sales</span>
+                  <span className="menu-title">Sales (B2B)</span>
                   <span className="dropdown-arrow">
                     <FontAwesomeIcon
                       icon={faChevronRight}
@@ -316,6 +316,12 @@ function CollegeLayout({ children }) {
 
                 </ul>
               </li>  
+              <li className={`nav-item ${location.pathname === '/institute/sales' ? 'active' : ''}`}>
+                <a href="/institute/sales" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faTasks} />
+                  <span className="menu-title">Sales (B2C)</span>
+                </a>
+              </li>
               <li className={`nav-item ${location.pathname === '/institute/candidatemanagment' ? 'active' : ''}`}>
                 <a href="/institute/candidatemanagment" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faTasks} />
@@ -423,18 +429,24 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesign" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={farBookmark} />
-                      <span className="menu-title">Status Design</span>
+                      <span className="menu-title">Status Design (B2B)</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/statusdesignb2c' ? 'active' : ''}`}>
+                    <Link to="/institute/statusdesignb2c" onClick={() => handleSidebarClose()}>
+                    <FontAwesomeIcon icon={faCogs} />
+                      <span className="menu-title">Status Design (B2C)</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/whatapp' ? 'active' : ''}`}>
                     <Link to="/institute/whatapp" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={farBookmark} />
+                    <FontAwesomeIcon icon={faWhatsapp} />
                       <span className="menu-title">Whatapp</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/whatappTemplate' ? 'active' : ''}`}>
                     <Link to="/institute/whatappTemplate" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={farBookmark} />
+                    <FontAwesomeIcon icon={faFileAlt} />
                       <span className="menu-title">Create Template</span>
                     </Link>
                   </li>

@@ -179,7 +179,42 @@ const useNavHeight = (dependencies = []) => {
 
   return { navRef, navHeight, navWidth };
 };
+const useScrollBlur = (navbarHeight = 140) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const contentRef = useRef(null);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.pageYOffset;
+      const shouldBlur = currentScrollY > navbarHeight / 3;
+      
+      setIsScrolled(shouldBlur);
+      setScrollY(currentScrollY);
+    };
+
+    // Throttle scroll event for better performance
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', throttledScroll, { passive: true });
+    handleScroll(); // Initial check
+
+    return () => {
+      window.removeEventListener('scroll', throttledScroll);
+    };
+  }, [navbarHeight]);
+
+  return { isScrolled, scrollY, contentRef };
+};
 const KYCManagement = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -267,7 +302,9 @@ const KYCManagement = () => {
 
   ]);
   const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters]);
-
+  const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
+  const blurIntensity = Math.min(scrollY / 10, 15);
+  const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
 
   // ========================================
   // 🎯 All Admission Filters Configuration
@@ -2604,8 +2641,36 @@ const KYCManagement = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
+          <div 
+            className="content-blur-overlay"
+            style={{
+              position: 'fixed',
+              top:180,
+              left: 0,
+              right: 0,
+              height: `${navHeight + 50}px`,
+              background: `linear-gradient(
+                180deg,
+                rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
+                rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
+                rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
+                transparent 100%
+              )`,
+              backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+              WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+              pointerEvents: 'none',
+              zIndex: 9,
+              transition: 'all 0.3s ease',
+              opacity: isScrolled ? 1 : 0
+            }}
+          />
           <div className="position-relative" >
-          <div  className="" ref={navRef} style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${navWidth}`}}>
+          <div  className="" ref={navRef} style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
+        WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+        boxShadow: isScrolled 
+          ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)' 
+          : '0 4px 25px 0 #0000001a',paddingBlock: '10px',
+          transition: 'all 0.3s ease'}}>
             <div className="container-fluid py-2">
               <div className="row align-items-center justify-content-between">
                 <div className="col-md-6 d-md-block d-sm-none">

@@ -647,42 +647,42 @@ const useMainWidth = (dependencies = []) => {// Default fallback
   return { widthRef, width };
 };
 const useScrollBlur = (navbarHeight = 140) => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
-  const contentRef = useRef(null);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.pageYOffset;
-      const shouldBlur = currentScrollY > navbarHeight / 3;
-      
-      setIsScrolled(shouldBlur);
-      setScrollY(currentScrollY);
-    };
-
-    // Throttle scroll event for better performance
-    let ticking = false;
-    const throttledScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          handleScroll();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener('scroll', throttledScroll, { passive: true });
-    handleScroll(); // Initial check
-
-    return () => {
-      window.removeEventListener('scroll', throttledScroll);
-    };
-  }, [navbarHeight]);
-
-  return { isScrolled, scrollY, contentRef };
-};
-const CRMDashboard = () => {
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [scrollY, setScrollY] = useState(0);
+    const contentRef = useRef(null);
+  
+    useEffect(() => {
+      const handleScroll = () => {
+        const currentScrollY = window.pageYOffset;
+        const shouldBlur = currentScrollY > navbarHeight / 3;
+        
+        setIsScrolled(shouldBlur);
+        setScrollY(currentScrollY);
+      };
+  
+      // Throttle scroll event for better performance
+      let ticking = false;
+      const throttledScroll = () => {
+        if (!ticking) {
+          requestAnimationFrame(() => {
+            handleScroll();
+            ticking = false;
+          });
+          ticking = true;
+        }
+      };
+  
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+      handleScroll(); // Initial check
+  
+      return () => {
+        window.removeEventListener('scroll', throttledScroll);
+      };
+    }, [navbarHeight]);
+  
+    return { isScrolled, scrollY, contentRef };
+  };
+const B2BSales = () => {
 
   const candidateRef = useRef();
 
@@ -1219,6 +1219,507 @@ const CRMDashboard = () => {
 
   // Document Modal Component
 
+  // const DocumentModal = () => {
+  //   const [showRejectionForm, setShowRejectionForm] = useState(false);
+  //   const [rejectionReason, setRejectionReason] = useState('');
+  //   const [documentZoom, setDocumentZoom] = useState(1);
+  //   const [documentRotation, setDocumentRotation] = useState(0);
+
+  //   const latestUpload = useMemo(() => {
+  //     if (!selectedDocument) return null;
+  //     return selectedDocument.uploads && selectedDocument.uploads.length > 0
+  //       ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+  //       : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
+  //   }, [selectedDocument]);
+
+  //   const handleZoomIn = useCallback(() => {
+  //     setDocumentZoom(prev => Math.min(prev + 0.1, 2));
+  //   }, []);
+
+  //   const handleZoomOut = useCallback(() => {
+  //     setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
+  //   }, []);
+
+  //   const handleRotate = useCallback(() => {
+  //     setDocumentRotation(prev => (prev + 90) % 360);
+  //   }, []);
+
+  //   const handleReset = useCallback(() => {
+  //     setDocumentZoom(1);
+  //     setDocumentRotation(0);
+  //   }, []);
+
+  //   const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  //   const fileType = fileUrl ? getFileType(fileUrl) : null;
+
+  //   const handleRejectClick = useCallback(() => {
+  //     setShowRejectionForm(true);
+  //   }, []);
+
+  //   const handleCancelRejection = useCallback(() => {
+  //     setShowRejectionForm(false);
+  //     setRejectionReason('');
+  //   }, []);
+
+  //   const handleConfirmRejection = useCallback(() => {
+  //     if (rejectionReason.trim()) {
+  //       updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
+  //       handleCancelRejection();
+  //     }
+  //   }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
+
+  //   if (!showDocumentModal || !selectedDocument) return null;
+
+  //   // Helper function to render document preview thumbnail using iframe/img
+  //   // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
+  //   const renderDocumentThumbnail = (upload, isSmall = true) => {
+  //     const fileUrl = upload?.fileUrl;
+  //     if (!fileUrl) {
+  //       return (
+  //         <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
+  //           display: 'flex',
+  //           alignItems: 'center',
+  //           justifyContent: 'center',
+  //           backgroundColor: '#f8f9fa',
+  //           border: '1px solid #dee2e6',
+  //           borderRadius: '4px',
+  //           width: isSmall ? '100%' : '150px',
+  //           height: isSmall ? 'auto' : '100px',
+  //           minHeight: '50px',
+  //           fontSize: isSmall ? '16px' : '24px',
+  //           color: '#6c757d'
+  //         }}>
+  //           📄
+  //         </div>
+  //       );
+  //     }
+
+  //     const fileType = getFileType(fileUrl);
+
+  //     if (fileType === 'image') {
+  //       return (
+  //         <img
+  //           src={fileUrl}
+  //           alt="Document Preview"
+  //           className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+  //           style={{
+  //             width: isSmall ? '100%' : '150px',
+  //             height: 'auto', // Completely auto height
+  //             maxWidth: '100%',
+  //             objectFit: 'contain',
+  //             borderRadius: '4px',
+  //             border: '1px solid #dee2e6',
+  //             cursor: 'pointer',
+  //             backgroundColor: '#f8f9fa',
+  //             display: 'block'
+  //           }}
+  //           onClick={() => {
+  //             if (isSmall) {
+  //               setCurrentPreviewUpload(upload);
+  //             }
+  //           }}
+  //         />
+  //       );
+  //     } else if (fileType === 'pdf') {
+  //       return (
+  //         <div style={{
+  //           position: 'relative',
+  //           overflow: 'visible', // Allow content to expand
+  //           width: isSmall ? '100%' : '150px',
+  //           height: 'auto' // Auto height for container
+  //         }}>
+  //           <iframe
+  //             src={fileUrl + '#navpanes=0&toolbar=0'} // Add FitH parameter for better PDF display
+  //             className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
+  //             style={{
+  //               width: '100%',
+  //               height: isSmall ? 'auto' : '100px', // Use viewport height for history
+  //               maxHeight: isSmall ? '600px' : '100px',
+  //               border: '1px solid #dee2e6',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer',
+  //               pointerEvents: isSmall ? 'auto' : 'none',
+  //               transform: isSmall ? 'scale(1)' : 'scale(0.3)',
+  //               transformOrigin: 'top left',
+  //               backgroundColor: '#fff'
+  //             }}
+  //             title="PDF Document"
+  //             onClick={() => {
+  //               if (isSmall) {
+  //                 setCurrentPreviewUpload(upload);
+  //               }
+  //             }}
+  //             scrolling={isSmall ? 'auto' : 'no'}
+  //           />
+  //           {!isSmall && (
+  //             <div style={{
+  //               position: 'absolute',
+  //               top: 0,
+  //               left: 0,
+  //               right: 0,
+  //               bottom: 0,
+  //               backgroundColor: 'rgba(220, 53, 69, 0.1)',
+  //               display: 'flex',
+  //               alignItems: 'center',
+  //               justifyContent: 'center',
+  //               color: '#dc3545',
+  //               fontSize: '12px',
+  //               fontWeight: 'bold',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer'
+  //             }}
+  //               onClick={() => {
+  //                 setCurrentPreviewUpload(upload);
+  //               }}>
+  //               PDF
+  //             </div>
+  //           )}
+  //         </div>
+  //       );
+  //     } else {
+  //       return (
+  //         <div style={{
+  //           position: 'relative',
+  //           width: isSmall ? '100%' : '150px',
+  //           height: 'auto' // Auto height
+  //         }}>
+  //           <iframe
+  //             src={fileUrl}
+  //             className={`document-thumbnail ${isSmall ? 'small' : ''}`}
+  //             style={{
+  //               width: '100%',
+  //               height: isSmall ? 'auto' : '100px',
+  //               minHeight: isSmall ? '300px' : '100px',
+  //               border: '1px solid #dee2e6',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer',
+  //               pointerEvents: isSmall ? 'auto' : 'none',
+  //               backgroundColor: '#f8f9fa'
+  //             }}
+  //             title="Document"
+  //             onClick={() => {
+  //               if (isSmall) {
+  //                 setCurrentPreviewUpload(upload);
+  //               }
+  //             }}
+  //             scrolling={isSmall ? 'auto' : 'no'}
+  //           />
+  //           {!isSmall && (
+  //             <div style={{
+  //               position: 'absolute',
+  //               top: 0,
+  //               left: 0,
+  //               right: 0,
+  //               bottom: 0,
+  //               backgroundColor: 'rgba(0, 123, 255, 0.1)',
+  //               display: 'flex',
+  //               alignItems: 'center',
+  //               justifyContent: 'center',
+  //               color: '#007bff',
+  //               fontSize: '24px',
+  //               borderRadius: '4px',
+  //               cursor: 'pointer'
+  //             }}
+  //               onClick={() => {
+  //                 setCurrentPreviewUpload(upload);
+  //               }}>
+  //               {fileType === 'document' ? '📄' :
+  //                 fileType === 'spreadsheet' ? '📊' : '📁'}
+  //             </div>
+  //           )}
+  //         </div>
+  //       );
+  //     }
+  //   };
+
+
+
+  //   return (
+  //     <div className="document-modal-overlay" onClick={closeDocumentModal}>
+  //       <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
+  //         <div className="modal-header">
+  //           <h3>{selectedDocument.Name} Verification</h3>
+  //           <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
+  //         </div>
+
+  //         <div className="modal-body">
+  //           <div className="document-preview-section">
+  //             <div className="document-preview-container" style={{ height: 'auto' }}>
+  //               {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
+  //                 (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
+  //                 <>
+  //                   {(() => {
+  //                     console.log('selectedDocument:', selectedDocument);
+  //                     console.log('latestUpload:', latestUpload);
+
+  //                     const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  //                     const hasDocument = fileUrl ||
+  //                       (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
+
+  //                     console.log('fileUrl:', fileUrl);
+  //                     console.log('hasDocument:', hasDocument);
+
+  //                     if (hasDocument) {
+  //                       // If we have a file URL, show the appropriate viewer
+  //                       if (fileUrl) {
+  //                         const fileType = getFileType(fileUrl);
+
+  //                         if (fileType === 'image') {
+  //                           return (
+  //                             <img
+  //                               src={fileUrl}
+  //                               alt="Document Preview"
+  //                               style={{
+  //                                 transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+  //                                 transition: 'transform 0.3s ease',
+  //                                 maxWidth: '100%',
+  //                                 objectFit: 'contain'
+  //                               }}
+  //                             />
+  //                           );
+  //                         } else if (fileType === 'pdf') {
+  //                           return (
+  //                             <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
+  //                               <iframe
+  //                                 src={fileUrl + '#navpanes=0&toolbar=0'}
+  //                                 width="100%"
+  //                                 height="100%"
+  //                                 style={{
+  //                                   border: 'none',
+  //                                   transform: `scale(${documentZoom})`,
+  //                                   transformOrigin: 'top left',
+  //                                   transition: 'transform 0.3s ease'
+  //                                 }}
+  //                                 title="PDF Document"
+  //                               />
+  //                             </div>
+  //                           );
+  //                         } else {
+  //                           return (
+  //                             <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+  //                               <div style={{ fontSize: '60px', marginBottom: '20px' }}>
+  //                                 {fileType === 'document' ? '📄' :
+  //                                   fileType === 'spreadsheet' ? '📊' : '📁'}
+  //                               </div>
+  //                               <h4>Document Preview</h4>
+  //                               <p>Click download to view this file</p>
+  //                               {fileUrl ? (
+  //                                 <a
+  //                                   href={fileUrl}
+  //                                   download
+  //                                   className="btn btn-primary"
+  //                                   target="_blank"
+  //                                   rel="noopener noreferrer"
+  //                                 >
+  //                                   <i className="fas fa-download me-2"></i>
+  //                                   Download & View
+  //                                 </a>
+  //                               ) : (
+  //                                 <button
+  //                                   className="btn btn-secondary"
+  //                                   disabled
+  //                                   title="File URL not available"
+  //                                 >
+  //                                   <i className="fas fa-download me-2"></i>
+  //                                   File Not Available
+  //                                 </button>
+  //                               )}
+  //                             </div>
+  //                           );
+  //                         }
+  //                       } else {
+  //                         // Document exists but no file URL - show document uploaded message
+  //                         return (
+  //                           <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+  //                             <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+  //                             <h4>Document Uploaded</h4>
+  //                             <p>Document is available for verification</p>
+  //                             <p><strong>Status:</strong> {selectedDocument?.status}</p>
+  //                           </div>
+  //                         );
+  //                       }
+  //                     } else {
+  //                       return (
+  //                         <div className="no-document">
+  //                           <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+  //                           <p>No document uploaded</p>
+  //                         </div>
+  //                       );
+  //                     }
+  //                   })()}
+  //                   <DocumentControls
+  //                     onZoomIn={handleZoomIn}
+  //                     onZoomOut={handleZoomOut}
+  //                     onRotate={handleRotate}
+  //                     onReset={handleReset}
+  //                     onDownload={fileUrl}
+  //                     zoomLevel={documentZoom}
+  //                     fileType={fileType}
+  //                   />
+  //                 </>
+  //               ) : (
+  //                 <div className="no-document">
+  //                   <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+  //                   <p>No document uploaded</p>
+  //                 </div>
+  //               )}
+  //             </div>
+
+  //             {/* document preview container  */}
+
+  //             {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+  //               <div className="info-card mt-4">
+  //                 <h4>Document History</h4>
+  //                 <div className="document-history">
+  //                   {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
+  //                     <div key={index} className="history-item" style={{
+  //                       display: 'block',
+  //                       padding: '12px',
+  //                       marginBottom: '8px',
+  //                       backgroundColor: '#f8f9fa',
+  //                       borderRadius: '8px',
+  //                       border: '1px solid #e9ecef'
+  //                     }}>
+  //                       {/* Document Preview Thumbnail using iframe/img */}
+  //                       <div className="history-preview" style={{ marginRight: '0px' }}>
+  //                         {renderDocumentThumbnail(upload, true)}
+  //                       </div>
+
+  //                       {/* Document Info */}
+  //                       <div className="history-info" style={{ flex: 1 }}>
+  //                         <div className="history-date" style={{
+  //                           fontSize: '14px',
+  //                           fontWeight: '500',
+  //                           color: '#495057',
+  //                           marginBottom: '4px'
+  //                         }}>
+  //                           {formatDate(upload.uploadedAt)}
+  //                         </div>
+  //                         <div className="history-status">
+  //                           <span className={`${getStatusBadgeClass(upload.status)}`} style={{
+  //                             fontSize: '12px',
+  //                             padding: '4px 8px'
+  //                           }}>
+  //                             {upload.status}
+  //                           </span>
+  //                         </div>
+  //                         {upload.fileUrl && (
+  //                           <div className="history-actions" style={{ marginTop: '8px' }}>
+  //                             <a
+  //                               href={upload.fileUrl}
+  //                               download
+  //                               className="btn btn-sm btn-outline-primary"
+  //                               target="_blank"
+  //                               rel="noopener noreferrer"
+  //                               style={{
+  //                                 fontSize: '11px',
+  //                                 padding: '2px 8px',
+  //                                 textDecoration: 'none'
+  //                               }}
+  //                             >
+  //                               <i className="fas fa-download me-1"></i>
+  //                               Download
+  //                             </a>
+  //                             <button
+  //                               className="btn btn-sm btn-outline-secondary ms-2"
+  //                               style={{
+  //                                 fontSize: '11px',
+  //                                 padding: '2px 8px'
+  //                               }}
+  //                               onClick={() => {
+  //                                 // Switch main preview to this upload
+  //                                 setCurrentPreviewUpload(upload);
+  //                               }}
+  //                             >
+  //                               <i className="fas fa-eye me-1"></i>
+  //                               Preview
+  //                             </button>
+  //                           </div>
+  //                         )}
+  //                       </div>
+  //                     </div>
+  //                   ))}
+  //                 </div>
+  //               </div>
+  //             )}
+  //           </div>
+
+  //           <div className="document-info-section">
+  //             <div className="info-card">
+  //               <h4>Document Information</h4>
+  //               <div className="info-row">
+  //                 <strong>Document Name:</strong> {selectedDocument.Name}
+  //               </div>
+  //               <div className="info-row">
+  //                 <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
+  //                   new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
+  //                     day: '2-digit',
+  //                     month: 'short',
+  //                     year: 'numeric'
+  //                   }) : 'N/A'}
+  //               </div>
+  //               <div className="info-row">
+  //                 <strong>Status:</strong>
+  //                 <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
+  //                   {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+  //                 </span>
+  //               </div>
+  //             </div>
+
+  //             {/* Document Actions */}
+  //             {(latestUpload?.status || selectedDocument?.status) === 'Pending' && (
+  //               <div className="document-actions mt-4">
+  //                 {!showRejectionForm ? (
+  //                   <div className="action-buttons">
+  //                     <button
+  //                       className="btn btn-success me-2"
+  //                       onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
+  //                     >
+  //                       <i className="fas fa-check"></i> Approve Document
+  //                     </button>
+  //                     <button
+  //                       className="btn btn-danger"
+  //                       onClick={handleRejectClick}
+  //                     >
+  //                       <i className="fas fa-times"></i> Reject Document
+  //                     </button>
+  //                   </div>
+  //                 ) : (
+  //                   <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+  //                     <textarea
+  //                       value={rejectionReason}
+  //                       onChange={(e) => setRejectionReason(e.target.value)}
+  //                       placeholder="Please provide a detailed reason for rejection..."
+  //                       rows="8"
+  //                       className="form-control mb-3"
+  //                     />
+  //                     <div className="d-flex gap-2">
+  //                       <button
+  //                         className="btn btn-danger"
+  //                         onClick={handleConfirmRejection}
+  //                       >
+  //                         Confirm Rejection
+  //                       </button>
+  //                       <button
+  //                         className="btn btn-secondary"
+  //                         onClick={handleCancelRejection}
+  //                       >
+  //                         Cancel
+  //                       </button>
+  //                     </div>
+  //                   </div>
+  //                 )}
+  //               </div>)}
+
+
+  //           </div>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // };
+
+
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
 
@@ -1429,10 +1930,10 @@ const CRMDashboard = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
+  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
-  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters]);
   const tabs = [
     'Lead Details',
     'Profile',
@@ -3000,12 +3501,7 @@ const CRMDashboard = () => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef}  className="" style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${width}px` , backdropFilter: `blur(${blurIntensity}px)`,
-        WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-        boxShadow: isScrolled 
-          ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)' 
-          : '0 4px 25px 0 #0000001a',paddingBlock: '10px',
-          transition: 'all 0.3s ease',}}
+            <nav ref={navRef}  className="" style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${width}px` , boxShadow: '0 4px 25px 0 #0000001a' ,paddingBlock: '10px'}}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
@@ -11276,9 +11772,7 @@ height:min-content !important;
               .mobileResponsive{
               padding: 0;
               }
-              .content-body{
-               margin-top: 30px!important;
-              }
+
               .nav-tabs-main{
                   white-space: nowrap;
                   flex-wrap: nowrap;
@@ -12845,5 +13339,5 @@ max-width: 600px;
   );
 };
 
-export default CRMDashboard;
+export default B2BSales;
 
