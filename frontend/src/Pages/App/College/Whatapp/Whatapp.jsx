@@ -4,6 +4,8 @@ import axios from "axios"
 import { toast } from "react-toastify"
 
 export default function FacebookWhatsAppConnector() {
+  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const token = userData.token;
   const [connectionStep, setConnectionStep] = useState(1)
   const [isConnected, setIsConnected] = useState(false)
   const [accessToken, setAccessToken] = useState("")
@@ -19,7 +21,7 @@ export default function FacebookWhatsAppConnector() {
   // Facebook App ID - Replace with your actual App ID
   const FACEBOOK_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || "YOUR_FACEBOOK_APP_ID"
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:3000'
-  const token = localStorage.getItem('token')
+
 
   // Load Bootstrap CSS and JS
   useEffect(() => {
@@ -125,9 +127,10 @@ export default function FacebookWhatsAppConnector() {
       setLoading(true)
 
       // Get user's businesses
-      window.FB.api("/me/businesses", { access_token: token }, (response) => {
-        if (response && response.data) {
-          const businesses = response.data.map((business) => ({
+      window.FB.api("/me/businesses", { access_token: token }, (businessResponse) => {
+        console.log("Business Response:", businessResponse);
+        if (businessResponse && businessResponse.data) {
+          const businesses = businessResponse.data.map((business) => ({
             id: business.id,
             name: business.name,
             verification_status: business.verification_status,
@@ -139,6 +142,7 @@ export default function FacebookWhatsAppConnector() {
               `/${business.id}/client_whatsapp_business_accounts`,
               { access_token: token },
               (wabaResponse) => {
+                console.log("WABA Response for business", business.id, ":", wabaResponse);
                 if (wabaResponse && wabaResponse.data) {
                   const accounts = wabaResponse.data.map((account) => ({
                     id: account.id,
@@ -176,115 +180,122 @@ export default function FacebookWhatsAppConnector() {
     try {
       // Facebook login with required permissions
       window.FB.login(
-        async (response) => {
-          if (response.authResponse) {
-            const { accessToken: fbToken } = response.authResponse
+        function(response) {
+          (async () => {
+            if (response.authResponse) {
+              const { accessToken: fbToken } = response.authResponse
 
-            try {
-              // Get user info first
-              const userInfoPromise = new Promise((resolve, reject) => {
-                window.FB.api("/me", { 
-                  fields: "name,email,picture,id",
-                  access_token: fbToken 
-                }, (userResponse) => {
-                  if (userResponse && !userResponse.error) {
-                    resolve(userResponse)
-                  } else {
-                    reject(new Error(userResponse?.error?.message || "Failed to get user info"))
-                  }
-                })
-              })
-
-              const userInfo = await userInfoPromise
-              setUserInfo(userInfo)
-
-              // Get business accounts
-              const businessAccountsPromise = new Promise((resolve, reject) => {
-                window.FB.api("/me/businesses", { 
-                  access_token: fbToken 
-                }, (businessResponse) => {
-                  if (businessResponse && businessResponse.data) {
-                    const businesses = businessResponse.data.map((business) => ({
-                      id: business.id,
-                      name: business.name,
-                      verification_status: business.verification_status,
-                    }))
-
-                    // Get WhatsApp Business Accounts for each business
-                    const wabaPromises = businesses.map(business => 
-                      new Promise((resolveWaba) => {
-                        window.FB.api(
-                          `/${business.id}/client_whatsapp_business_accounts`,
-                          { access_token: fbToken },
-                          (wabaResponse) => {
-                            if (wabaResponse && wabaResponse.data) {
-                              const accounts = wabaResponse.data.map((account) => ({
-                                id: account.id,
-                                name: account.name,
-                                business_id: business.id,
-                                business_name: business.name,
-                                phone: account.phone_number || "Not configured",
-                              }))
-                              resolveWaba(accounts)
-                            } else {
-                              resolveWaba([])
-                            }
-                          }
-                        )
-                      })
-                    )
-
-                    Promise.all(wabaPromises).then(results => {
-                      const allAccounts = results.flat()
-                      resolve(allAccounts)
-                    })
-                  } else {
-                    reject(new Error(businessResponse?.error?.message || "Failed to get business accounts"))
-                  }
-                })
-              })
-
-              const businessAccounts = await businessAccountsPromise
-              setBusinessAccounts(businessAccounts)
-
-              // Store token and user info in backend
-              const token = localStorage.getItem('token')
-              const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:3000'
-              
               try {
-                const saveResponse = await axios.post(`${backendUrl}/college/whatsapp/save-facebook-token`, {
-                  accessToken: fbToken,
-                  userInfo: userInfo,
-                  businessAccounts: businessAccounts
-                }, {
-                  headers: { 'x-auth': token }
+                // Get user info first
+                const userInfoPromise = new Promise((resolve, reject) => {
+                  window.FB.api("/me", { 
+                    fields: "name,email,picture,id",
+                    access_token: fbToken 
+                  }, (userResponse) => {
+                    if (userResponse && !userResponse.error) {
+                      resolve(userResponse)
+                    } else {
+                      reject(new Error(userResponse?.error?.message || "Failed to get user info"))
+                    }
+                  })
                 })
 
-                if (saveResponse.data.status) {
-                  setFacebookConnected(true)
-                  setAccessToken(fbToken)
-                  setConnectionStep(2)
+                const userInfo = await userInfoPromise
+                setUserInfo(userInfo)
+
+                // Get business accounts
+                const businessAccountsPromise = new Promise((resolve, reject) => {
+                  window.FB.api("/me/businesses", { 
+                    access_token: fbToken 
+                  }, (businessResponse) => {
+                    console.log("Business Response:", businessResponse);
+                    if (businessResponse && businessResponse.data) {
+                      const businesses = businessResponse.data.map((business) => ({
+                        id: business.id,
+                        name: business.name,
+                        verification_status: business.verification_status,
+                      }))
+
+                      // Get WhatsApp Business Accounts for each business
+                      const wabaPromises = businesses.map(business => 
+                        new Promise((resolveWaba) => {
+                          window.FB.api(
+                            `/${business.id}/client_whatsapp_business_accounts`,
+                            { access_token: fbToken },
+                            (wabaResponse) => {
+                              console.log("WABA Response for business", business.id, ":", wabaResponse);
+                              if (wabaResponse && wabaResponse.data) {
+                                const accounts = wabaResponse.data.map((account) => ({
+                                  id: account.id,
+                                  name: account.name,
+                                  business_id: business.id,
+                                  business_name: business.name,
+                                  phone: account.phone_number || "Not configured",
+                                }))
+                                resolveWaba(accounts)
+                              } else {
+                                resolveWaba([])
+                              }
+                            }
+                          )
+                        })
+                      )
+
+                      Promise.all(wabaPromises).then(results => {
+                        const allAccounts = results.flat()
+                        resolve(allAccounts)
+                      })
+                    } else {
+                      reject(new Error(businessResponse?.error?.message || "Failed to get business accounts"))
+                    }
+                  })
+                })
+
+                const businessAccounts = await businessAccountsPromise
+                console.log(businessAccounts,'businessAccounts');
+                setBusinessAccounts(businessAccounts)
+
+                // Store token and user info in backend
+                
+                const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL 
+                
+                try {
+                  console.log(fbToken,'fbToken',userInfo,'userInfo',businessAccounts,'businessAccounts');
+                  const saveResponse = await axios.post(`${backendUrl}/college/whatsapp/save-facebook-token`, {
+                    accessToken: fbToken,
+                    userInfo: userInfo,
+                    businessAccounts: businessAccounts
+                  }, {
+                    headers: { 'x-auth': token }
                   
-                  // Show success message
-                  toast.success("Facebook connected successfully! ✅")
-                } else {
-                  throw new Error(saveResponse.data.message || "Failed to save token")
+                  })
+
+                  if (saveResponse.data.status) {
+                    setFacebookConnected(true)
+                    setAccessToken(fbToken)
+                    setConnectionStep(2)
+                    
+                    // Show success message
+                    toast.success("Facebook connected successfully! ✅")
+                  } else {
+                    throw new Error(saveResponse.data.message || "Failed to save token")
+                  }
+                } catch (saveError) {
+                  console.error("Error saving token:", saveError)
+                  setError("Connected to Facebook but failed to save token. Please try again.")
                 }
-              } catch (saveError) {
-                console.error("Error saving token:", saveError)
-                setError("Connected to Facebook but failed to save token. Please try again.")
+
+              } catch (apiError) {
+                console.error("API error:", apiError)
+                setError(apiError.message || "Failed to get user information")
               }
 
-            } catch (apiError) {
-              console.error("API error:", apiError)
-              setError(apiError.message || "Failed to get user information")
+              setLoading(false)
+            } else {
+              setError("Facebook login was cancelled or failed")
+              setLoading(false)
             }
-
-            setLoading(false)
-          } else {
-            setError("Facebook login was cancelled or failed")
-            setLoading(false)
-          }
+          })();
         },
         {
           scope: "whatsapp_business_management,business_management,pages_read_engagement",
@@ -304,16 +315,17 @@ export default function FacebookWhatsAppConnector() {
 
     setLoading(true)
     try {
-      // Exchange short-lived token for long-lived token
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${FACEBOOK_APP_ID}&client_secret=YOUR_APP_SECRET&fb_exchange_token=${accessToken}`,
+      // Call backend to exchange short-lived token for long-lived token
+      const response = await axios.post(
+        `${backendUrl}/college/whatsapp/exchange-token`,
+        { shortLivedToken: accessToken },
+        { headers: { 'x-auth': token } }
       )
 
-      const data = await response.json()
-
-      if (data.access_token) {
-        setAccessToken(data.access_token)
+      if (response.data.status && response.data.access_token) {
+        setAccessToken(response.data.access_token)
         setConnectionStep(3)
+        toast.success("Long-lived token generated successfully!")
       } else {
         setError("Failed to generate long-lived token")
       }
