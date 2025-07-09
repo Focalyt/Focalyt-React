@@ -477,6 +477,32 @@ const LeadAnalyticsDashboard = () => {
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
 
+  // Fetch filter options from backend API on mount
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+        const token = userData.token;
+        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        const res = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { 'x-auth': token }
+        });
+        if (res.data.status) {
+          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
+          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
+          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch filter options:', err);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
+
+
+
   
   const handleCriteriaChange = (criteria, values) => {
     setFormData((prevState) => ({
@@ -2315,6 +2341,328 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
           )}
+
+<style> 
+          {
+            
+            `
+          
+    /* Enhanced Multi-Select Dropdown Styles */
+.multi-select-container-new {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-dropdown-new {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-trigger {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  background: white !important;
+  border: 1px solid #ced4da !important;
+  border-radius: 0.375rem !important;
+  padding: 0.375rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  min-height: 38px !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  width: 100% !important;
+}
+
+.multi-select-trigger:hover {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+}
+
+.multi-select-trigger.open {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+.select-display-text {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #495057;
+  font-weight: normal;
+}
+
+.dropdown-arrow {
+  color: #6c757d;
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+.multi-select-trigger.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.multi-select-options-new {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  background: white;
+  border: 1px solid #ced4da;
+  border-top: none;
+  border-radius: 0 0 0.375rem 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  max-height: 320px;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.options-header {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.select-all-btn,
+.clear-all-btn {
+  font-size: 0.75rem !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 0.25rem !important;
+  border: 1px solid !important;
+}
+
+.select-all-btn {
+  border-color: #0d6efd !important;
+  color: #0d6efd !important;
+}
+
+.clear-all-btn {
+  border-color: #6c757d !important;
+  color: #6c757d !important;
+}
+
+.select-all-btn:hover {
+  background-color: #0d6efd !important;
+  color: white !important;
+}
+
+.clear-all-btn:hover {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+.options-search {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.options-list-new {
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.options-list-new::-webkit-scrollbar {
+  width: 6px;
+}
+
+.options-list-new::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.options-list-new::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.options-list-new::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.option-item-new {
+  display: flex !important;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.option-item-new:last-child {
+  border-bottom: none;
+}
+
+.option-item-new:hover {
+  background-color: #f8f9fa;
+}
+
+.option-item-new input[type="checkbox"] {
+  margin: 0 0.5rem 0 0 !important;
+  cursor: pointer;
+  accent-color: #0d6efd;
+}
+
+.option-label-new {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #495057;
+  cursor: pointer;
+}
+
+.options-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.no-options {
+  padding: 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Close dropdown when clicking outside */
+.multi-select-container-new.dropdown-open::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+/* Focus states for accessibility */
+.multi-select-trigger:focus {
+  outline: none;
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.option-item-new input[type="checkbox"]:focus {
+  outline: 2px solid #86b7fe;
+  outline-offset: 2px;
+}
+
+/* Selected state styling */
+.option-item-new input[type="checkbox"]:checked + .option-label-new {
+  font-weight: 500;
+  color: #0d6efd;
+}
+
+/* Badge styling for multi-select */
+.badge.bg-primary {
+  background-color: #0d6efd !important;
+  font-size: 0.75rem;
+  padding: 0.25em 0.4em;
+}
+
+/* Animation for dropdown open/close */
+.multi-select-options-new {
+  transform-origin: top;
+  animation: dropdownOpen 0.15s ease-out;
+}
+
+@keyframes dropdownOpen {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* Prevent text selection on dropdown trigger */
+.multi-select-trigger {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Enhanced visual feedback */
+.multi-select-trigger:active {
+  transform: translateY(1px);
+}
+
+/* Loading state (if needed) */
+.multi-select-loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.multi-select-loading .dropdown-arrow {
+  animation: spin 1s linear infinite;
+}
+.react-calendar{
+width:min-content !important;
+height:min-content !important;
+}
+@media (max-width: 768px) {
+  .multi-select-options-new {
+    max-height: 250px;
+  }
+  
+  .options-header {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .select-all-btn,
+  .clear-all-btn {
+    width: 100%;
+  }
+  
+  .options-list-new {
+    max-height: 150px;
+  }
+  .marginTopMobile {
+    margin-top: 340px !important;
+  }
+   .nav-tabs-main{
+                  white-space: nowrap;
+                  flex-wrap: nowrap;
+                  overflow: scroll;
+                  scrollbar-width: none;
+                  -ms-overflow-style: none;
+                  &::-webkit-scrollbar {
+                    display: none;
+                  }
+              }
+              .nav-tabs-main > li > button{
+              padding: 15px 9px;
+              }
+}
+
+   
+            `
+          }
+
+      </style>
     </div>
 
     

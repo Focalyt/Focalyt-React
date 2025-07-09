@@ -12,6 +12,8 @@ const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
   const [reason, setReason] = useState('');
   const reasonRef = useRef('');
 
+  
+
   const handleReasonChange = (e) => {
     reasonRef.current = e.target.value;
     setReason(e.target.value);
@@ -106,6 +108,121 @@ const useNavHeight = (dependencies = []) => {
   return { navRef, navHeight, navWidth };
 };
 
+const MultiSelectCheckbox = ({
+  title,
+  options,
+  selectedValues,
+  onChange,
+  icon = "fas fa-list",
+  isOpen,
+  onToggle
+}) => {
+  const handleCheckboxChange = (value) => {
+    const newValues = selectedValues.includes(value)
+      ? selectedValues.filter(v => v !== value)
+      : [...selectedValues, value];
+    onChange(newValues);
+  };
+
+  // Get display text for selected items
+  const getDisplayText = () => {
+    if (selectedValues.length === 0) {
+      return `Select ${title}`;
+    } else if (selectedValues.length === 1) {
+      const selectedOption = options.find(opt => opt.value === selectedValues[0]);
+      return selectedOption ? selectedOption.label : selectedValues[0];
+    } else if (selectedValues.length <= 2) {
+      const selectedLabels = selectedValues.map(val => {
+        const option = options.find(opt => opt.value === val);
+        return option ? option.label : val;
+      });
+      return selectedLabels.join(', ');
+    } else {
+      return `${selectedValues.length} items selected`;
+    }
+  };
+
+  return (
+    <div className="multi-select-container-new">
+      <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
+        <i className={`${icon} me-1 text-primary`}></i>
+        {title}
+        {selectedValues.length > 0 && (
+          <span className="badge bg-primary ms-2">{selectedValues.length}</span>
+        )}
+      </label>
+
+      <div className="multi-select-dropdown-new">
+        <button
+          type="button"
+          className={`form-select multi-select-trigger ${isOpen ? 'open' : ''}`}
+          onClick={onToggle}
+          style={{ cursor: 'pointer', textAlign: 'left' }}
+        >
+          <span className="select-display-text">
+            {getDisplayText()}
+          </span>
+          <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`}></i>
+        </button>
+
+        {isOpen && (
+          <div className="multi-select-options-new">
+            {/* Search functionality (optional) */}
+            <div className="options-search">
+              <div className="input-group input-group-sm">
+                <span className="input-group-text" style={{ height: '40px' }}>
+                  <i className="fas fa-search"></i>
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder={`Search ${title.toLowerCase()}...`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+
+            {/* Options List */}
+            <div className="options-list-new">
+              {options.map((option) => (
+                <label key={option.value} className="option-item-new">
+                  <input
+                    type="checkbox"
+                    className="form-check-input me-2"
+                    checked={selectedValues.includes(option.value)}
+                    onChange={() => handleCheckboxChange(option.value)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span className="option-label-new">{option.label}</span>
+                  {selectedValues.includes(option.value) && (
+                    <i className="fas fa-check text-primary ms-auto"></i>
+                  )}
+                </label>
+              ))}
+
+              {options.length === 0 && (
+                <div className="no-options">
+                  <i className="fas fa-info-circle me-2"></i>
+                  No {title.toLowerCase()} available
+                </div>
+              )}
+            </div>
+
+            {/* Footer with count */}
+            {selectedValues.length > 0 && (
+              <div className="options-footer">
+                <small className="text-muted">
+                  {selectedValues.length} of {options.length} selected
+                </small>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const AdmissionList = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -118,6 +235,8 @@ const AdmissionList = () => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState({});
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
+
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
   const [showEditPanel, setShowEditPanel] = useState(false);
@@ -134,7 +253,6 @@ const AdmissionList = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
 
   // Documents specific state
@@ -149,6 +267,98 @@ const AdmissionList = () => {
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
+
+  const [formData, setFormData] = useState({
+    projects: {
+      type: "includes",
+      values: []
+    },
+    verticals: {
+      type: "includes",
+      values: []
+    },
+    course: {
+      type: "includes",
+      values: []
+    },
+    center: {
+      type: "includes",
+      values: []
+    },
+    counselor: {
+      type: "includes",
+      values: []
+    },
+    sector: {
+      type: "includes",
+      values: []
+    }
+  });
+
+  const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
+  const [verticalOptions, setVerticalOptions] = useState([]);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [courseOptions, setCourseOptions] = useState([]);
+  const [centerOptions, setCenterOptions] = useState([]);
+  const [counselorOptions, setCounselorOptions] = useState([]);
+  // Fetch filter options from backend API on mount
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+        const token = userData.token;
+        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        const res = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { 'x-auth': token }
+        });
+        if (res.data.status) {
+          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
+          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
+          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch filter options:', err);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
+
+
+
+
+  const handleCriteriaChange = (criteria, values) => {
+    setFormData((prevState) => ({
+      ...prevState,
+      [criteria]: {
+        type: "includes",
+        values: values
+      }
+    }));
+    console.log('Selected verticals:', values);
+    // Reset to first page and fetch with new filters
+  };
+
+  const [dropdownStates, setDropdownStates] = useState({
+    projects: false,
+    verticals: false,
+    course: false,
+    center: false,
+    counselor: false,
+    sector: false
+  });
+
+  const toggleDropdown = (filterName) => {
+    setDropdownStates(prev => {
+      // Close all other dropdowns and toggle the current one
+      const newState = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = key === filterName ? !prev[key] : false;
+        return acc;
+      }, {});
+      return newState;
+    });
+  };
 
 
   // Static document data for demonstration
@@ -187,12 +397,13 @@ const AdmissionList = () => {
   // 🎯 All Admission Filters Configuration
   // ========================================
   const [admissionFilters, setAdmissionFilters] = useState([
-    { _id: 'pendingDocs', name: 'Pending For Batch Assign', count: 856, milestone: '' },
-    { _id: 'documentDone', name: 'Batch Assigned', count: 624, milestone: 'Completed' },
-    { _id: 'zeroPeriod', name: 'Zero Period', count: 4, milestone: '' },
-    { _id: 'batchFreeze', name: 'Batch Freeze', count: 4, milestone: '' },
-    { _id: 'dropout', name: 'Dropout', count: 1480, milestone: '' },
-    { _id: 'alladmission', name: 'All Lists', count: 1480, milestone: '' },
+    { _id: 'alladmission', name: 'All Lists', count: 0, milestone: '' },
+
+    { _id: 'pendingBatchAssign', name: 'Pending For Batch Assign', count: 0, milestone: '' },
+    { _id: 'batchAssigned', name: 'Pending For Zero Period', count: 0, milestone: 'Completed' },
+    { _id: 'zeroPeriod', name: 'Pending For Batch Freeze', count: 0, milestone: '' },
+    { _id: 'batchFreeze', name: 'Batch Freezed Students', count: 0, milestone: '' },
+    { _id: 'dropout', name: 'Dropout', count: 0, milestone: '' }
   ]);
 
   const { navRef, navHeight, navWidth } = useNavHeight([admissionFilters]);
@@ -444,106 +655,23 @@ const AdmissionList = () => {
     return { totalDocs, uploadedDocs, pendingDocs, verifiedDocs, rejectedDocs };
   };
 
-  // ========================================
-  // 🎯 Main Tab Change Handler
-  // ========================================
-  const handleMainTabChange = (tabName) => {
-    setMainTab(tabName);
-    setActiveCrmFilter(0); // Reset to first filter
 
-    // Reset filters and fetch appropriate data
-    applyFiltersForTab(tabName, 0);
-
-    // Also reset other filters
-    setFilterData({
-      name: '',
-      courseType: '',
-      status: 'true',
-      leadStatus: '',
-      sector: '',
-      createdFromDate: null,
-      createdToDate: null,
-      modifiedFromDate: null,
-      modifiedToDate: null,
-      nextActionFromDate: null,
-      nextActionToDate: null,
-    });
-  };
-
-  // ========================================
-  // 🎯 Tab-Specific Filter Logic
-  // ========================================
-  const applyFiltersForTab = (mainTabName, filterIndex) => {
-    console.log('mainTabName', mainTabName)
-    const currentFilters = mainTabName === 'AllAdmission' ? admissionFilters : [];
-    const selectedFilter = currentFilters[filterIndex];
-
-    let filteredData = [...allProfilesData];
-    console.log('selectedFilter', selectedFilter)
-
-
-    if (selectedFilter._id === 'pendingDocs') {
-      filteredData = filteredData.filter(profile => {
-        const docs = profile._candidate?.documents;
-        const counts = getDocumentCounts(docs);
-        return counts.pendingDocs > 0;
-      });
-    } else if (selectedFilter._id === 'documentDone') {
-      filteredData = filteredData.filter(profile => {
-        const docs = profile._candidate?.documents;
-        const counts = getDocumentCounts(docs);
-        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-      });
-    } else if (selectedFilter._id === 'zeroPeriod') {
-      filteredData = filteredData.filter(profile => {
-        const docs = profile._candidate?.documents;
-        const counts = getDocumentCounts(docs);
-        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-      });
-    } else if (selectedFilter._id === 'batchFreeze') {
-      filteredData = filteredData.filter(profile => {
-        const docs = profile._candidate?.documents;
-        const counts = getDocumentCounts(docs);
-        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-      });
-    } else if (selectedFilter._id === 'dropout') {
-      filteredData = filteredData.filter(profile => {
-        const docs = profile._candidate?.documents;
-        const counts = getDocumentCounts(docs);
-        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-      });
-    } else if (selectedFilter._id === 'alladmission') {
-      filteredData = filteredData.filter(profile => {
-        const docs = profile._candidate?.documents;
-        const counts = getDocumentCounts(docs);
-        return counts.verifiedDocs === counts.totalDocs && counts.totalDocs > 0;
-      });
-    }
-
-
-    console.log(`Filter applied: ${selectedFilter.name}`, {
-      original: allProfilesData.length,
-      filtered: filteredData.length,
-      filterType: mainTabName,
-      filterId: selectedFilter._id
-    });
-
-    setAllProfiles(filteredData);
-  };
 
   // ========================================
   // 🎯 Filter Click Handler
   // ========================================
   const handleCrmFilterClick = (_id, index) => {
     setActiveCrmFilter(index);
-    applyFiltersForTab(mainTab, index);
+    console.log('_id', _id)
+    setFilterData({ ...filterData, status: _id });
+    
   };
 
   // Filter state from Registration component
   const [filterData, setFilterData] = useState({
     name: '',
     courseType: '',
-    status: 'true',
+    status: 'alladmission',
     leadStatus: '',
     sector: '',
     createdFromDate: null,
@@ -629,8 +757,7 @@ const AdmissionList = () => {
       ...filterData,
       [fieldName]: date
     };
-    setFilterData(newFilterData);
-    setTimeout(() => applyFilters(newFilterData), 100);
+   
   };
 
 
@@ -652,18 +779,26 @@ const AdmissionList = () => {
     let newFilterData = { ...filterData };
 
     if (filterType === 'created') {
-      newFilterData.createdFromDate = null;
-      newFilterData.createdToDate = null;
+      setFilterData(prev => ({
+        ...prev,
+        createdFromDate: null,
+        createdToDate: null
+      }));
+      
     } else if (filterType === 'modified') {
-      newFilterData.modifiedFromDate = null;
-      newFilterData.modifiedToDate = null;
+      setFilterData(prev => ({
+        ...prev,
+        modifiedFromDate: null,
+        modifiedToDate: null
+      }));
     } else if (filterType === 'nextAction') {
-      newFilterData.nextActionFromDate = null;
-      newFilterData.nextActionToDate = null;
+      setFilterData(prev => ({
+        ...prev,
+        nextActionFromDate: null,
+        nextActionToDate: null
+      }));
     }
-
-    setFilterData(newFilterData);
-    setTimeout(() => applyFilters(newFilterData), 100);
+    
   };
 
   const handleDateChange = (date, fieldName) => {
@@ -677,7 +812,6 @@ const AdmissionList = () => {
         ...filterData,
         [fieldName]: date
       };
-      applyFilters(newFilterData);
     }, 100);
   };
 
@@ -687,11 +821,7 @@ const AdmissionList = () => {
       createdFromDate: null,
       createdToDate: null
     }));
-    setTimeout(() => applyFilters({
-      ...filterData,
-      createdFromDate: null,
-      createdToDate: null
-    }), 100);
+    
   };
 
   const clearModifiedDate = () => {
@@ -700,11 +830,7 @@ const AdmissionList = () => {
       modifiedFromDate: null,
       modifiedToDate: null
     }));
-    setTimeout(() => applyFilters({
-      ...filterData,
-      modifiedFromDate: null,
-      modifiedToDate: null
-    }), 100);
+   
   };
 
   const clearNextActionDate = () => {
@@ -713,70 +839,16 @@ const AdmissionList = () => {
       nextActionFromDate: null,
       nextActionToDate: null
     }));
-    setTimeout(() => applyFilters({
-      ...filterData,
-      nextActionFromDate: null,
-      nextActionToDate: null
-    }), 100);
+    
   };
 
   const handleSearch = (searchTerm) => {
-    if (!searchTerm.trim()) {
-      applyFilters();
-      return;
-    }
-
-    const searchFiltered = allProfilesData.filter(profile => {
-      try {
-        const name = profile._candidate?.name ? String(profile._candidate.name).toLowerCase() : '';
-        const mobile = profile._candidate?.mobile ? String(profile._candidate.mobile).toLowerCase() : '';
-        const email = profile._candidate?.email ? String(profile._candidate.email).toLowerCase() : '';
-        const searchLower = searchTerm.toLowerCase();
-
-        return name.includes(searchLower) ||
-          mobile.includes(searchLower) ||
-          email.includes(searchLower);
-      } catch (error) {
-        console.error('Search filter error for profile:', profile, error);
-        return false;
-      }
-    });
-
-    setAllProfiles(searchFiltered);
+   const searchItem = searchTerm.trim();
+   setFilterData(prev => ({ ...prev, name: searchItem }));
+   
   };
 
-  const applyFilters = (filters = filterData) => {
-    console.log('Applying filters with data:', filters);
-
-    let filtered = [...allProfilesData];
-
-    try {
-      // Search filter
-      if (filters.name && filters.name.trim()) {
-        const searchTerm = filters.name.toLowerCase();
-        filtered = filtered.filter(profile => {
-          try {
-            const name = profile._candidate?.name ? String(profile._candidate.name).toLowerCase() : '';
-            const mobile = profile._candidate?.mobile ? String(profile._candidate.mobile).toLowerCase() : '';
-            const email = profile._candidate?.email ? String(profile._candidate.email).toLowerCase() : '';
-
-            return name.includes(searchTerm) ||
-              mobile.includes(searchTerm) ||
-              email.includes(searchTerm);
-          } catch (error) {
-            return false;
-          }
-        });
-      }
-
-      console.log('Filter results:', filtered.length, 'out of', allProfilesData.length);
-      setAllProfiles(filtered);
-
-    } catch (error) {
-      console.error('Filter error:', error);
-      setAllProfiles(allProfilesData);
-    }
-  };
+ 
 
   // Helper function for status icons
   const getStatusIcon = (statusName) => {
@@ -804,7 +876,6 @@ const AdmissionList = () => {
       nextActionFromDate: null,
       nextActionToDate: null,
     });
-    setAllProfiles(allProfilesData);
   };
 
   const handleStatusChange = (e) => {
@@ -1117,17 +1188,43 @@ const AdmissionList = () => {
 
   useEffect(() => {
     fetchProfileData();
-  }, [currentPage]);
+  }, [currentPage, filterData]);
 
-  const fetchProfileData = async () => {
+  const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
+      setIsLoadingProfiles(true);
+
 
       if (!token) {
         console.warn('No token found in session storage.');
+        setIsLoadingProfiles(false);
         return;
       }
+      console.log('filters', filters)
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        ...(filters?.name && { name: filters.name }),
+        ...(filters?.courseType && { courseType: filters.courseType }),
+        ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters?.kyc && filters.kyc !== 'false' && { kyc: filters.kyc }),
+        ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters?.sector && { sector: filters.sector }),
+        ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        // Multi-select filters
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(filters.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(filters.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(filters.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(filters.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(filters.counselor.values) })
+      });
+      
 
-      const response = await axios.get(`${backendUrl}/college/admission-list?page=${currentPage}`, {
+      const response = await axios.get(`${backendUrl}/college/admission-list?${queryParams}`, {
         headers: {
           'x-auth': token,
         },
@@ -1135,8 +1232,19 @@ const AdmissionList = () => {
 
       if (response.data.success && response.data.data) {
         console.log('backend response', response.data.data)
+        const { crmFilterCounts } = response.data;
+        const filter = [
+          { _id: 'alladmission', name: 'All Lists', count: crmFilterCounts.all, milestone: '' },
+          { _id: 'pendingBatchAssign', name: 'Pending For Batch Assign', count: crmFilterCounts.pendingBatchAssign, milestone: '' },
+          { _id: 'batchAssigned', name: 'Pending For Zero Period', count: crmFilterCounts.batchAssigned, milestone: 'Completed' },
+          { _id: 'zeroPeriod', name: 'Pending For Batch Freeze', count: crmFilterCounts.zeroPeriod, milestone: '' },
+          { _id: 'batchFreeze', name: 'Batch Freezed Students', count: crmFilterCounts.batchFreeze, milestone: '' },
+          { _id: 'dropout', name: 'Dropout', count: crmFilterCounts.dropout, milestone: '' }
+
+        ];
+
+        setAdmissionFilters(filter);
         setAllProfiles(response.data.data);
-        setAllProfilesData(response.data.data)
         setTotalPages(response.data.totalPages)
 
 
@@ -1145,6 +1253,9 @@ const AdmissionList = () => {
       }
     } catch (error) {
       console.error('Error fetching profile data:', error);
+    }
+    finally {
+      setIsLoadingProfiles(false);
     }
   };
 
@@ -1210,11 +1321,6 @@ const AdmissionList = () => {
       const newFilterData = { ...filterData, [name]: value };
       setFilterData(newFilterData);
 
-      if (newFilterData.name) {
-        handleSearch(newFilterData.name);
-      } else {
-        applyFilters(newFilterData);
-      }
     } catch (error) {
       console.error('Filter change error:', error);
     }
@@ -2597,8 +2703,7 @@ const AdmissionList = () => {
                           className="btn btn-outline-secondary border-start-0"
                           type="button"
                           onClick={() => {
-                            setFilterData(prev => ({ ...prev, name: '' }));
-                            setAllProfiles(allProfilesData);
+                            setFilterData(prev => ({ ...prev, name: '' }));                            
                           }}
                         >
                           <i className="fas fa-times"></i>
@@ -2630,30 +2735,404 @@ const AdmissionList = () => {
 
           {/* Advanced Filters */}
           {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm">
-              <div className="container-fluid py-4" style={{marginTop:'160px'}}>
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <div className="d-flex align-items-center">
-                    <i className="fas fa-filter text-primary me-2"></i>
-                    <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                    <span className="bg-light text-dark ms-2">
-                      {Object.values(filterData).filter(val => val && val !== 'true').length} Active
-                    </span>
+            <div
+              className="modal show fade d-block"
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 1050
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsFilterCollapsed(true);
+              }}
+            >
+              <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
+                <div className="modal-content">
+                  {/* Modal Header - Fixed at top */}
+                  <div className="modal-header bg-white border-bottom">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-filter text-primary me-2"></i>
+                        <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                        {totalSelected > 0 && (
+                          <span className="badge bg-primary ms-2">
+                            {totalSelected} Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={clearAllFilters}
+                        >
+                          <i className="fas fa-times-circle me-1"></i>
+                          Clear All
+                        </button>
+                        <button
+                          className="btn-close"
+                          onClick={() => setIsFilterCollapsed(true)}
+                          aria-label="Close"
+                        ></button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={clearAllFilters}
-                    >
-                      <i className="fas fa-times-circle me-1"></i>
-                      Clear All
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-chevron-up"></i>
-                    </button>
+
+                  {/* Modal Body - Scrollable content */}
+                  <div className="modal-body p-4">
+                    <div className="row g-4">
+                      {/* Course Type Filter */}
+                      <div className="col-md-3">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-graduation-cap me-1 text-success"></i>
+                          Course Type
+                        </label>
+                        <div className="position-relative">
+                          <select
+                            className="form-select"
+                            name="courseType"
+                            value={filterData.courseType}
+                            onChange={handleFilterChange}
+                          >
+                            <option value="">All Types</option>
+                            <option value="Free">🆓 Free</option>
+                            <option value="Paid">💰 Paid</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Project Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Project"
+                          options={projectOptions}
+                          selectedValues={formData.projects.values}
+                          onChange={(values) => handleCriteriaChange('projects', values)}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.projects}
+                          onToggle={() => toggleDropdown('projects')}
+                        />
+                      </div>
+
+                      {/* Verticals Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Verticals"
+                          options={verticalOptions}
+                          selectedValues={formData.verticals.values}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.verticals}
+                          onToggle={() => toggleDropdown('verticals')}
+                          onChange={(values) => handleCriteriaChange('verticals', values)}
+                        />
+                      </div>
+
+                      {/* Course Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Course"
+                          options={courseOptions}
+                          selectedValues={formData.course.values}
+                          onChange={(values) => handleCriteriaChange('course', values)}
+                          icon="fas fa-graduation-cap"
+                          isOpen={dropdownStates.course}
+                          onToggle={() => toggleDropdown('course')}
+                        />
+                      </div>
+
+                      {/* Center Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Center"
+                          options={centerOptions}
+                          selectedValues={formData.center.values}
+                          onChange={(values) => handleCriteriaChange('center', values)}
+                          icon="fas fa-building"
+                          isOpen={dropdownStates.center}
+                          onToggle={() => toggleDropdown('center')}
+                        />
+                      </div>
+
+                      {/* Counselor Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Counselor"
+                          options={counselorOptions}
+                          selectedValues={formData.counselor.values}
+                          onChange={(values) => handleCriteriaChange('counselor', values)}
+                          icon="fas fa-user-tie"
+                          isOpen={dropdownStates.counselor}
+                          onToggle={() => toggleDropdown('counselor')}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Date Filters Section */}
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Date Range Filters
+                        </h6>
+                      </div>
+
+                      {/* Created Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-plus me-1 text-success"></i>
+                          Lead Creation Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
+                                value={filterData.createdFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                maxDate={filterData.createdToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
+                                value={filterData.createdToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
+                                minDate={filterData.createdFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.createdFromDate || filterData.createdToDate) && (
+                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
+                              <small className="text-success">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
+                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
+                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('created')}
+                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Created Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Modified Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
+                          Lead Modification Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
+                                value={filterData.modifiedFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                maxDate={filterData.modifiedToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
+                                value={filterData.modifiedToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
+                                minDate={filterData.modifiedFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
+                              <small className="text-warning">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
+                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
+                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('modified')}
+                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Modified Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Next Action Date Range */}
+                      <div className="col-md-4">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-check me-1 text-info"></i>
+                          Next Action Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-3">
+                          <div className="row g-2">
+                            <div className="col-6">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
+                                value={filterData.nextActionFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                maxDate={filterData.nextActionToDate}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
+                                value={filterData.nextActionToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
+                                minDate={filterData.nextActionFromDate}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Show selected dates */}
+                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
+                              <small className="text-info">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
+                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
+                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          {/* Clear button */}
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100"
+                              onClick={() => clearDateFilter('nextAction')}
+                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear Next Action Date
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Results Summary */}
+                    <div className="row mt-4">
+                      <div className="col-12">
+                        <div className="alert alert-info">
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-info-circle me-2"></i>
+                            <div>
+                              <strong>Results Summary:</strong> Showing {allProfiles.length} results on page {currentPage} of {totalPages}
+
+                              {/* Active filter indicators */}
+                              <div className="mt-2">
+                                {(filterData.createdFromDate || filterData.createdToDate) && (
+                                  <span className="badge bg-success me-2">
+                                    <i className="fas fa-calendar-plus me-1"></i>
+                                    Created Date Filter Active
+                                  </span>
+                                )}
+
+                                {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                                  <span className="badge bg-warning me-2">
+                                    <i className="fas fa-calendar-edit me-1"></i>
+                                    Modified Date Filter Active
+                                  </span>
+                                )}
+
+                                {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                                  <span className="badge bg-info me-2">
+                                    <i className="fas fa-calendar-check me-1"></i>
+                                    Next Action Date Filter Active
+                                  </span>
+                                )}
+
+                                {totalSelected > 0 && (
+                                  <span className="badge bg-primary me-2">
+                                    <i className="fas fa-filter me-1"></i>
+                                    {totalSelected} Multi-Select Filters Active
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Footer - Fixed at bottom */}
+                  <div className="modal-footer bg-light border-top">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="text-muted small">
+                        <i className="fas fa-filter me-1"></i>
+                        {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
+                      </div>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => setIsFilterCollapsed(true)}
+                        >
+                          <i className="fas fa-eye-slash me-1"></i>
+                          Hide Filters
+                        </button>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => {
+                            fetchProfileData(filterData);
+                            setIsFilterCollapsed(true);
+                          }}
+                        >
+                          <i className="fas fa-search me-1"></i>
+                          Apply Filters
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2668,6 +3147,16 @@ const AdmissionList = () => {
                   <div className="col-12 rounded equal-height-2 coloumn-2">
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
+                        {isLoadingProfiles? (
+                          <div className="col-12 text-center py-5">
+                            <div className="d-flex flex-column align-items-center">
+                              <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+                                <span className="visually-hidden">Loading...</span>
+                              </div>
+                              <h5 className="text-muted">Loading profiles...</h5>
+                            </div>
+                          </div>
+                        ):(<>
                         {allProfiles && allProfiles.length > 0 ? (
                           allProfiles.map((profile, profileIndex) => (
                             <div className={`card-content transition-col mb-2`} key={profileIndex}>
@@ -2700,12 +3189,17 @@ const AdmissionList = () => {
                                           <img
                                             src="/Assets/public_assets/images/ekyc_done.png"
                                             alt="ekyc done"
-                                            style={{ width: 100, height: 'auto', marginLeft: 8, display: profile.kyc === true ? 'inline-block' : 'none' }}
+                                            style={{ width: 100, height: 'auto', marginLeft: 8, display: (profile.kyc === true && profile.docCounts?.totalRequired > 0 )? 'inline-block' : 'none' }}
                                           />
                                           <img
                                             src="/Assets/public_assets/images/ekyc_pending.png"
                                             alt="ekyc pending"
-                                            style={{ width: 100, height: 'auto', display: profile.kyc === false ? 'inline-block' : 'none' }}
+                                            style={{ width: 100, height: 'auto', display: (profile.kyc === false && profile.docCounts?.totalRequired > 0)? 'inline-block' : 'none' }}
+                                          />
+                                           <img
+                                            src="/Assets/public_assets/images/ekyc_not_required.png"
+                                            alt="ekyc pending"
+                                            style={{ width: 100, height: 'auto', display:  profile.docCounts?.totalRequired === 0? 'inline-block' : 'none' }}
                                           />
                                         </div>
                                       </div>
@@ -3949,7 +4443,7 @@ const AdmissionList = () => {
                               <p>Try adjusting your filters or search criteria</p>
                             </div>
                           </div>
-                        )}
+                        )}</>)}
                       </div>
                     </div>
                   </div>
@@ -6606,6 +7100,329 @@ background: #fd2b5a;
 
           `
         }
+      </style>
+
+
+      <style> 
+          {
+            
+            `
+          
+    /* Enhanced Multi-Select Dropdown Styles */
+.multi-select-container-new {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-dropdown-new {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-trigger {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  background: white !important;
+  border: 1px solid #ced4da !important;
+  border-radius: 0.375rem !important;
+  padding: 0.375rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  min-height: 38px !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  width: 100% !important;
+}
+
+.multi-select-trigger:hover {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+}
+
+.multi-select-trigger.open {
+  border-color: #86b7fe !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+.select-display-text {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #495057;
+  font-weight: normal;
+}
+
+.dropdown-arrow {
+  color: #6c757d;
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+.multi-select-trigger.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.multi-select-options-new {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  background: white;
+  border: 1px solid #ced4da;
+  border-top: none;
+  border-radius: 0 0 0.375rem 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  max-height: 320px;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.options-header {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.select-all-btn,
+.clear-all-btn {
+  font-size: 0.75rem !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 0.25rem !important;
+  border: 1px solid !important;
+}
+
+.select-all-btn {
+  border-color: #0d6efd !important;
+  color: #0d6efd !important;
+}
+
+.clear-all-btn {
+  border-color: #6c757d !important;
+  color: #6c757d !important;
+}
+
+.select-all-btn:hover {
+  background-color: #0d6efd !important;
+  color: white !important;
+}
+
+.clear-all-btn:hover {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+.options-search {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.options-list-new {
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.options-list-new::-webkit-scrollbar {
+  width: 6px;
+}
+
+.options-list-new::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.options-list-new::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.options-list-new::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.option-item-new {
+  display: flex !important;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.option-item-new:last-child {
+  border-bottom: none;
+}
+
+.option-item-new:hover {
+  background-color: #f8f9fa;
+}
+
+.option-item-new input[type="checkbox"] {
+  margin: 0 0.5rem 0 0 !important;
+  cursor: pointer;
+  accent-color: #0d6efd;
+}
+
+.option-label-new {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #495057;
+  cursor: pointer;
+}
+
+.options-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.no-options {
+  padding: 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Close dropdown when clicking outside */
+.multi-select-container-new.dropdown-open::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+/* Focus states for accessibility */
+.multi-select-trigger:focus {
+  outline: none;
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.option-item-new input[type="checkbox"]:focus {
+  outline: 2px solid #86b7fe;
+  outline-offset: 2px;
+}
+
+/* Selected state styling */
+.option-item-new input[type="checkbox"]:checked + .option-label-new {
+  font-weight: 500;
+  color: #0d6efd;
+}
+
+/* Badge styling for multi-select */
+.badge.bg-primary {
+  background-color: #0d6efd !important;
+  font-size: 0.75rem;
+  padding: 0.25em 0.4em;
+}
+
+/* Animation for dropdown open/close */
+.multi-select-options-new {
+  transform-origin: top;
+  animation: dropdownOpen 0.15s ease-out;
+}
+
+@keyframes dropdownOpen {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* Prevent text selection on dropdown trigger */
+.multi-select-trigger {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Enhanced visual feedback */
+.multi-select-trigger:active {
+  transform: translateY(1px);
+}
+
+/* Loading state (if needed) */
+.multi-select-loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.multi-select-loading .dropdown-arrow {
+  animation: spin 1s linear infinite;
+}
+.react-calendar{
+width:min-content !important;
+height:min-content !important;
+}
+@media (max-width: 768px) {
+  .multi-select-options-new {
+    max-height: 250px;
+  }
+  
+  .options-header {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .select-all-btn,
+  .clear-all-btn {
+    width: 100%;
+  }
+  
+  .options-list-new {
+    max-height: 150px;
+  }
+  .marginTopMobile {
+    margin-top: 340px !important;
+  }
+   .nav-tabs-main{
+                  white-space: nowrap;
+                  flex-wrap: nowrap;
+                  overflow: scroll;
+                  scrollbar-width: none;
+                  -ms-overflow-style: none;
+                  &::-webkit-scrollbar {
+                    display: none;
+                  }
+              }
+              .nav-tabs-main > li > button{
+              padding: 15px 9px;
+              }
+}
+
+   
+            `
+          }
+
       </style>
     </div>
   );
