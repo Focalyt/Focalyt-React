@@ -626,10 +626,10 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                         <div key={center.id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`}>
                             <div className="card h-100 border rounded shadow-sm position-relative">
                                 <div className="card-body">
-                                    <div className="d-flex justify-content-between align-items-start mb-2">
+                                    <div className="d-flex justify-content-between align-items-start mb-2 row">
                                         {/* ======== MODIFY THIS: Make center card clickable ======== */}
                                         <div
-                                            className="flex-grow-1 cursor-pointer"
+                                            className="flex-grow-1 cursor-pointer col-md-9"
                                             onClick={() => handleCenterClick(center)}
                                             style={{ cursor: 'pointer' }}
                                         >
@@ -664,10 +664,10 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                                             </div>
                                         </div>
                                         {/* ======== MODIFY THIS: Add stopPropagation to action buttons ======== */}
-                                        <div className="text-end d-flex">
-                                            <button className="btn btn-sm btn-light me-1" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(center); }}>
+                                        <div className="text-end d-flex col-md-3 justify-content-end">
+                                            {/* <button className="btn btn-sm btn-light me-1" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(center); }}>
                                                 <i className="bi bi-share-fill"></i>
-                                            </button>
+                                            </button> */}
                                             <button className="btn btn-sm btn-light me-1" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(center); }}>
                                                 <i className="bi bi-pencil-square"></i>
                                             </button>
@@ -719,7 +719,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                                     </div> */}
 
                                     <div className="small text-muted mt-3">
-                                        <i className="bi bi-calendar me-1"></i>Created: <strong>{center.createdAt}</strong>
+                                        <i className="bi bi-calendar me-1"></i>Created: <strong>{new Date(center.createdAt).toLocaleDateString('en-GB')}</strong>
                                     </div>
                                 </div>
                             </div>

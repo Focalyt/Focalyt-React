@@ -6,9 +6,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNavigate } from "react-router-dom";
 
 import {
-  faChartLine, faUser, faSearch, faClipboardList, faChevronRight, faPlusCircle, faForward, faCoins, faGraduationCap, faBuilding, faBookOpen, faTasks ,faCogs, faWhatsapp, faFileAlt
+  faChartLine, faUser, faSearch, faClipboardList, faChevronRight, faPlusCircle, faForward, faCoins, faGraduationCap, faBuilding, faBookOpen, faTasks ,faCogs, faFileAlt
 } from "@fortawesome/free-solid-svg-icons";
-
+import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import {
   faUser as farUser, faFile as farFile,
   faPaperPlane as farPaperPlane, faMap as farMap, faHand as farHand, faBookmark as farBookmark,

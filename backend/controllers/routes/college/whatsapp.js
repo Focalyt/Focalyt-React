@@ -389,6 +389,7 @@ router.post('/save-facebook-token', authenticateCollege, async (req, res) => {
       'whatsappConfig.lastConnected': new Date(),
       'whatsappConfig.isActive': true
     };
+    console.log(updateData);
 
     await College.findByIdAndUpdate(req.collegeId, updateData);
 
@@ -547,6 +548,32 @@ router.get('/connected-clients', authenticateCollege, async (req, res) => {
   } catch (error) {
     console.error('Get connected clients error:', error);
     res.status(500).json({ status: false, message: 'Failed to get connected clients' });
+  }
+});
+
+// Exchange short-lived Facebook token for long-lived token (secure, backend only)
+router.post('/exchange-token', authenticateCollege, async (req, res) => {
+  try {
+    const { shortLivedToken } = req.body;
+    if (!shortLivedToken) {
+      return res.status(400).json({ status: false, message: 'Short-lived token required' });
+    }
+
+    const fbRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+      params: {
+        grant_type: 'fb_exchange_token',
+        client_id: process.env.FACEBOOK_APP_ID,
+        client_secret: process.env.FACEBOOK_APP_SECRET,
+        fb_exchange_token: shortLivedToken
+      }
+    });
+    console.log(fbRes.data);
+
+    // Optionally, yahan long-lived token ko DB me bhi save kar sakte hain
+    res.json({ status: true, access_token: fbRes.data.access_token, expires_in: fbRes.data.expires_in });
+  } catch (error) {
+    console.error('Token exchange error:', error.response?.data || error.message);
+    res.status(500).json({ status: false, message: 'Failed to exchange token' });
   }
 });
 

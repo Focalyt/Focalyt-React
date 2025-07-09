@@ -556,12 +556,10 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
             <div key={project.id || project._id} className={`mb-4 ${viewMode === 'grid' ? 'col-md-6' : 'col-12'}`}>
               <div className="card h-100 border rounded shadow-sm position-relative">
                 <div className="card-body">
-                  <div className="d-flex justify-content-between align-items-start mb-2">
-                    <div
-                      className="flex-grow-1 cursor-pointer"
+                  <div className="d-flex justify-content-between align-items-start mb-2 row">
+                    <div className="flex-grow-1 cursor-pointer col-md-9"
                       onClick={() => handleProjectClick(project)}
-                      style={{ cursor: 'pointer' }}
-                    >
+                      style={{ cursor: 'pointer' }}>
                       <div className="d-flex align-items-center mb-2">
                         <i className="bi bi-kanban-fill text-primary fs-3 me-2"></i>
                         <div>
@@ -575,10 +573,10 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                         </span>
                       </div>
                     </div>
-                    <div className="text-end d-flex">
-                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(project); }}>
+                    <div className="text-end d-flex col-md-3 justify-content-end">
+                      {/* <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(project); }}>
                         <i className="bi bi-share-fill"></i>
-                      </button>
+                      </button> */}
                       <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(project); }}>
                         <i className="bi bi-pencil-square"></i>
                       </button>
@@ -591,12 +589,12 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                   <div className="small text-muted">
                     <div className="row">
                       <div className="col-4">
-                        <i className="bi bi-calendar me-1"></i>Created: <strong>{project.createdAt || 'N/A'}</strong>
+                        <i className="bi bi-calendar me-1"></i>Created: <strong>{new Date(project.createdAt).toLocaleDateString('en-GB') || 'N/A'}</strong>
                       </div>
-                      <div className="col-4">
-                        <i className="bi bi-calendar-check me-1"></i>Due: <strong>{project.dueDate || 'N/A'}</strong>
-                      </div>
-                      <div className="col-4">
+                      {/* <div className="col-4">
+                        <i className="bi bi-calendar-check me-1"></i>Due: <strong>{new Date(project.dueDate).toLocaleDateString('en-GB') || 'N/A'}</strong>
+                      </div> */}
+                      {/* <div className="col-4">
                         <span
                           className="text-primary"
                           style={{ cursor: 'pointer', textDecoration: 'underline' }}
@@ -604,7 +602,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                         >
                           <i className="bi bi-building me-1"></i>{project.centers || 0} Centers
                         </span>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
                 </div>
