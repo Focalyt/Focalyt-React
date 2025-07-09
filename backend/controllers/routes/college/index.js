@@ -406,7 +406,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					{
 						$expr: {
 							$eq: [
-								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
 								member
 							]
 						}
@@ -891,7 +891,7 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 					{
 						$expr: {
 							$eq: [
-								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
 								member
 							]
 						}
@@ -3622,7 +3622,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 					{
 						$expr: {
 							$eq: [
-								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
 								member
 							]
 						}
@@ -4106,7 +4106,7 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 					{
 						$expr: {
 							$eq: [
-								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
 								member
 							]
 						}
@@ -4885,7 +4885,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 					{
 						$expr: {
 							$eq: [
-								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
 								member
 							]
 						}
@@ -5212,7 +5212,7 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 					{
 						$expr: {
 							$eq: [
-								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
 								member
 							]
 						}
@@ -5444,7 +5444,7 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 					{
 						$expr: {
 							$eq: [
-								{ $arrayElemAt: ["$leadAssignment._id", -1] },
+								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
 								memberId
 							]
 						}
@@ -6190,6 +6190,73 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 		});
 	}
 });
+
+router.route('/refer-leads')
+.get(isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = await College.findOne({ '_concernPerson._id': user._id }).populate('_concernPerson._id').select('_concernPerson');
+		console.log(college._concernPerson, 'college');
+		if (!college) {
+			return res.status(404).json({ status: false, message: 'College not found' });
+		}
+		res.status(200).json({
+			success: true,
+			data: college._concernPerson
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+})
+
+.post(isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		let { counselorId, appliedCourseId, type } = req.body;
+		counselorId = new mongoose.Types.ObjectId(counselorId);
+
+		// If appliedCourseId is not an array, convert it to an array
+		if (!Array.isArray(appliedCourseId)) {
+			appliedCourseId = [appliedCourseId];
+		}
+		for (const id of appliedCourseId) {
+		const counselor = await User.findById(counselorId);
+		if (!counselor) {
+			return res.status(404).json({ status: false, message: 'Counselor not found' });
+		}
+	
+		
+		const appliedCourse = await AppliedCourses.findById(id);
+		if (!appliedCourse) {
+			return res.status(404).json({ status: false, message: 'Applied course not found' });
+		}
+		const updateData = {
+			_counsellor: counselorId,
+			counsellorName: counselor.name,
+			assignDate: new Date(),
+			assignedBy: new mongoose.Types.ObjectId(user._id)	
+		}
+		appliedCourse.leadAssignment.push(updateData);
+		await appliedCourse.save();
+	}
+		res.status(200).json({
+			success: true,
+			message: 'Lead referred successfully'
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({
+			success: false,
+			message: "Server Error"
+		});
+	}
+})
+
+
 
 
 

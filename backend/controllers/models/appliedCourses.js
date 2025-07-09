@@ -141,12 +141,12 @@ const appliedCoursesSchema = new Schema(
 
     ],
     leadAssignment: [{
-      _id: {
+      _counsellor: {
         type: ObjectId,
         ref: "User",
       },
       counsellorName: {
-        type: String,
+        type: String
       },
       assignDate: {
         type: Date,
@@ -365,7 +365,7 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
 
       // Add new assignment to leadAssignment array
       this.leadAssignment.push({
-        _id: new mongoose.Types.ObjectId(selectedCounselor),
+        _counsellor: new mongoose.Types.ObjectId(selectedCounselor),
         counsellorName: counselorName,
         assignDate: new Date(),
         assignedBy: this.registeredBy

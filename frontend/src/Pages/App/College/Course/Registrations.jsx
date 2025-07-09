@@ -2248,7 +2248,7 @@ const CRMDashboard = () => {
       });
       console.log(userData, 'userData');
       let concernPersons = [];
-      await response.data.concernPerson.map(person => {
+      await response.data.data.map(person => {
         if (person._id._id.toString() !== userData._id.toString()) {
           concernPersons.push(person);
         }
@@ -2277,12 +2277,13 @@ const CRMDashboard = () => {
     setSelectedConcernPerson(e.target.value);
   }
 
-  const handleReferLead = async () => {
+  const handleReferLead = async (type) => {
     console.log(selectedConcernPerson, 'selectedConcernPerson');
     try {
       const response = await axios.post(`${backendUrl}/college/refer-leads`, {
         counselorId: selectedConcernPerson,
-        appliedCourseId: selectedProfile._id
+        appliedCourseId: type === 'RefferSingleLead' ? selectedProfile._id : selectedProfiles,
+        type
       }, {
         headers: {
           'x-auth': token,
@@ -2650,7 +2651,7 @@ const CRMDashboard = () => {
               <button
                 type="submit"
                 className="btn text-white"
-                onClick={handleReferLead}
+                onClick={() => handleReferLead(showPanel === 'Reffer' ? 'RefferSingleLead' : 'RefferBulkLead')}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
