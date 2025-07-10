@@ -690,6 +690,7 @@ const CRMDashboard = () => {
     if (candidateRef.current) {
       console.log('start fetching', id)
       candidateRef.current.fetchProfile(id);
+      fetchProfileData()
     }
   };
 

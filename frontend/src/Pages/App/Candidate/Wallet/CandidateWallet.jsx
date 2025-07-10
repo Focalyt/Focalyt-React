@@ -293,7 +293,7 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
                     `
                     .money-rain {
     /* background: url(public/Assets/images/money-rain.jpg) no-repeat; */
-    background: url(../../../../../public/Assets/images/money-rain.jpg) no-repeat;
+    background: url(/Assets/images/money-rain.jpg) no-repeat;
     background-size: 100%;
     background-size: cover;
     background-position: right;
@@ -307,6 +307,7 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
 }
 .now-padding {
     padding-top: 8px;
+    font-size:1rem;
 }
 .single-footer ul {
     list-style-type: none;
@@ -348,7 +349,7 @@ const EarningCard = ({ imageSrc, title, description, descriptions, buttonText, b
 @media only screen and (max-width: 900px) {
     .money-rain {
         /* background-image: url(../../../../../../public/Assets/images/mobilebg.jpg) !important; */
-        background-image: url(../../../../../public/Assets/images/mobilebg.jpg)!important;
+        background-image: url(/Assets/images/mobilebg.jpg)!important;
         background-repeat: no-repeat !important;
         background-size: cover !important;
         background-position: bottom !important;

@@ -447,6 +447,19 @@ const CoinsPage = () => {
       
       <div className="sidenav-overlay"></div>
       <div className="drag-target"></div>
+
+      <style>
+
+        {
+
+          `
+          .card-content {
+    padding: 0px 20px;
+    gap: 20px;
+}
+          `
+        }
+      </style>
     </>
   );
 };

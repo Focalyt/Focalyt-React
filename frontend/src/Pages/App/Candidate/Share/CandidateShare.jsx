@@ -110,6 +110,37 @@ ${url}`;
     border-radius: 0.4285rem;
     transition: color 0.15sease-in-out, background-color 0.15sease-in-out, border-color 0.15sease-in-out, box-shadow 0.15sease-in-out
 }
+    .tab_head {
+    background-color: #b8caf0;
+    font-size: 17px;
+    color: black;
+}
+.both-border-top {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+.btn-success {
+    border-color: #1f9d57 !important;
+    background-color: #28c76f !important;
+    color: #fff;
+}
+.breadcrumb {
+    font-size: 1rem;
+    font-family: "Montserrat", Helvetica, Arial, serif;
+    background-color: transparent;
+    padding: 0.5rem 0 0.5rem 1rem !important;
+    border-left: 1px solid #d6dce1;
+    border-radius: 0;
+}
+.breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    list-style: none;
+    background-color: #ededed;
+    border-radius: 0.5rem;
+}
     `
   }
 </style>

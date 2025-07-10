@@ -529,7 +529,28 @@ const NearByJobs = () => {
           }
        
        } 
+          .extra-ss {
+    padding-top: 11px;
+    padding-bottom: 11px;
+}
         `}
+      </style>
+
+
+      <style>
+        {
+
+          `
+          .btn {
+    border: 1px solid #FC2B5A !important;
+}
+    .btn-primary {
+    color: #fff!important;
+    background-color: #FC2B5A !important;
+    border-color: #FC2B5A;
+}
+          `
+        }
       </style>
     </div>
   );
