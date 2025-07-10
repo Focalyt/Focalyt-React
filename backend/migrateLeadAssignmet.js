@@ -21,7 +21,19 @@ async function updateOldLeadAssignments() {
       console.log(record, 'record');
       for (let assignment of record.leadAssignment) {
         // If counsellorName is a string, we need to find the corresponding User and update it to ObjectId
-        assignment._counsellor = assignment._id;        
+        if (assignment._counsellorName === 'Sonika Kumari') {
+          assignment._counsellor = new mongoose.Types.ObjectId('6851150242d2442b05c135ea');
+        }
+        else if (assignment._counsellorName === 'Anjali') {
+          assignment._counsellor = new mongoose.Types.ObjectId('685113ef42d2442b05c135e1');
+        }
+        else if (assignment._counsellorName === 'Ankita Rajput') {
+          assignment._counsellor = new mongoose.Types.ObjectId('6851158642d2442b05c135f3');
+        }
+        else if (assignment._counsellorName === 'Kavita Mehta') {
+          assignment._counsellor = new mongoose.Types.ObjectId('685503a454773244f7a6b4ed');
+        }
+
         assignment._id =  new mongoose.Types.ObjectId();
       }
       console.log(record, 'record after update');

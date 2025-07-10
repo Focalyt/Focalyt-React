@@ -20,12 +20,12 @@ const useNavHeight = (dependencies = []) => {
 
   const calculateHeightAndWidth = useCallback(() => {
     console.log('🔍 Calculating nav height and width...');
-    
+
     if (navRef.current) {
       // Calculate Height
       const height = navRef.current.offsetHeight;
       console.log('📏 Found nav height:', height);
-      
+
       if (height > 0) {
         setNavHeight(height);
         console.log('✅ Nav height set to:', height + 'px');
@@ -36,7 +36,7 @@ const useNavHeight = (dependencies = []) => {
       if (parentContainer) {
         const parentWidth = parentContainer.offsetWidth;
         console.log('📐 Parent width:', parentWidth);
-        
+
         if (parentWidth > 0) {
           setNavWidth(parentWidth + 'px');
           console.log('✅ Width set to:', parentWidth + 'px');
@@ -63,7 +63,7 @@ const useNavHeight = (dependencies = []) => {
   useEffect(() => {
     // Calculate immediately and with delays
     calculateHeightAndWidth();
-    
+
     // Use ResizeObserver for better performance
     const resizeObserver = new ResizeObserver(() => {
       calculateHeightAndWidth();
@@ -104,12 +104,12 @@ const useNavHeight = (dependencies = []) => {
     setTimeout(calculateHeightAndWidth, 100);
   }, dependencies);
 
-  return { 
-    navRef, 
-    navHeight, 
-    navWidth, 
-    subTabsHeight, 
-    contentMarginTop 
+  return {
+    navRef,
+    navHeight,
+    navWidth,
+    subTabsHeight,
+    contentMarginTop
   };
 };
 
@@ -185,13 +185,13 @@ const Student = ({
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
-  const { 
-    navRef, 
-    navHeight, 
-    navWidth, 
-    subTabsHeight, 
-    contentMarginTop 
-  } = useNavHeight([activeTab, activeSubTab]);    
+  const {
+    navRef,
+    navHeight,
+    navWidth,
+    subTabsHeight,
+    contentMarginTop
+  } = useNavHeight([activeTab, activeSubTab]);
 
   // ===== ENHANCED ATTENDANCE STATE =====
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -308,23 +308,23 @@ const Student = ({
     try {
       // Create download link
       const link = document.createElement('a');
-      
+
       // Set URL
-    
-      
+
+
       link.href = fileUrl;
       link.download = fileName || 'download';
-      
+
       // Force download attributes
       link.setAttribute('download', fileName || 'download');
       link.setAttribute('target', '_blank');
       link.style.display = 'none';
-      
+
       // Add to DOM, click, and remove
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
     } catch (error) {
       console.error('Download failed:', error);
       // Fallback: open in new tab
@@ -1899,7 +1899,7 @@ const Student = ({
       const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
       const response = await axios.post(`${backendUrl}/college/upload-document`, formData, {
-        headers: { 
+        headers: {
           'x-auth': token,
           'Content-Type': 'multipart/form-data'
         }
@@ -2153,37 +2153,37 @@ const Student = ({
     console.log('files', files);
     if (!files) return;
     files.forEach(file => {
-    // Validate file type (images and PDFs)
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "application/pdf",
-      "video/mp4",
-      "video/avi",
-      "video/mov",
-      "video/wmv",
-      "video/flv",
-      "video/webm",
-      "video/mkv",
-    ];
-    if (!allowedTypes.includes(file.type)) {
-      alert("Please select a valid file (JPG, PNG, GIF, or PDF)");
-      return;
-    }
+      // Validate file type (images and PDFs)
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+        "application/pdf",
+        "video/mp4",
+        "video/avi",
+        "video/mov",
+        "video/wmv",
+        "video/flv",
+        "video/webm",
+        "video/mkv",
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        alert("Please select a valid file (JPG, PNG, GIF, or PDF)");
+        return;
+      }
 
-    // Validate file size (max 10MB)
-    const maxSize = 20 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      alert("File size should be less than 20MB");
-      return;
-    }
-    console.log('file', file);
+      // Validate file size (max 10MB)
+      const maxSize = 20 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        alert("File size should be less than 20MB");
+        return;
+      }
+      console.log('file', file);
 
-    setSelectedFiles([...selectedFiles, file]);
+      setSelectedFiles([...selectedFiles, file]);
 
-    
+
     });
   };
   useEffect(() => {
@@ -4117,7 +4117,7 @@ const Student = ({
         <div className="col-12">
           {/* Enhanced Header */}
           <div className="position-relative">
-            <div className="" ref={navRef} style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${navWidth}` , boxShadow: '0 4px 25px 0 #0000001a' , paddingBottom: '15px'}}>
+            <div className="" ref={navRef} style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${navWidth}`, boxShadow: '0 4px 25px 0 #0000001a', paddingBottom: '15px' }}>
               <div className="container-fluid">
                 <div className="row align-items-center">
                   <div className="col-md-5 d-md-block d-sm-none">
@@ -4171,57 +4171,7 @@ const Student = ({
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       {/* ===== ENHANCED ATTENDANCE CONTROLS ===== */}
 
-                      <>
-                        {/* Time Filter */}
 
-
-                        {/* Attendance Mode Toggle */}
-                        <button
-                          onClick={() => {
-                            setShowAttendanceMode(!showAttendanceMode);
-                            setShowBulkControls(false)
-                          }
-                          }
-                          className={`btn btn-sm ${showAttendanceMode
-                            ? "btn-success"
-                            : "btn-outline-success"
-                            }`}
-                        >
-                          <i className="fas fa-check-circle me-1"></i>
-                          {showAttendanceMode
-                            ? "Exit Attendance"
-                            : "Mark Attendance"}
-                        </button>
-
-                        {/* Bulk Controls */}
-                        {showAttendanceMode && (
-                          <button
-                            onClick={() =>
-                              setShowBulkControls(!showBulkControls)
-                            }
-                            className={`btn btn-sm ${showBulkControls
-                              ? "btn-primary"
-                              : "btn-outline-primary"
-                              }`}
-                          >
-                            <i className="fas fa-users me-1"></i>
-                            {showBulkControls ? "Exit Bulk Controls" : "Show Bulk Controls"}
-                          </button>
-                        )}
-
-                        {/* Save & Export */}
-                        {showAttendanceMode && (
-                          <>
-                            <button
-                              className="btn btn-sm btn-warning"
-                              onClick={saveAllAttendance}
-                            >
-                              <i className="fas fa-save me-1"></i>
-                              Save
-                            </button>
-                          </>
-                        )}
-                      </>
 
 
                       {/* Search */}
@@ -4330,27 +4280,24 @@ const Student = ({
                   </div>
 
                   {/* ===== BULK ATTENDANCE CONTROLS ===== */}
-
-                  {/* <div className="col-12 mt-3 p-3 bg-light rounded">
-                    {showAttendanceMode && (
-                      <div className="d-flex align-items-center gap-2">
-                        <label className="form-label mb-0 small fw-bold">
-                          Date:
-                        </label>
-                        <DatePicker
-                          value={selectedDate ? new Date(selectedDate + 'T12:00:00') : new Date()}
-                          onChange={handleDatePickerChange}
-                          format="dd/MM/yyyy"
-                          maxDate={new Date()}
-                          minDate={new Date(new Date().setDate(new Date().getDate() - 7))}
-                          clearIcon={null}
-                          calendarIcon={<i className="fas fa-calendar-alt"></i>}
-                        />
-                      </div>
-                    )}
-                    {showBulkControls && showAttendanceMode && (
+                  {showAttendanceMode && showBulkControls && (
+                    <div className="col-12 mt-3 p-3 bg-light rounded">
 
                       <div className="d-flex align-items-center gap-3 flex-wrap">
+                        <div className="d-flex align-items-center gap-2">
+                          <label className="form-label mb-0 small fw-bold">
+                            Date:
+                          </label>
+                          <DatePicker
+                            value={selectedDate ? new Date(selectedDate + 'T12:00:00') : new Date()}
+                            onChange={handleDatePickerChange}
+                            format="dd/MM/yyyy"
+                            maxDate={new Date()}
+                            minDate={new Date(new Date().setDate(new Date().getDate() - 7))}
+                            clearIcon={null}
+                            calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                          />
+                        </div>
                         <div className="d-flex align-items-center">
                           <input
                             type="checkbox"
@@ -4412,8 +4359,9 @@ const Student = ({
                         </>
 
                       </div>
-                    )}
-                  </div> */}
+
+                    </div>
+                  )}
 
                 </div>
               </div>
@@ -4655,6 +4603,57 @@ const Student = ({
 
               <section className="list-view">
                 <div className="row">
+
+                  <div className="col-12 d-flex justify-content-end mb-2">
+                    {/* Time Filter */}
+
+
+                    {/* Attendance Mode Toggle */}
+                    <button
+                      onClick={() => {
+                        setShowAttendanceMode(!showAttendanceMode);
+                        setShowBulkControls(false)
+                      }
+                      }
+                      className={`btn btn-sm ${showAttendanceMode
+                        ? "btn-success"
+                        : "btn-outline-success"
+                        } me-2`}
+                    >
+                      <i className="fas fa-check-circle me-1"></i>
+                      {showAttendanceMode
+                        ? "Exit Attendance"
+                        : "Mark Attendance"}
+                    </button>
+
+                    {/* Bulk Controls */}
+                    {showAttendanceMode && (
+                      <>
+                      <button
+                        onClick={() =>
+                          setShowBulkControls(!showBulkControls)
+                        }
+                        className={`btn btn-sm ${showBulkControls
+                          ? "btn-primary"
+                          : "btn-outline-primary"
+                          } me-2`}
+                      >
+                        <i className="fas fa-users me-1"></i>
+                        {showBulkControls ? "Exit Bulk Controls" : "Show Bulk Controls"}
+                      </button>
+                   
+                        <button
+                          className="btn btn-sm btn-warning"
+                          onClick={saveAllAttendance}
+                        >
+                          <i className="fas fa-save me-1"></i>
+                          Save
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+
                   <div className="col-12 rounded equal-height-2 coloumn-2">
                     <div className="card px-3">
                       <div className="row" id="students-main-row">
@@ -6508,11 +6507,11 @@ const Student = ({
                     <div className="col-md-4 mb-3" key={image.id}>
                       <div className="card">
                         <div className="position-relative">
-                          <i 
-                            className="fas fa-download position-absolute" 
-                            style={{ 
-                              top: '10px', 
-                              right: '10px', 
+                          <i
+                            className="fas fa-download position-absolute"
+                            style={{
+                              top: '10px',
+                              right: '10px',
                               zIndex: 10,
                               cursor: 'pointer',
                               color: 'white',
@@ -6524,7 +6523,7 @@ const Student = ({
                               e.stopPropagation();
                               try {
                                 const fullUrl = image?.fileUrl;
-                                
+
                                 await downloadImage(fullUrl, image.originalFileName || image.name || 'download.jpg');
                               } catch (error) {
                                 console.error('Download failed:', error);
@@ -6573,9 +6572,9 @@ const Student = ({
               <div className="modal-body">
                 <div className="row">
 
-                <div className="d-flex justify-content-center align-items-center mb-3">
-                  <video src={selectedVideo} alt="" style={{ width: '100%', height: '300px', objectFit: 'contain' }} controls />
-                </div>
+                  <div className="d-flex justify-content-center align-items-center mb-3">
+                    <video src={selectedVideo} alt="" style={{ width: '100%', height: '300px', objectFit: 'contain' }} controls />
+                  </div>
 
                   {getVideosForDate(selectedDate).map((video) => (
                     <div className="col-md-6 mb-3" key={video.id}>
@@ -6583,7 +6582,7 @@ const Student = ({
                         <div className="position-relative" onClick={() => setSelectedVideo(video.fileUrl)}>
 
                           <video src={video.fileUrl} className="card-img-top" />
-                          
+
                         </div>
                         <div className="card-body p-2">
                           <small className="text-muted">{video.name}</small>
