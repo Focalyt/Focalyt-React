@@ -4930,7 +4930,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			if (status === 'pendingBatchAssign') {
 				baseMatchStage.batch = { $in: [null] };
 			}
-			if (status === 'batchAssigned') {	
+			if (status === 'batchAssigned') {
 				baseMatchStage.batch = { $ne: null };
 				baseMatchStage.isZeroPeriodAssigned = { $in: [false] };
 				baseMatchStage.dropout = { $in: [false] };
@@ -5255,7 +5255,7 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 			}
 			basePipeline.push({ $match: baseMatchStage });
 			basePipeline.push(
-				{ $lookup: { from: 'courses', localField: '_course', foreignField: '_id', as: '_course', pipeline: [ { $lookup: { from: 'sectors', localField: 'sectors', foreignField: '_id', as: 'sectors' } }, { $lookup: { from: 'verticals', localField: 'vertical', foreignField: '_id', as: 'vertical' } }, { $lookup: { from: 'projects', localField: 'project', foreignField: '_id', as: 'project' } } ] } },
+				{ $lookup: { from: 'courses', localField: '_course', foreignField: '_id', as: '_course', pipeline: [{ $lookup: { from: 'sectors', localField: 'sectors', foreignField: '_id', as: 'sectors' } }, { $lookup: { from: 'verticals', localField: 'vertical', foreignField: '_id', as: 'vertical' } }, { $lookup: { from: 'projects', localField: 'project', foreignField: '_id', as: 'project' } }] } },
 				{ $unwind: '$_course' },
 				{ $lookup: { from: 'centers', localField: '_center', foreignField: '_id', as: '_center' } },
 				{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
@@ -5719,7 +5719,7 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 	try {
 		const user = req.user;
 		// Find the college for the current user
-		const college = await College.findOne({ '_concernPerson._id': user._id });
+		const college = await College.findOne({ '_concernPerson._id': user._id }).populate('_concernPerson._id');
 		if (!college) {
 			return res.status(404).json({ status: false, message: 'College not found' });
 		}
@@ -5772,7 +5772,6 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 		const projectSet = new Map();
 		const courseSet = new Map();
 		const centerSet = new Map();
-		const counselorSet = new Map();
 
 		appliedCourses.forEach(ac => {
 			// Verticals
@@ -5800,13 +5799,21 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 				centerSet.set(ac._center._id.toString(), { _id: ac._center._id, name: ac._center.name });
 			}
 			// Counselors (last assignment)
-			if (Array.isArray(ac.leadAssignment) && ac.leadAssignment.length > 0) {
-				const last = ac.leadAssignment[ac.leadAssignment.length - 1];
-				if (last && last._id && last.counsellorName && !counselorSet.has(last._id.toString())) {
-					counselorSet.set(last._id.toString(), { _id: last._id, name: last.counsellorName });
-				}
-			}
+
 		});
+
+		let counselors = []
+		college._concernPerson.forEach(person => {
+			console.log(person._id, 'person');
+			let data = {
+				_id: person._id._id,
+				name: person._id.name
+			}
+			counselors.push(data)
+
+		})
+
+		console.log(counselors, 'counselors');
 
 		res.json({
 			status: true,
@@ -5814,7 +5821,7 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 			projects: Array.from(projectSet.values()),
 			courses: Array.from(courseSet.values()),
 			centers: Array.from(centerSet.values()),
-			counselors: Array.from(counselorSet.values())
+			counselors
 		});
 	} catch (err) {
 		console.error('Error in /filters-data:', err);
@@ -6192,69 +6199,82 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 });
 
 router.route('/refer-leads')
-.get(isCollege, async (req, res) => {
-	try {
-		const user = req.user;
-		const college = await College.findOne({ '_concernPerson._id': user._id }).populate('_concernPerson._id').select('_concernPerson');
-		console.log(college._concernPerson, 'college');
-		if (!college) {
-			return res.status(404).json({ status: false, message: 'College not found' });
-		}
-		res.status(200).json({
-			success: true,
-			data: college._concernPerson
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({
-			success: false,
-			message: "Server Error"
-		});
-	}
-})
+	.get(isCollege, async (req, res) => {
+		try {
+			const user = req.user;
+			const college = await College.findOne({ '_concernPerson._id': user._id }).populate('_concernPerson._id').select('_concernPerson');
+			console.log(college._concernPerson, 'college');
+			if (!college) {
+				return res.status(404).json({ status: false, message: 'College not found' });
+			}
+			let counselors = []
+			college._concernPerson.forEach(person => {
+				counselors.filter(c => {
+					if (c._id === person._id) {
+						return
+					} else {
+						counselors.push(person._id)
+					}
+				})
 
-.post(isCollege, async (req, res) => {
-	try {
-		const user = req.user;
-		let { counselorId, appliedCourseId, type } = req.body;
-		counselorId = new mongoose.Types.ObjectId(counselorId);
+			})
 
-		// If appliedCourseId is not an array, convert it to an array
-		if (!Array.isArray(appliedCourseId)) {
-			appliedCourseId = [appliedCourseId];
+			console.log(counselors, 'counsellor');
+			res.status(200).json({
+				success: true,
+				data: counselors
+			});
+		} catch (err) {
+			console.error(err);
+			res.status(500).json({
+				success: false,
+				message: "Server Error"
+			});
 		}
-		for (const id of appliedCourseId) {
-		const counselor = await User.findById(counselorId);
-		if (!counselor) {
-			return res.status(404).json({ status: false, message: 'Counselor not found' });
+	})
+
+	.post(isCollege, async (req, res) => {
+		try {
+			const user = req.user;
+			let { counselorId, appliedCourseId, type } = req.body;
+			counselorId = new mongoose.Types.ObjectId(counselorId);
+
+			// If appliedCourseId is not an array, convert it to an array
+			if (!Array.isArray(appliedCourseId)) {
+				appliedCourseId = [appliedCourseId];
+			}
+			for (const id of appliedCourseId) {
+				const counselor = await User.findById(counselorId);
+				if (!counselor) {
+					return res.status(404).json({ status: false, message: 'Counselor not found' });
+				}
+
+
+				const appliedCourse = await AppliedCourses.findById(id);
+				if (!appliedCourse) {
+					return res.status(404).json({ status: false, message: 'Applied course not found' });
+				}
+				const updateData = {
+					_counsellor: counselorId,
+					counsellorName: counselor.name,
+					assignDate: new Date(),
+					assignedBy: new mongoose.Types.ObjectId(user._id)
+				}
+				appliedCourse.leadAssignment.push(updateData);
+				await appliedCourse.save();
+			}
+			res.status(200).json({
+				success: true,
+				message: 'Lead referred successfully'
+			});
+		} catch (err) {
+			console.error(err);
+			res.status(500).json({
+				success: false,
+				message: "Server Error"
+			});
 		}
-	
-		
-		const appliedCourse = await AppliedCourses.findById(id);
-		if (!appliedCourse) {
-			return res.status(404).json({ status: false, message: 'Applied course not found' });
-		}
-		const updateData = {
-			_counsellor: counselorId,
-			counsellorName: counselor.name,
-			assignDate: new Date(),
-			assignedBy: new mongoose.Types.ObjectId(user._id)	
-		}
-		appliedCourse.leadAssignment.push(updateData);
-		await appliedCourse.save();
-	}
-		res.status(200).json({
-			success: true,
-			message: 'Lead referred successfully'
-		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({
-			success: false,
-			message: "Server Error"
-		});
-	}
-})
+	})
 
 
 
