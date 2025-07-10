@@ -3218,7 +3218,7 @@ const KYCManagement = () => {
                                   {/* Profile Header Card */}
                                   <div className="card border-0 shadow-sm mb-0 mt-2">
                                     <div className="card-body px-1 py-0 my-2">
-                                      <div className="row align-items-center justify-content-between">
+                                       <div className="row align-items-center justify-content-between">
                                         <div className="col-md-7">
                                           <div className="d-flex align-items-center">
                                             <div className="form-check me-3">
