@@ -98,7 +98,9 @@ import AttendanceManagement from './Component/Layouts/App/College/ProjectManagem
 import Whatapp from './Pages/App/College/Whatapp/Whatapp';
 import WhatappTemplate from './Pages/App/College/Whatapp/WhatappTemplate';
 import B2BSales from './Pages/App/College/Course/B2BSales';
-import StatusB2C from './Pages/App/College/Status/statusB2C';
+import StatusB2C from './Pages/App/College/Status/statusB2C'
+import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
+import TermsOfService from './Pages/App/College/Register/termsOfService';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -188,6 +190,8 @@ const Layout = () => {
         {/*  college views  */}
 
         <Route path="/institute/login" element={<CollegeLogin />} />
+        <Route path="/institute/privacyPolicy" element={<PrivacyPolicy />} />
+        <Route path="/institute/termsOfService" element={<TermsOfService />} />
         <Route path="/institute/register" element={<CollegeRegister />} />
         {/* CollegeLayout will wrap only protected pages */}
         <Route path="/institute" element={<CollegeLayout  />}>
