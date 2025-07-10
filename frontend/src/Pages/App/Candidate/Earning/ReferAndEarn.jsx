@@ -226,7 +226,7 @@ ${backendUrl}/candidate/login?refCode=${id}`;
                     </a>
                   </div>
                   <div className="totalCount col-xl-2 col-lg-4 col-md-4 col-sm-6 col-12 mt-4">
-                    <span>Total Candidates: {count}</span>
+                    <span style={{whiteSpace: 'nowrap'}}>Total Candidates: {count}</span>
                   </div>
                 </div>
               </form>
@@ -362,7 +362,12 @@ ${backendUrl}/candidate/login?refCode=${id}`;
     padding: 1rem;
     vertical-align: middle;
 }
-          `
+.card-content {
+    padding: 0px 20px;
+    gap: 20px;
+}   
+
+`
         }
       </style>
 

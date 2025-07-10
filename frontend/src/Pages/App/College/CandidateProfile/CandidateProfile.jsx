@@ -132,62 +132,7 @@ const CandidateProfile = forwardRef((props, ref) => {
         return size <= 5 * 1024 * 1024; // 5MB
     };
 
-    // const handleFileUpload = async (e) => {
-    //     const file = e.target.files[0];
-    //     if (!file) return;
-
-    //     const fileType = file.name;
-    //     const fileSize = file.size;
-
-    //     if (!checkCvValidation(fileType) && !checkCVSize(fileSize)) {
-    //         alert("Upload the CV in .docx, .doc, .jpg, .jpeg, .png or pdf format and size should be less than 5MB");
-    //         e.target.value = '';
-    //         return;
-    //     } else if (checkCvValidation(fileType) && !checkCVSize(fileSize)) {
-    //         alert("Uploaded CV size should be less than 5MB");
-    //         e.target.value = '';
-    //         return;
-    //     } else if (!checkCvValidation(fileType) && checkCVSize(fileSize)) {
-    //         alert("Upload the CV in .docx, .doc, .jpg, .jpeg, .png or pdf format");
-    //         e.target.value = '';
-    //         return;
-    //     }
-
-    //     const formData = new FormData();
-    //     formData.append("file", file);
-
-    //     const headers = {
-    //         headers: {
-    //             'x-auth': token,
-    //             'Content-Type': 'multipart/form-data'
-    //         }
-    //     };
-
-    //     try {
-    //         const result = await axios.post(`${backendUrl}/api/uploadSingleFile`, formData, headers);
-    //         console.log("📦 Upload response:", result.data);
-
-    //         if (result.data.status) {
-    //             localStorage.setItem("resume", result.data.data.Key); // Saving key like original
-
-    //             // Store file info in localStorage
-    //             const currentDate = new Date().toLocaleDateString('en-GB', {
-    //                 day: 'numeric', month: 'short', year: 'numeric'
-    //             }).replace(/ /g, ' ');
-
-    //             localStorage.setItem('resumeFileName', file.name);
-    //             localStorage.setItem('resumeUploadDate', currentDate);
-
-    //             setFileName(file.name);
-    //             setUploadDate(currentDate);
-    //         }
-    //     } catch (error) {
-    //         console.error("Upload failed:", error);
-    //         alert("Something went wrong while uploading the resume.");
-    //     }
-    // };
-
-
+    
     // Audio recording state
     const [isRecording, setIsRecording] = useState(false);
     const [recordings, setRecordings] = useState([]);
@@ -1284,6 +1229,7 @@ const CandidateProfile = forwardRef((props, ref) => {
 
                     isValid = true;
                     // window.location.reload();
+                    
                     return isValid;
 
                 }

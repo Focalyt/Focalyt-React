@@ -237,6 +237,11 @@ const CandidateDashboard = () => {
 <style>
   {
     `
+ html body .content .content-wrapper {
+    padding: calc(2.2rem - 0.4rem) 2.2rem 0;
+    margin-top: 6rem;
+}
+
     #profile_status a{
     width: 100%;
 }
