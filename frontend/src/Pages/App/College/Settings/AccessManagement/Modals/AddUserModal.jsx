@@ -345,7 +345,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
             ) : (
               <div className="card">
                 <div className="card-header d-flex justify-content-between align-items-center">
-                  <span className="fw-bold">Select Reporting Managers ({users.length} available)</span>
+                  <span className="fw-bold">Select Reporting Managers ({users.filter(u => u.status === true || u.status === 'true' || u.status === "active").length} available)</span>
                   <div>
                     <button
                       type="button"
@@ -353,7 +353,9 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       onClick={() => {
                         setUserForm(prev => ({
                           ...prev,
-                          reporting_managers: users.map(u => u.user_id)
+                          reporting_managers: users.filter(user => 
+                            user.status === true || user.status === 'true' || user.status === "active"
+                          ).map(u => u.user_id)
                         }));
                       }}
                     >
@@ -371,7 +373,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                   </div>
                 </div>
                 <div className="card-body" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                  {users.map(user => {
+                  {users.filter(u => ( u.status === true || u.status === 'true' || u.status === "active")).map(user => {
                     const isSelected = userForm.reporting_managers.includes(user.user_id);
                     
                     return (
