@@ -436,7 +436,7 @@ const CollegeLogin = () => {
                                 )}
 
                                 <div className="terms">
-                                    I agree to <a href="/employersTermsofService" target="_blank">Employers terms of use</a> and <a href="/userAgreement" target="_blank">User Agreement</a>.
+                    I agree to <a href="/institute/termsOfService" target="_blank"> Terms of Service</a> and <a href="/institute/privacyPolicy" target="_blank">Privacy Policy</a>.
                                 </div>
 
                                 <button
