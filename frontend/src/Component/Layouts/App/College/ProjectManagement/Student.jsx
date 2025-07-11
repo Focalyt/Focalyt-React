@@ -6911,9 +6911,9 @@ const Student = ({
             animation: fadeIn 0.5s ease-out;
           }
 
-          .content-body {
-            padding: 2rem 1rem;
-          }
+          // .content-body {
+          //   padding: 2rem 1rem;
+          // }
 
           /* Custom scrollbar */
           ::-webkit-scrollbar {

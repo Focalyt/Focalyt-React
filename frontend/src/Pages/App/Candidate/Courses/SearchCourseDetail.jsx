@@ -1710,7 +1710,7 @@ const CourseDetails = () => {
 }
 .single-footer .contact-info li img {
     position: absolute;
-    left: 0;
+    left: -14px;
     top: 3px;
     height: auto;
     width: 12px;

@@ -741,6 +741,7 @@ const CandidateLogin = () => {
                 {`
                 .marginLeft{
                     margin-left:0px!important;
+                    overflow-x: hidden;
                 }
                 .swiper-pagination-bullet{
                     width: 5px;

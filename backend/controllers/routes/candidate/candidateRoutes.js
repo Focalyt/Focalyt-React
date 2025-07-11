@@ -635,25 +635,25 @@ router
     }
   });
 
-router.get("/login", async (req, res) => {
-  let user = req.session.user
-  let { returnUrl } = req.query
+// router.get("/login", async (req, res) => {
+//   let user = req.session.user
+//   let { returnUrl } = req.query
 
 
-  const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
-  console.log(fullUrl);
+//   const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
+//   console.log(fullUrl);
 
-  // Modify script to run after DOM is loaded and escape quotes properly
+//   // Modify script to run after DOM is loaded and escape quotes properly
  
 
-  if (user && user.role == 3 && returnUrl && returnUrl.trim() !== '') {
-    return res.redirect(returnUrl)
-  }
-  else if (user && user.role == 3) {
-    return res.redirect("/candidate/dashboard");
-  }
-  return res.render(`${req.vPath}/app/candidate/login`, { apikey: process.env.AUTH_KEY_GOOGLE });
-});
+//   if (user && user.role == 3 && returnUrl && returnUrl.trim() !== '') {
+//     return res.redirect(returnUrl)
+//   }
+//   else if (user && user.role == 3) {
+//     return res.redirect("/candidate/dashboard");
+//   }
+//   return res.render(`${req.vPath}/app/candidate/login`, { apikey: process.env.AUTH_KEY_GOOGLE });
+// });
 // router.get("/searchjob", [isCandidate], async (req, res) => {
 //   const data = req.query;
 //   let validation = { mobile: req.session.user.mobile }

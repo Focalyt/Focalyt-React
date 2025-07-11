@@ -278,7 +278,7 @@ function CollegeLayout({ children }) {
                 <a href="#" onClick={() => toggleSubmenu('sales')}>
                   <FontAwesomeIcon icon={faBookOpen} />
                   {/* <i class="fas fa-list"></i> */}
-                  <span className="menu-title">Sales (B2B)</span>
+                  <span className="menu-title">Sales (B2C)</span>
                   <span className="dropdown-arrow">
                     <FontAwesomeIcon
                       icon={faChevronRight}
@@ -667,7 +667,7 @@ function CollegeLayout({ children }) {
 }
 .dropdown-divider {
     height: 0;
-    margin: 0.5rem 0;
+    margin: 0;
     overflow: hidden;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
@@ -704,6 +704,33 @@ span#notification {
 #wrapping-bottom {
     white-space: pre-wrap !important;
 }
+
+@keyframes slideIn {
+    from {
+          transform: translateX(-100%);
+          opacity: 0;
+         }
+     to {
+         transform: translateX(0);
+         opacity: 1;
+        }
+    }
+
+          @keyframes slideOut {
+            from {
+              transform: translateX(0);
+              opacity: 1;
+            }
+            to {
+              transform: translateX(-100%);
+              opacity: 0;
+            }
+          }
+
+          .slide-in {
+            animation: slideIn 0.3s ease-out;
+          }
+
 @media (max-width: 1199px) {
     .main-menu {
       position: fixed;

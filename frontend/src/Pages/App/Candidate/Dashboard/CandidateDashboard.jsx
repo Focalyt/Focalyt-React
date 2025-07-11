@@ -475,7 +475,7 @@ background-color: #64ccf3;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 250px;
+  width: 230px;
   height: 100vh;
   z-index: 1000;
   transition: all 0.3s ease;
