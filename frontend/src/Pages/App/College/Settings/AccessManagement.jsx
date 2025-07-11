@@ -139,6 +139,46 @@ const AccessManagement = () => {
     setShowEditUser(true);
   };
 
+  const handleDeleteUser = async (user) => {
+    console.log(user, 'user');
+    const confirm = window.confirm('Are you sure you want to delete this user?');
+    if (confirm) {
+      try {
+        const response = await axios.delete(`${backendUrl}/college/users/${user.user_id}`, {
+          headers: { 'x-auth': token }
+        });
+        if (response.data.success) {
+          await fetchUsers();
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error);
+      }
+    }
+  };
+
+  const handleRestoreUser = async (user) => {
+    console.log(user, 'user');
+    const confirm = window.confirm('Are you sure you want to restore this user?');
+    if (confirm) {
+      try {
+        console.log('token', token)
+        const response = await axios.post(
+          `${backendUrl}/college/users/restore/${user.user_id}`, 
+          {}, // empty data object
+          {
+            headers: { 'x-auth': token }
+          }
+        );
+        if (response.data.success) {
+          alert(response.data.message);
+          await fetchUsers();
+        }
+      } catch (error) {
+        console.error('Error restoring user:', error);
+      }
+    }
+  };
+
   const handleCreateRole = () => {
     setAddMode('role');
     setShowAddRole(true);
@@ -171,7 +211,7 @@ const AccessManagement = () => {
           email: user.email,
           mobile: user.mobile,
           designation: user.designation,
-          status: user.status ? 'active' : 'inactive',
+          status: user.status? 'active' : 'inactive',
           reporting_managers: user.accessSummary?.reportingManagers || 0,
           role: user.role,
           roleId: user.roleId,
@@ -332,6 +372,8 @@ const fetchBatches = async () => {
             users={users}
             handleAddUser={handleAddUser}
             handleEditUser={handleEditUser}
+            onDeleteUser={handleDeleteUser}
+            onRestoreUser={handleRestoreUser}
             allRoles={allRoles}
             permissionMode={permissionMode}
             searchTerm={searchTerm}

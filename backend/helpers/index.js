@@ -103,6 +103,7 @@ module.exports.isCollege = async (req, res, next) => {
 
     // ✅ Else check for token in headers (for React SPA project)
     const token = req.header('x-auth');
+    console.log('token', token)
 
 
     if (!token) throw error;
