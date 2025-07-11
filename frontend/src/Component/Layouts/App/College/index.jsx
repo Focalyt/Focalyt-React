@@ -319,7 +319,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/institute/sales' ? 'active' : ''}`}>
                 <a href="/institute/sales" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faTasks} />
-                  <span className="menu-title">Sales (B2C)</span>
+                  <span className="menu-title">Sales (B2B)</span>
                 </a>
               </li>
               <li className={`nav-item ${location.pathname === '/institute/candidatemanagment' ? 'active' : ''}`}>
