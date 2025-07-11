@@ -150,7 +150,7 @@ const handleMoveLeft = async (statusId, currentIndex) => {
     const token = userData.token;
     
     // Make the API call in the background
-    axios.put(`${backendUrl}/college/status/reorder`, {
+    axios.put(`${backendUrl}/college/statusB2b/reorder`, {
       statusOrder
     }, {
       headers: { 'x-auth': token }
@@ -203,7 +203,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
     const token = userData.token;
     
     // Make the API call in the background
-    axios.put(`${backendUrl}/college/status/reorder`, {
+    axios.put(`${backendUrl}/college/statusB2b/reorder`, {
       statusOrder
     }, {
       headers: { 'x-auth': token }
@@ -571,7 +571,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
         if (isSubstatus) {
           if (editMode) {
             // Edit substatus
-            const response = await axios.put(`${backendUrl}/college/status/${statusId}/substatus/${substatusId}`, {
+            const response = await axios.put(`${backendUrl}/college/statusB2b/${statusId}/substatus/${substatusId}`, {
               title, description, hasRemarks, hasFollowup, hasAttachment
             }, { headers: { 'x-auth': token } });
 
@@ -581,7 +581,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
             }
           } else {
             // Add substatus
-            const response = await axios.post(`${backendUrl}/college/status/${statusId}/substatus`, {
+            const response = await axios.post(`${backendUrl}/college/statusB2b/${statusId}/substatus`, {
               title, description, hasRemarks, hasFollowup, hasAttachment
             }, { headers: { 'x-auth': token } });
 
@@ -595,7 +595,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
           // 🔁 Edit role (API call)
           if (editMode && statusId) {
             // Edit status
-            const response = await axios.put(`${backendUrl}/college/status/edit/${statusId}`, {
+            const response = await axios.put(`${backendUrl}/college/statusB2b/edit/${statusId}`, {
               title, description, milestone
             }, { headers: { 'x-auth': token } });
 
@@ -605,7 +605,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
             }
           } else {
             // Add status
-            const response = await axios.post(`${backendUrl}/college/status/add`, {
+            const response = await axios.post(`${backendUrl}/college/statusB2b/add`, {
               title, description,milestone
             }, { headers: { 'x-auth': token } });
 
@@ -871,7 +871,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
 
-      const response = await axios.get(`${backendUrl}/college/status`, {
+      const response = await axios.get(`${backendUrl}/college/statusB2b`, {
         headers: { 'x-auth': token }
       });
 
@@ -958,7 +958,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
 
-      const response = await axios.put(`${backendUrl}/college/status/reorder`, {
+      const response = await axios.put(`${backendUrl}/college/statusB2b/reorder`, {
         statusOrder
       }, {
         headers: { 'x-auth': token }
@@ -1056,7 +1056,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
         const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
         const token = userData.token;
 
-        const response = await axios.delete(`${backendUrl}/college/status/deleteSubStatus/${deletingStatusId}/substatus/${deletingSubstatusId}`, {
+        const response = await axios.delete(`${backendUrl}/college/statusB2b/deleteSubStatus/${deletingStatusId}/substatus/${deletingSubstatusId}`, {
           headers: { 'x-auth': token }
         });
 
@@ -1077,7 +1077,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
         const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
         const token = userData.token;
 
-        const response = await axios.delete(`${backendUrl}/college/status/delete/${deletingStatusId}`, {
+        const response = await axios.delete(`${backendUrl}/college/statusB2b/delete/${deletingStatusId}`, {
           headers: { 'x-auth': token }
         });
 

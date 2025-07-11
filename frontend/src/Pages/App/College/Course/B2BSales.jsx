@@ -2098,7 +2098,7 @@ const B2BSales = () => {
 
   const fetchStatus = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/college/status`, {
+      const response = await axios.get(`${backendUrl}/college/statusB2b`, {
         headers: { 'x-auth': token }
       });
 
@@ -2164,7 +2164,7 @@ const B2BSales = () => {
 
   const fetchSubStatus = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
+      const response = await axios.get(`${backendUrl}/college/statusB2b/${seletectedStatus}/substatus`, {
         headers: { 'x-auth': token }
       });
 
@@ -3504,13 +3504,13 @@ const B2BSales = () => {
                 <div className="row align-items-center">
                   <div className="col-md-6 d-md-block d-sm-none">
                     <div className="d-flex align-items-center">
-                      <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                      <h4 className="fw-bold text-dark mb-0 me-3">B2B Cycle</h4>
                       <nav aria-label="breadcrumb">
                         <ol className="breadcrumb mb-0 small">
                           <li className="breadcrumb-item">
                             <a href="/institute/dashboard" className="text-decoration-none">Home</a>
                           </li>
-                          <li className="breadcrumb-item active">Admission Cycle</li>
+                          <li className="breadcrumb-item active">B2B Cycle</li>
                         </ol>
                       </nav>
                     </div>
@@ -3518,6 +3518,9 @@ const B2BSales = () => {
 
                   <div className="col-md-6">
                     <div className="d-flex justify-content-end align-items-center gap-2">
+                      <button className="btn btn-primary">
+                        <i className="fas fa-plus me-1"></i> Add Lead
+                      </button>
                       <div className="input-group" style={{ maxWidth: '300px' }}>
                         <span className="input-group-text bg-white border-end-0 input-height">
                           <i className="fas fa-search text-muted"></i>
