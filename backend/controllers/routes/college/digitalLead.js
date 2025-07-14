@@ -140,7 +140,7 @@ class BatchProcessor {
                 source = 'FB Form';
             }
 
-            if (!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4) {
+            if (!FirstName || !MobileNumber || !Gender  || !Email || !courseId || !Field4) {
                 throw new Error("All fields are required");
             }
 
