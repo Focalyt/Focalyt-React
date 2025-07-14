@@ -299,7 +299,7 @@ const batchProcessor = new BatchProcessor();
 router.route("/addleaddandcourseapply")
     .post(async (req, res) => {
         try {
-            console.log("Lead received:", req.body.FirstName);
+            console.log("Lead received:", req.body);
 
             // Basic validation only
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
