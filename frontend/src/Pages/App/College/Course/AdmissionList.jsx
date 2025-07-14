@@ -104,6 +104,7 @@ const useNavHeight = (dependencies = []) => {
   // Recalculate when dependencies change
   useEffect(() => {
     setTimeout(calculateHeightAndWidth, 100);
+    setTimeout(calculateHeightAndWidth, 300);
   }, dependencies);
 
   return { navRef, navHeight, navWidth };
@@ -464,7 +465,11 @@ const AdmissionList = () => {
     { _id: 'dropout', name: 'Dropout', count: 0, milestone: '' }
   ]);
 
-  const { navRef, navHeight, navWidth } = useNavHeight([admissionFilters]);
+  const { navRef, navHeight, navWidth } = useNavHeight([admissionFilters, showEditPanel, 
+    showFollowupPanel, 
+    leadHistoryPanel, 
+    showWhatsappPanel,
+    mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -1397,6 +1402,7 @@ const AdmissionList = () => {
     setShowEditPanel(false);
     setShowFollowupPanel(false);
     setShowWhatsappPanel(false);
+    setLeadHistoryPanel(false);
 
     if (panel === 'StatusChange') {
       if (profile) {
@@ -1419,6 +1425,10 @@ const AdmissionList = () => {
     if (!isMobile) {
       setMainContentClass('col-8');
     }
+    setTimeout(() => {
+      const event = new Event('resize');
+      window.dispatchEvent(event);
+    }, 300);  
   };
 
   const closeEditPanel = () => {
@@ -1427,6 +1437,10 @@ const AdmissionList = () => {
     if (!isMobile) {
       setMainContentClass('col-12');
     }
+    setTimeout(() => {
+      const event = new Event('resize');
+      window.dispatchEvent(event);
+    }, 300);
   };
 
   const handleFetchCandidate = async (profile = null) => {
@@ -1448,6 +1462,10 @@ const AdmissionList = () => {
     if (!isMobile) {
       setMainContentClass('col-8');
     }
+    setTimeout(() => {
+      const event = new Event('resize');
+      window.dispatchEvent(event);
+    }, 300);
   };
 
   const closeWhatsappPanel = () => {
@@ -1480,6 +1498,10 @@ const AdmissionList = () => {
     if (!isMobile) {
       setMainContentClass(showEditPanel || showWhatsappPanel ? 'col-8' : 'col-12');
     }
+    setTimeout(() => {
+      const event = new Event('resize');
+      window.dispatchEvent(event);
+    }, 300);
   };
 
   const getPaginationPages = () => {
@@ -2756,7 +2778,7 @@ const AdmissionList = () => {
             }}
           />
           <div className="position-relative" >
-          <div ref={navRef} style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
+          <nav ref={navRef} style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
         WebkitBackdropFilter: `blur(${blurIntensity}px)`,
         boxShadow: isScrolled 
           ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)' 
@@ -2832,7 +2854,7 @@ const AdmissionList = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </nav>
           </div>
 
           {/* Advanced Filters */}
@@ -8945,7 +8967,13 @@ max-width: 600px;
     color: #fff;
     
 }
-          
+    nav[ref] {
+  transition: width 0.3s ease !important;
+}
+
+.position-relative {
+  transition: width 0.3s ease !important;
+      
           `
         }
         </style>

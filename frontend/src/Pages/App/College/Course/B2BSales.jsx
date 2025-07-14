@@ -398,22 +398,22 @@ const DocumentModal = memo(({
                       );
                     }
                   })()}
-                 {fileUrl && (
-              <div className="preview-controls">
-                <button className="control-btn" onClick={handleZoomIn}>
-                  <i className="fas fa-search-plus"></i>
-                </button>
-                <button className="control-btn" onClick={handleZoomOut}>
-                  <i className="fas fa-search-minus"></i>
-                </button>
-                <button className="control-btn" onClick={handleRotate}>
-                  <i className="fas fa-redo"></i>
-                </button>
-                <button className="control-btn" onClick={handleReset}>
-                  <i className="fas fa-compress"></i>
-                </button>
-              </div>
-            )}
+                  {fileUrl && (
+                    <div className="preview-controls">
+                      <button className="control-btn" onClick={handleZoomIn}>
+                        <i className="fas fa-search-plus"></i>
+                      </button>
+                      <button className="control-btn" onClick={handleZoomOut}>
+                        <i className="fas fa-search-minus"></i>
+                      </button>
+                      <button className="control-btn" onClick={handleRotate}>
+                        <i className="fas fa-redo"></i>
+                      </button>
+                      <button className="control-btn" onClick={handleReset}>
+                        <i className="fas fa-compress"></i>
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="no-document">
@@ -574,12 +574,12 @@ const useNavHeight = (dependencies = []) => {
     });
 
     window.addEventListener('resize', handleResize);
-    
+
     if (navRef.current) {
-      observer.observe(navRef.current, { 
-        childList: true, 
-        subtree: true, 
-        attributes: true 
+      observer.observe(navRef.current, {
+        childList: true,
+        subtree: true,
+        attributes: true
       });
     }
 
@@ -624,12 +624,12 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     });
 
     window.addEventListener('resize', handleResize);
-    
+
     if (widthRef.current) {
-      observer.observe(widthRef.current, { 
-        childList: true, 
-        subtree: true, 
-        attributes: true 
+      observer.observe(widthRef.current, {
+        childList: true,
+        subtree: true,
+        attributes: true
       });
     }
 
@@ -642,46 +642,46 @@ const useMainWidth = (dependencies = []) => {// Default fallback
   // Recalculate when dependencies change
   useEffect(() => {
     setTimeout(calculateWidth, 50);
-  }, dependencies); 
+  }, dependencies);
 
   return { widthRef, width };
 };
 const useScrollBlur = (navbarHeight = 140) => {
-    const [isScrolled, setIsScrolled] = useState(false);
-    const [scrollY, setScrollY] = useState(0);
-    const contentRef = useRef(null);
-  
-    useEffect(() => {
-      const handleScroll = () => {
-        const currentScrollY = window.pageYOffset;
-        const shouldBlur = currentScrollY > navbarHeight / 3;
-        
-        setIsScrolled(shouldBlur);
-        setScrollY(currentScrollY);
-      };
-  
-      // Throttle scroll event for better performance
-      let ticking = false;
-      const throttledScroll = () => {
-        if (!ticking) {
-          requestAnimationFrame(() => {
-            handleScroll();
-            ticking = false;
-          });
-          ticking = true;
-        }
-      };
-  
-      window.addEventListener('scroll', throttledScroll, { passive: true });
-      handleScroll(); // Initial check
-  
-      return () => {
-        window.removeEventListener('scroll', throttledScroll);
-      };
-    }, [navbarHeight]);
-  
-    return { isScrolled, scrollY, contentRef };
-  };
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.pageYOffset;
+      const shouldBlur = currentScrollY > navbarHeight / 3;
+
+      setIsScrolled(shouldBlur);
+      setScrollY(currentScrollY);
+    };
+
+    // Throttle scroll event for better performance
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', throttledScroll, { passive: true });
+    handleScroll(); // Initial check
+
+    return () => {
+      window.removeEventListener('scroll', throttledScroll);
+    };
+  }, [navbarHeight]);
+
+  return { isScrolled, scrollY, contentRef };
+};
 const B2BSales = () => {
 
   const candidateRef = useRef();
@@ -751,7 +751,24 @@ const B2BSales = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false);
 
+  // Lead form state
+  const [leadFormData, setLeadFormData] = useState({
+    leadCategory: '',
+    typeOfB2B: '',
+    businessName: '',
+    concernPersonName: '',
+    designation: '',
+    email: '',
+    mobile: '',
+    whatsapp: '',
+    leadOwner: ''
+  });
+
+  // Form validation state
+  const [formErrors, setFormErrors] = useState({});
+  const [extractedNumbers, setExtractedNumbers] = useState([]);
 
   //refer lead stats
   const [concernPersons, setConcernPersons] = useState([]);
@@ -815,6 +832,183 @@ const B2BSales = () => {
     } else {
       setSelectedProfiles(prev => prev.filter(id => id !== profile._id));
     }
+  };
+
+  // Email validation function
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Mobile/WhatsApp number validation function
+  const validateMobileNumber = (number) => {
+    // Remove all non-digit characters
+    const cleanNumber = number.replace(/\D/g, '');
+    // Check if it's a valid Indian mobile number (10 digits starting with 6-9)
+    const mobileRegex = /^[6-9]\d{9}$/;
+    return mobileRegex.test(cleanNumber);
+  };
+
+  // Extract mobile/WhatsApp numbers from text
+  const extractMobileNumbers = (text) => {
+    if (!text) return [];
+
+    // Regex to match various mobile number formats
+    const mobileRegex = /(?:\+91[\s-]?)?[6-9]\d{9}|(?:\+91[\s-]?)?[0-9]{10}/g;
+    const matches = text.match(mobileRegex) || [];
+
+    // Clean and validate numbers
+    const validNumbers = matches
+      .map(num => num.replace(/\D/g, ''))
+      .filter(num => {
+        // Remove +91 prefix if present and validate
+        const cleanNum = num.startsWith('91') && num.length === 12 ? num.slice(2) : num;
+        return validateMobileNumber(cleanNum);
+      })
+      .map(num => {
+        // Remove +91 prefix if present
+        return num.startsWith('91') && num.length === 12 ? num.slice(2) : num;
+      });
+
+    // Return unique numbers (max 10)
+    return [...new Set(validNumbers)].slice(0, 10);
+  };
+
+  // Handle lead form input changes
+  const handleLeadInputChange = (e) => {
+    const { name, value } = e.target;
+    setLeadFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Clear error for this field
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+
+    // Extract numbers from mobile and whatsapp fields
+    if (name === 'mobile' || name === 'whatsapp') {
+      const extracted = extractMobileNumbers(value);
+      setExtractedNumbers(extracted);
+    }
+  };
+
+  // Handle mobile number input with validation
+  const handleLeadMobileChange = (e) => {
+    const { name, value } = e.target;
+
+    // Only allow digits, spaces, hyphens, and plus sign
+    const cleanValue = value.replace(/[^\d\s\-+]/g, '');
+
+    setLeadFormData(prev => ({
+      ...prev,
+      [name]: cleanValue
+    }));
+
+    // Clear error for this field
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+
+    // Extract numbers
+    const extracted = extractMobileNumbers(cleanValue);
+    setExtractedNumbers(extracted);
+  };
+
+  // Validate lead form
+  const validateLeadForm = () => {
+    const errors = {};
+
+    // Required field validation
+    if (!leadFormData.leadCategory) errors.leadCategory = 'Lead category is required';
+    if (!leadFormData.typeOfB2B) errors.typeOfB2B = 'B2B type is required';
+    if (!leadFormData.businessName) errors.businessName = 'Business name is required';
+    if (!leadFormData.concernPersonName) errors.concernPersonName = 'Concern person name is required';
+
+    // Email validation
+    if (!leadFormData.email) {
+      errors.email = 'Email is required';
+    } else if (!validateEmail(leadFormData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    // Mobile validation
+    if (!leadFormData.mobile) {
+      errors.mobile = 'Mobile number is required';
+    } else if (!validateMobileNumber(leadFormData.mobile)) {
+      errors.mobile = 'Please enter a valid 10-digit mobile number';
+    }
+
+    // WhatsApp validation (optional but validate if provided)
+    if (leadFormData.whatsapp && !validateMobileNumber(leadFormData.whatsapp)) {
+      errors.whatsapp = 'Please enter a valid 10-digit WhatsApp number';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Handle lead form submission
+  const handleLeadSubmit = async () => {
+    if (!validateLeadForm()) {
+      return;
+    }
+
+    try {
+      // Here you would typically send the data to your backend
+      console.log('Lead form data:', leadFormData);
+      console.log('Extracted numbers:', extractedNumbers);
+
+      // Show success message
+      alert('Lead added successfully!');
+
+      // Reset form
+      setLeadFormData({
+        leadCategory: '',
+        typeOfB2B: '',
+        businessName: '',
+        concernPersonName: '',
+        designation: '',
+        email: '',
+        mobile: '',
+        whatsapp: '',
+        leadOwner: ''
+      });
+      setFormErrors({});
+      setExtractedNumbers([]);
+
+      // Close modal
+      setShowAddLeadModal(false);
+
+    } catch (error) {
+      console.error('Error submitting lead:', error);
+      alert('Failed to add lead. Please try again.');
+    }
+  };
+
+  // Close lead modal
+  const handleCloseLeadModal = () => {
+    setShowAddLeadModal(false);
+    setLeadFormData({
+      leadCategory: '',
+      typeOfB2B: '',
+      businessName: '',
+      concernPersonName: '',
+      designation: '',
+      email: '',
+      mobile: '',
+      whatsapp: '',
+      leadOwner: ''
+    });
+    setFormErrors({});
+    setExtractedNumbers([]);
   };
 
 
@@ -904,9 +1098,9 @@ const B2BSales = () => {
 
         // Optionally refresh data here
         const closeButton = document.querySelector('#staticBackdrop .btn-close');
-      if (closeButton) {
-        closeButton.click();
-      }
+        if (closeButton) {
+          closeButton.click();
+        }
         fetchProfileData()
       } else {
         alert('Failed to upload file');
@@ -986,7 +1180,7 @@ const B2BSales = () => {
     alert(`Document ${status} successfully!`);
     closeDocumentModal();
   }, [closeDocumentModal]);
-  
+
   // const updateDocumentStatus = (uploadId, status) => {
   //   // In real app, this would make an API call
   //   console.log(`Updating document ${uploadId} to ${status}`);
@@ -1217,509 +1411,6 @@ const B2BSales = () => {
   // Calculate total selected filters
   const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
 
-  // Document Modal Component
-
-  // const DocumentModal = () => {
-  //   const [showRejectionForm, setShowRejectionForm] = useState(false);
-  //   const [rejectionReason, setRejectionReason] = useState('');
-  //   const [documentZoom, setDocumentZoom] = useState(1);
-  //   const [documentRotation, setDocumentRotation] = useState(0);
-
-  //   const latestUpload = useMemo(() => {
-  //     if (!selectedDocument) return null;
-  //     return selectedDocument.uploads && selectedDocument.uploads.length > 0
-  //       ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-  //       : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
-  //   }, [selectedDocument]);
-
-  //   const handleZoomIn = useCallback(() => {
-  //     setDocumentZoom(prev => Math.min(prev + 0.1, 2));
-  //   }, []);
-
-  //   const handleZoomOut = useCallback(() => {
-  //     setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
-  //   }, []);
-
-  //   const handleRotate = useCallback(() => {
-  //     setDocumentRotation(prev => (prev + 90) % 360);
-  //   }, []);
-
-  //   const handleReset = useCallback(() => {
-  //     setDocumentZoom(1);
-  //     setDocumentRotation(0);
-  //   }, []);
-
-  //   const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-  //   const fileType = fileUrl ? getFileType(fileUrl) : null;
-
-  //   const handleRejectClick = useCallback(() => {
-  //     setShowRejectionForm(true);
-  //   }, []);
-
-  //   const handleCancelRejection = useCallback(() => {
-  //     setShowRejectionForm(false);
-  //     setRejectionReason('');
-  //   }, []);
-
-  //   const handleConfirmRejection = useCallback(() => {
-  //     if (rejectionReason.trim()) {
-  //       updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
-  //       handleCancelRejection();
-  //     }
-  //   }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
-
-  //   if (!showDocumentModal || !selectedDocument) return null;
-
-  //   // Helper function to render document preview thumbnail using iframe/img
-  //   // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
-  //   const renderDocumentThumbnail = (upload, isSmall = true) => {
-  //     const fileUrl = upload?.fileUrl;
-  //     if (!fileUrl) {
-  //       return (
-  //         <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
-  //           display: 'flex',
-  //           alignItems: 'center',
-  //           justifyContent: 'center',
-  //           backgroundColor: '#f8f9fa',
-  //           border: '1px solid #dee2e6',
-  //           borderRadius: '4px',
-  //           width: isSmall ? '100%' : '150px',
-  //           height: isSmall ? 'auto' : '100px',
-  //           minHeight: '50px',
-  //           fontSize: isSmall ? '16px' : '24px',
-  //           color: '#6c757d'
-  //         }}>
-  //           📄
-  //         </div>
-  //       );
-  //     }
-
-  //     const fileType = getFileType(fileUrl);
-
-  //     if (fileType === 'image') {
-  //       return (
-  //         <img
-  //           src={fileUrl}
-  //           alt="Document Preview"
-  //           className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-  //           style={{
-  //             width: isSmall ? '100%' : '150px',
-  //             height: 'auto', // Completely auto height
-  //             maxWidth: '100%',
-  //             objectFit: 'contain',
-  //             borderRadius: '4px',
-  //             border: '1px solid #dee2e6',
-  //             cursor: 'pointer',
-  //             backgroundColor: '#f8f9fa',
-  //             display: 'block'
-  //           }}
-  //           onClick={() => {
-  //             if (isSmall) {
-  //               setCurrentPreviewUpload(upload);
-  //             }
-  //           }}
-  //         />
-  //       );
-  //     } else if (fileType === 'pdf') {
-  //       return (
-  //         <div style={{
-  //           position: 'relative',
-  //           overflow: 'visible', // Allow content to expand
-  //           width: isSmall ? '100%' : '150px',
-  //           height: 'auto' // Auto height for container
-  //         }}>
-  //           <iframe
-  //             src={fileUrl + '#navpanes=0&toolbar=0'} // Add FitH parameter for better PDF display
-  //             className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
-  //             style={{
-  //               width: '100%',
-  //               height: isSmall ? 'auto' : '100px', // Use viewport height for history
-  //               maxHeight: isSmall ? '600px' : '100px',
-  //               border: '1px solid #dee2e6',
-  //               borderRadius: '4px',
-  //               cursor: 'pointer',
-  //               pointerEvents: isSmall ? 'auto' : 'none',
-  //               transform: isSmall ? 'scale(1)' : 'scale(0.3)',
-  //               transformOrigin: 'top left',
-  //               backgroundColor: '#fff'
-  //             }}
-  //             title="PDF Document"
-  //             onClick={() => {
-  //               if (isSmall) {
-  //                 setCurrentPreviewUpload(upload);
-  //               }
-  //             }}
-  //             scrolling={isSmall ? 'auto' : 'no'}
-  //           />
-  //           {!isSmall && (
-  //             <div style={{
-  //               position: 'absolute',
-  //               top: 0,
-  //               left: 0,
-  //               right: 0,
-  //               bottom: 0,
-  //               backgroundColor: 'rgba(220, 53, 69, 0.1)',
-  //               display: 'flex',
-  //               alignItems: 'center',
-  //               justifyContent: 'center',
-  //               color: '#dc3545',
-  //               fontSize: '12px',
-  //               fontWeight: 'bold',
-  //               borderRadius: '4px',
-  //               cursor: 'pointer'
-  //             }}
-  //               onClick={() => {
-  //                 setCurrentPreviewUpload(upload);
-  //               }}>
-  //               PDF
-  //             </div>
-  //           )}
-  //         </div>
-  //       );
-  //     } else {
-  //       return (
-  //         <div style={{
-  //           position: 'relative',
-  //           width: isSmall ? '100%' : '150px',
-  //           height: 'auto' // Auto height
-  //         }}>
-  //           <iframe
-  //             src={fileUrl}
-  //             className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-  //             style={{
-  //               width: '100%',
-  //               height: isSmall ? 'auto' : '100px',
-  //               minHeight: isSmall ? '300px' : '100px',
-  //               border: '1px solid #dee2e6',
-  //               borderRadius: '4px',
-  //               cursor: 'pointer',
-  //               pointerEvents: isSmall ? 'auto' : 'none',
-  //               backgroundColor: '#f8f9fa'
-  //             }}
-  //             title="Document"
-  //             onClick={() => {
-  //               if (isSmall) {
-  //                 setCurrentPreviewUpload(upload);
-  //               }
-  //             }}
-  //             scrolling={isSmall ? 'auto' : 'no'}
-  //           />
-  //           {!isSmall && (
-  //             <div style={{
-  //               position: 'absolute',
-  //               top: 0,
-  //               left: 0,
-  //               right: 0,
-  //               bottom: 0,
-  //               backgroundColor: 'rgba(0, 123, 255, 0.1)',
-  //               display: 'flex',
-  //               alignItems: 'center',
-  //               justifyContent: 'center',
-  //               color: '#007bff',
-  //               fontSize: '24px',
-  //               borderRadius: '4px',
-  //               cursor: 'pointer'
-  //             }}
-  //               onClick={() => {
-  //                 setCurrentPreviewUpload(upload);
-  //               }}>
-  //               {fileType === 'document' ? '📄' :
-  //                 fileType === 'spreadsheet' ? '📊' : '📁'}
-  //             </div>
-  //           )}
-  //         </div>
-  //       );
-  //     }
-  //   };
-
-
-
-  //   return (
-  //     <div className="document-modal-overlay" onClick={closeDocumentModal}>
-  //       <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
-  //         <div className="modal-header">
-  //           <h3>{selectedDocument.Name} Verification</h3>
-  //           <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
-  //         </div>
-
-  //         <div className="modal-body">
-  //           <div className="document-preview-section">
-  //             <div className="document-preview-container" style={{ height: 'auto' }}>
-  //               {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
-  //                 (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
-  //                 <>
-  //                   {(() => {
-  //                     console.log('selectedDocument:', selectedDocument);
-  //                     console.log('latestUpload:', latestUpload);
-
-  //                     const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-  //                     const hasDocument = fileUrl ||
-  //                       (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
-
-  //                     console.log('fileUrl:', fileUrl);
-  //                     console.log('hasDocument:', hasDocument);
-
-  //                     if (hasDocument) {
-  //                       // If we have a file URL, show the appropriate viewer
-  //                       if (fileUrl) {
-  //                         const fileType = getFileType(fileUrl);
-
-  //                         if (fileType === 'image') {
-  //                           return (
-  //                             <img
-  //                               src={fileUrl}
-  //                               alt="Document Preview"
-  //                               style={{
-  //                                 transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-  //                                 transition: 'transform 0.3s ease',
-  //                                 maxWidth: '100%',
-  //                                 objectFit: 'contain'
-  //                               }}
-  //                             />
-  //                           );
-  //                         } else if (fileType === 'pdf') {
-  //                           return (
-  //                             <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
-  //                               <iframe
-  //                                 src={fileUrl + '#navpanes=0&toolbar=0'}
-  //                                 width="100%"
-  //                                 height="100%"
-  //                                 style={{
-  //                                   border: 'none',
-  //                                   transform: `scale(${documentZoom})`,
-  //                                   transformOrigin: 'top left',
-  //                                   transition: 'transform 0.3s ease'
-  //                                 }}
-  //                                 title="PDF Document"
-  //                               />
-  //                             </div>
-  //                           );
-  //                         } else {
-  //                           return (
-  //                             <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-  //                               <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-  //                                 {fileType === 'document' ? '📄' :
-  //                                   fileType === 'spreadsheet' ? '📊' : '📁'}
-  //                               </div>
-  //                               <h4>Document Preview</h4>
-  //                               <p>Click download to view this file</p>
-  //                               {fileUrl ? (
-  //                                 <a
-  //                                   href={fileUrl}
-  //                                   download
-  //                                   className="btn btn-primary"
-  //                                   target="_blank"
-  //                                   rel="noopener noreferrer"
-  //                                 >
-  //                                   <i className="fas fa-download me-2"></i>
-  //                                   Download & View
-  //                                 </a>
-  //                               ) : (
-  //                                 <button
-  //                                   className="btn btn-secondary"
-  //                                   disabled
-  //                                   title="File URL not available"
-  //                                 >
-  //                                   <i className="fas fa-download me-2"></i>
-  //                                   File Not Available
-  //                                 </button>
-  //                               )}
-  //                             </div>
-  //                           );
-  //                         }
-  //                       } else {
-  //                         // Document exists but no file URL - show document uploaded message
-  //                         return (
-  //                           <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-  //                             <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
-  //                             <h4>Document Uploaded</h4>
-  //                             <p>Document is available for verification</p>
-  //                             <p><strong>Status:</strong> {selectedDocument?.status}</p>
-  //                           </div>
-  //                         );
-  //                       }
-  //                     } else {
-  //                       return (
-  //                         <div className="no-document">
-  //                           <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-  //                           <p>No document uploaded</p>
-  //                         </div>
-  //                       );
-  //                     }
-  //                   })()}
-  //                   <DocumentControls
-  //                     onZoomIn={handleZoomIn}
-  //                     onZoomOut={handleZoomOut}
-  //                     onRotate={handleRotate}
-  //                     onReset={handleReset}
-  //                     onDownload={fileUrl}
-  //                     zoomLevel={documentZoom}
-  //                     fileType={fileType}
-  //                   />
-  //                 </>
-  //               ) : (
-  //                 <div className="no-document">
-  //                   <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-  //                   <p>No document uploaded</p>
-  //                 </div>
-  //               )}
-  //             </div>
-
-  //             {/* document preview container  */}
-
-  //             {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-  //               <div className="info-card mt-4">
-  //                 <h4>Document History</h4>
-  //                 <div className="document-history">
-  //                   {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
-  //                     <div key={index} className="history-item" style={{
-  //                       display: 'block',
-  //                       padding: '12px',
-  //                       marginBottom: '8px',
-  //                       backgroundColor: '#f8f9fa',
-  //                       borderRadius: '8px',
-  //                       border: '1px solid #e9ecef'
-  //                     }}>
-  //                       {/* Document Preview Thumbnail using iframe/img */}
-  //                       <div className="history-preview" style={{ marginRight: '0px' }}>
-  //                         {renderDocumentThumbnail(upload, true)}
-  //                       </div>
-
-  //                       {/* Document Info */}
-  //                       <div className="history-info" style={{ flex: 1 }}>
-  //                         <div className="history-date" style={{
-  //                           fontSize: '14px',
-  //                           fontWeight: '500',
-  //                           color: '#495057',
-  //                           marginBottom: '4px'
-  //                         }}>
-  //                           {formatDate(upload.uploadedAt)}
-  //                         </div>
-  //                         <div className="history-status">
-  //                           <span className={`${getStatusBadgeClass(upload.status)}`} style={{
-  //                             fontSize: '12px',
-  //                             padding: '4px 8px'
-  //                           }}>
-  //                             {upload.status}
-  //                           </span>
-  //                         </div>
-  //                         {upload.fileUrl && (
-  //                           <div className="history-actions" style={{ marginTop: '8px' }}>
-  //                             <a
-  //                               href={upload.fileUrl}
-  //                               download
-  //                               className="btn btn-sm btn-outline-primary"
-  //                               target="_blank"
-  //                               rel="noopener noreferrer"
-  //                               style={{
-  //                                 fontSize: '11px',
-  //                                 padding: '2px 8px',
-  //                                 textDecoration: 'none'
-  //                               }}
-  //                             >
-  //                               <i className="fas fa-download me-1"></i>
-  //                               Download
-  //                             </a>
-  //                             <button
-  //                               className="btn btn-sm btn-outline-secondary ms-2"
-  //                               style={{
-  //                                 fontSize: '11px',
-  //                                 padding: '2px 8px'
-  //                               }}
-  //                               onClick={() => {
-  //                                 // Switch main preview to this upload
-  //                                 setCurrentPreviewUpload(upload);
-  //                               }}
-  //                             >
-  //                               <i className="fas fa-eye me-1"></i>
-  //                               Preview
-  //                             </button>
-  //                           </div>
-  //                         )}
-  //                       </div>
-  //                     </div>
-  //                   ))}
-  //                 </div>
-  //               </div>
-  //             )}
-  //           </div>
-
-  //           <div className="document-info-section">
-  //             <div className="info-card">
-  //               <h4>Document Information</h4>
-  //               <div className="info-row">
-  //                 <strong>Document Name:</strong> {selectedDocument.Name}
-  //               </div>
-  //               <div className="info-row">
-  //                 <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
-  //                   new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
-  //                     day: '2-digit',
-  //                     month: 'short',
-  //                     year: 'numeric'
-  //                   }) : 'N/A'}
-  //               </div>
-  //               <div className="info-row">
-  //                 <strong>Status:</strong>
-  //                 <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
-  //                   {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
-  //                 </span>
-  //               </div>
-  //             </div>
-
-  //             {/* Document Actions */}
-  //             {(latestUpload?.status || selectedDocument?.status) === 'Pending' && (
-  //               <div className="document-actions mt-4">
-  //                 {!showRejectionForm ? (
-  //                   <div className="action-buttons">
-  //                     <button
-  //                       className="btn btn-success me-2"
-  //                       onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
-  //                     >
-  //                       <i className="fas fa-check"></i> Approve Document
-  //                     </button>
-  //                     <button
-  //                       className="btn btn-danger"
-  //                       onClick={handleRejectClick}
-  //                     >
-  //                       <i className="fas fa-times"></i> Reject Document
-  //                     </button>
-  //                   </div>
-  //                 ) : (
-  //                   <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
-  //                     <textarea
-  //                       value={rejectionReason}
-  //                       onChange={(e) => setRejectionReason(e.target.value)}
-  //                       placeholder="Please provide a detailed reason for rejection..."
-  //                       rows="8"
-  //                       className="form-control mb-3"
-  //                     />
-  //                     <div className="d-flex gap-2">
-  //                       <button
-  //                         className="btn btn-danger"
-  //                         onClick={handleConfirmRejection}
-  //                       >
-  //                         Confirm Rejection
-  //                       </button>
-  //                       <button
-  //                         className="btn btn-secondary"
-  //                         onClick={handleCancelRejection}
-  //                       >
-  //                         Cancel
-  //                       </button>
-  //                     </div>
-  //                   </div>
-  //                 )}
-  //               </div>)}
-
-
-  //           </div>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   );
-  // };
-
-
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
 
@@ -1935,7 +1626,7 @@ const B2BSales = () => {
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
   const tabs = [
-    'Lead Details',,
+    'Lead Details', ,
     'Documents'
   ];
 
@@ -3474,11 +3165,11 @@ const B2BSales = () => {
     <div className="container-fluid">
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
-        <div 
+          <div
             className="content-blur-overlay"
             style={{
               position: 'fixed',
-              top:0,
+              top: 0,
               left: 0,
               right: 0,
               height: `${navHeight + 50}px`,
@@ -3498,7 +3189,7 @@ const B2BSales = () => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef}  className="" style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${width}px` , boxShadow: '0 4px 25px 0 #0000001a' ,paddingBlock: '10px'}}
+            <nav ref={navRef} className="" style={{ zIndex: 11, backgroundColor: 'white', position: 'fixed', width: `${width}px`, boxShadow: '0 4px 25px 0 #0000001a', paddingBlock: '10px' }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
@@ -3518,7 +3209,7 @@ const B2BSales = () => {
 
                   <div className="col-md-6">
                     <div className="d-flex justify-content-end align-items-center gap-2">
-                      <button className="btn btn-primary">
+                      <button className="btn btn-primary" onClick={() => setShowAddLeadModal(true)} style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
                       <div className="input-group" style={{ maxWidth: '300px' }}>
@@ -3561,7 +3252,7 @@ const B2BSales = () => {
                         )}
                       </button>
 
-                    
+
                     </div>
                   </div>
 
@@ -4013,10 +3704,10 @@ const B2BSales = () => {
 
 
           {/* Main Content */}
-          <div className="content-body marginTopMobile" style={{ 
-              marginTop: `${navHeight + 10}px`,
-              transition: 'margin-top 0.2s ease-in-out'
-            }}>
+          <div className="content-body marginTopMobile" style={{
+            marginTop: `${navHeight + 10}px`,
+            transition: 'margin-top 0.2s ease-in-out'
+          }}>
             <section className="list-view">
               <div className="row">
                 <div className="d-flex justify-content-end gap-2">
@@ -5361,6 +5052,276 @@ const B2BSales = () => {
                             )}
 
 
+                            {/* Lead Add modal Start*/}
+                            {showAddLeadModal && (
+                            <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+                              <div className="modal-dialog modal-lg modal-dialog-centered">
+                                <div className="modal-content">
+                                  {/* Modal Header */}
+                                  <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
+                                    <h5 className="modal-title d-flex align-items-center">
+                                      <i className="fas fa-user-plus me-2"></i>
+                                      Add New B2B Lead
+                                    </h5>
+                                    <button
+                                      type="button"
+                                      className="btn-close btn-close-white"
+                                    // onClick={handleCloseLeadModal}
+                                    ></button>
+                                  </div>
+
+                                  {/* Modal Body */}
+                                  <div className="modal-body p-4">
+                                    <div className="row g-3">
+                                      {/* Lead Category */}
+                                      <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-tag text-primary me-1"></i>
+                                          Lead Category <span className="text-danger">*</span>
+                                        </label>
+                                        <select
+                                          className={`form-select ${formErrors.leadCategory ? 'is-invalid' : ''}`}
+                                          name="leadCategory"
+                                          value={leadFormData.leadCategory}
+                                          onChange={handleLeadInputChange}
+                                        >
+                                          <option value="">Select Lead Category</option>
+                                          {/* {leadCategories.map(category => (
+                                              <option key={category.value} value={category.value}>
+                                                {category.label}
+                                              </option>
+                                            ))} */}
+                                        </select>
+                                        {formErrors.leadCategory && (
+                                          <div className="invalid-feedback">
+                                            {formErrors.leadCategory}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Type of B2B */}
+                                      <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-building text-primary me-1"></i>
+                                          Type of B2B <span className="text-danger">*</span>
+                                        </label>
+                                        <select
+                                          className={`form-select ${formErrors.typeOfB2B ? 'is-invalid' : ''}`}
+                                          name="typeOfB2B"
+                                          value={leadFormData.typeOfB2B}
+                                          onChange={handleLeadInputChange}
+                                        >
+                                          <option value="">Select B2B Type</option>
+                                          {/* {b2bTypes.map(type => (
+                                            <option key={type.value} value={type.value}>
+                                              {type.label}
+                                            </option>
+                                          ))} */}
+                                        </select>
+                                        {formErrors.typeOfB2B && (
+                                          <div className="invalid-feedback">
+                                            {formErrors.typeOfB2B}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Business Name */}
+                                      <div className="col-12">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-briefcase text-primary me-1"></i>
+                                          Business Name <span className="text-danger">*</span>
+                                        </label>
+                                        <input
+                                          type="text"
+                                          className={`form-control ${formErrors.businessName ? 'is-invalid' : ''}`}
+                                          name="businessName"
+                                          value={leadFormData.businessName}
+                                          onChange={handleLeadInputChange}
+                                          placeholder="Enter business/company name"
+                                        />
+                                        {formErrors.businessName && (
+                                          <div className="invalid-feedback">
+                                            {formErrors.businessName}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Concern Person Name */}
+                                      <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-user text-primary me-1"></i>
+                                          Concern Person Name <span className="text-danger">*</span>
+                                        </label>
+                                        <input
+                                          type="text"
+                                          className={`form-control ${formErrors.concernPersonName ? 'is-invalid' : ''}`}
+                                          name="concernPersonName"
+                                          value={leadFormData.concernPersonName}
+                                          onChange={handleLeadInputChange}
+                                          placeholder="Enter contact person name"
+                                        />
+                                        {formErrors.concernPersonName && (
+                                          <div className="invalid-feedback">
+                                            {formErrors.concernPersonName}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Designation */}
+                                      <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-id-badge text-primary me-1"></i>
+                                          Designation
+                                        </label>
+                                        <input
+                                          type="text"
+                                          className="form-control"
+                                          name="designation"
+                                          value={leadFormData.designation}
+                                          onChange={handleLeadInputChange}
+                                          placeholder="e.g., HR Manager, CEO, Director"
+                                        />
+                                      </div>
+
+                                      {/* Email */}
+                                      <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-envelope text-primary me-1"></i>
+                                          Email <span className="text-danger">*</span>
+                                        </label>
+                                        <input
+                                          type="email"
+                                          className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
+                                          name="email"
+                                          value={leadFormData.email}
+                                          onChange={handleLeadInputChange}
+                                          placeholder="Enter email address"
+                                        />
+                                        {formErrors.email && (
+                                          <div className="invalid-feedback">
+                                            {formErrors.email}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Mobile */}
+                                      <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-phone text-primary me-1"></i>
+                                          Mobile <span className="text-danger">*</span>
+                                        </label>
+                                        <input
+                                          type="tel"
+                                          className={`form-control ${formErrors.mobile ? 'is-invalid' : ''}`}
+                                          name="mobile"
+                                          value={leadFormData.mobile}
+                                          onChange={handleLeadMobileChange}
+                                          placeholder="Enter mobile number"
+                                        />
+                                        {formErrors.mobile && (
+                                          <div className="invalid-feedback">
+                                            {formErrors.mobile}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* WhatsApp */}
+                                      <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                          <i className="fab fa-whatsapp text-success me-1"></i>
+                                          WhatsApp
+                                        </label>
+                                        <input
+                                          type="tel"
+                                          className={`form-control ${formErrors.whatsapp ? 'is-invalid' : ''}`}
+                                          name="whatsapp"
+                                          value={leadFormData.whatsapp}
+                                          onChange={handleLeadMobileChange}
+                                          placeholder="WhatsApp number"
+                                        />
+                                        {formErrors.whatsapp && (
+                                          <div className="invalid-feedback">
+                                            {formErrors.whatsapp}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Lead Owner */}
+                                      <div className="col-md-6">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-user-tie text-primary me-1"></i>
+                                          Lead Owner
+                                        </label>
+                                        <select
+                                          className="form-select"
+                                          name="leadOwner"
+                                          value={leadFormData.leadOwner}
+                                          onChange={handleLeadInputChange}
+                                        >
+                                          <option value="">Select Lead Owner</option>
+                                          {/* {leadOwners.map(owner => (
+                                            <option key={owner.value} value={owner.value}>
+                                              {owner.label}
+                                            </option>
+                                          ))} */}
+                                        </select>
+                                      </div>
+
+                                      {/* Extracted Numbers Display */}
+                                      {extractedNumbers.length > 0 && (
+                                        <div className="col-12">
+                                          <div className="alert alert-info">
+                                            <div className="d-flex align-items-center mb-2">
+                                              <i className="fas fa-phone text-primary me-2"></i>
+                                              <strong>Extracted Mobile/WhatsApp Numbers ({extractedNumbers.length}):</strong>
+                                            </div>
+                                            <div className="row g-2">
+                                              {extractedNumbers.map((number, index) => (
+                                                <div key={index} className="col-md-3 col-sm-6">
+                                                  <span className="badge bg-success me-1">
+                                                    <i className="fas fa-check me-1"></i>
+                                                    {number}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Form Actions */}
+                                    <div className="row mt-4">
+                                      <div className="col-12">
+                                        <div className="d-flex justify-content-end gap-2">
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline-secondary px-4"
+                                            onClick={handleCloseLeadModal}
+                                          >
+                                            <i className="fas fa-times me-1"></i>
+                                            Cancel
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn px-4"
+                                            style={{ backgroundColor: '#fc2b5a', color: 'white' }}
+                                            onClick={handleLeadSubmit}
+                                          >
+                                            <i className="fas fa-save me-1"></i>
+                                            Add Lead
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            )}
+                            {/* Lead Add modal End */}
+
+
                             <style>
                               {
                                 `.new-modal-content{
@@ -5457,7 +5418,7 @@ const B2BSales = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row " style={{ 
+            <div className="row " style={{
               marginTop: `${navHeight + 12}px`,
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed'

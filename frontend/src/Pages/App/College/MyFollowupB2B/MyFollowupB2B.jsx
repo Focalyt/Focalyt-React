@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef , useCallback} from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -120,7 +120,155 @@ const MultiSelectCheckbox = ({
     </div>
   );
 };
+const useNavHeight = (dependencies = []) => {
+  const navRef = useRef(null);
+  const [navHeight, setNavHeight] = useState(140); // Default fallback
+  const widthRef = useRef(null);
+  const [width, setWidth] = useState(0);
 
+  const calculateHeight = useCallback(() => {
+    if (navRef.current) {
+      const height = navRef.current.offsetHeight;
+      setNavHeight(height);
+      console.log('Nav height updated:', height + 'px');
+    }
+  }, []);
+
+  const calculateWidth = useCallback(() => {
+
+    if (widthRef.current) {
+      const width = widthRef.current.offsetWidth;
+      setWidth(width);
+      console.log('Width updated:', width + 'px');
+    }
+  }, []);
+
+
+  useEffect(() => {
+    // Initial calculation
+    calculateHeight();
+    calculateWidth();
+    // Resize listener
+    const handleResize = () => {
+      setTimeout(calculateHeight, 100);
+      setTimeout(calculateWidth, 100);
+    };
+
+    // Mutation observer for nav content changes
+    const observer = new MutationObserver(() => {
+      setTimeout(calculateHeight, 50);
+      setTimeout(calculateWidth, 50);
+    });
+
+    window.addEventListener('resize', handleResize);
+    
+    if (navRef.current) {
+      observer.observe(navRef.current, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true 
+      });
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      observer.disconnect();
+    };
+  }, [calculateHeight, calculateWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateHeight, 50);
+    setTimeout(calculateWidth, 50);
+  }, dependencies);
+
+  return { navRef, navHeight, calculateHeight, width };
+};
+const useMainWidth = (dependencies = []) => {// Default fallback
+  const widthRef = useRef(null);
+  const [width, setWidth] = useState(0);
+
+  const calculateWidth = useCallback(() => {
+
+    if (widthRef.current) {
+      const width = widthRef.current.offsetWidth;
+      setWidth(width);
+      console.log('Width updated:', width + 'px');
+    }
+  }, []);
+
+
+  useEffect(() => {
+    calculateWidth();
+    // Resize listener
+    const handleResize = () => {
+      setTimeout(calculateWidth, 100);
+    };
+
+    // Mutation observer for nav content changes
+    const observer = new MutationObserver(() => {
+      setTimeout(calculateWidth, 50);
+    });
+
+    window.addEventListener('resize', handleResize);
+    
+    if (widthRef.current) {
+      observer.observe(widthRef.current, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true 
+      });
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      observer.disconnect();
+    };
+  }, [calculateWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateWidth, 50);
+  }, dependencies); 
+
+  return { widthRef, width };
+};
+const useScrollBlur = (navbarHeight = 140) => {
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [scrollY, setScrollY] = useState(0);
+    const contentRef = useRef(null);
+  
+    useEffect(() => {
+      const handleScroll = () => {
+        const currentScrollY = window.pageYOffset;
+        const shouldBlur = currentScrollY > navbarHeight / 3;
+        
+        setIsScrolled(shouldBlur);
+        setScrollY(currentScrollY);
+      };
+  
+      // Throttle scroll event for better performance
+      let ticking = false;
+      const throttledScroll = () => {
+        if (!ticking) {
+          requestAnimationFrame(() => {
+            handleScroll();
+            ticking = false;
+          });
+          ticking = true;
+        }
+      };
+  
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+      handleScroll(); // Initial check
+  
+      return () => {
+        window.removeEventListener('scroll', throttledScroll);
+      };
+    }, [navbarHeight]);
+  
+    return { isScrolled, scrollY, contentRef };
+  };
 const MyFollowups = () => {
   //Calendar Stats
   // State management
@@ -1162,6 +1310,10 @@ const MyFollowups = () => {
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
+  const { navRef, navHeight } = useNavHeight([isFilterCollapsed ]);
+  const { widthRef, width } = useMainWidth([isFilterCollapsed ]);
+  const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
+  const blurIntensity = Math.min(scrollY / 10, 15);
 
   const tabs = [
     'Lead Details',
@@ -3477,7 +3629,32 @@ const MyFollowups = () => {
         <div className={isMobile ? 'col-12' : mainContentClass}>
 
           {/* Header */}
-          <div className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--my--followup" >
+
+          <div 
+            className="content-blur-overlay"
+            style={{
+              position: 'fixed',
+              top:0,
+              left: 0,
+              right: 0,
+              height: `${navHeight + 50}px`,
+              background: `linear-gradient(
+                180deg,
+                rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
+                rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
+                rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
+                transparent 100%
+              )`,
+              backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+              WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+              pointerEvents: 'none',
+              zIndex: 9,
+              transition: 'all 0.3s ease',
+              opacity: isScrolled ? 1 : 0
+            }}
+          />
+
+          <div ref={navRef} className="bg-white shadow-sm border-bottom mb-3" style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${width}px` , boxShadow: '0 4px 25px 0 #0000001a' ,paddingBlock: '10px'}}>
             <div className="container-fluid py-2 " >
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">

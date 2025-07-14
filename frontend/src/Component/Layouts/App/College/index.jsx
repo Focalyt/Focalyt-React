@@ -67,7 +67,9 @@ function CollegeLayout({ children }) {
     settings: false,
     education: false,
     sales: false,
-    salesb2b: false
+    salesb2b: false,
+    dropdown: false,
+    events: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
@@ -148,7 +150,9 @@ function CollegeLayout({ children }) {
     settings: useRef(null),
     education: useRef(null),
     sales: useRef(null),
-    salesb2b: useRef(null)
+    salesb2b: useRef(null),
+    dropdown: useRef(null),
+    events: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -163,7 +167,9 @@ function CollegeLayout({ children }) {
     settings: '0px',
     education: '0px',
     sales: '0px',
-    salesb2b: '0px'
+    salesb2b: '0px',
+    dropdown: '0px',
+    events: '0px'
   });
 
   useLayoutEffect(() => {
@@ -417,6 +423,12 @@ function CollegeLayout({ children }) {
                 <a href="#" onClick={() => toggleSubmenu('events')}>
                   <FontAwesomeIcon icon={farCirclePlay} />
                   <span className="menu-title">Events</span>
+                  <span className="dropdown-arrow">
+                        <FontAwesomeIcon
+                          icon={faChevronRight}
+                          className={`chevron-icon ${openSubmenu.events ? 'rotate-90' : ''}`}
+                        />
+                      </span>
                 </a>
                 <ul
                   ref={menuRefs.events}
@@ -470,11 +482,11 @@ function CollegeLayout({ children }) {
                     </Link>
                   </li>
                   {/* <li className={`nav-item ${location.pathname === '/institute/assignmentRule' ? 'active' : ''}`}>
-                    <Link to="/institute/assignmentRule" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={farBookmark} />
-                      <span className="menu-title">Assignment Rule</span>
-                    </Link>
-                  </li> */}
+                      <Link to="/institute/assignmentRule" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={farBookmark} />
+                        <span className="menu-title">Assignment Rule</span>
+                      </Link>
+                    </li> */}
 
                   <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesign" onClick={() => handleSidebarClose()}>
@@ -501,7 +513,35 @@ function CollegeLayout({ children }) {
                     </Link>
                   </li>
 
+                  <li className={`nav-item has-sub ${openSubmenu.dropdown ? 'open' : ''}`}>
+                    <a href="#" onClick={() => toggleSubmenu('dropdown')}>
+                      <FontAwesomeIcon icon={faFileAlt} />
+                      <span className="menu-title">Dropdown</span>
+                      <span className="dropdown-arrow">
+                        <FontAwesomeIcon
+                          icon={faChevronRight}
+                          className={`chevron-icon ${openSubmenu.dropdown ? 'rotate-90' : ''}`}
+                        />
+                      </span>
+                    </a>
+                    <ul
+                      ref={menuRefs.dropdown}
+                      className="menu-content"
+                      style={{
+                        maxHeight: submenuMaxHeight.dropdown,
+                        overflow: 'hidden',
+                        transition: 'max-height 0.3s ease-in-out'
+                      }}
+                    >
 
+                      <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
+                        <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
+                          <FontAwesomeIcon icon={faFileAlt} />
+                          <span className="menu-title">Type of B2B</span>
+                        </Link>
+                      </li>
+                    </ul>
+                  </li>
                 </ul>
               </li>
 
@@ -605,6 +645,7 @@ function CollegeLayout({ children }) {
 .nav-item.has-sub.open > a {
   background-color: rgba(115, 103, 240, 0.12);
 }
+        
         `}
       </style>
 

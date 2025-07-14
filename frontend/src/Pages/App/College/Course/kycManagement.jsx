@@ -137,23 +137,26 @@ const useNavHeight = (dependencies = []) => {
 
   const calculateHeightAndWidth = useCallback(() => {
     console.log('🔍 Calculating nav height and width...');
-    
+
     if (navRef.current) {
       // Calculate Height
       const height = navRef.current.offsetHeight;
       console.log('📏 Found height:', height);
-      
+
       if (height > 0) {
         setNavHeight(height);
         console.log('✅ Height set to:', height + 'px');
       }
 
       // Calculate Width from parent (position-relative container)
-      const parentContainer = navRef.current.closest('.position-relative');
+      // const parentContainer = navRef.current.closest('.position-relative');
+      const parentContainer = navRef.current.closest('[class*="col-"]') || 
+      navRef.current.parentElement;
+
       if (parentContainer) {
         const parentWidth = parentContainer.offsetWidth;
         console.log('📐 Parent width:', parentWidth);
-        
+
         if (parentWidth > 0) {
           setNavWidth(parentWidth + 'px');
           console.log('✅ Width set to:', parentWidth + 'px');
@@ -181,7 +184,9 @@ const useNavHeight = (dependencies = []) => {
 
   // Recalculate when dependencies change
   useEffect(() => {
-    setTimeout(calculateHeightAndWidth, 100);
+    calculateHeightAndWidth();
+    setTimeout(calculateHeightAndWidth, 50);
+    setTimeout(calculateHeightAndWidth, 200);
   }, dependencies);
 
   return { navRef, navHeight, navWidth };
@@ -195,7 +200,7 @@ const useScrollBlur = (navbarHeight = 140) => {
     const handleScroll = () => {
       const currentScrollY = window.pageYOffset;
       const shouldBlur = currentScrollY > navbarHeight / 3;
-      
+
       setIsScrolled(shouldBlur);
       setScrollY(currentScrollY);
     };
@@ -330,7 +335,11 @@ const KYCManagement = () => {
     { _id: 'All', name: 'All', count: 0, milestone: '' }
 
   ]);
-  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters]);
+  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters, showEditPanel, 
+    showFollowupPanel, 
+    leadHistoryPanel, 
+    showWhatsappPanel,
+    mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -385,8 +394,8 @@ const KYCManagement = () => {
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
 
-   // Fetch filter options from backend API on mount
-   useEffect(() => {
+  // Fetch filter options from backend API on mount
+  useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
         const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -579,7 +588,7 @@ const KYCManagement = () => {
     document.body?.classList.remove('no-scroll');
   };
 
-  
+
 
   const updateDocumentStatus = async (uploadId, status, rejectionReason) => {
     try {
@@ -1383,7 +1392,9 @@ const KYCManagement = () => {
     setShowEditPanel(false);
     setShowFollowupPanel(false);
     if (!isMobile) {
-      setMainContentClass('col-12');
+      // setMainContentClass('col-12');
+      const hasOtherPanelsOpen = leadHistoryPanel || showWhatsappPanel;
+    setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
     }
   };
 
@@ -1412,7 +1423,9 @@ const KYCManagement = () => {
   const closeWhatsappPanel = () => {
     setShowWhatsappPanel(false);
     if (!isMobile) {
-      setMainContentClass(showEditPanel ? 'col-8' : 'col-12');
+      // setMainContentClass(showEditPanel ? 'col-8' : 'col-12');
+      const hasOtherPanelsOpen = showEditPanel || showFollowupPanel || showWhatsappPanel;
+    setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
     }
   };
 
@@ -1437,7 +1450,9 @@ const KYCManagement = () => {
   const closeleadHistoryPanel = () => {
     setLeadHistoryPanel(false)
     if (!isMobile) {
-      setMainContentClass(showEditPanel || showWhatsappPanel ? 'col-8' : 'col-12');
+      // setMainContentClass(showEditPanel || showWhatsappPanel ? 'col-8' : 'col-12');
+      const hasOtherPanelsOpen = showEditPanel || showFollowupPanel || showWhatsappPanel;
+    setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
     }
   };
 
@@ -2080,7 +2095,7 @@ const KYCManagement = () => {
                       onChange={handleFileSelect}
                       style={{ display: 'none' }}
                     />
-                    
+
                     <button
                       className="btn btn-primary"
                       onClick={() => document.getElementById('file-input').click()}
@@ -2708,11 +2723,11 @@ const KYCManagement = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
-          <div 
+          <div
             className="content-blur-overlay"
             style={{
               position: 'fixed',
-              top:180,
+              top: 180,
               left: 0,
               right: 0,
               height: `${navHeight + 50}px`,
@@ -2732,103 +2747,105 @@ const KYCManagement = () => {
             }}
           />
           <div className="position-relative" >
-          <div  className="" ref={navRef} style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
-        WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-        boxShadow: isScrolled 
-          ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)' 
-          : '0 4px 25px 0 #0000001a',paddingBlock: '10px',
-          transition: 'all 0.3s ease'}}>
-            <div className="container-fluid py-2">
-              <div className="row align-items-center justify-content-between">
-                <div className="col-md-6 d-md-block d-sm-none">
-                  <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
-                    <div className="btn-group" role="group" aria-label="eKYC Filters">
-                      {ekycFilters.map((filter, index) => (
-                        <div key={filter._id} className="position-relative d-inline-block me-2">
-                          <button
-                            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                            onClick={() => handleCrmFilterClick(filter, index)}
-                          >
-                            <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
-                            {filter.name}
-                            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
-                          </button>
-                          {filter.milestone && (
-                            <span
-                              className="bg-success d-flex align-items-center milestoneResponsive"
-                              style={{
-                                fontSize: '0.75rem',
-                                color: 'white',
-                                verticalAlign: 'middle',
-                                padding: '0.25em 0.5em',
-                                transform: 'translate(15%, -100%)',
-                                position: 'absolute',
-                                borderRadius: '3px',
-                                top: '-10px',
-                                left: '50%',
-                                zIndex: 1
-                              }}
-                              title={`Milestone: ${filter.milestone}`}
+            <nav className="" ref={navRef} style={{
+              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
+              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+              boxShadow: isScrolled
+                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
+                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
+              transition: 'all 0.3s ease'
+            }}>
+              <div className="container-fluid py-2">
+                <div className="row align-items-center justify-content-between">
+                  <div className="col-md-6 d-md-block d-sm-none">
+                    <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
+                      <div className="btn-group" role="group" aria-label="eKYC Filters">
+                        {ekycFilters.map((filter, index) => (
+                          <div key={filter._id} className="position-relative d-inline-block me-2">
+                            <button
+                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                              onClick={() => handleCrmFilterClick(filter, index)}
                             >
-                              🚩 <span style={{ marginLeft: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>{filter.milestone}</span>
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                              <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
+                              {filter.name}
+                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
+                            </button>
+                            {filter.milestone && (
+                              <span
+                                className="bg-success d-flex align-items-center milestoneResponsive"
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: 'white',
+                                  verticalAlign: 'middle',
+                                  padding: '0.25em 0.5em',
+                                  transform: 'translate(15%, -100%)',
+                                  position: 'absolute',
+                                  borderRadius: '3px',
+                                  top: '-10px',
+                                  left: '50%',
+                                  zIndex: 1
+                                }}
+                                title={`Milestone: ${filter.milestone}`}
+                              >
+                                🚩 <span style={{ marginLeft: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>{filter.milestone}</span>
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="col-md-6">
-                  <div className="d-flex justify-content-end align-items-center gap-2">
-                    <div className="input-group" style={{ maxWidth: '300px' }}>
-                      <span className="input-group-text bg-white border-end-0 input-height">
-                        <i className="fas fa-search text-muted"></i>
-                      </span>
-                      <input
-                        type="text"
-                        name="name"
-                        className="form-control border-start-0 m-0"
-                        placeholder="Quick search..."
-                        value={filterData.name}
-                        onChange={handleFilterChange}
-                      />
-                      {filterData.name && (
-                        <button
-                          className="btn btn-outline-secondary border-start-0"
-                          type="button"
-                          onClick={() => {
-                            setFilterData(prev => ({ ...prev, name: '' }));
-                            fetchProfileData();
-                          }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                      className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                      style={{ whiteSpace: 'nowrap' }}
-                    >
-                      <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                      Filters
-                      {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                        <span className="bg-light text-dark ms-1">
-                          {Object.values(filterData).filter(val => val && val !== 'true').length}
+                  <div className="col-md-6">
+                    <div className="d-flex justify-content-end align-items-center gap-2">
+                      <div className="input-group" style={{ maxWidth: '300px' }}>
+                        <span className="input-group-text bg-white border-end-0 input-height">
+                          <i className="fas fa-search text-muted"></i>
                         </span>
-                      )}
-                    </button>
+                        <input
+                          type="text"
+                          name="name"
+                          className="form-control border-start-0 m-0"
+                          placeholder="Quick search..."
+                          value={filterData.name}
+                          onChange={handleFilterChange}
+                        />
+                        {filterData.name && (
+                          <button
+                            className="btn btn-outline-secondary border-start-0"
+                            type="button"
+                            onClick={() => {
+                              setFilterData(prev => ({ ...prev, name: '' }));
+                              fetchProfileData();
+                            }}
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
+                        )}
+                      </div>
 
-                   
+                      <button
+                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                        Filters
+                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                          <span className="bg-light text-dark ms-1">
+                            {Object.values(filterData).filter(val => val && val !== 'true').length}
+                          </span>
+                        )}
+                      </button>
+
+
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
 
-          </div>
+            </nav>
           </div>
           {!isFilterCollapsed && (
             <div
@@ -3261,7 +3278,7 @@ const KYCManagement = () => {
                                   {/* Profile Header Card */}
                                   <div className="card border-0 shadow-sm mb-0 mt-2">
                                     <div className="card-body px-1 py-0 my-2">
-                                       <div className="row align-items-center justify-content-between">
+                                      <div className="row align-items-center justify-content-between">
                                         <div className="col-md-7">
                                           <div className="d-flex align-items-center">
                                             <div className="form-check me-3">
@@ -3414,24 +3431,24 @@ const KYCManagement = () => {
                                                   Set Followup
                                                 </button>
                                                 <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
                                                   onClick={() => {
                                                     handleFetchCandidate(profile);
                                                     console.log('selectedProfile', profile);
                                                   }}
-                                            >
-                                              Edit Profile
-                                            </button>
+                                                >
+                                                  Edit Profile
+                                                </button>
                                               </div>
                                             </div>
 
@@ -3561,24 +3578,24 @@ const KYCManagement = () => {
                                                   Set Followup
                                                 </button>
                                                 <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
                                                   onClick={() => {
                                                     handleFetchCandidate(profile);
                                                     console.log('selectedProfile', profile);
                                                   }}
-                                            >
-                                              Edit Profile
-                                            </button>
+                                                >
+                                                  Edit Profile
+                                                </button>
                                               </div>
                                             </div>
 
@@ -3887,7 +3904,7 @@ const KYCManagement = () => {
                                                   <div className="resume-profile-section">
                                                     {profile._candidate?.personalInfo?.image ? (
                                                       <img
-                                                        src={`${profile._candidate?.personalInfo?.image }`}
+                                                        src={`${profile._candidate?.personalInfo?.image}`}
                                                         alt="Profile"
                                                         className="resume-profile-image"
                                                       />
@@ -4675,24 +4692,24 @@ const KYCManagement = () => {
         {isMobile && renderLeadHistoryPanel()}
 
         {openModalId === selectedProfile?._id && (
-                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                                <div className="modal-dialog modal-dialog-scrollable m-0 mt-2">
-                                  <div className="modal-content new-modal-content">
-                                    <div className="modal-header">
-                                      <h1 className="modal-title fs-5">Candidate Profile</h1>
-                                      <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
-                                    </div>
-                                    <div className="modal-body">
-                                      <CandidateProfile ref={candidateRef} />
-                                    </div>
-                                    <div className="modal-footer">
-                                      <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
-                                      <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+          <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-scrollable m-0 mt-2">
+              <div className="modal-content new-modal-content">
+                <div className="modal-header">
+                  <h1 className="modal-title fs-5">Candidate Profile</h1>
+                  <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
+                </div>
+                <div className="modal-body">
+                  <CandidateProfile ref={candidateRef} />
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
+                  <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
 
@@ -7818,10 +7835,10 @@ background: #fd2b5a;
     }
         `}
       </style>
-      <style> 
-          {
-            
-            `
+      <style>
+        {
+
+          `
           
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
@@ -8136,7 +8153,7 @@ height:min-content !important;
 
    
             `
-          }
+        }
 
       </style>
 
@@ -9501,7 +9518,7 @@ max-width: 600px;
 } 
 `
         }
-        </style>
+      </style>
     </div>
   );
 };

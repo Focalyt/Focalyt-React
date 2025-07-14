@@ -629,7 +629,8 @@ const useMainWidth = (dependencies = []) => {// Default fallback
       observer.observe(widthRef.current, { 
         childList: true, 
         subtree: true, 
-        attributes: true 
+        attributes: true ,
+        attributeFilter: ['class']
       });
     }
 
@@ -641,7 +642,7 @@ const useMainWidth = (dependencies = []) => {// Default fallback
 
   // Recalculate when dependencies change
   useEffect(() => {
-    setTimeout(calculateWidth, 50);
+    setTimeout(calculateWidth, 100);
   }, dependencies); 
 
   return { widthRef, width };
@@ -1433,7 +1434,7 @@ const CRMDashboard = () => {
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
-  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters]);
+  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
   const tabs = [
     'Lead Details',
     'Profile',
@@ -5335,8 +5336,7 @@ const CRMDashboard = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row " style={{ 
-              marginTop: `${navHeight + 12}px`,
+            <div className="row " style={{ zIndex:15,
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed'
             }}>
