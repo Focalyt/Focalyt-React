@@ -311,6 +311,16 @@ const Shortlisting = () => {
       <div className="sidenav-overlay"></div>
       <div className="drag-target"></div>
 
+      <style>
+        {
+          `
+          .breadcrumb-item a {
+            color: #FC2B5A;
+          }
+            `
+        }
+      </style>
+
     </>
   );
 };

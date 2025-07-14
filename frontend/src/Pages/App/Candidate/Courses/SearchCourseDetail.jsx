@@ -6944,6 +6944,9 @@ display: none;
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
 }
+  .breadcrumb-item a {
+    color: #FC2B5A;
+        }
         `
       }
     </style>

@@ -755,6 +755,9 @@ background-color: #64ccf3;
     font-size: 1.32rem;
     margin-bottom: 0.5rem;
 }
+    .breadcrumb-item a {
+    color: #FC2B5A;
+        }
 `
 }</style>
 

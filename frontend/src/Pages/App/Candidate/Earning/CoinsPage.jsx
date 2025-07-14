@@ -457,6 +457,9 @@ const CoinsPage = () => {
     padding: 0px 20px;
     gap: 20px;
 }
+    .breadcrumb-item a {
+    color: #FC2B5A;
+        }
           `
         }
       </style>

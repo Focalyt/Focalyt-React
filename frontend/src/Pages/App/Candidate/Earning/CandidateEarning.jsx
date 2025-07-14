@@ -785,8 +785,12 @@ transition: 1s ease}
         line-height: 1.9;
     }
 }
-          `
+.breadcrumb-item a {
+    color: #FC2B5A;
         }
+
+          `
+        }        
       </style>
 
     </>

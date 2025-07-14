@@ -9,7 +9,7 @@ import User from './StepContainer/User';
 import axios from 'axios'
 
 import {
-  faChartLine, faUser, faSearch, faClipboardList, faWallet, faIndianRupeeSign, faForward, faCoins,
+  faChartLine, faUser, faSearch, faClipboardList, faChevronRight , faWallet, faIndianRupeeSign, faForward, faCoins,
 } from "@fortawesome/free-solid-svg-icons";
 
 import {
@@ -711,6 +711,13 @@ function CandidateLayout({ children }) {
                 <a href="#" onClick={() => toggleSubmenu('profile')}>
                   <FontAwesomeIcon icon={faUser} />
                   <span className="menu-title">Profile</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      style={{fontSize: '12px'}}
+                      className={`chevron-icon ${openSubmenu.profile ? 'rotate-90' : ''}`}
+                    />
+                  </span>
                 </a>
                 <ul
                   ref={menuRefs.profile}
@@ -741,6 +748,13 @@ function CandidateLayout({ children }) {
                 <a href="#" onClick={() => toggleSubmenu('courses')}>
                   <FontAwesomeIcon icon={farUser} />
                   <span className="menu-title">Courses</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      style={{fontSize: '12px'}}
+                      className={`chevron-icon ${openSubmenu.courses ? 'rotate-90' : ''}`}
+                    />
+                  </span>
                 </a>
                 <ul
                   ref={menuRefs.courses}
@@ -771,6 +785,13 @@ function CandidateLayout({ children }) {
                 <a href="#" onClick={() => toggleSubmenu('jobs')}>
                   <FontAwesomeIcon icon={faClipboardList} />
                   <span className="menu-title">Jobs</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      style={{fontSize: '12px'}}
+                      className={`chevron-icon ${openSubmenu.jobs ? 'rotate-90' : ''}`}
+                    />
+                  </span>
                 </a>
                 <ul
                   ref={menuRefs.jobs}
@@ -819,6 +840,13 @@ function CandidateLayout({ children }) {
                 <a href="#" onClick={() => toggleSubmenu('wallet')}>
                   <FontAwesomeIcon icon={faWallet} />
                   <span className="menu-title">Wallet</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      style={{fontSize: '12px'}}
+                      className={`chevron-icon ${openSubmenu.wallet ? 'rotate-90' : ''}`}
+                    />
+                  </span>
                 </a>
                 <ul
                   ref={menuRefs.wallet}
@@ -861,6 +889,13 @@ function CandidateLayout({ children }) {
                 <a href="#" onClick={() => toggleSubmenu('events')}>
                   <FontAwesomeIcon icon={faCalendarAlt} />
                   <span className="menu-title">Events</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      className={`chevron-icon ${openSubmenu.events ? 'rotate-90' : ''}`}
+                      style={{fontSize: '12px'}}
+                    />
+                  </span>
                 </a>
                 <ul
                   ref={menuRefs.events}
@@ -1343,7 +1378,45 @@ span#notification {
     right: 15px;
     top: 10px;
     transition: transform 0.3s ease;
-}  
+}
+    
+.dropdown-arrow {
+    position: absolute;
+    right: 15px;
+    transition: transform 0.3s ease;
+}
+.dropdown-arrow {
+    color: #6c757d;
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+}
+.nav-item > a::after {
+    content: '\f105';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    transition: transform 0.3s ease;
+}
+.nav-item.open > a::after {
+    transform: rotate(90deg);
+}
+.nav-item > a::after {
+    content: ''; position: absolute;
+    top: 0;
+    visibility: hidden;
+}
+.chevron-icon {
+  font-size: 12px!important;
+  transition: transform 0.3s ease;
+}
+
+.rotate-90 {
+  transform: rotate(90deg);
+}
 `
         }
       </style>

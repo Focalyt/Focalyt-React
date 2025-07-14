@@ -647,6 +647,9 @@ button.close {
         width: 100% !important;
     }
 }
+    .breadcrumb-item a {
+    color: #FC2B5A;
+        }
             `
           }
         </style>

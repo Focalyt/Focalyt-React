@@ -129,6 +129,14 @@ const CandidateAppliedJobs = () => {
           </ul>
         </nav>
       )}
+      <style>
+        {
+          `
+          .breadcrumb-item a {
+            color: #FC2B5A;
+        }`
+                }
+      </style>
     </div>
   );
 };

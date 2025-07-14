@@ -54,6 +54,8 @@ import CollegeLayout from './Component/Layouts/App/College';
 import CollegeLogin from './Pages/App/College/Login/CollegeLogin';
 import CollegeRegister from './Pages/App/College/Register/CollegeRegister';
 import Dashboard from './Pages/App/College/Dashboard/Dashboard';
+import DashboardB2B from './Pages/App/College/Dashboard/DashboardB2B';
+
 import Profile from './Pages/App/College/Profile/Profile';
 import UploadCandidates from './Pages/App/College/UploadCandidates/UploadCandidates';
 import UploadTemplates from './Pages/App/College/UploadTemplates/UploadTemplates';
@@ -71,7 +73,8 @@ import AccessManagement from './Pages/App/College/Settings/AccessManagement';
 import ClgCourse from './Pages/App/College/Settings/Course';
 import ApprovalManagement from './Pages/App/College/ApprovalManagement/ApprovalManagement';
 import Status from './Pages/App/College/Status/status';
-import MyFollowup from './Pages/App/College/MyFollowup/MyFollowup';
+import MyFollowup from './Pages/App/College/MyFollowupB2C/MyFollowupB2C';
+import MyFollowupB2B from './Pages/App/College/MyFollowupB2B/MyFollowupB2B';
 import AddLeads from './Pages/App/College/Course/AddLeads';
 
 
@@ -196,6 +199,7 @@ const Layout = () => {
         {/* CollegeLayout will wrap only protected pages */}
         <Route path="/institute" element={<CollegeLayout  />}>
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="dashboardb2b" element={<DashboardB2B />} />
           <Route path="myprofile" element={<Profile/>}/>
           <Route path="uploadCandidates" element={<UploadCandidates/>}/>
           <Route path="uploadTemplates" element={<UploadTemplates/>}/>
@@ -215,6 +219,7 @@ const Layout = () => {
           <Route path='approvalManagement' element={<ApprovalManagement/>}/>
           <Route path='statusdesign' element={<Status/>}/>
           <Route path = 'myfollowup' element={<MyFollowup/>}/>
+          <Route path = 'myfollowupb2b' element={<MyFollowupB2B/>}/>
           <Route path='registrationcards' element={<RegistrationCards/>}/>
           {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
           <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />

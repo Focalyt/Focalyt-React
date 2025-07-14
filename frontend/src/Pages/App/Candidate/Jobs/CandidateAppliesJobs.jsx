@@ -546,7 +546,10 @@ width:100%;
 }
 }
 
-          `
+.breadcrumb-item a {
+    color: #FC2B5A;
+        }   
+`
         }
       </style>
 

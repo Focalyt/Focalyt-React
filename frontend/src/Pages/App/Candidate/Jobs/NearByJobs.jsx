@@ -275,7 +275,7 @@ const NearByJobs = () => {
               <div className="col-6 my-auto">
                 <h5>Filter Data / डेटा फ़िल्टर करें</h5>
               </div>
-              <div className="col-6 text-right">
+              <div className="col-6 text-right d-flex justify-content-end">
                 <button 
                   className="btn btn-outline-secondary py-0 mx-0"
                   onClick={toggleFilters}
@@ -549,7 +549,10 @@ const NearByJobs = () => {
     background-color: #FC2B5A !important;
     border-color: #FC2B5A;
 }
-          `
+.breadcrumb-item a {
+    color: #FC2B5A;
+        }   
+`
         }
       </style>
     </div>
