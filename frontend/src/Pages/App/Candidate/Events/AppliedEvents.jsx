@@ -410,7 +410,11 @@ const CandidatesEvents = () => {
    
   }
 
-        `}</style>
+  .breadcrumb-item a {
+    color: #FC2B5A;
+        }    
+
+      `}</style>
       </div>
     </>
   );

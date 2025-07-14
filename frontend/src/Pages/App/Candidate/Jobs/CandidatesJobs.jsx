@@ -3486,6 +3486,10 @@ input.star:checked ~ .rev-box {
   height: 125px;
   overflow: visible;
 }
+
+.breadcrumb-item a {
+    color: #FC2B5A;
+        }   
     `
   }
 </style>

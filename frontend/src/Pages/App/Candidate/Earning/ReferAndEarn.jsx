@@ -365,7 +365,11 @@ ${backendUrl}/candidate/login?refCode=${id}`;
 .card-content {
     padding: 0px 20px;
     gap: 20px;
-}   
+}  
+    
+.breadcrumb-item a {
+    color: #FC2B5A;
+        }
 
 `
         }

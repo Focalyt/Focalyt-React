@@ -1465,7 +1465,7 @@ const Student = ({
       <div className="card">
         <div className="card-header">
           <div className="d-flex justify-content-between align-items-center">
-            <h6 className="mb-0">Attendance Records</h6>
+            <h6 className="mb-0 text-black">Attendance Records</h6>
             <div className="d-flex gap-2 align-items-center">
               {/* View Selector */}
               <div className="btn-group btn-group-sm" role="group">
@@ -1569,7 +1569,7 @@ const Student = ({
           <div className="row mb-4">
             <div className="col-md-6">
               <div className="d-flex justify-content-between small text-muted mb-1">
-                <span>
+                <span className="text-black">
                   {timeFilter === "today"
                     ? "Daily Status"
                     : timeFilter === "week"
@@ -1580,7 +1580,7 @@ const Student = ({
                           ? "Yearly Attendance"
                           : "Period Attendance"}
                 </span>
-                <span>{filteredStats.attendancePercentage}%</span>
+                <span className="text-black">{filteredStats.attendancePercentage}%</span>
               </div>
               <div className="progress mb-2" style={{ height: "20px" }}>
                 <div
@@ -1592,14 +1592,14 @@ const Student = ({
                   {filteredStats.attendancePercentage}%
                 </div>
               </div>
-              <small className="text-muted">
+              <small className="text-muted text-black">
                 Target: 85% • Current: {filteredStats.attendancePercentage}%
               </small>
             </div>
             <div className="col-md-6">
               <div className="d-flex justify-content-between small text-muted mb-1">
-                <span>Punctuality Score</span>
-                <span>{filteredStats.punctualityScore}%</span>
+                <span className="text-black">Punctuality Score</span>
+                <span className="text-black">{filteredStats.punctualityScore}%</span>
               </div>
               <div className="progress mb-2" style={{ height: "20px" }}>
                 <div
@@ -1611,7 +1611,7 @@ const Student = ({
                   {filteredStats.punctualityScore}%
                 </div>
               </div>
-              <small className="text-muted">
+              <small className="text-muted text-black">
                 On-time arrivals out of total present days
               </small>
             </div>
@@ -2400,7 +2400,7 @@ const Student = ({
               <i className="fas fa-clipboard-list me-2"></i>
               Attendance Register
             </h4>
-            <p className="text-muted mb-0">
+            <p className="text-muted mb-0 text-black">
               Total Students: {allStudentsAttendanceData.length} |
               Period: {dates.length > 0 ? `${dates[0]?.day}/${registerCurrentMonth + 1}/${registerCurrentYear}` : ''} to {dates.length > 0 ? `${dates[dates.length - 1]?.day}/${registerCurrentMonth + 1}/${registerCurrentYear}` : ''}
             </p>
@@ -3384,7 +3384,7 @@ const Student = ({
                   <strong>Document Name:</strong> {selectedDocument.Name}
                 </div>
                 <div className="info-row">
-                  <strong>Upload Date:</strong>{" "}
+                  <strong className="text-black">Upload Date:</strong>{" "}
                   {latestUpload?.uploadedAt || selectedDocument?.uploadedAt
                     ? new Date(
                       latestUpload?.uploadedAt || selectedDocument?.uploadedAt
@@ -4721,10 +4721,10 @@ const Student = ({
                                           </div>
                                         </div>
                                         <div>
-                                          <h6 className="mb-0 fw-bold">
+                                          <h6 className="mb-0 fw-bold text-black">
                                             {profile._candidate.name}
                                           </h6>
-                                          <small className="text-muted">
+                                          <small className="text-muted text-black">
                                             {profile._candidate.mobile}
                                           </small>
                                           <div className="mt-1">
@@ -5031,7 +5031,7 @@ const Student = ({
 
                                   <div className="card-body">
                                     {(studentTabsActive[studentIndex] || 0) === 0 && (
-                                      <div className="tab-pane active" id="lead-details">
+                                      <div className="tab-pane active text-black" id="lead-details">
                                         {/* Your lead details content here */}
                                         <div className="scrollable-container">
                                           <div className="scrollable-content">
@@ -5332,7 +5332,7 @@ const Student = ({
                                     {(studentTabsActive[studentIndex] || 0) ===
                                       1 && (
                                         <div
-                                          className="tab-pane active"
+                                          className="tab-pane active text-black"
                                           id="profile"
                                         >
                                           <div className="resume-preview-body">
@@ -5838,7 +5838,7 @@ const Student = ({
                                     {(studentTabsActive[studentIndex] || 0) ===
                                       2 && (
                                         <div
-                                          className="tab-pane active"
+                                          className="tab-pane active text-black"
                                           id="course-history"
                                         >
                                           <div className="section-card">
@@ -5913,7 +5913,7 @@ const Student = ({
                                     {(studentTabsActive[studentIndex] || 0) ===
                                       3 && (
                                         <div
-                                          className="tab-pane active"
+                                          className="tab-pane active text-black"
                                           id="studentsDocuments"
                                         >
                                           {(() => {
@@ -6755,7 +6755,7 @@ const Student = ({
           // }
 
           .card-header {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            // background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border-bottom: 1px solid #dee2e6;
             border-radius: 12px 12px 0 0;
           }
@@ -7147,12 +7147,12 @@ const Student = ({
           /* Dark mode support (if needed) */
           @media (prefers-color-scheme: dark) {
             .card {
-              background-color: #2d3748;
+              // background-color: #2d3748;
               color: #e2e8f0;
             }
 
             .card-header {
-              background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+              // background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
               border-bottom-color: #4a5568;
             }
 

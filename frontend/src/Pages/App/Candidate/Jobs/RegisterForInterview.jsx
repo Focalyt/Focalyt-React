@@ -1386,6 +1386,9 @@ input.star:checked ~ .rev-box {
     margin-bottom: 5px;
   }
 }
+  .breadcrumb-item a {
+    color: #FC2B5A;
+        }
           `
         }
       </style>
