@@ -562,7 +562,7 @@ const CollegeRegister = ({ embedded = false }) => {
                 )}
 
                 <p className="pt-0 px-1" style={{ fontSize: '12px', color: '#666', marginBottom: '20px' }}>
-                    I agree to <a href="/institute/termsOfService" target="_blank"> Terms of Service</a> and <a href="/institute/privacyPolicy" target="_blank">Privacy Policy</a>.
+                    I agree to <a href="/terms-of-service" target="_blank"> Terms of Service</a> and <a href="/privacy-policy" target="_blank">Privacy Policy</a>.
                 </p>
 
                 <div className="row">

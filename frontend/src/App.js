@@ -193,8 +193,8 @@ const Layout = () => {
         {/*  college views  */}
 
         <Route path="/institute/login" element={<CollegeLogin />} />
-        <Route path="/institute/privacyPolicy" element={<PrivacyPolicy />} />
-        <Route path="/institute/termsOfService" element={<TermsOfService />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
         <Route path="/institute/register" element={<CollegeRegister />} />
         {/* CollegeLayout will wrap only protected pages */}
         <Route path="/institute" element={<CollegeLayout  />}>

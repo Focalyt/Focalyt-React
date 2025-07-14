@@ -79,6 +79,7 @@ module.exports.centerSchema = require("./center");
 module.exports.Roles = require("./roleManagement");
 module.exports.UserActivityLog = require("./userActivityLog");
 module.exports.Status = require("./status");
+module.exports.StatusB2b = require("./statusB2b");
 module.exports.ApprovalRequest = require("./approval");
 module.exports.LeadAssignmentRule = require("./leadAssignmentRule");
 module.exports.EventType = require("./eventType");

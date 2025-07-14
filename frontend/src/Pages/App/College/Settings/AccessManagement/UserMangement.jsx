@@ -7,6 +7,7 @@ import {
   Eye,
   Edit,
   Trash2,
+  RotateCcw,
   Plus,
   Grid,
   List,
@@ -34,7 +35,8 @@ const UserManagement = ({
   onViewUserDetails,
   onStatusChange,
   onEditUser,
-  onDeleteUser
+  onDeleteUser,
+  onRestoreUser
 }) => {
   const [activeTab, setActiveTab] = useState('active');
   const [viewMode, setViewMode] = useState('list'); // 'list', 'matrix'
@@ -549,12 +551,13 @@ const UserManagement = ({
                           >
                             <Edit size={14} />
                           </button>
+
                           <button
                             className="btn btn-sm btn-outline-danger"
-                            onClick={() => onDeleteUser && onDeleteUser(user.id)}
-                            title="Delete User"
+                            onClick={() => {activeTab === 'active' ? onDeleteUser && onDeleteUser(user) : onRestoreUser && onRestoreUser(user)}}
+                            title= {activeTab === 'active' ? "Delete User" : "Restore User"}
                           >
-                            <Trash2 size={14} />
+                            {activeTab === 'active' ? <Trash2 size={14} /> : <RotateCcw size={14} />}
                           </button>
                         </div>
                       </td>

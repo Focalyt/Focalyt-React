@@ -1464,11 +1464,7 @@ const CRMDashboard = () => {
     }
   }, [seletectedStatus]);
 
-  useEffect(() => {
-    console.log('seletectedSubStatus', seletectedSubStatus)
-
-  }, [seletectedSubStatus]);
-
+ 
 
   //Advance filter
 
@@ -2106,20 +2102,15 @@ const CRMDashboard = () => {
       const { name, value } = e.target;
       const newFilterData = { ...filterData, [name]: value };
       setFilterData(newFilterData);
-
-      // Reset to first page and fetch with new filters
-      setCurrentPage(1);
-      fetchProfileData(newFilterData, 1);
     } catch (error) {
       console.error('Filter change error:', error);
     }
   };
 
-  useEffect(() => {
-    // Always fetch data when formData changes, regardless of whether filters have values
-    setCurrentPage(1);
-    fetchProfileData(filterData, 1);
-  }, [formData]);
+
+  const handleApplyFilters = (e) => {
+   fetchProfileData(filterData, 1);
+  };
 
   const handleCriteriaChange = (criteria, values) => {
     setFormData((prevState) => ({
@@ -2129,7 +2120,7 @@ const CRMDashboard = () => {
         values: values
       }
     }));
-    console.log('Selected verticals:', values);
+    console.log(`Selected ${criteria}:`, values);
     // Reset to first page and fetch with new filters
   };
 
@@ -3502,7 +3493,7 @@ const CRMDashboard = () => {
                         <button
                           className="btn btn-primary"
                           onClick={() => {
-                            fetchProfileData(filterData);
+                            handleApplyFilters(filterData, 1);
                             setIsFilterCollapsed(true);
                           }}
                         >

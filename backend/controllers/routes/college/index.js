@@ -34,6 +34,7 @@ const roleManagementRoutes = require("./roleManagement");
 const coverLetterRoutes = require("./coverLetter");
 const mockInterviewRoutes = require("./mockInterview");
 const coursesRoutes = require("./courses");
+const statusB2bRoutes = require("./statusB2b");
 const router = express.Router();
 const moment = require('moment')
 router.use("/todo", isCollege, todoRoutes);
@@ -55,6 +56,7 @@ router.use("/coverLetter", isCollege, coverLetterRoutes);
 router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
+router.use("/statusB2b", statusB2bRoutes);
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 
@@ -359,6 +361,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			center,
 			counselor
 		} = req.query;
+		console.log('req.query', req.query)
 
 		// Parse multi-select filter values
 		let projectsArray = [];
@@ -485,7 +488,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 									from: 'verticals',
 									localField: 'vertical',
 									foreignField: '_id',
-									as: 'vertical'
+									as: 'verticalData'
 								}
 							},
 							{
@@ -493,7 +496,14 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 									from: 'projects',
 									localField: 'project',
 									foreignField: '_id',
-									as: 'project'
+									as: 'projectData'  // ← Different name
+								}
+							},
+							{
+								$addFields: {
+									projectInfo: { $arrayElemAt: ['$projectData', 0] },  // ← Single object
+									// Keep original 'project' field as ObjectId
+									verticalInfo: { $arrayElemAt: ['$verticalData', 0] },
 								}
 							}
 						]
@@ -647,13 +657,14 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 			// Sector filter (multi-select)
 			if (projectsArray.length > 0) {
-				additionalMatches['_course.sectors._id'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+				additionalMatches['_course.project'] = { 
+					$in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) 
+				};
 			}
 
 			// Verticals filter (multi-select)
 			if (verticalsArray.length > 0) {
-				console.log('verticalsArray', verticalsArray)
-				additionalMatches['_course.vertical._id'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+				additionalMatches['_course.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
 			}
 
 			// Course filter (multi-select)
@@ -829,10 +840,13 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			counselorArray
 		});
 
+		console.log('crmFilterCounts', crmFilterCounts)
+
 
 		// Apply pagination
 		const totalCount = results.length;
 		const paginatedResult = results.slice(skip, skip + limit);
+
 
 		res.status(200).json({
 			success: true,
@@ -860,6 +874,8 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 	const counts = { all: 0 };
 
 	try {
+
+		console.log('appliedFilters', appliedFilters)
 		// First get all statuses from the database
 		const allStatuses = await Status.find({}).select('_id title milestone');
 
@@ -960,7 +976,7 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 									from: 'verticals',
 									localField: 'vertical',
 									foreignField: '_id',
-									as: 'vertical'
+									as: 'verticalData'
 								}
 							},
 							{
@@ -968,7 +984,14 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 									from: 'projects',
 									localField: 'project',
 									foreignField: '_id',
-									as: 'project'
+									as: 'projectData'  // ← Changed from 'project' to 'projectData'
+								}
+							},
+							{
+								$addFields: {
+									projectInfo: { $arrayElemAt: ['$projectData', 0] },  // ← Single object
+									// Keep original 'project' field as ObjectId
+									verticalInfo: { $arrayElemAt: ['$verticalData', 0] },
 								}
 							}
 						]
@@ -1020,12 +1043,14 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 				additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(appliedFilters.courseType, 'i') };
 			}
 
-			if (appliedFilters.projectsArray && appliedFilters.projectsArray.length > 0) {
-				additionalMatches['_course.sectors._id'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			if (appliedFilters.projectsArray.length > 0) {
+				additionalMatches['_course.project'] = { 
+					$in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) 
+				};
 			}
 
 			if (appliedFilters.verticalsArray && appliedFilters.verticalsArray.length > 0) {
-				additionalMatches['_course.vertical._id'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+				additionalMatches['_course.vertical'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
 			}
 
 			if (appliedFilters.courseArray && appliedFilters.courseArray.length > 0) {

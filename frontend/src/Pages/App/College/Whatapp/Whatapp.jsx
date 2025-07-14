@@ -20,7 +20,7 @@ export default function FacebookWhatsAppConnector() {
 
   // Facebook App ID - Replace with your actual App ID
   const FACEBOOK_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || "YOUR_FACEBOOK_APP_ID"
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:3000'
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL  
 
 
   // Load Bootstrap CSS and JS

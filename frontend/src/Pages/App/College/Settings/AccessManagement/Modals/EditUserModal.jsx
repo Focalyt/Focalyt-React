@@ -419,7 +419,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
             ) : (
               <div className="card">
                 <div className="card-header d-flex justify-content-between align-items-center">
-                  <span className="fw-bold">Select Reporting Managers ({users.length} available)</span>
+                  <span className="fw-bold">Select Reporting Managers ({users.filter(u => u.status === true || u.status === 'true' || u.status === "active").length} available)</span>
                   <div>
                     <button
                       type="button"
@@ -429,6 +429,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                           ...prev,
                           reporting_managers: users
                             .filter(user => 
+                              user.status === true || user.status === 'true' || user.status === "active" &&
                               user.user_id !== editUser?.user_id &&
                               !(editUser.my_team || []).includes(user.user_id.toString())
                             )
@@ -452,6 +453,7 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                 <div className="card-body" style={{ maxHeight: '250px', overflowY: 'auto' }}>
                   {users
                     .filter(user => 
+                      user.status === true || user.status === 'true' || user.status === "active" &&
                       user.user_id !== editUser?.user_id &&
                       !(editUser.my_team || []).includes(user.user_id.toString())
                     )
