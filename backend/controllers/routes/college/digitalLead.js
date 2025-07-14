@@ -299,12 +299,12 @@ const batchProcessor = new BatchProcessor();
 router.route("/addleaddandcourseapply")
     .post(async (req, res) => {
         try {
-            console.log("Lead received:", req.body);
+            console.log("Lead received:", req.body.FirstName);
 
             // Basic validation only
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
 
-            if (!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4) {
+            if (!FirstName || !MobileNumber || !Gender  || !Email || !courseId || !Field4) {
                 return res.status(200).json({
                     status: false,
                     msg: "All fields are required"
