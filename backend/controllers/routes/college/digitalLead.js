@@ -140,7 +140,7 @@ class BatchProcessor {
                 source = 'FB Form';
             }
 
-            if (!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4) {
+            if (!FirstName || !MobileNumber || !Gender  || !Email || !courseId || !Field4) {
                 throw new Error("All fields are required");
             }
 
@@ -304,7 +304,7 @@ router.route("/addleaddandcourseapply")
             // Basic validation only
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4 } = req.body;
 
-            if (!FirstName || !MobileNumber || !Gender || !DateOfBirth || !Email || !courseId || !Field4) {
+            if (!FirstName || !MobileNumber || !Gender  || !Email || !courseId || !Field4) {
                 return res.status(200).json({
                     status: false,
                     msg: "All fields are required"
