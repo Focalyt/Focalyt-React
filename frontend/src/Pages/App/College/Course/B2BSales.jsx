@@ -3346,7 +3346,7 @@ const B2BSales = () => {
                       <div className="col-md-3">
                         <label className="form-label small fw-bold text-dark">
                           <i className="fas fa-graduation-cap me-1 text-success"></i>
-                          Course Type
+                           Type of B2B
                         </label>
                         <div className="position-relative">
                           <select
@@ -3361,70 +3361,23 @@ const B2BSales = () => {
                           </select>
                         </div>
                       </div>
-
-                      {/* Project Filter */}
                       <div className="col-md-3">
-                        <MultiSelectCheckbox
-                          title="Project"
-                          options={projectOptions}
-                          selectedValues={formData.projects.values}
-                          onChange={(values) => handleCriteriaChange('projects', values)}
-                          icon="fas fa-sitemap"
-                          isOpen={dropdownStates.projects}
-                          onToggle={() => toggleDropdown('projects')}
-                        />
-                      </div>
-
-                      {/* Verticals Filter */}
-                      <div className="col-md-3">
-                        <MultiSelectCheckbox
-                          title="Verticals"
-                          options={verticalOptions}
-                          selectedValues={formData.verticals.values}
-                          icon="fas fa-sitemap"
-                          isOpen={dropdownStates.verticals}
-                          onToggle={() => toggleDropdown('verticals')}
-                          onChange={(values) => handleCriteriaChange('verticals', values)}
-                        />
-                      </div>
-
-                      {/* Course Filter */}
-                      <div className="col-md-3">
-                        <MultiSelectCheckbox
-                          title="Course"
-                          options={courseOptions}
-                          selectedValues={formData.course.values}
-                          onChange={(values) => handleCriteriaChange('course', values)}
-                          icon="fas fa-graduation-cap"
-                          isOpen={dropdownStates.course}
-                          onToggle={() => toggleDropdown('course')}
-                        />
-                      </div>
-
-                      {/* Center Filter */}
-                      <div className="col-md-3">
-                        <MultiSelectCheckbox
-                          title="Center"
-                          options={centerOptions}
-                          selectedValues={formData.center.values}
-                          onChange={(values) => handleCriteriaChange('center', values)}
-                          icon="fas fa-building"
-                          isOpen={dropdownStates.center}
-                          onToggle={() => toggleDropdown('center')}
-                        />
-                      </div>
-
-                      {/* Counselor Filter */}
-                      <div className="col-md-3">
-                        <MultiSelectCheckbox
-                          title="Counselor"
-                          options={counselorOptions}
-                          selectedValues={formData.counselor.values}
-                          onChange={(values) => handleCriteriaChange('counselor', values)}
-                          icon="fas fa-user-tie"
-                          isOpen={dropdownStates.counselor}
-                          onToggle={() => toggleDropdown('counselor')}
-                        />
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-graduation-cap me-1 text-success"></i>
+                           Lead Category
+                        </label>
+                        <div className="position-relative">
+                          <select
+                            className="form-select"
+                            name="courseType"
+                            value={filterData.courseType}
+                            onChange={handleFilterChange}
+                          >
+                            <option value="">All Types</option>
+                            <option value="Free">🆓 Free</option>
+                            <option value="Paid">💰 Paid</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
 
