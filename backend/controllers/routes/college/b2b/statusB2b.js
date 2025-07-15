@@ -3,11 +3,11 @@ const express = require("express");
 const mongoose = require('mongoose');
 const cors = require('cors');
 const router = express.Router();
-const { isCollege, auth1, authenti } = require("../../../helpers");
+const { isCollege, auth1, authenti } = require("../../../../helpers");
 
 // Status Model
-const Status = require('../../models/statusB2b');
-const AppliedCourses = require('../../models/appliedCourses');
+const Status = require('../../../models/statusB2b');
+const AppliedCourses = require('../../../models/appliedCourses');
 
 // @route   GET api/statuses
 // @desc    Get All Statuses

@@ -5066,7 +5066,7 @@ const B2BSales = () => {
                                     <button
                                       type="button"
                                       className="btn-close btn-close-white"
-                                    // onClick={handleCloseLeadModal}
+                                    onClick={handleCloseLeadModal}
                                     ></button>
                                   </div>
 
@@ -5144,6 +5144,22 @@ const B2BSales = () => {
                                             {formErrors.businessName}
                                           </div>
                                         )}
+                                      </div>
+
+                                      {/* Business Address */}
+                                      <div className="col-12">
+                                        <label className="form-label fw-bold">
+                                          <i className="fas fa-map-marker-alt text-primary me-1"></i>
+                                          Business Address
+                                        </label>
+                                        <input
+                                          type="text"
+                                          className={`form-control ${formErrors.businessAddress ? 'is-invalid' : ''}`}
+                                          name="businessAddress"
+                                          value={leadFormData.businessAddress}
+                                          onChange={handleLeadInputChange}
+                                          placeholder="Enter business address"
+                                        />
                                       </div>
 
                                       {/* Concern Person Name */}
