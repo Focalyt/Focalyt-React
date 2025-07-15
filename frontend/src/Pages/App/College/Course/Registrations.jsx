@@ -2109,9 +2109,7 @@ const CRMDashboard = () => {
   };
 
 
-  const handleApplyFilters = (e) => {
-   fetchProfileData(filterData, 1);
-  };
+  
 
   const handleCriteriaChange = (criteria, values) => {
     setFormData((prevState) => ({
@@ -3474,7 +3472,7 @@ const CRMDashboard = () => {
                         <button
                           className="btn btn-primary"
                           onClick={() => {
-                            handleApplyFilters(filterData, 1);
+                            fetchProfileData(filterData, 1);
                             setIsFilterCollapsed(true);
                           }}
                         >

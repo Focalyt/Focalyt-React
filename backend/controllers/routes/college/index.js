@@ -3656,7 +3656,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			// Base match stage
 			let baseMatchStage = {
 				kycStage: { $in: [true] },
-				admissionDone: { $nin: [true] },
 				$or: [
 					{ registeredBy: member },
 					{
@@ -4140,7 +4139,6 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 			// Base match stage for KYC candidates
 			let baseMatchStage = {
 				kycStage: { $in: [true] },
-				admissionDone: { $nin: [true] },
 				$or: [
 					{ registeredBy: member },
 					{
