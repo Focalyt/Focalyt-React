@@ -4254,34 +4254,39 @@ const B2BSales = () => {
                                                 : 'N/A'}</div>
                                             </div>
                                             <div className="info-group">
-                                              <div className="info-label">Lead Owner</div>
+                                              <div className="info-label">Lead Category</div>
                                               <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
                                             </div>
                                             <div className="info-group">
-                                              <div className="info-label">COURSE / JOB NAME</div>
+                                              <div className="info-label">Type of B2B</div>
                                               <div className="info-value">{profile._course?.name}</div>
                                             </div>
                                             <div className="info-group">
-                                              <div className="info-label">BATCH NAME</div>
+                                              <div className="info-label">Business Name</div>
                                               <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                             </div>
                                           </div>
 
                                           <div className="info-card">
                                             <div className="info-group">
-                                              <div className="info-label">TYPE OF PROJECT</div>
+                                              <div className="info-label">Concern Person Name</div>
                                               <div className="info-value">{profile._course?.typeOfProject}</div>
                                             </div>
                                             <div className="info-group">
-                                              <div className="info-label">PROJECT</div>
+                                              <div className="info-label">Designation</div>
                                               <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                             </div>
                                             <div className="info-group">
-                                              <div className="info-label">SECTOR</div>
+                                              <div className="info-label">Email</div>
                                               <div className="info-value">{profile.sector}</div>
                                             </div>
                                             <div className="info-group">
-                                              <div className="info-label">LEAD CREATION DATE</div>
+                                              <div className="info-label">Mobile Number</div>
+                                              <div className="info-value">{profile.createdAt ?
+                                                new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                            </div>
+                                            <div className="info-group">
+                                              <div className="info-label">WhatsApp Number</div>
                                               <div className="info-value">{profile.createdAt ?
                                                 new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
                                             </div>
@@ -4297,18 +4302,10 @@ const B2BSales = () => {
                                               <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
                                             </div>
                                             <div className="info-group">
-                                              <div className="info-label">BRANCH NAME</div>
+                                              <div className="info-label">Lead Owner</div>
                                               <div className="info-value">{profile._center?.name || 'N/A'}</div>
                                             </div>
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD MODIFICATION DATE</div>
-                                              <div className="info-value">{profile.updatedAt ?
-                                                new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Remarks</div>
-                                              <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                            </div>
+
                                           </div>
                                         </div>
                                       </div>
@@ -4332,34 +4329,39 @@ const B2BSales = () => {
                                                       : 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
-                                                    <div className="info-label">Lead Owner</div>
+                                                    <div className="info-label">Lead Category</div>
                                                     <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
+                                                    <div className="info-label">Type of B2B</div>
                                                     <div className="info-value">{profile._course?.name}</div>
                                                   </div>
                                                   <div className="info-group">
-                                                    <div className="info-label">BATCH NAME</div>
+                                                    <div className="info-label">Business Name</div>
                                                     <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                                   </div>
                                                 </div>
 
                                                 <div className="info-card">
                                                   <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
+                                                    <div className="info-label">Concern Person Name</div>
                                                     <div className="info-value">{profile._course?.typeOfProject}</div>
                                                   </div>
                                                   <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
+                                                    <div className="info-label">Designation</div>
                                                     <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
-                                                    <div className="info-label">SECTOR</div>
+                                                    <div className="info-label">Email</div>
                                                     <div className="info-value">{profile._course?.sectors}</div>
                                                   </div>
                                                   <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
+                                                    <div className="info-label">Mobile Number</div>
+                                                    <div className="info-value">{profile.createdAt ?
+                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                  </div>
+                                                  <div className="info-group">
+                                                    <div className="info-label">WhatsApp Number</div>
                                                     <div className="info-value">{profile.createdAt ?
                                                       new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
                                                   </div>
@@ -4375,26 +4377,16 @@ const B2BSales = () => {
                                                     <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
                                                   </div>
                                                   <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
+                                                    <div className="info-label">Lead Owner</div>
                                                     <div className="info-value">{profile._center?.name || 'N/A'}</div>
                                                   </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ?
-                                                      new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
+                                                 
                                                   <div className="info-group">
                                                     <div className="info-label">Remarks</div>
                                                     <div className="info-value">{profile.remarks || 'N/A'}</div>
                                                   </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION By</div>
-                                                    <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
-                                                  </div>
+                                                 
+
                                                 </div>
                                               </div>
                                             </div>
@@ -4426,39 +4418,38 @@ const B2BSales = () => {
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
+                                                    <div className="info-label">Concern Person Name</div>
                                                     <div className="info-value">{profile._course?.typeOfProject}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
+                                                    <div className="info-label">Designation</div>
                                                     <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
-                                                    <div className="info-label">Sector</div>
+                                                    <div className="info-label">Email</div>
                                                     <div className="info-value">{profile._course?.sectors}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
+                                                    <div className="info-label">Mobile Number</div>
+                                                    <div className="info-value">{profile._course?.name}</div>
+                                                  </div>
+                                                </div>
+                                                <div className="col-xl- col-3">
+                                                  <div className="info-group">
+                                                    <div className="info-label">WhatsApp Number</div>
                                                     <div className="info-value">{profile._course?.name}</div>
                                                   </div>
                                                 </div>
 
-
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">NEXT ACTION DATE</div>
+                                                    <div className="info-label">Type Of B2B</div>
                                                     <div className="info-value">
                                                       {profile.followups?.length > 0
                                                         ?
@@ -4484,64 +4475,14 @@ const B2BSales = () => {
 
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ? (() => {
-                                                      const dateObj = new Date(profile.createdAt);
-                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                      }).replace(/ /g, '-');
-                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                      });
-                                                      return `${datePart}, ${timePart}`;
-                                                    })() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ? (() => {
-                                                      const dateObj = new Date(profile.updatedAt);
-                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                      }).replace(/ /g, '-');
-                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                      });
-                                                      return `${datePart}, ${timePart}`;
-                                                    })() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Remarks</div>
+                                                    <div className="info-label">Lead Category</div>
                                                     <div className="info-value">{profile.remarks || 'N/A'}</div>
                                                   </div>
                                                 </div>
+                                                
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION BY</div>
-                                                    <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD OWNER</div>
+                                                    <div className="info-label">Lead Owner</div>
                                                     <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
                                                   </div>
                                                 </div>

@@ -53,6 +53,7 @@ function CollegeLayout({ children }) {
   const toggleSubmenu = (menu) => {
     setOpenSubmenu(prev => {
       const newState = { ...prev, [menu]: !prev[menu] };
+      console.log(`Toggling ${menu}:`, newState[menu]); // Debug log
       return newState;
     });
   };
@@ -116,16 +117,7 @@ function CollegeLayout({ children }) {
   const toggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);
   };
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth <= 1199;
-      setIsMobile(mobile);
-      setIsSidebarOpen(!mobile); // Desktop: open, Mobile: close by default
-    };
-    window.addEventListener('resize', handleResize);
 
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -178,9 +170,12 @@ function CollegeLayout({ children }) {
       const ref = menuRefs[key];
       if (ref.current) {
         if (openSubmenu[key]) {
-          // Opening: set to scrollHeight immediately
-          newHeights[key] = `${ref.current.scrollHeight}px`;
+          // Opening: get scrollHeight without breaking transition
+          const scrollHeight = ref.current.scrollHeight;
+          console.log(`${key} opening - height:`, scrollHeight); // Debug log
+          newHeights[key] = `${scrollHeight}px`;
         } else {
+          // Closing: set current height first, then animate to 0
           const currentHeight = `${ref.current.scrollHeight}px`;
           newHeights[key] = currentHeight;
 
@@ -199,6 +194,65 @@ function CollegeLayout({ children }) {
       ...prev,
       ...newHeights,
     }));
+  }, [openSubmenu]);
+
+  // Special effect for nested submenus (like dropdown inside settings)
+  useEffect(() => {
+    // When dropdown opens/closes, recalculate both dropdown and settings heights
+    if (openSubmenu.dropdown !== undefined) {
+      const dropdownRef = menuRefs.dropdown;
+      const settingsRef = menuRefs.settings;
+      
+      if (dropdownRef.current) {
+        // Force immediate height calculation for dropdown
+        const dropdownHeight = dropdownRef.current.scrollHeight;
+        console.log('Dropdown height:', dropdownHeight, 'Open state:', openSubmenu.dropdown); // Debug log
+        console.log('Current submenuMaxHeight.dropdown:', submenuMaxHeight.dropdown); // Debug log
+        
+        setSubmenuMaxHeight(prev => ({
+          ...prev,
+          dropdown: openSubmenu.dropdown ? `${Math.max(dropdownHeight, 80)}px` : '0px'
+        }));
+      }
+      
+      if (settingsRef.current && openSubmenu.settings) {
+        setTimeout(() => {
+          const settingsHeight = settingsRef.current.scrollHeight;
+          console.log('Settings height:', settingsHeight); // Debug log
+          setSubmenuMaxHeight(prev => ({
+            ...prev,
+            settings: `${settingsHeight}px`
+          }));
+        }, 100);
+      }
+    }
+  }, [openSubmenu.dropdown]);
+
+  // Additional effect to handle nested submenu height updates
+  useEffect(() => {
+    // Force recalculation of parent menu heights when nested menus change
+    const updateParentHeights = () => {
+      const newHeights = {};
+      Object.keys(menuRefs).forEach((key) => {
+        const ref = menuRefs[key];
+        if (ref.current && openSubmenu[key]) {
+          // Get accurate scrollHeight while maintaining transition
+          const scrollHeight = ref.current.scrollHeight;
+          newHeights[key] = `${scrollHeight}px`;
+        }
+      });
+
+      if (Object.keys(newHeights).length > 0) {
+        setSubmenuMaxHeight(prev => ({
+          ...prev,
+          ...newHeights,
+        }));
+      }
+    };
+
+    // Use a delay to ensure DOM updates are complete
+    const timeoutId = setTimeout(updateParentHeights, 100);
+    return () => clearTimeout(timeoutId);
   }, [openSubmenu]);
 
   return (
@@ -528,7 +582,7 @@ function CollegeLayout({ children }) {
                       ref={menuRefs.dropdown}
                       className="menu-content"
                       style={{
-                        maxHeight: submenuMaxHeight.dropdown,
+                        maxHeight: openSubmenu.dropdown ? '600px' : '0px',
                         overflow: 'hidden',
                         transition: 'max-height 0.3s ease-in-out'
                       }}
@@ -538,6 +592,12 @@ function CollegeLayout({ children }) {
                         <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
                           <FontAwesomeIcon icon={faFileAlt} />
                           <span className="menu-title">Type of B2B</span>
+                        </Link>
+                      </li>
+                        <li className={`nav-item ${location.pathname === '/institute/typeOfCategory' ? 'active' : ''}`}>
+                        <Link to="/institute/typeOfCategory" onClick={() => handleSidebarClose()}>
+                          <FontAwesomeIcon icon={faFileAlt} />
+                          <span className="menu-title">Type of Category</span>
                         </Link>
                       </li>
                     </ul>
