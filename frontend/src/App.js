@@ -77,7 +77,7 @@ import MyFollowup from './Pages/App/College/MyFollowupB2C/MyFollowupB2C';
 import MyFollowupB2B from './Pages/App/College/MyFollowupB2B/MyFollowupB2B';
 import AddLeads from './Pages/App/College/Course/AddLeads';
 import TypeB2b from './Pages/App/College/Settings/TypeOfB2B/TypeB2b';
-import TypeCategory from './Pages/App/College/TypeOfCategory/TypeCategory';
+import TypeCategory from './Pages/App/College/Settings/TypeOfCategory/TypeCategory';
 
 import CompanyLayout from './Component/Layouts/App/Company';
 import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
