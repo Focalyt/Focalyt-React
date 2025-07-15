@@ -665,8 +665,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 			// Sector filter (multi-select)
 			if (projectsArray.length > 0) {
-				additionalMatches['_course.project'] = { 
-					$in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) 
+				additionalMatches['_course.project'] = {
+					$in: projectsArray.map(id => new mongoose.Types.ObjectId(id))
 				};
 			}
 
@@ -688,15 +688,22 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 			// Name search filter
 			if (name && name.trim()) {
-				const searchRegex = new RegExp(name.trim(), 'i');
+				const searchTerm = name.trim();
+				const searchRegex = new RegExp(searchTerm, 'i');
+
+				console.log('searchTerm', searchTerm)
+				console.log('searchRegex', searchRegex)
+
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': parseInt(searchRegex) },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm }, // Try both number and string
 					{ '_candidate.email': searchRegex }
 				] : [
 					{ '_candidate.name': searchRegex },
 					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 					{ '_candidate.email': searchRegex }
 				];
 			}
@@ -1052,8 +1059,8 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 			}
 
 			if (appliedFilters.projectsArray.length > 0) {
-				additionalMatches['_course.project'] = { 
-					$in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) 
+				additionalMatches['_course.project'] = {
+					$in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id))
 				};
 			}
 
