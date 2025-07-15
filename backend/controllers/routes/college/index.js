@@ -2522,7 +2522,19 @@ router.route("/createResume/:id").get(isCollege, authenti, async (req, res) => {
 			};
 		}
 		const logo = fs.readFileSync(path.join(__dirname, '../../../public/images/elements/mipie-footer.png'), { encoding: 'base64' });
-		const browser = await puppeteer.launch(params);
+		const browser = await puppeteer.launch({
+			headless: 'new',
+			args: [
+			  '--no-sandbox',
+			  '--disable-setuid-sandbox',
+			  '--disable-dev-shm-usage',
+			  '--disable-accelerated-2d-canvas',
+			  '--no-first-run',
+			  '--no-zygote',
+			  '--disable-gpu',
+			  '--disable-extensions'
+			]
+		  });
 		const page = await browser.newPage();
 		await page.goto(url, { waitUntil: "networkidle2" });
 		const data = await page.pdf({
