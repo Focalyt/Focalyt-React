@@ -6,6 +6,10 @@ const B2BLeadSchema = new mongoose.Schema({
   typeOfB2B: { type: ObjectId, ref:'TypeOfB2B', required: true },
   businessName: { type: String, required: true },
   businessAddress: { type: String },
+  coordinates:{
+    type: { type: String, default: "Point" },
+    coordinates: { type: [Number], required: true }
+  },
   concernPersonName: { type: String, required: true },
   designation: { type: String },
   email: { type: String, required: true },

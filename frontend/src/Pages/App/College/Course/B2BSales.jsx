@@ -8,6 +8,45 @@ import axios from 'axios'
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+// Google Maps API styles
+const mapStyles = `
+  .map-container {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .map-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    background: #f8f9fa;
+    color: #6c757d;
+  }
+  
+  .location-info {
+    background: #e8f5e8;
+    border: 1px solid #28a745;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 8px;
+  }
+  
+  .map-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .map-buttons .btn {
+    flex: 1;
+    font-size: 0.875rem;
+  }
+`;
+
 const MultiSelectCheckbox = ({
   title,
   options,
@@ -123,416 +162,6 @@ const MultiSelectCheckbox = ({
   );
 };
 
-const DocumentModal = memo(({
-  showDocumentModal,
-  selectedDocument,
-  closeDocumentModal,
-  updateDocumentStatus,
-  getFileType
-}) => {
-  const [showRejectionForm, setShowRejectionForm] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [documentZoom, setDocumentZoom] = useState(1);
-  const [documentRotation, setDocumentRotation] = useState(0);
-  const getStatusBadgeClass = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return 'text-dark';
-      case 'verified': return 'text-sucess';
-      case 'rejected': return 'text-danger';
-      default: return 'text-secondary';
-    }
-  };
-  const latestUpload = useMemo(() => {
-    if (!selectedDocument) return null;
-    return selectedDocument.uploads && selectedDocument.uploads.length > 0
-      ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-      : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
-  }, [selectedDocument]);
-
-  const handleZoomIn = useCallback(() => {
-    setDocumentZoom(prev => Math.min(prev + 0.1, 2));
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
-  }, []);
-
-  const handleRotate = useCallback(() => {
-    setDocumentRotation(prev => (prev + 90) % 360);
-  }, []);
-
-  const handleReset = useCallback(() => {
-    setDocumentZoom(1);
-    setDocumentRotation(0);
-  }, []);
-
-  const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-  const fileType = fileUrl ? getFileType(fileUrl) : null;
-
-  const handleRejectClick = useCallback(() => {
-    setShowRejectionForm(true);
-  }, []);
-
-  const handleCancelRejection = useCallback(() => {
-    setShowRejectionForm(false);
-    setRejectionReason('');
-  }, []);
-
-  const handleConfirmRejection = useCallback(() => {
-    if (rejectionReason.trim()) {
-      updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
-      handleCancelRejection();
-    }
-  }, [latestUpload, selectedDocument, rejectionReason, updateDocumentStatus, handleCancelRejection]);
-
-  if (!showDocumentModal || !selectedDocument) return null;
-
-  // Fixed renderDocumentThumbnail - removed setCurrentPreviewUpload calls
-  const renderDocumentThumbnail = (upload, isSmall = true) => {
-    const fileUrl = upload?.fileUrl;
-    if (!fileUrl) {
-      return (
-        <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f8f9fa',
-          border: '1px solid #dee2e6',
-          borderRadius: '4px',
-          width: isSmall ? '100%' : '150px',
-          height: isSmall ? 'auto' : '100px',
-          minHeight: '50px',
-          fontSize: isSmall ? '16px' : '24px',
-          color: '#6c757d'
-        }}>
-          📄
-        </div>
-      );
-    }
-
-    const fileType = getFileType(fileUrl);
-
-    if (fileType === 'image') {
-      return (
-        <img
-          src={fileUrl}
-          alt="Document Preview"
-          className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-          style={{
-            width: isSmall ? '100%' : '150px',
-            height: 'auto',
-            maxWidth: '100%',
-            objectFit: 'contain',
-            borderRadius: '4px',
-            border: '1px solid #dee2e6',
-            backgroundColor: '#f8f9fa',
-            display: 'block',
-            // Remove cursor pointer to indicate it's not clickable
-            cursor: 'default'
-          }}
-        // Remove onClick handler
-        />
-      );
-    } else if (fileType === 'pdf') {
-      return (
-        <div style={{
-          position: 'relative',
-          overflow: 'visible',
-          width: isSmall ? '100%' : '150px',
-          height: 'auto'
-        }}>
-          <iframe
-            src={fileUrl + '#navpanes=0&toolbar=0'}
-            className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
-            style={{
-              width: '100%',
-              height: isSmall ? 'auto' : '100px',
-              minHeight: isSmall ? '300px' : '100px',
-              border: '1px solid #dee2e6',
-              borderRadius: '4px',
-              backgroundColor: '#f8f9fa',
-              // Disable pointer events to prevent clicks
-              pointerEvents: 'none'
-            }}
-            title="Document"
-            scrolling={isSmall ? 'auto' : 'no'}
-          />
-          {!isSmall && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 123, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#007bff',
-              fontSize: '24px',
-              borderRadius: '4px',
-              // Remove cursor pointer
-              cursor: 'default',
-              // Disable pointer events
-              pointerEvents: 'none'
-            }}>
-              {fileType === 'document' ? '📄' :
-                fileType === 'spreadsheet' ? '📊' : '📁'}
-            </div>
-          )}
-        </div>
-      );
-    }
-  };
-
-  return (
-    <div className="document-modal-overlay" onClick={closeDocumentModal}>
-      <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{selectedDocument.Name} Verification</h3>
-          <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
-        </div>
-
-        <div className="modal-body">
-          <div className="document-preview-section">
-            <div className="document-preview-container" style={{ height: 'auto' }}>
-              {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
-                (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
-                <>
-                  {(() => {
-                    console.log('selectedDocument:', selectedDocument);
-                    console.log('latestUpload:', latestUpload);
-
-                    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-                    const hasDocument = fileUrl ||
-                      (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
-
-                    console.log('fileUrl:', fileUrl);
-                    console.log('hasDocument:', hasDocument);
-
-                    if (hasDocument) {
-                      // If we have a file URL, show the appropriate viewer
-                      if (fileUrl) {
-                        const fileType = getFileType(fileUrl);
-
-                        if (fileType === 'image') {
-                          return (
-                            <img
-                              src={fileUrl}
-                              alt="Document Preview"
-                              style={{
-                                transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                                transition: 'transform 0.3s ease',
-                                maxWidth: '100%',
-                                objectFit: 'contain'
-                              }}
-                            />
-                          );
-                        } else if (fileType === 'pdf') {
-                          return (
-                            <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
-                              <iframe
-                                src={fileUrl + '#navpanes=0&toolbar=0'}
-                                width="100%"
-                                height="100%"
-                                style={{
-                                  border: 'none',
-                                  transform: `scale(${documentZoom})`,
-                                  transformOrigin: 'top left',
-                                  transition: 'transform 0.3s ease'
-                                }}
-                                title="PDF Document"
-                              />
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                                {fileType === 'document' ? '📄' :
-                                  fileType === 'spreadsheet' ? '📊' : '📁'}
-                              </div>
-                              <h4>Document Preview</h4>
-                              <p>Click download to view this file</p>
-                              {fileUrl ? (
-                                <a
-                                  href={fileUrl}
-                                  download
-                                  className="btn btn-primary"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <i className="fas fa-download me-2"></i>
-                                  Download & View
-                                </a>
-                              ) : (
-                                <button
-                                  className="btn btn-secondary"
-                                  disabled
-                                  title="File URL not available"
-                                >
-                                  <i className="fas fa-download me-2"></i>
-                                  File Not Available
-                                </button>
-                              )}
-                            </div>
-                          );
-                        }
-                      } else {
-                        // Document exists but no file URL - show document uploaded message
-                        return (
-                          <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                            <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
-                            <h4>Document Uploaded</h4>
-                            <p>Document is available for verification</p>
-                            <p><strong>Status:</strong> {selectedDocument?.status}</p>
-                          </div>
-                        );
-                      }
-                    } else {
-                      return (
-                        <div className="no-document">
-                          <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                          <p>No document uploaded</p>
-                        </div>
-                      );
-                    }
-                  })()}
-                  {fileUrl && (
-                    <div className="preview-controls">
-                      <button className="control-btn" onClick={handleZoomIn}>
-                        <i className="fas fa-search-plus"></i>
-                      </button>
-                      <button className="control-btn" onClick={handleZoomOut}>
-                        <i className="fas fa-search-minus"></i>
-                      </button>
-                      <button className="control-btn" onClick={handleRotate}>
-                        <i className="fas fa-redo"></i>
-                      </button>
-                      <button className="control-btn" onClick={handleReset}>
-                        <i className="fas fa-compress"></i>
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="no-document">
-                  <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                  <p>No document uploaded</p>
-                </div>
-              )}
-            </div>
-
-            {/* document preview container  */}
-
-            {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-              <div className="info-card mt-4">
-                <h4>Document History</h4>
-                <div className="document-history">
-                  {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
-                    <div key={index} className="history-item" style={{
-                      display: 'block',
-                      padding: '12px',
-                      marginBottom: '8px',
-                      backgroundColor: '#f8f9fa',
-                      borderRadius: '8px',
-                      border: '1px solid #e9ecef'
-                    }}>
-                      {/* Document Preview Thumbnail using iframe/img */}
-                      <div className="history-preview" style={{ marginRight: '0px' }}>
-                        {renderDocumentThumbnail(upload, true)}
-                      </div>
-
-                      {/* Document Info */}
-                      <div className="history-info" style={{ flex: 1 }}>
-                        {/* <div className="history-date" style={{
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          color: '#495057',
-                          marginBottom: '4px'
-                        }}>
-                          {formatDate(upload.uploadedAt)}
-                        </div> */}
-                        <div className="history-status">
-                          <span className={`${getStatusBadgeClass(upload.status)}`} style={{
-                            fontSize: '12px',
-                            padding: '4px 8px'
-                          }}>
-                            {upload.status}
-                          </span>
-                        </div>
-                        {upload.fileUrl && (
-                          <div className="history-actions" style={{ marginTop: '8px' }}>
-                            <a
-                              href={upload.fileUrl}
-                              download
-                              className="btn btn-sm btn-outline-primary"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                fontSize: '11px',
-                                padding: '2px 8px',
-                                textDecoration: 'none'
-                              }}
-                            >
-                              <i className="fas fa-download me-1"></i>
-                              Download
-                            </a>
-                            {/* <button
-                              className="btn btn-sm btn-outline-secondary ms-2"
-                              style={{
-                                fontSize: '11px',
-                                padding: '2px 8px'
-                              }}
-                              onClick={() => {
-                                
-                                setCurrentPreviewUpload(upload);
-                              }}
-                            >
-                              <i className="fas fa-eye me-1"></i>
-                              Preview
-                            </button> */}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="document-info-section">
-            <div className="info-card">
-              <h4>Document Information</h4>
-              <div className="info-row">
-                <strong>Document Name:</strong> {selectedDocument.Name}
-              </div>
-              <div className="info-row">
-                <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
-                  new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric'
-                  }) : 'N/A'}
-              </div>
-              <div className="info-row">
-                <strong>Status:</strong>
-                <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
-                  {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
-                </span>
-              </div>
-            </div>
-
-
-
-
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(140); // Default fallback
@@ -758,6 +387,7 @@ const B2BSales = () => {
     leadCategory: '',
     typeOfB2B: '',
     businessName: '',
+    businessAddress: '',
     concernPersonName: '',
     designation: '',
     email: '',
@@ -801,6 +431,71 @@ const B2BSales = () => {
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
+  
+  // B2B Dropdown Options
+  const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
+  const [typeOfB2BOptions, setTypeOfB2BOptions] = useState([]);
+  
+  // Google Maps API
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [showMap, setShowMap] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Load Google Maps API
+  useEffect(() => {
+    const loadGoogleMapsAPI = () => {
+      if (window.google && window.google.maps) {
+        setMapLoaded(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        setMapLoaded(true);
+        initializeAutocomplete();
+      };
+      script.onerror = () => {
+        console.error('Failed to load Google Maps API');
+      };
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMapsAPI();
+  }, []);
+
+  // Initialize Google Maps Autocomplete
+  const initializeAutocomplete = () => {
+    if (!window.google || !window.google.maps) return;
+
+    const addressInput = document.getElementById('businessAddress');
+    if (addressInput) {
+      const autocomplete = new window.google.maps.places.Autocomplete(addressInput, {
+        types: ['address'],
+        componentRestrictions: { country: 'IN' } // Restrict to India
+      });
+
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry) {
+          const location = {
+            address: place.formatted_address,
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+            placeId: place.place_id
+          };
+          setSelectedLocation(location);
+          setLeadFormData(prev => ({
+            ...prev,
+            businessAddress: place.formatted_address
+          }));
+        }
+      });
+    }
+  };
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -809,6 +504,8 @@ const B2BSales = () => {
         const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
         const token = userData.token;
         const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        
+        // Fetch main filter options
         const res = await axios.get(`${backendUrl}/college/filters-data`, {
           headers: { 'x-auth': token }
         });
@@ -819,12 +516,161 @@ const B2BSales = () => {
           setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
           setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
         }
+
+        // Fetch B2B dropdown options
+        await fetchB2BDropdownOptions();
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
       }
     };
     fetchFilterOptions();
   }, []);
+
+  // Fetch B2B dropdown options
+  const fetchB2BDropdownOptions = async () => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+      // Fetch Lead Categories
+      const leadCategoriesRes = await axios.get(`${backendUrl}/college/b2b/lead-categories`, {
+        headers: { 'x-auth': token }
+      });
+      if (leadCategoriesRes.data.status) {
+        setLeadCategoryOptions(leadCategoriesRes.data.data.map(cat => ({ 
+          value: cat._id, 
+          label: cat.name 
+        })));
+      }
+
+      // Fetch Type of B2B
+      const typeOfB2BRes = await axios.get(`${backendUrl}/college/b2b/type-of-b2b`, {
+        headers: { 'x-auth': token }
+      });
+      if (typeOfB2BRes.data.status) {
+        setTypeOfB2BOptions(typeOfB2BRes.data.data.map(type => ({ 
+          value: type._id, 
+          label: type.name 
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to fetch B2B dropdown options:', err);
+    }
+  };
+
+  // Handle map toggle
+  const toggleMap = () => {
+    setShowMap(!showMap);
+  };
+
+  // Handle location selection from map
+  const handleMapLocationSelect = (location) => {
+    setSelectedLocation(location);
+    setLeadFormData(prev => ({
+      ...prev,
+      businessAddress: location.address
+    }));
+    setShowMap(false);
+  };
+
+  // Get current location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const geocoder = new window.google.maps.Geocoder();
+          const latlng = { lat: latitude, lng: longitude };
+          
+          geocoder.geocode({ location: latlng }, (results, status) => {
+            if (status === 'OK' && results[0]) {
+              const location = {
+                address: results[0].formatted_address,
+                lat: latitude,
+                lng: longitude,
+                placeId: results[0].place_id
+              };
+              handleMapLocationSelect(location);
+            }
+          });
+        },
+        (error) => {
+          console.error('Error getting current location:', error);
+          alert('Unable to get current location. Please enter address manually.');
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by this browser.');
+    }
+  };
+
+  // Initialize map when shown
+  useEffect(() => {
+    if (showMap && mapLoaded && window.google) {
+      const mapElement = document.getElementById('map');
+      if (mapElement) {
+        const map = new window.google.maps.Map(mapElement, {
+          center: selectedLocation ? { lat: selectedLocation.lat, lng: selectedLocation.lng } : { lat: 20.5937, lng: 78.9629 }, // Default to India center
+          zoom: 12,
+          mapTypeControl: true,
+          streetViewControl: true,
+          fullscreenControl: true
+        });
+
+        let marker = null;
+
+        // Add click listener to map
+        map.addListener('click', (event) => {
+          const lat = event.latLng.lat();
+          const lng = event.latLng.lng();
+          
+          // Remove existing marker
+          if (marker) {
+            marker.setMap(null);
+          }
+
+          // Add new marker
+          marker = new window.google.maps.Marker({
+            position: { lat, lng },
+            map: map,
+            draggable: true
+          });
+
+          // Geocode the clicked location
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            if (status === 'OK' && results[0]) {
+              const location = {
+                address: results[0].formatted_address,
+                lat: lat,
+                lng: lng,
+                placeId: results[0].place_id
+              };
+              handleMapLocationSelect(location);
+            }
+          });
+        });
+
+        // Add marker for selected location if exists
+        if (selectedLocation) {
+          marker = new window.google.maps.Marker({
+            position: { lat: selectedLocation.lat, lng: selectedLocation.lng },
+            map: map,
+            draggable: true
+          });
+          map.setCenter({ lat: selectedLocation.lat, lng: selectedLocation.lng });
+        }
+      }
+    }
+  }, [showMap, mapLoaded, selectedLocation]);
+
+  // Reinitialize autocomplete when map is loaded
+  useEffect(() => {
+    if (mapLoaded) {
+      initializeAutocomplete();
+    }
+  }, [mapLoaded]);
 
   const handleCheckboxChange = (profile, checked) => {
     if (checked) {
@@ -961,9 +807,20 @@ const B2BSales = () => {
       return;
     }
 
+    setLoading(true);
     try {
+      // Prepare data with location information
+      const leadData = {
+        ...leadFormData,
+        location: selectedLocation ? {
+          address: selectedLocation.address,
+          coordinates: [selectedLocation.lat, selectedLocation.lng],
+          placeId: selectedLocation.placeId
+        } : null
+      };
+
       // Here you would typically send the data to your backend
-      console.log('Lead form data:', leadFormData);
+      console.log('Lead form data:', leadData);
       console.log('Extracted numbers:', extractedNumbers);
 
       // Show success message
@@ -974,6 +831,7 @@ const B2BSales = () => {
         leadCategory: '',
         typeOfB2B: '',
         businessName: '',
+        businessAddress: '',
         concernPersonName: '',
         designation: '',
         email: '',
@@ -983,6 +841,8 @@ const B2BSales = () => {
       });
       setFormErrors({});
       setExtractedNumbers([]);
+      setSelectedLocation(null);
+      setShowMap(false);
 
       // Close modal
       setShowAddLeadModal(false);
@@ -990,6 +850,8 @@ const B2BSales = () => {
     } catch (error) {
       console.error('Error submitting lead:', error);
       alert('Failed to add lead. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1000,6 +862,7 @@ const B2BSales = () => {
       leadCategory: '',
       typeOfB2B: '',
       businessName: '',
+      businessAddress: '',
       concernPersonName: '',
       designation: '',
       email: '',
@@ -1009,6 +872,8 @@ const B2BSales = () => {
     });
     setFormErrors({});
     setExtractedNumbers([]);
+    setSelectedLocation(null);
+    setShowMap(false);
   };
 
 
@@ -3177,6 +3042,8 @@ const B2BSales = () => {
 
   return (
     <div className="container-fluid">
+      {/* Inject Google Maps styles */}
+      <style>{mapStyles}</style>
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           <div
@@ -4460,506 +4327,11 @@ const B2BSales = () => {
                                       </div>
                                     </div>
                                   )}
-                                  {/* Documents Tab */}
-                                  {/* {activeTab === 4 && ( */}
+                                  
 
-                                  {(activeTab[profileIndex] || 0) === 1 && (
-                                    <div className="tab-pane active" id='studentsDocuments'>
-                                      {(() => {
-                                        const documentsToDisplay = profile.uploadedDocs || [];
-                                        const totalRequired = profile?.docCounts?.totalRequired || 0;
-
-                                        // If no documents are required, show a message
-                                        if (totalRequired === 0) {
-                                          return (
-                                            <div className="col-12 text-center py-5">
-                                              <div className="text-muted">
-                                                <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                <h5 className="text-success">No Documents Required</h5>
-                                                <p>This course does not require any document verification.</p>
-                                              </div>
-                                            </div>
-
-                                          );
-                                        }
-
-                                        // If documents are required, show the full interface
-                                        return (
-                                          <div className="enhanced-documents-panel">
-                                            {/* Enhanced Stats Grid */}
-                                            <div className="stats-grid">
-                                              {(() => {
-                                                // Use backend counts only, remove static document fallback
-                                                const backendCounts = profile?.docCounts || {};
-                                                return (
-                                                  <>
-                                                    <div className="stat-card total-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-file-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.totalRequired || 0}</h4>
-                                                        <p>Total Required</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-list"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card uploaded-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-cloud-upload-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                        <p>Uploaded</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card pending-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-clock"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                        <p>Pending Review</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-exclamation-triangle"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card verified-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-check-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                        <p>Approved</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-thumbs-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card rejected-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-times-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                        <p>Rejected</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-down"></i>
-                                                      </div>
-                                                    </div>
-                                                  </>
-                                                );
-                                              })()}
-                                            </div>
-
-                                            {/* Enhanced Filter Section */}
-                                            <div className="filter-section-enhanced">
-                                              <div className="filter-tabs-container">
-                                                <h5 className="filter-title">
-                                                  <i className="fas fa-filter me-2"></i>
-                                                  Filter Documents
-                                                </h5>
-                                                <div className="filter-tabs">
-                                                  {(() => {
-                                                    const backendCounts = profile?.docCounts || {};
-                                                    return (
-                                                      <>
-                                                        <button
-                                                          className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('all')}
-                                                        >
-                                                          <i className="fas fa-list-ul"></i>
-                                                          All Documents
-                                                          <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('pending')}
-                                                        >
-                                                          <i className="fas fa-clock"></i>
-                                                          Pending
-                                                          <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('verified')}
-                                                        >
-                                                          <i className="fas fa-check-circle"></i>
-                                                          Verified
-                                                          <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('rejected')}
-                                                        >
-                                                          <i className="fas fa-times-circle"></i>
-                                                          Rejected
-                                                          <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                        </button>
-                                                      </>
-                                                    );
-                                                  })()}
-                                                </div>
-                                              </div>
-                                            </div>
-
-                                            {/* Enhanced Documents Grid */}
-                                            <div className="documents-grid-enhanced">
-                                              {(() => {
-                                                // Filter documents based on status filter
-                                                const filteredDocs = filterDocuments(documentsToDisplay);
-
-                                                if (filteredDocs.length === 0) {
-                                                  return (
-                                                    <div className="col-12 text-center py-5">
-                                                      <div className="text-muted">
-                                                        <i className="fas fa-filter fa-3x mb-3"></i>
-                                                        <h5>No Documents Found</h5>
-                                                        <p>No documents match the current filter criteria.</p>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                }
-
-                                                return filteredDocs.map((doc, index) => {
-                                                  // Check if this is a document with upload data or just uploaded file info
-                                                  const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                    ? doc.uploads[doc.uploads.length - 1]
-                                                    : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                  return (
-                                                    <div key={doc._id || index} className="document-card-enhanced">
-                                                      <div className="document-image-container">
-                                                        {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                          <>
-                                                            {(() => {
-                                                              const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                              const fileType = getFileType(fileUrl);
-
-                                                              if (fileType === 'image') {
-                                                                return (
-                                                                  <img
-                                                                    src={fileUrl}
-                                                                    alt="Document Preview"
-                                                                    className="document-image"
-                                                                  />
-                                                                );
-                                                              } else if (fileType === 'pdf') {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                  </div>
-                                                                );
-                                                              } else {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
-                                                                      fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                      }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                      {fileType === 'document' ? 'Document' :
-                                                                        fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                    </p>
-                                                                  </div>
-                                                                );
-                                                              }
-                                                            })()}
-                                                            <div className="image-overlay">
-                                                              <button
-                                                                className="preview-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                              >
-                                                                <i className="fas fa-search-plus"></i>
-                                                                Preview
-                                                              </button>
-                                                            </div>
-                                                          </>
-                                                        ) : (
-                                                          <div className="no-document-placeholder">
-                                                            <i className="fas fa-file-upload"></i>
-                                                            <p>No Document</p>
                                                           </div>
-                                                        )}
-
-                                                        {/* Status Badge Overlay */}
-                                                        <div className="status-badge-overlay">
-                                                          {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                            <span className="status-badge-new pending">
-                                                              <i className="fas fa-clock"></i>
-                                                              Pending
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                            <span className="status-badge-new verified">
-                                                              <i className="fas fa-check-circle"></i>
-                                                              Verified
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                            <span className="status-badge-new rejected">
-                                                              <i className="fas fa-times-circle"></i>
-                                                              Rejected
-                                                            </span>
-                                                          )}
-                                                          {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                            <span className="status-badge-new not-uploaded">
-                                                              <i className="fas fa-upload"></i>
-                                                              Required
-                                                            </span>
                                                           )}
                                                         </div>
-                                                      </div>
-
-                                                      <div className="document-info-section">
-                                                        <div className="document-header">
-                                                          <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
-                                                          <div className="document-actions">
-                                                            {(!latestUpload) ? (
-                                                              <button className="action-btn upload-btn" title="Upload Document" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick={() => {
-                                                                setSelectedProfile(profile); // Set the current profile
-                                                                openUploadModal(doc);        // Open the upload modal
-                                                              }}>
-                                                                <i className="fas fa-cloud-upload-alt"></i>
-                                                                Upload
-                                                              </button>
-                                                            ) : (
-                                                              <button
-                                                                className="action-btn verify-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                                title="Verify Document"
-                                                              >
-                                                                <i className="fas fa-search"></i>
-                                                                PREVIEW
-                                                              </button>
-                                                            )}
-                                                          </div>
-                                                        </div>
-
-                                                        <div className="document-meta">
-                                                          <div className="meta-item">
-                                                            <i className="fas fa-calendar-alt text-muted"></i>
-                                                            <span className="meta-text">
-                                                              {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                  day: '2-digit',
-                                                                  month: 'short',
-                                                                  year: 'numeric'
-                                                                }) :
-                                                                'Not uploaded'
-                                                              }
-                                                            </span>
-                                                          </div>
-
-                                                          {latestUpload && (
-                                                            <div className="meta-item">
-                                                              <i className="fas fa-clock text-muted"></i>
-                                                              <span className="meta-text">
-                                                                {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                  hour: '2-digit',
-                                                                  minute: '2-digit'
-                                                                })}
-                                                              </span>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                });
-                                              })()}
-                                            </div>
-
-                                            {/* <DocumentModal /> */}
-                                            {showDocumentModal && (
-                                              <DocumentModal
-                                                showDocumentModal={showDocumentModal}
-                                                selectedDocument={selectedDocument}
-                                                closeDocumentModal={closeDocumentModal}
-                                                updateDocumentStatus={updateDocumentStatus}
-                                                getFileType={getFileType}
-                                              />
-                                            )}
-                                            <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                              <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
-                                                <div className="modal-content p-0 w-100">
-                                                  <div className="modal-header">
-                                                    <h3>
-                                                      <i className="fas fa-cloud-upload-alt me-2"></i>
-                                                      Upload {selectedDocumentForUpload?.Name || 'Document'}
-                                                    </h3>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
-                                                  </div>
-                                                  <div className="modal-body">
-
-
-
-                                                    <div className="upload-section">
-                                                      {!selectedFile ? (
-                                                        <div className="file-drop-zone">
-                                                          <div className="drop-zone-content">
-                                                            <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                                                            <h4>Choose a file to upload</h4>
-                                                            <p>Drag and drop a file here, or click to select</p>
-                                                            <div className="file-types">
-                                                              <span>Supported: JPG, PNG, GIF, PDF</span>
-                                                              <span>Max size: 10MB</span>
-                                                            </div>
-                                                            <input
-                                                              type="file"
-                                                              id="file-input"
-                                                              accept=".jpg,.jpeg,.png,.gif,.pdf"
-                                                              onChange={handleFileSelect}
-                                                              style={{ display: 'none' }}
-                                                            />
-                                                            <button
-                                                              className="btn btn-primary"
-
-                                                              onClick={() => document.getElementById('file-input').click()}
-                                                            >
-                                                              <i className="fas fa-folder-open me-2"></i>
-                                                              Choose File
-                                                            </button>
-                                                          </div>
-                                                        </div>
-                                                      ) : (
-                                                        <div className="file-preview-section">
-                                                          <div className="selected-file-info">
-                                                            <h4>Selected File:</h4>
-                                                            <div className="file-details">
-                                                              <div className="file-icon">
-                                                                <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
-                                                              </div>
-                                                              <div className="file-info">
-                                                                <p className="file-name">{selectedFile.name}</p>
-                                                                <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                              </div>
-                                                              <button
-                                                                className="btn btn-sm btn-outline-secondary"
-                                                                onClick={() => {
-                                                                  setSelectedFile(null);
-                                                                  setUploadPreview(null);
-                                                                }}
-                                                              >
-                                                                <i className="fas fa-trash"></i>
-                                                              </button>
-                                                            </div>
-                                                          </div>
-
-                                                          {uploadPreview && (
-                                                            <div className="upload-preview">
-                                                              <h5>Preview:</h5>
-                                                              <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                                                            </div>
-                                                          )}
-
-                                                          {isUploading && (
-                                                            <div className="upload-progress-section">
-                                                              <h5>Uploading...</h5>
-                                                              <div className="progress-bar-container">
-                                                                <div
-                                                                  className="progress-bar"
-                                                                  style={{ width: `${uploadProgress}%` }}
-                                                                ></div>
-                                                              </div>
-                                                              <p>{uploadProgress}% Complete</p>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      )}
-                                                    </div>
-
-
-
-                                                  </div>
-                                                  <div className="modal-footer">
-                                                    <button
-                                                      className="btn btn-secondary"
-                                                      onClick={closeUploadModal}
-                                                      disabled={isUploading}
-                                                    >
-                                                      Cancel
-                                                    </button>
-                                                    <button
-                                                      className="btn btn-primary"
-                                                      onClick={handleFileUpload}
-                                                      disabled={!selectedFile || isUploading}
-                                                    >
-                                                      {isUploading ? (
-                                                        <>
-                                                          <i className="fas fa-spinner fa-spin me-2"></i>
-                                                          Uploading...
-                                                        </>
-                                                      ) : (
-                                                        <>
-                                                          <i className="fas fa-upload me-2"></i>
-                                                          Upload Document
-                                                        </>
-                                                      )}
-                                                    </button>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
-
-                                </div>
-                              )}
-                            </div>
-
-                            {/* <div class="modal fade" id={`profileModal-${profile._id}`} data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby={`profileModalLabel-${profile._id}`} aria-hidden="true">
-                              <div class="modal-dialog modal-dialog-scrollable">
-                                <div class="modal-content new-modal-content">
-                                  <div class="modal-header">
-                                    <h1 class="modal-title fs-5" id={`profileModalLabel-${profile._id}`}>Modal title</h1>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                  </div>
-                                  <div class="modal-body">
-                                    <CandidateProfile ref={candidateRef} />
-                                  </div>
-                                  <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                    <button onClick={handleSaveCV} type="button" class="btn btn-primary">Save CV</button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div> */}
-
-                            {openModalId === profile._id && (
-                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                                <div className="modal-dialog modal-dialog-scrollable m-0 mt-2">
-                                  <div className="modal-content new-modal-content">
-                                    <div className="modal-header">
-                                      <h1 className="modal-title fs-5">Candidate Profile</h1>
-                                      <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
-                                    </div>
-                                    <div className="modal-body">
-                                      <CandidateProfile ref={candidateRef} />
-                                    </div>
-                                    <div className="modal-footer">
-                                      <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
-                                      <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-
                             {/* Lead Add modal Start*/}
                             {showAddLeadModal && (
                             <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
@@ -4994,11 +4366,11 @@ const B2BSales = () => {
                                           onChange={handleLeadInputChange}
                                         >
                                           <option value="">Select Lead Category</option>
-                                          {/* {leadCategories.map(category => (
+                                          {leadCategoryOptions.map(category => (
                                               <option key={category.value} value={category.value}>
                                                 {category.label}
                                               </option>
-                                            ))} */}
+                                            ))}
                                         </select>
                                         {formErrors.leadCategory && (
                                           <div className="invalid-feedback">
@@ -5020,11 +4392,11 @@ const B2BSales = () => {
                                           onChange={handleLeadInputChange}
                                         >
                                           <option value="">Select B2B Type</option>
-                                          {/* {b2bTypes.map(type => (
+                                          {typeOfB2BOptions.map(type => (
                                             <option key={type.value} value={type.value}>
                                               {type.label}
                                             </option>
-                                          ))} */}
+                                          ))}
                                         </select>
                                         {formErrors.typeOfB2B && (
                                           <div className="invalid-feedback">
@@ -5060,15 +4432,99 @@ const B2BSales = () => {
                                           <i className="fas fa-map-marker-alt text-primary me-1"></i>
                                           Business Address
                                         </label>
+                                        <div className="input-group">
                                         <input
                                           type="text"
+                                            id="businessAddress"
                                           className={`form-control ${formErrors.businessAddress ? 'is-invalid' : ''}`}
                                           name="businessAddress"
                                           value={leadFormData.businessAddress}
                                           onChange={handleLeadInputChange}
-                                          placeholder="Enter business address"
-                                        />
+                                            placeholder="Enter business address or use map to select"
+                                            disabled={loading}
+                                          />
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline-primary"
+                                            onClick={toggleMap}
+                                            disabled={loading || !mapLoaded}
+                                            title="Open Map"
+                                          >
+                                            <i className="fas fa-map"></i>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline-success"
+                                            onClick={getCurrentLocation}
+                                            disabled={loading || !mapLoaded}
+                                            title="Use Current Location"
+                                          >
+                                            <i className="fas fa-location-arrow"></i>
+                                          </button>
+                                        </div>
+                                        {selectedLocation && (
+                                          <div className="location-info">
+                                            <small className="text-success">
+                                              <i className="fas fa-check-circle me-1"></i>
+                                              Location: {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
+                                            </small>
+                                          </div>
+                                        )}
                                       </div>
+
+                                      {/* Map Modal */}
+                                      {showMap && (
+                                        <div className="col-12">
+                                          <div className="card map-container">
+                                            <div className="card-header d-flex justify-content-between align-items-center">
+                                              <h6 className="mb-0">
+                                                <i className="fas fa-map-marker-alt me-2"></i>
+                                                Select Location on Map
+                                              </h6>
+                                              <button
+                                                type="button"
+                                                className="btn-close"
+                                                onClick={() => setShowMap(false)}
+                                              ></button>
+                                            </div>
+                                            <div className="card-body p-0">
+                                              <div 
+                                                id="map" 
+                                                className="map-loading"
+                                                style={{ 
+                                                  height: '400px', 
+                                                  width: '100%',
+                                                  position: 'relative'
+                                                }}
+                                              >
+                                                <div className="text-center p-4">
+                                                  <div className="spinner-border text-primary"></div>
+                                                  <p className="mt-2">Loading map...</p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                            <div className="card-footer">
+                                              <div className="map-buttons">
+                                                <button
+                                                  type="button"
+                                                  className="btn btn-outline-primary btn-sm"
+                                                  onClick={getCurrentLocation}
+                                                >
+                                                  <i className="fas fa-location-arrow me-1"></i>
+                                                  Use Current Location
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="btn btn-secondary btn-sm"
+                                                  onClick={() => setShowMap(false)}
+                                                >
+                                                  Close Map
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
 
                                       {/* Concern Person Name */}
                                       <div className="col-md-6">

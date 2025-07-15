@@ -756,7 +756,6 @@ const CRMDashboard = () => {
 
 
   //refer lead stats
-  const [concernPersons, setConcernPersons] = useState([]);
   const [selectedConcernPerson, setSelectedConcernPerson] = useState(null);
 
   //filter stats
@@ -810,6 +809,10 @@ const CRMDashboard = () => {
     };
     fetchFilterOptions();
   }, []);
+
+  useEffect(() => {
+    console.log(counselorOptions, 'counselorOptions')
+  }, [counselorOptions])
 
   const handleCheckboxChange = (profile, checked) => {
     if (checked) {
@@ -2233,22 +2236,6 @@ const CRMDashboard = () => {
     }
 
 
-    const fetchConcernPersons = async () => {
-      const response = await axios.get(`${backendUrl}/college/refer-leads`, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-      console.log(userData, 'userData');
-      let concernPersons = [];
-      await response.data.data.map(person => {
-        if (person._id._id.toString() !== userData._id.toString()) {
-          concernPersons.push(person);
-        }
-      });
-      setConcernPersons(concernPersons);
-    }
-    fetchConcernPersons();
   };
   const handleFetchCandidate = async (profile = null) => {
     setShowPopup(null)
@@ -2624,8 +2611,8 @@ const CRMDashboard = () => {
                       onChange={handleConcernPersonChange}
                     >
                       <option value="">Select Counselor</option>
-                      {concernPersons.map((counselor, index) => (
-                        <option key={index} value={counselor._id._id}>{counselor._id.name}</option>))}
+                      {counselorOptions.map((counselor, index) => (
+                        <option key={index} value={counselor.value}>{counselor.label}</option>))}
                     </select>
                   </div>
                 </div>

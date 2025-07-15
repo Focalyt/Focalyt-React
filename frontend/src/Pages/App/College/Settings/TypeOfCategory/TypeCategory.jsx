@@ -6,25 +6,26 @@ function TypeCategory() {
     const token = userData.token;
 
     // State management
-    const [centers, setCenters] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [formData, setFormData] = useState({
-        name: ''
+        name: '',
+        description: ''
     });
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [alert, setAlert] = useState({ show: false, message: '', type: '' });
 
-    // Fetch all centers on component mount
+    // Fetch all categories on component mount
     useEffect(() => {
-        fetchCenters();
+        fetchCategories();
     }, []);
 
-    // Fetch centers from API
-    const fetchCenters = async () => {
+    // Fetch categories from API
+    const fetchCategories = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${backendUrl}/admin/centers`, {
+            const response = await fetch(`${backendUrl}/college/b2b/lead-categories`, {
                 method: 'GET',
                 headers: {
                     'x-auth': token,
@@ -34,12 +35,14 @@ function TypeCategory() {
 
             const data = await response.json();
 
-            if (data.success) {
-                setCenters(data.data || []);
+            if (data.status) {
+                setCategories(data.data || []);
+            } else {
+                showAlert(data.message || 'Failed to fetch categories', 'error');
             }
         } catch (error) {
-            console.error('Error fetching centers:', error);
-            showAlert('Failed to fetch centers', 'error');
+            console.error('Error fetching categories:', error);
+            showAlert('Failed to fetch categories', 'error');
         } finally {
             setLoading(false);
         }
@@ -50,7 +53,7 @@ function TypeCategory() {
         e.preventDefault();
 
         if (!formData.name.trim()) {
-            showAlert('Please enter center name', 'error');
+            showAlert('Please enter category name', 'error');
             return;
         }
 
@@ -58,8 +61,8 @@ function TypeCategory() {
             setLoading(true);
 
             const url = isEditing
-                ? `${backendUrl}/admin/center/${editingId}`
-                : `${backendUrl}/admin/center`;
+                ? `${backendUrl}/college/b2b/lead-categories/${editingId}`
+                : `${backendUrl}/college/b2b/lead-categories`;
 
             const method = isEditing ? 'PUT' : 'POST';
 
@@ -74,52 +77,52 @@ function TypeCategory() {
 
             const data = await response.json();
 
-            if (data.success) {
+            if (data.status) {
                 showAlert(
-                    isEditing ? 'Center updated successfully!' : 'Center added successfully!',
+                    isEditing ? 'Category updated successfully!' : 'Category added successfully!',
                     'success'
                 );
                 resetForm();
-                fetchCenters();
+                fetchCategories();
             } else {
                 showAlert(data.message || 'Operation failed', 'error');
             }
         } catch (error) {
             console.error('Error submitting form:', error);
-            showAlert('Failed to save center', 'error');
+            showAlert('Failed to save category', 'error');
         } finally {
             setLoading(false);
         }
     };
 
     // Handle status toggle
-    const handleStatusToggle = async (centerId, currentStatus) => {
+    const handleStatusToggle = async (categoryId, currentStatus) => {
         try {
             const newStatus = !currentStatus;
 
-            const response = await fetch(`${backendUrl}/admin/changestatus`, {
-                method: 'POST',
+            const response = await fetch(`${backendUrl}/college/b2b/lead-categories/${categoryId}`, {
+                method: 'PUT',
                 headers: {
                     'x-auth': token,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    id: centerId,
-                    status: newStatus,
-                    model: 'Center'
+                    isActive: newStatus
                 })
             });
 
             const data = await response.json();
 
-            if (data.success) {
+            if (data.status) {
                 // Update local state
-                setCenters(prev => prev.map(center =>
-                    center._id === centerId
-                        ? { ...center, status: newStatus }
-                        : center
+                setCategories(prev => prev.map(category =>
+                    category._id === categoryId
+                        ? { ...category, isActive: newStatus }
+                        : category
                 ));
                 showAlert('Status updated successfully!', 'success');
+            } else {
+                showAlert(data.message || 'Failed to update status', 'error');
             }
         } catch (error) {
             console.error('Error updating status:', error);
@@ -128,17 +131,18 @@ function TypeCategory() {
     };
 
     // Handle edit button click
-    const handleEdit = (center) => {
+    const handleEdit = (category) => {
         setFormData({
-            name: center.name
+            name: category.name,
+            description: category.description || ''
         });
         setIsEditing(true);
-        setEditingId(center._id);
+        setEditingId(category._id);
     };
 
     // Reset form
     const resetForm = () => {
-        setFormData({ name: '' });
+        setFormData({ name: '', description: '' });
         setIsEditing(false);
         setEditingId(null);
     };
@@ -159,7 +163,7 @@ function TypeCategory() {
                     <div className="row breadcrumbs-top">
                         <div className="col-12">
                             <h3 className="content-header-title float-left mb-0">
-                                {isEditing ? 'Edit Category' : 'Add Category'}
+                                {isEditing ? 'Edit B2B Category' : 'Add B2B Category'}
                             </h3>
                             <div className="breadcrumb-wrapper col-12">
                                 <ol className="breadcrumb">
@@ -167,7 +171,7 @@ function TypeCategory() {
                                         <a href="/">Home</a>
                                     </li>
                                     <li className="breadcrumb-item active">
-                                        {isEditing ? 'Edit Category' : 'Add Category'}
+                                        {isEditing ? 'Edit B2B Category' : 'Add B2B Category'}
                                     </li>
                                 </ol>
                             </div>
@@ -197,7 +201,7 @@ function TypeCategory() {
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
-                                        {isEditing ? 'Edit Category' : 'Add Category'}
+                                        {isEditing ? 'Edit B2B Category' : 'Add B2B Category'}
                                     </h4>
                                 </div>
                                 <div className="card-content">
@@ -217,6 +221,22 @@ function TypeCategory() {
                                                         placeholder="Enter Category"
                                                         required
                                                         maxLength={50}
+                                                        disabled={loading}
+                                                    />
+                                                </div>
+
+                                                <div className="col-xl-8 mb-1">
+                                                    <label>
+                                                        Description
+                                                    </label>
+                                                    <textarea
+                                                        className="form-control"
+                                                        name="description"
+                                                        value={formData.description}
+                                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                        placeholder="Enter description (optional)"
+                                                        rows="3"
+                                                        maxLength={200}
                                                         disabled={loading}
                                                     />
                                                 </div>
@@ -256,7 +276,7 @@ function TypeCategory() {
                             </div>
                         </div>
 
-                        {/* Centers List */}
+                        {/* Category List */}
                         <div className="col-6 rounded equal-height-2 coloumn-2">
                             <div className="card">
                                 <div className="row p-1">
@@ -271,7 +291,7 @@ function TypeCategory() {
 
                                 <div className="card-content">
                                     <div className="table-responsive">
-                                        {loading && centers.length === 0 ? (
+                                        {loading && categories.length === 0 ? (
                                             <div className="text-center p-4">
                                                 <div className="spinner-border text-primary"></div>
                                                 <p className="mt-2">Loading B2B types...</p>
@@ -281,39 +301,46 @@ function TypeCategory() {
                                                 <thead>
                                                     <tr>
                                                         <th>Category</th>
+                                                        <th>Description</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {centers.length > 0 ? (
-                                                        centers.map((center) => (
-                                                            <tr key={center._id}>
-                                                                <td>{center.name}</td>
+                                                    {categories.length > 0 ? (
+                                                        categories.map((category) => (
+                                                            <tr key={category._id}>
+                                                                <td>{category.name}</td>
+                                                                <td>
+                                                                    <span className="text-muted">
+                                                                        {category.description || 'No description'}
+                                                                    </span>
+                                                                </td>
                                                                 <td>
                                                                     <div className="form-check form-switch">
                                                                         <input
                                                                             className="form-check-input"
                                                                             type="checkbox"
-                                                                            checked={center.status}
-                                                                            onChange={() => handleStatusToggle(center._id, center.status)}
+                                                                            checked={category.isActive}
+                                                                            onChange={() => handleStatusToggle(category._id, category.isActive)}
                                                                         />
                                                                     </div>
                                                                 </td>
                                                                 <td>
                                                                     <button
-                                                                        className="btn btn-link p-0"
-                                                                        onClick={() => handleEdit(center)}
-                                                                        title="Edit Center"
+                                                                        className="btn btn-sm btn-outline-primary"
+                                                                        onClick={() => handleEdit(category)}
+                                                                        title="Edit Category"
                                                                     >
-                                                                        <i className="feather icon-edit fa-lg text-primary"></i>
+                                                                        <i className="fas fa-edit me-1"></i>
+                                                                        Edit
                                                                     </button>
                                                                 </td>
                                                             </tr>
                                                         ))
                                                     ) : (
                                                         <tr>
-                                                            <td colSpan="3" className="text-center">
+                                                            <td colSpan="4" className="text-center">
                                                                 {loading ? 'Loading...' : 'No Categories found'}
                                                             </td>
                                                         </tr>
@@ -322,7 +349,7 @@ function TypeCategory() {
                                             </table>
                                         )}
 
-                                        {!loading && centers.length === 0 && (
+                                        {!loading && categories.length === 0 && (
                                             <p className="text-center mt-3">No result found</p>
                                         )}
                                     </div>
