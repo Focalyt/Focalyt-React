@@ -2522,19 +2522,7 @@ router.route("/createResume/:id").get(isCollege, authenti, async (req, res) => {
 			};
 		}
 		const logo = fs.readFileSync(path.join(__dirname, '../../../public/images/elements/mipie-footer.png'), { encoding: 'base64' });
-		const browser = await puppeteer.launch({
-			headless: 'new',
-			args: [
-			  '--no-sandbox',
-			  '--disable-setuid-sandbox',
-			  '--disable-dev-shm-usage',
-			  '--disable-accelerated-2d-canvas',
-			  '--no-first-run',
-			  '--no-zygote',
-			  '--disable-gpu',
-			  '--disable-extensions'
-			]
-		  });
+		const browser = await puppeteer.launch(params);
 		const page = await browser.newPage();
 		await page.goto(url, { waitUntil: "networkidle2" });
 		const data = await page.pdf({
@@ -5478,7 +5466,7 @@ router.get("/generate-application-form/:id", async (req, res) => {
 			})
 		if (!data._candidate?.personalInfo?.image || data._candidate.personalInfo.image.trim() === '') {
 			console.log('pic required')
-			return res.json({ status: false, message: "Profile pic required" });
+			return res.status(500).json({ status: false, message: "Profile pic required" });
 		}
 
 

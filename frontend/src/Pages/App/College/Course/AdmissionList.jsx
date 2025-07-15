@@ -979,6 +979,11 @@ const AdmissionList = () => {
         }
       );
 
+      if(response.data.status === false){
+        alert(response.data.message || 'Failed to download admission form');
+        return;
+      }
+
       // Create a blob from the PDF data
       const blob = new Blob([response.data], { type: 'application/pdf' });
       
