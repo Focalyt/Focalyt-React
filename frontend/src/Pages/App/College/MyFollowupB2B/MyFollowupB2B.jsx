@@ -3654,7 +3654,7 @@ const MyFollowups = () => {
             }}
           />
 
-          <div ref={navRef} className="bg-white shadow-sm border-bottom mb-3" style={{zIndex: 11 , backgroundColor: 'white' ,position:'fixed' , width: `${width}px` , boxShadow: '0 4px 25px 0 #0000001a' ,paddingBlock: '10px'}}>
+          <div ref={navRef} className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--my--followup" >
             <div className="container-fluid py-2 " >
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
