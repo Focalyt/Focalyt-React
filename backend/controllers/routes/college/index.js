@@ -34,9 +34,18 @@ const roleManagementRoutes = require("./roleManagement");
 const coverLetterRoutes = require("./coverLetter");
 const mockInterviewRoutes = require("./mockInterview");
 const coursesRoutes = require("./courses");
-const statusB2bRoutes = require("./statusB2b");
+
+
+
+//b2b routes
+const b2bRoutes = require("./b2b/b2b");
+const statusB2bRoutes = require("./b2b/statusB2b");
 const router = express.Router();
 const moment = require('moment')
+
+router.use("/b2b", isCollege, b2bRoutes);
+router.use("/statusB2b", statusB2bRoutes);
+
 router.use("/todo", isCollege, todoRoutes);
 router.use("/attendance", isCollege, attendanceRoutes);
 router.use("/classroom-media", isCollege, classroomMediaRoutes);
@@ -56,7 +65,6 @@ router.use("/coverLetter", isCollege, coverLetterRoutes);
 router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
-router.use("/statusB2b", statusB2bRoutes);
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 

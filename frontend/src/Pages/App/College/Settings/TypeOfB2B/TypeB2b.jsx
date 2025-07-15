@@ -6,25 +6,26 @@ function TypeB2b() {
     const token = userData.token;
 
     // State management
-    const [centers, setCenters] = useState([]);
+    const [b2bTypes, setB2bTypes] = useState([]);
     const [formData, setFormData] = useState({
-        name: ''
+        name: '',
+        description: ''
     });
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [alert, setAlert] = useState({ show: false, message: '', type: '' });
 
-    // Fetch all centers on component mount
+    // Fetch all B2B types on component mount
     useEffect(() => {
-        fetchCenters();
+        fetchB2bTypes();
     }, []);
 
-    // Fetch centers from API
-    const fetchCenters = async () => {
+    // Fetch B2B types from API
+    const fetchB2bTypes = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${backendUrl}/admin/centers`, {
+            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b`, {
                 method: 'GET',
                 headers: {
                     'x-auth': token,
@@ -34,12 +35,14 @@ function TypeB2b() {
 
             const data = await response.json();
 
-            if (data.success) {
-                setCenters(data.data || []);
+            if (data.status) {
+                setB2bTypes(data.data || []);
+            } else {
+                showAlert(data.message || 'Failed to fetch B2B types', 'error');
             }
         } catch (error) {
-            console.error('Error fetching centers:', error);
-            showAlert('Failed to fetch centers', 'error');
+            console.error('Error fetching B2B types:', error);
+            showAlert('Failed to fetch B2B types', 'error');
         } finally {
             setLoading(false);
         }
@@ -50,7 +53,7 @@ function TypeB2b() {
         e.preventDefault();
 
         if (!formData.name.trim()) {
-            showAlert('Please enter center name', 'error');
+            showAlert('Please enter B2B type name', 'error');
             return;
         }
 
@@ -58,8 +61,8 @@ function TypeB2b() {
             setLoading(true);
 
             const url = isEditing
-                ? `${backendUrl}/admin/center/${editingId}`
-                : `${backendUrl}/admin/center`;
+                ? `${backendUrl}/college/b2b/type-of-b2b/${editingId}`
+                : `${backendUrl}/college/b2b/type-of-b2b`;
 
             const method = isEditing ? 'PUT' : 'POST';
 
@@ -74,52 +77,52 @@ function TypeB2b() {
 
             const data = await response.json();
 
-            if (data.success) {
+            if (data.status) {
                 showAlert(
-                    isEditing ? 'Center updated successfully!' : 'Center added successfully!',
+                    isEditing ? 'B2B type updated successfully!' : 'B2B type added successfully!',
                     'success'
                 );
                 resetForm();
-                fetchCenters();
+                fetchB2bTypes();
             } else {
                 showAlert(data.message || 'Operation failed', 'error');
             }
         } catch (error) {
             console.error('Error submitting form:', error);
-            showAlert('Failed to save center', 'error');
+            showAlert('Failed to save B2B type', 'error');
         } finally {
             setLoading(false);
         }
     };
 
     // Handle status toggle
-    const handleStatusToggle = async (centerId, currentStatus) => {
+    const handleStatusToggle = async (typeId, currentStatus) => {
         try {
             const newStatus = !currentStatus;
 
-            const response = await fetch(`${backendUrl}/admin/changestatus`, {
-                method: 'POST',
+            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b/${typeId}`, {
+                method: 'PUT',
                 headers: {
                     'x-auth': token,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    id: centerId,
-                    status: newStatus,
-                    model: 'Center'
+                    isActive: newStatus
                 })
             });
 
             const data = await response.json();
 
-            if (data.success) {
+            if (data.status) {
                 // Update local state
-                setCenters(prev => prev.map(center =>
-                    center._id === centerId
-                        ? { ...center, status: newStatus }
-                        : center
+                setB2bTypes(prev => prev.map(type =>
+                    type._id === typeId
+                        ? { ...type, isActive: newStatus }
+                        : type
                 ));
                 showAlert('Status updated successfully!', 'success');
+            } else {
+                showAlert(data.message || 'Failed to update status', 'error');
             }
         } catch (error) {
             console.error('Error updating status:', error);
@@ -128,17 +131,18 @@ function TypeB2b() {
     };
 
     // Handle edit button click
-    const handleEdit = (center) => {
+    const handleEdit = (type) => {
         setFormData({
-            name: center.name
+            name: type.name,
+            description: type.description || ''
         });
         setIsEditing(true);
-        setEditingId(center._id);
+        setEditingId(type._id);
     };
 
     // Reset form
     const resetForm = () => {
-        setFormData({ name: '' });
+        setFormData({ name: '', description: '' });
         setIsEditing(false);
         setEditingId(null);
     };
@@ -221,6 +225,22 @@ function TypeB2b() {
                                                     />
                                                 </div>
 
+                                                <div className="col-xl-8 mb-1">
+                                                    <label>
+                                                        Description
+                                                    </label>
+                                                    <textarea
+                                                        className="form-control"
+                                                        name="description"
+                                                        value={formData.description}
+                                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                        placeholder="Enter description (optional)"
+                                                        rows="3"
+                                                        maxLength={200}
+                                                        disabled={loading}
+                                                    />
+                                                </div>
+
                                                 <div className="col-xl-4 mb-1 d-flex align-items-end gap-2">
                                                     <button
                                                         type="button"
@@ -271,7 +291,7 @@ function TypeB2b() {
 
                                 <div className="card-content">
                                     <div className="table-responsive">
-                                        {loading && centers.length === 0 ? (
+                                        {loading && b2bTypes.length === 0 ? (
                                             <div className="text-center p-4">
                                                 <div className="spinner-border text-primary"></div>
                                                 <p className="mt-2">Loading B2B types...</p>
@@ -281,39 +301,46 @@ function TypeB2b() {
                                                 <thead>
                                                     <tr>
                                                         <th>B2B Type</th>
+                                                        <th>Description</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {centers.length > 0 ? (
-                                                        centers.map((center) => (
-                                                            <tr key={center._id}>
-                                                                <td>{center.name}</td>
+                                                    {b2bTypes.length > 0 ? (
+                                                        b2bTypes.map((type) => (
+                                                            <tr key={type._id}>
+                                                                <td>{type.name}</td>
+                                                                <td>
+                                                                    <span className="text-muted">
+                                                                        {type.description || 'No description'}
+                                                                    </span>
+                                                                </td>
                                                                 <td>
                                                                     <div className="form-check form-switch">
                                                                         <input
                                                                             className="form-check-input"
                                                                             type="checkbox"
-                                                                            checked={center.status}
-                                                                            onChange={() => handleStatusToggle(center._id, center.status)}
+                                                                            checked={type.isActive}
+                                                                            onChange={() => handleStatusToggle(type._id, type.isActive)}
                                                                         />
                                                                     </div>
                                                                 </td>
                                                                 <td>
                                                                     <button
-                                                                        className="btn btn-link p-0"
-                                                                        onClick={() => handleEdit(center)}
-                                                                        title="Edit Center"
+                                                                        className="btn btn-sm btn-outline-primary"
+                                                                        onClick={() => handleEdit(type)}
+                                                                        title="Edit B2B Type"
                                                                     >
-                                                                        <i className="feather icon-edit fa-lg text-primary"></i>
+                                                                        <i className="fas fa-edit me-1"></i>
+                                                                        Edit
                                                                     </button>
                                                                 </td>
                                                             </tr>
                                                         ))
                                                     ) : (
                                                         <tr>
-                                                            <td colSpan="3" className="text-center">
+                                                            <td colSpan="4" className="text-center">
                                                                 {loading ? 'Loading...' : 'No B2B types found'}
                                                             </td>
                                                         </tr>
@@ -322,7 +349,7 @@ function TypeB2b() {
                                             </table>
                                         )}
 
-                                        {!loading && centers.length === 0 && (
+                                        {!loading && b2bTypes.length === 0 && (
                                             <p className="text-center mt-3">No result found</p>
                                         )}
                                     </div>

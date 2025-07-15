@@ -85,3 +85,11 @@ module.exports.LeadAssignmentRule = require("./leadAssignmentRule");
 module.exports.EventType = require("./eventType");
 module.exports.WhatsAppMessage = require("./whatsappMessage");
 // module.exports.Manager = required("");
+
+
+//b2b models
+module.exports.TypeOfB2B = require("./b2b/typeOfB2B");
+module.exports.LeadCategory = require("./b2b/leadCategory");
+module.exports.FollowUp = require("./b2b/followUp");
+module.exports.Lead = require("./b2b/lead");
+
