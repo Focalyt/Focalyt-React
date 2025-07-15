@@ -1486,7 +1486,7 @@ const B2BSales = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
-  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters]);
+  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters , mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -2251,6 +2251,13 @@ const B2BSales = () => {
 
     if (!isMobile) {
       setMainContentClass('col-8');
+
+      setTimeout(() => {
+        if (widthRef.current) {
+          window.dispatchEvent(new Event('resize'));
+        }
+      }, 200);
+
     }
   };
 
@@ -2291,6 +2298,13 @@ const B2BSales = () => {
 
     if (!isMobile) {
       setMainContentClass('col-8');
+
+      setTimeout(() => {
+        if (widthRef.current) {
+          window.dispatchEvent(new Event('resize'));
+        }
+      }, 200);
+
     }
 
 
@@ -4785,7 +4799,6 @@ const B2BSales = () => {
         {!isMobile && (
           <div className="col-4">
             <div className="row " style={{
-              marginTop: `${navHeight + 12}px`,
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed'
             }}>
