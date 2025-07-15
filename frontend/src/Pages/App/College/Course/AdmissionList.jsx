@@ -957,7 +957,6 @@ const AdmissionList = () => {
         return;
       }
 
-
       // Check if backend URL and token exist
       if (!backendUrl) {
         alert('Backend URL not configured');
@@ -969,27 +968,52 @@ const AdmissionList = () => {
         return;
       }
 
-      // Send PUT request to backend API to update status
+      // Send GET request to backend API to generate PDF
       const response = await axios.get(
         `${backendUrl}/college/generate-application-form/${profile._id}`,
         {
           headers: {
             'x-auth': token,
-          }
+          },
+          responseType: 'blob' // Important: Set response type to blob for PDF
         }
       );
 
-      if (response.data.success) {
-        alert('Admission form downloaded successfully!');
-        // Refresh the profile data
-        await fetchProfileData();
-      } else {
-        console.error('API returned error:', response.data);
-        alert(response.data.message || 'Failed to move to admission');
-      }
+      // Create a blob from the PDF data
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `application_form_${profile._id}.pdf`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      alert('Admission form downloaded successfully!');
+      
     } catch (error) {
-      console.error('Error moving to admission:', error);
-      alert('Failed to move to admission');
+      console.error('Error downloading admission form:', error);
+      
+      // Check if it's an error response with a message
+      if (error.response && error.response.data) {
+        try {
+          // Try to parse error response as JSON to get error message
+          const errorText = await error.response.data.text();
+          const errorData = JSON.parse(errorText);
+          alert(errorData.message || 'Failed to download admission form');
+        } catch (parseError) {
+          alert('Failed to download admission form');
+        }
+      } else {
+        alert('Failed to download admission form');
+      }
     }
   };
 
@@ -2042,49 +2066,6 @@ const AdmissionList = () => {
                 </div>
               </div>
 
-              {/* Document Actions */}
-              <div className="document-actions mt-4">
-                {!showRejectionForm ? (
-                  <div className="action-buttons">
-                    <button
-                      className="btn btn-success me-2"
-                      onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
-                    >
-                      <i className="fas fa-check"></i> Approve Document
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      onClick={handleRejectClick}
-                    >
-                      <i className="fas fa-times"></i> Reject Document
-                    </button>
-                  </div>
-                ) : (
-                  <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
-                    <textarea
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      placeholder="Please provide a detailed reason for rejection..."
-                      rows="8"
-                      className="form-control mb-3"
-                    />
-                    <div className="d-flex gap-2">
-                      <button
-                        className="btn btn-danger"
-                        onClick={handleConfirmRejection}
-                      >
-                        Confirm Rejection
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={handleCancelRejection}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
 
 
             </div>
@@ -4529,16 +4510,7 @@ const AdmissionList = () => {
                                                                   <i className="fas fa-cloud-upload-alt"></i>
                                                                   Upload
                                                                 </button>
-                                                              ) : ((latestUpload?.status || doc.status) === 'Pending') ? (
-                                                                <button
-                                                                  className="action-btn verify-btn"
-                                                                  onClick={() => openDocumentModal(doc)}
-                                                                  title="Verify Document"
-                                                                >
-                                                                  <i className="fas fa-search"></i>
-                                                                  Verify
-                                                                </button>
-                                                              ) : (
+                                                              )  : (
                                                                 <button
                                                                   className="action-btn view-btn"
                                                                   onClick={() => openDocumentModal(doc)}

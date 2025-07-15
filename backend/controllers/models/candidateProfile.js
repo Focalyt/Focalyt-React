@@ -81,6 +81,7 @@ const candidateProfileSchema = new Schema(
         },
       ],
       fatherName:{type : String},
+      motherName:{type : String},
       skills: [
         {
           skillName: { type: String },

@@ -1115,6 +1115,8 @@ const CandidateProfile = forwardRef((props, ref) => {
                         professionalSummary: profileData?.personalInfo?.professionalSummary || '',
                         currentAddress: profileData?.personalInfo?.currentAddress || {},
                         permanentAddress: profileData?.personalInfo?.permanentAddress || {},
+                        fatherName: profileData?.personalInfo?.fatherName || '',
+                        motherName: profileData?.personalInfo?.motherName || '',
                         image: userData.image || user.image || '',
                         resume: userData.resume || user.resume || '',
                         voiceIntro: recordings.map(rec => ({
@@ -1504,12 +1506,23 @@ const CandidateProfile = forwardRef((props, ref) => {
                                     })}
                                 </div>
                                 <div className="profile-summary">
-                                    {createEditable(profileData?.personalInfo?.professionalSummary || '', 'Father name', (val) => {
+                                    {createEditable(profileData?.personalInfo?.fatherName || '', 'Father Name', (val) => {
                                         setProfileData(prev => ({
                                             ...prev,
                                             personalInfo: {
                                                 ...(prev.personalInfo || {}),
-                                                professionalSummary: val
+                                                fatherName: val
+                                            }
+                                        }));
+                                    })}
+                                </div>
+                                <div className="profile-summary">
+                                    {createEditable(profileData?.personalInfo?.motherName || '', 'Mother Name', (val) => {
+                                        setProfileData(prev => ({
+                                            ...prev,
+                                            personalInfo: {
+                                                ...(prev.personalInfo || {}),
+                                                motherName: val
                                             }
                                         }));
                                     })}

@@ -1144,6 +1144,8 @@ router.post('/saveProfile', [isCollege], async (req, res) => {
 			updatePayload.personalInfo = {};
 
 			if (personalInfo.professionalTitle) updatePayload.personalInfo.professionalTitle = personalInfo.professionalTitle;
+			if (personalInfo.fatherName) updatePayload.personalInfo.fatherName = personalInfo.fatherName;
+			if (personalInfo.motherName) updatePayload.personalInfo.motherName = personalInfo.motherName;
 			if (personalInfo.declaration) updatePayload.personalInfo.declaration = personalInfo.declaration;
 			if (personalInfo.totalExperience) updatePayload.personalInfo.totalExperience = personalInfo.totalExperience;
 			if (personalInfo.professionalSummary) updatePayload.personalInfo.professionalSummary = personalInfo.professionalSummary;
