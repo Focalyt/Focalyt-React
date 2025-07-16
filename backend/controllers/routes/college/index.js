@@ -665,8 +665,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 			// Sector filter (multi-select)
 			if (projectsArray.length > 0) {
-				additionalMatches['_course.project'] = { 
-					$in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) 
+				additionalMatches['_course.project'] = {
+					$in: projectsArray.map(id => new mongoose.Types.ObjectId(id))
 				};
 			}
 
@@ -688,15 +688,22 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 			// Name search filter
 			if (name && name.trim()) {
-				const searchRegex = new RegExp(name.trim(), 'i');
+				const searchTerm = name.trim();
+				const searchRegex = new RegExp(searchTerm, 'i');
+
+				console.log('searchTerm', searchTerm)
+				console.log('searchRegex', searchRegex)
+
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': parseInt(searchRegex) },
+					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm }, // Try both number and string
 					{ '_candidate.email': searchRegex }
 				] : [
 					{ '_candidate.name': searchRegex },
 					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 					{ '_candidate.email': searchRegex }
 				];
 			}
@@ -1052,8 +1059,8 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 			}
 
 			if (appliedFilters.projectsArray.length > 0) {
-				additionalMatches['_course.project'] = { 
-					$in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) 
+				additionalMatches['_course.project'] = {
+					$in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id))
 				};
 			}
 
@@ -3649,7 +3656,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			// Base match stage
 			let baseMatchStage = {
 				kycStage: { $in: [true] },
-				admissionDone: { $nin: [true] },
 				$or: [
 					{ registeredBy: member },
 					{
@@ -4133,7 +4139,6 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 			// Base match stage for KYC candidates
 			let baseMatchStage = {
 				kycStage: { $in: [true] },
-				admissionDone: { $nin: [true] },
 				$or: [
 					{ registeredBy: member },
 					{
@@ -5368,6 +5373,602 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 		return counts;
 	}
 }
+
+
+router.get("/generate-application-form/:id", async (req, res) => {
+	try {
+		let { id } = req.params
+		if (typeof id === 'string') {
+			id = new mongoose.Types.ObjectId(id)
+		}
+
+		const getFinancialYear = () => {
+			const today = new Date();
+			const year = today.getFullYear();
+			const month = today.getMonth() + 1; // 0-based
+
+			if (month >= 4) {
+				// FY starts from April
+				return `${year}-${year + 1}`;
+			} else {
+				return `${year - 1}-${year}`;
+			}
+		};
+		const fy = getFinancialYear();
+
+
+		const getFinancialYearDates = () => {
+			const today = new Date();
+			const year = today.getFullYear();
+			const month = today.getMonth() + 1;
+
+			let startYear = month >= 4 ? year : year - 1;
+			let endYear = startYear + 1;
+
+			const startDate = new Date(`${startYear}-04-01T00:00:00.000Z`);
+			const endDate = new Date(`${endYear}-03-31T23:59:59.999Z`);
+
+			return { startDate, endDate };
+		};
+
+		const generateApplicationNumber = async () => {
+			// "2024-25"
+			const key = `Focalyt/${fy}`;
+			const { startDate, endDate } = getFinancialYearDates();
+			// Increment or create
+
+			const count = await AppliedCourses.find({
+				createdAt: { $gte: startDate, $lte: endDate }
+			}).countDocuments()
+
+
+			const paddedCount = count + 1
+			return `${key}/${paddedCount}`; // e.g. "Focalyt/2024-25/00027"
+		};
+		const applicationNumber = await generateApplicationNumber()
+
+		console.log('applicationNumber', applicationNumber)
+
+
+		let data = await AppliedCourses.findById(id)
+			.populate({
+				path: '_course',
+				populate: [
+					{
+						path: 'sectors',
+						select: 'name'
+					},
+					{
+						path: 'vertical',
+						select: 'name'  // Add the fields you want to populate from the `vertical` path
+					},
+					{
+						path: 'project',
+						select: 'name'  // Add the fields you want to populate from the `project` path
+					}
+				]
+			})
+			.populate('_leadStatus')
+			.populate('_center')
+			.populate('registeredBy')
+			.populate({
+				path: '_candidate',
+				populate: [
+					{ path: '_appliedCourses', populate: [{ path: '_course', select: 'name description' }, { path: 'registeredBy', select: 'name email' }, { path: '_center', select: 'name location' }, { path: '_leadStatus', select: 'title' }] },
+				]
+			})
+			.populate({
+				path: 'logs',
+				populate: {
+					path: 'user',
+					select: 'name'
+				}
+			})
+		if (!data._candidate?.personalInfo?.image || data._candidate.personalInfo.image.trim() === '') {
+			console.log('pic required')
+			return res.status(500).json({ status: false, message: "Profile pic required" });
+		}
+
+
+
+		const isDocsRequired = !!data?._course?.docsRequired?.length > 0
+
+		if (isDocsRequired) {
+			const requiredDocs = data._course?.docsRequired || [];
+			const uploadedDocs = data.uploadedDocs || [];
+
+			// Map uploaded docs by docsId for quick lookup
+			const uploadedDocsMap = {};
+			uploadedDocs.forEach(d => {
+				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+			});
+
+			// Prepare combined docs array
+			const allDocs = requiredDocs.map(reqDoc => {
+				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+				if (uploadedDoc) {
+					// Agar uploaded hai to uploadedDoc details bhejo
+					return {
+						...uploadedDoc,
+						Name: reqDoc.Name,        // Required document ka name bhi add kar lo
+						mandatory: reqDoc.mandatory,
+						_id: reqDoc._id
+					};
+				} else {
+					// Agar uploaded nahi hai to Not Uploaded status ke saath dummy object bhejo
+					return {
+						docsId: reqDoc._id,
+						Name: reqDoc.Name,
+						mandatory: reqDoc.mandatory,
+						status: "Not Uploaded",
+						fileUrl: null,
+						reason: null,
+						verifiedBy: null,
+						verifiedDate: null,
+						uploadedAt: null
+					};
+				}
+			});
+
+			if (requiredDocs) {
+
+				// Create a merged array with both required docs and uploaded docs info
+				combinedDocs = requiredDocs.map(reqDoc => {
+					// Convert Mongoose document to plain object
+					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+
+					// Find matching uploaded docs for this required doc
+					const matchingUploads = uploadedDocs.filter(
+						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+					);
+
+					return {
+						_id: docObj._id,
+						Name: docObj.Name || 'Document',
+						mandatory: docObj.mandatory,
+						description: docObj.description || '',
+						uploads: matchingUploads || []
+					};
+				});
+
+
+			} else {
+				console.log("Course not found or no docs required");
+			};
+
+			console.log(combinedDocs, 'combinedDocs')
+		}
+
+		const formatDate = (date) => {
+			const d = new Date(date);
+			const day = String(d.getDate()).padStart(2, '0');
+			const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+			const year = d.getFullYear();
+			return `${day}/${month}/${year}`;
+		};
+
+		const dobFormatted = formatDate(data._candidate.dob);
+
+		const logoPath = path.join(__dirname, '../../../controllers/public/public_assets/images/newpage/logo-ha.svg');
+		const logoBase64 = fs.readFileSync(logoPath, { encoding: 'base64' });
+		const imgTag = `<img src="data:image/svg+xml;base64,${logoBase64}" />`;
+		const htmlContent = `
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Form ${fy}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+			
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color:rgb(255, 255, 255);
+            padding: 0px;
+            height: 297mm;
+            width: 210mm;
+            min-width: 210mm;
+            min-height: 297mm;
+
+        }
+        
+        .form-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border: 2px solid #ddd;
+            padding: 5px;
+        }
+        
+        .header {
+            background-color: #4a5a8a;
+            color: white;
+            padding: 5px;
+            font-weight: bold;
+            font-size: 20px;
+            position: relative;
+        }
+        
+        .header-info {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .header-info table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .header-info td {
+            padding: 4px 0;
+            font-size: 15px;
+        }
+        
+        .header-info .label {
+            font-weight: bold;
+            width: 180px;
+        }
+        
+        .logo {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .logo img {
+            height: 40px;
+            width: auto;
+        }
+        
+        .section-header {
+            background-color: #4a5a8a;
+            color: white;
+            padding: 10px 15px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 0;
+        }
+        
+        .section-content {
+            padding: 15px;
+            position: relative;
+        }
+        
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        
+        .details-table td {
+            padding: 6px 5px;
+            font-size: 12px;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+        
+        .details-table .label {
+            font-weight: bold;
+            width: 140px;
+        }
+        
+        .details-table .value {
+            padding-left: 10px;
+        }
+        
+        .photo-section {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+        }
+        
+        .photo-placeholder {
+            width: 100px;
+            height: 120px;
+            border: 2px solid #ccc;
+            background-color: #f9f9f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .photo-img {
+            width: 100px;
+            height: 120px;
+            border: 2px solid #ccc;
+            object-fit: cover;
+        }
+        
+        .address-row {
+            display: flex;
+            gap: 30px;
+        }
+        
+        .address-col {
+            flex: 1;
+        }
+        
+        .documents-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .documents-table th,
+        .documents-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            font-size: 12px;
+        }
+        
+        .documents-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        
+        .document-link {
+            color: #0066cc;
+            text-decoration: underline;
+            font-size: 11px;
+        }
+        
+        .declaration-content {
+            font-size: 12px;
+            line-height: 1.4;
+            text-align: justify;
+        }
+        
+        .signature-section {
+            margin-top: 30px;
+            text-align: right;
+        }
+        
+        .signature-name {
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        
+        .clear {
+            clear: both;
+        }
+        
+        .personal-details-content {
+            margin-right: 120px;
+        }
+        .div-1 , .div-2 {
+            width:50%
+        }
+        .div-2{
+            padding: 50px;
+        }
+        .section-1st{
+            display: flex;
+            align-items: center;
+        }
+
+        
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <!-- Header -->
+        <div class="section-1st">
+            <div class="div-1">
+                <!-- Header -->
+                <div class="header">
+                    APPLICATION FORM ${fy}
+
+                </div>
+
+                <!-- Header Information -->
+                <div class="header-info">
+                    <table>
+
+                        <tr>
+                            <td class="label">Project :</td>
+                            <td>${data?._course?.project?.name || ''}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Course :</td>
+                            <td>${data?._course?.name || ''}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Application Form Number:</td>
+                            <td>${applicationNumber}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Branch:</td>
+                            <td>${data?._center?.name || ''}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="div-2">
+            ${imgTag}
+
+            </div>
+        </div>
+        
+        <!-- Personal Details -->
+        <div class="section-header">
+            PERSONAL DETAILS
+        </div>
+        
+        <div class="section-content">
+            <div class="photo-section">
+                <div class="photo-placeholder">
+				${data._candidate?.personalInfo?.image
+				? `<img class="photo-img" src="${data._candidate.personalInfo.image}" />`
+				: `<div class="photo-placeholder">Photo</div>`}
+				  
+                </div>
+            </div>
+            
+            <div class="personal-details-content">
+                <table class="details-table">
+                    <tr>
+                        <td class="label">Full Name:</td>
+                        <td class="value">${data?._candidate?.name || ''}</td>
+                    </tr>
+					<tr>
+                        <td class="label">Father Name:</td>
+                        <td class="value">${data?._candidate?.personalInfo?.fatherName || ''}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Mother Name:</td>
+                        <td class="value">${data?._candidate?.personalInfo?.motherName || ''}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Email:</td>
+                        <td class="value">${data?._candidate?.email || ''}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Mobile:</td>
+                        <td class="value">${data?._candidate?.mobile || ''}</td>
+                    </tr>
+                    
+                    <tr>
+                        <td class="label">Date of Birth:</td>
+                        <td class="value">${dobFormatted || ''}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Gender:</td>
+                        <td class="value">${data?._candidate?.sex || ''}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="clear"></div>
+        </div>
+        
+        <!-- Permanent Address -->
+        <div class="section-header">
+            PERMANENT ADDRESS DETAILS
+        </div>
+        
+        <div class="section-content">
+            <div class="address-row">
+                <div class="address-col">
+                    <table class="details-table">
+                        <tr>
+                            <td class="label">Address Line 1:</td>
+                            <td class="value">${data?._candidate?.personalInfo?.currentAddress?.fullAddress || ''}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">State:</td>
+                            <td class="value">${data?._candidate?.personalInfo?.currentAddress?.state || ''}</td>
+                        </tr>
+                        
+                    </table>
+                </div>
+                <div class="address-col">
+                    <table class="details-table">
+					<tr>
+                            <td class="label">City:</td>
+                            <td class="value">${data?._candidate?.personalInfo?.currentAddress?.city || ''}</td>
+
+                        </tr>
+						<tr>
+                            <td class="label">Country:</td>
+                            <td class="value">Domestic (Indian Resident)</td>
+                        </tr>                      
+                        
+                       
+                    </table>
+                </div>
+            </div>
+        </div>     
+       
+        
+        <!-- Documents Upload -->
+
+		${isDocsRequired ?
+				`   <div class="section-header">
+            DOCUMENTS UPLOAD
+        </div>
+        
+        <div class="section-content">
+            <table class="documents-table">
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+  ${combinedDocs.map(doc => `
+    <tr>
+      <td>${doc.Name} ${doc.mandatory ? '<span style="color:red">*</span>' : ''} </td>
+     <td>${doc.uploads?.length ? doc.uploads[doc.uploads.length - 1].status : 'Not Uploaded'}</td>
+
+    </tr>
+  `).join('')}
+</tbody>
+            </table>
+        </div>
+		` : ''}
+        
+
+        
+        <!-- Declaration -->
+        <div class="section-header">
+            DECLARATION
+        </div>
+        
+        <div class="section-content">
+            <div class="declaration-content">
+                <p>I certify that the information submitted by me in support of this application, is true to the best of my knowledge and belief. I understand that in the event of any information being found false or incorrect, my admission is liable to be rejected / cancelled at any stage of the program. I undertake to abide by the disciplinary rules and regulations of Focal Skills Development.</p>
+                
+                <div class="signature-section">
+                    <div class="signature-name">${data._candidate.name}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+  `;
+
+		const browser = await puppeteer.launch({
+			headless: true,
+			args: ['--no-sandbox', '--disable-setuid-sandbox'],
+		});
+
+		const page = await browser.newPage();
+		await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+
+		const pdfBuffer = await page.pdf({
+			format: "A4",
+			printBackground: true,
+		});
+
+		await browser.close();
+
+		// Send PDF buffer as a downloadable file
+		res.set({
+			"Content-Type": "application/pdf",
+			"Content-Disposition": `attachment; filename="application_form.pdf"`,
+			"Content-Length": pdfBuffer.length,
+		});
+
+		return res.send(pdfBuffer);
+
+	} catch (err) {
+		console.error("PDF generation error:", err);
+		res.status(500).send({ status: false, message: "Failed to generate PDF" });
+	}
+
+})
 
 
 router.get('/dashbord-data', isCollege, async (req, res) => {

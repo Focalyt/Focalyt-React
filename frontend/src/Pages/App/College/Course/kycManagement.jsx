@@ -747,12 +747,7 @@ const KYCManagement = () => {
     modifiedFromDate: null,
     modifiedToDate: null,
     nextActionFromDate: null,
-    nextActionToDate: null,
-    projects: [],
-    verticals: [],
-    course: [],
-    center: [],
-    counselor: []
+    nextActionToDate: null
 
   });
 
@@ -917,11 +912,10 @@ const KYCManagement = () => {
   };
 
   const clearAllFilters = () => {
-    setFilterData({
+    const clearedFilters = {
       name: '',
       courseType: '',
       status: 'true',
-      kyc: false,
       leadStatus: '',
       sector: '',
       createdFromDate: null,
@@ -930,8 +924,21 @@ const KYCManagement = () => {
       modifiedToDate: null,
       nextActionFromDate: null,
       nextActionToDate: null,
+    };
+
+    setFilterData(clearedFilters);
+    setFormData({
+      projects: { type: "includes", values: [] },
+      verticals: { type: "includes", values: [] },
+      course: { type: "includes", values: [] },
+      center: { type: "includes", values: [] },
+      counselor: { type: "includes", values: [] },
+      sector: { type: "includes", values: [] }
     });
 
+    setCurrentPage(1);
+    // Explicitly call fetchProfileData with cleared filters to ensure data is fetched
+    fetchProfileData(clearedFilters, 1);
   };
 
   const handleStatusChange = (e) => {
@@ -1258,6 +1265,7 @@ const KYCManagement = () => {
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
+      console.log('filters', filters)
       setIsLoadingProfiles(true);
       if (!token) {
         console.warn('No token found in session storage.');
@@ -1267,24 +1275,23 @@ const KYCManagement = () => {
 
       const queryParams = new URLSearchParams({
         page: page.toString(),
-        ...(filters?.name && { name: filters.name }),
-        ...(filters?.courseType && { courseType: filters.courseType }),
-        ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
-        ...(filters?.kyc && filters.kyc !== 'false' && { kyc: filters.kyc }),
-        ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
-        ...(filters?.sector && { sector: filters.sector }),
-        ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        ...(filters.name && { name: filters.name }),
+        ...(filters.courseType && { courseType: filters.courseType }),
+        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters.sector && { sector: filters.sector }),
+        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
         // Multi-select filters
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(filters.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(filters.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(filters.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(filters.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(filters.counselor.values) })
+        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
 
       const response = await axios.get(`${backendUrl}/college/kycCandidates?${queryParams}`, {
@@ -2799,9 +2806,7 @@ const KYCManagement = () => {
                   <div className="col-md-6">
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       <div className="input-group" style={{ maxWidth: '300px' }}>
-                        <span className="input-group-text bg-white border-end-0 input-height">
-                          <i className="fas fa-search text-muted"></i>
-                        </span>
+                       
                         <input
                           type="text"
                           name="name"
@@ -2810,19 +2815,17 @@ const KYCManagement = () => {
                           value={filterData.name}
                           onChange={handleFilterChange}
                         />
-                        {filterData.name && (
-                          <button
-                            className="btn btn-outline-secondary border-start-0"
-                            type="button"
-                            onClick={() => {
-                              setFilterData(prev => ({ ...prev, name: '' }));
-                              fetchProfileData();
-                            }}
-                          >
-                            <i className="fas fa-times"></i>
-                          </button>
-                        )}
+                         <button
+                        onClick={() => fetchProfileData()}
+                        className={`btn btn-outline-primary`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-search me-1`}></i>
+                        Search
+                        
+                      </button>
                       </div>
+                     
 
                       <button
                         onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
@@ -2838,7 +2841,7 @@ const KYCManagement = () => {
                         )}
                       </button>
 
-
+                    
                     </div>
                   </div>
                 </div>
@@ -3237,7 +3240,7 @@ const KYCManagement = () => {
                         <button
                           className="btn btn-primary"
                           onClick={() => {
-                            fetchProfileData(filterData);
+                            fetchProfileData(filterData, 1);
                             setIsFilterCollapsed(true);
                           }}
                         >
@@ -3251,6 +3254,7 @@ const KYCManagement = () => {
               </div>
             </div>
           )}
+
 
           {/* Main Content */}
           <div className="content-body" style={{ marginTop: `${navHeight + 10}px` }}>

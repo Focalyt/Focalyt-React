@@ -1482,9 +1482,6 @@ const CRMDashboard = () => {
       [fieldName]: date
     };
     setFilterData(newFilterData);
-
-    // Apply filters immediately
-    setTimeout(() => fetchProfileData(newFilterData), 100);
   };
   const formatDate = (date) => {
     // If the date is not a valid Date object, try to convert it
@@ -1517,7 +1514,7 @@ const CRMDashboard = () => {
     }
 
     setFilterData(newFilterData);
-    setTimeout(() => fetchProfileData(newFilterData), 100);
+    
   };
 
 
@@ -2112,9 +2109,7 @@ const CRMDashboard = () => {
   };
 
 
-  const handleApplyFilters = (e) => {
-   fetchProfileData(filterData, 1);
-  };
+  
 
   const handleCriteriaChange = (criteria, values) => {
     setFormData((prevState) => ({
@@ -3007,9 +3002,7 @@ const CRMDashboard = () => {
                   <div className="col-md-6">
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       <div className="input-group" style={{ maxWidth: '300px' }}>
-                        <span className="input-group-text bg-white border-end-0 input-height">
-                          <i className="fas fa-search text-muted"></i>
-                        </span>
+                       
                         <input
                           type="text"
                           name="name"
@@ -3018,19 +3011,17 @@ const CRMDashboard = () => {
                           value={filterData.name}
                           onChange={handleFilterChange}
                         />
-                        {filterData.name && (
-                          <button
-                            className="btn btn-outline-secondary border-start-0"
-                            type="button"
-                            onClick={() => {
-                              setFilterData(prev => ({ ...prev, name: '' }));
-                              fetchProfileData();
-                            }}
-                          >
-                            <i className="fas fa-times"></i>
-                          </button>
-                        )}
+                         <button
+                        onClick={() => fetchProfileData()}
+                        className={`btn btn-outline-primary`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-search me-1`}></i>
+                        Search
+                        
+                      </button>
                       </div>
+                     
 
                       <button
                         onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
@@ -3481,7 +3472,7 @@ const CRMDashboard = () => {
                         <button
                           className="btn btn-primary"
                           onClick={() => {
-                            handleApplyFilters(filterData, 1);
+                            fetchProfileData(filterData, 1);
                             setIsFilterCollapsed(true);
                           }}
                         >
@@ -3585,9 +3576,10 @@ const CRMDashboard = () => {
                                           <div className="progress-text"></div>
                                         </div>
                                       </div>
-                                      <div>
+                                      <div className="d-flex flex-column">
                                         <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
                                         <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
+                                        <small className="text-muted">{profile._candidate?.email || 'Email'}</small>
                                       </div>
                                       <div style={{ marginLeft: '15px' }}>
                                         <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
@@ -3595,14 +3587,7 @@ const CRMDashboard = () => {
                                             <i className="fas fa-phone"></i>
                                           </a>
                                         </button>
-                                        {/* <button
-                                        className="btn btn-outline-success btn-sm border-0"
-                                        onClick={openWhatsappPanel}
-                                        style={{ fontSize: '20px' }}
-                                        title="WhatsApp"
-                                      >
-                                        <i className="fab fa-whatsapp"></i>
-                                      </button> */}
+                                        
                                         <a
                                           className="btn btn-outline-success btn-sm border-0"
                                           href={`https://wa.me/${profile._candidate?.mobile}`}
