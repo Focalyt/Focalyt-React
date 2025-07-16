@@ -316,7 +316,7 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
     for (let counselorId of allCounselors) {
       // Find last assignment for this counselor with same course and center (sorted by createdAt)
       const lastAssignment = await AppliedCourses.findOne({
-        'leadAssignment._id': counselorId
+        'leadAssignment.counselorId': counselorId
       }).sort({ createdAt: -1 });
 
       let lastAssignmentDate = null;
