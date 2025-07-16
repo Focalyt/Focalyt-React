@@ -3788,7 +3788,7 @@ const AdmissionList = () => {
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">Counsellor Name</div>
-                                                      <div className="info-value">{profile._course?.counslername}</div>
+                                                      <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
                                                     </div>
                                                   </div>
                                                 </div>
@@ -3882,7 +3882,7 @@ const AdmissionList = () => {
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
                                                       <div className="info-label">Counsellor Name</div>
-                                                      <div className="info-value">{profile._course?.counslername}</div>
+                                                      <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
                                                     </div>
                                                   </div>
                                                   <div className="col-xl- col-3">
