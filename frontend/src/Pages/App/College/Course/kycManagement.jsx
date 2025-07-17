@@ -136,16 +136,13 @@ const useNavHeight = (dependencies = []) => {
   const [navWidth, setNavWidth] = useState('100%');
 
   const calculateHeightAndWidth = useCallback(() => {
-    console.log('🔍 Calculating nav height and width...');
 
     if (navRef.current) {
       // Calculate Height
       const height = navRef.current.offsetHeight;
-      console.log('📏 Found height:', height);
 
       if (height > 0) {
         setNavHeight(height);
-        console.log('✅ Height set to:', height + 'px');
       }
 
       // Calculate Width from parent (position-relative container)
@@ -155,11 +152,9 @@ const useNavHeight = (dependencies = []) => {
 
       if (parentContainer) {
         const parentWidth = parentContainer.offsetWidth;
-        console.log('📐 Parent width:', parentWidth);
 
         if (parentWidth > 0) {
           setNavWidth(parentWidth + 'px');
-          console.log('✅ Width set to:', parentWidth + 'px');
         }
       }
     } else {
@@ -952,11 +947,17 @@ const KYCManagement = () => {
         return;
       }
 
-      // Check if all documents are verified using docCounts
-      if (profile.docCounts.verifiedCount !== profile.docCounts.mandatoryCount) {
-        alert('All documents must be verified before moving to admission list');
-        return;
-      }
+      const uploadedDocs = profile.uploadedDocs
+
+      for (const doc of uploadedDocs) {
+        const docStatus = doc.status
+        if (doc.mandatory && !docStatus) {
+          console.log('docs is', doc)
+          alert('All documents must be verified before moving to admission list');
+          return;
+        }
+      }    
+      
 
       // Show confirmation dialog
       const confirmMove = window.confirm('Do you really want to move this profile to admission list?');
@@ -1352,10 +1353,6 @@ const KYCManagement = () => {
       const { name, value } = e.target;
       const newFilterData = { ...filterData, [name]: value };
       setFilterData(newFilterData);
-
-
-      fetchProfileData(newFilterData);
-
     } catch (error) {
       console.error('Filter change error:', error);
     }

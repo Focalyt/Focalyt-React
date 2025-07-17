@@ -59,27 +59,23 @@ const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
     const [navWidth, setNavWidth] = useState('100%');
   
     const calculateHeightAndWidth = useCallback(() => {
-      console.log('🔍 Calculating nav height and width...');
       
       if (navRef.current) {
         // Calculate Height
         const height = navRef.current.offsetHeight;
-        console.log('📏 Found height:', height);
         
         if (height > 0) {
           setNavHeight(height);
-          console.log('✅ Height set to:', height + 'px');
+          
         }
   
         // Calculate Width from parent (position-relative container)
         const parentContainer = navRef.current.closest('.position-relative');
         if (parentContainer) {
           const parentWidth = parentContainer.offsetWidth;
-          console.log('📐 Parent width:', parentWidth);
           
           if (parentWidth > 0) {
             setNavWidth(parentWidth + 'px');
-            console.log('✅ Width set to:', parentWidth + 'px');
           }
         }
       } else {

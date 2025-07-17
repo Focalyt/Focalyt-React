@@ -3929,15 +3929,22 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 			// Name search filter
 			if (name && name.trim()) {
-				const searchRegex = new RegExp(name.trim(), 'i');
+				const searchTerm = name.trim();
+				const searchRegex = new RegExp(searchTerm, 'i');
+
+				console.log('searchTerm', searchTerm)
+				console.log('searchRegex', searchRegex)
+
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
 					{ '_candidate.name': searchRegex },
 					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm }, // Try both number and string
 					{ '_candidate.email': searchRegex }
 				] : [
 					{ '_candidate.name': searchRegex },
 					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 					{ '_candidate.email': searchRegex }
 				];
 			}
@@ -3996,6 +4003,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 					// Convert Mongoose document to plain object
 					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
 
+					const isDocApproved = uploadedDocs.some(uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString() && uploadDoc.status === "Verified");
+
 					// Find matching uploaded docs for this required doc
 					const matchingUploads = uploadedDocs.filter(
 						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
@@ -4004,6 +4013,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 					return {
 						_id: docObj._id,
 						Name: docObj.Name || 'Document',
+						mandatory: docObj.mandatory,
+						status: isDocApproved,
 						description: docObj.description || '',
 						uploads: matchingUploads || []
 					};
