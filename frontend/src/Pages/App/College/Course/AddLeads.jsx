@@ -453,6 +453,12 @@ const AddLeads = () => {
     console.log("Final Form Data Object:", data);
 
     try {
+
+      if(formData.selectedCenter === "" || formData.name === "" || formData.email === "" || formData.address === "" || formData.sex === "" || formData.dob === "" || formData.state === "" || formData.city === "" || formData.longitude === "" || formData.latitude === "" || formData.highestQualification === "" || formData.courseId === "" ){
+        alert("Please fill all the fields");
+        return;
+      }
+
       const response = await fetch(`${backendUrl}/college/candidate/addleaddandcourseapply`, {
         method: 'POST',
         headers: {

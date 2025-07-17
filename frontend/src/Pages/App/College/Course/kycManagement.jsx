@@ -953,7 +953,7 @@ const KYCManagement = () => {
       }
 
       // Check if all documents are verified using docCounts
-      if (profile.docCounts.verifiedCount !== profile.docCounts.totalRequired) {
+      if (profile.docCounts.verifiedCount !== profile.docCounts.mandatoryCount) {
         alert('All documents must be verified before moving to admission list');
         return;
       }

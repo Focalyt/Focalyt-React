@@ -4017,12 +4017,14 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 					return {
 						...uploadedDoc,
 						Name: reqDoc.Name,
+						mandatory: reqDoc.mandatory,
 						_id: reqDoc._id
 					};
 				} else {
 					return {
 						docsId: reqDoc._id,
 						Name: reqDoc.Name,
+						mandatory: reqDoc.mandatory,
 						status: "Not Uploaded",
 						fileUrl: null,
 						reason: null,
@@ -4033,14 +4035,18 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				}
 			});
 
+			console.log(allDocs, 'allDocs')
+
 			// Count calculations
 			let verifiedCount = 0;
 			let RejectedCount = 0;
 			let pendingVerificationCount = 0;
 			let notUploadedCount = 0;
+			let mandatoryCount = 0;
 
 			allDocs.forEach(doc => {
 				if (doc.status === "Verified") verifiedCount++;
+				else if (doc.mandatory) mandatoryCount++;
 				else if (doc.status === "Rejected") RejectedCount++;
 				else if (doc.status === "Pending") pendingVerificationCount++;
 				else if (doc.status === "Not Uploaded") notUploadedCount++;
@@ -4058,6 +4064,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				uploadedDocs: combinedDocs,
 				docCounts: {
 					totalRequired,
+					mandatoryCount,
 					RejectedCount,
 					uploadedCount,
 					verifiedCount,
