@@ -4008,7 +4008,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 					// Find matching uploaded docs for this required doc
 					const matchingUploads = uploadedDocs.filter(
 						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
-					);
+					)
 
 					return {
 						_id: docObj._id,
