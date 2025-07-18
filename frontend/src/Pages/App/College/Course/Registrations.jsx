@@ -686,12 +686,23 @@ const useScrollBlur = (navbarHeight = 140) => {
 const CRMDashboard = () => {
 
   const candidateRef = useRef();
+  
+  useEffect(() => {
+    console.log('CandidateRef initialized:', candidateRef.current);
+  }, []);
+  
+  useEffect(() => {
+    console.log('CandidateRef current changed:', candidateRef.current);
+  }, [candidateRef.current]);
 
   const fetchProfile = (id) => {
+    console.log('fetchProfile called with id:', id);
+    console.log('candidateRef.current:', candidateRef.current);
     if (candidateRef.current) {
-      console.log('start fetching', id)
+      console.log('candidateRef.current exists, calling fetchProfile');
       candidateRef.current.fetchProfile(id);
-      fetchProfileData()
+    } else {
+      console.log('candidateRef.current is null - this is the problem!');
     }
   };
 
@@ -2233,15 +2244,24 @@ const CRMDashboard = () => {
 
   };
   const handleFetchCandidate = async (profile = null) => {
+    console.log('handleFetchCandidate called with profile:', profile);
     setShowPopup(null)
     setSelectedProfile(profile)
     setOpenModalId(profile._id);
+    console.log('openModalId set to:', profile._id);
   }
 
   useEffect(() => {
-    console.log('useeffect', selectedProfile);
+    console.log('useEffect triggered with selectedProfile:', selectedProfile);
     if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
+      console.log('About to call fetchProfile with candidate ID:', selectedProfile._candidate._id);
       fetchProfile(selectedProfile._candidate._id);
+    } else {
+      console.log('selectedProfile condition failed:', {
+        selectedProfile: !!selectedProfile,
+        hasCandidate: !!(selectedProfile && selectedProfile._candidate),
+        hasCandidateId: !!(selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id)
+      });
     }
   }, [selectedProfile]);
 
@@ -5200,6 +5220,7 @@ const CRMDashboard = () => {
                                       <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                                     </div>
                                     <div className="modal-body">
+                                      {console.log('Modal body rendering, candidateRef:', candidateRef)}
                                       <CandidateProfile ref={candidateRef} />
                                     </div>
                                     <div className="modal-footer">

@@ -479,11 +479,11 @@ function Jobs() {
                               >
                                 ({course.displayCompanyName})
                               </h5>
-                              {(course.amount || course.min) && (
+                              {((course.isFixed && course.fixedSalary) || (!course.isFixed && course.min && course.max)) && (
                                 <p class="text-center digi-price mb-3 mt-3">
                                   <span class="rupee text-white">₹ &nbsp;</span>
                                   <span class="r-price text-white">
-                                    {course.amount ? `${course.amount}` : `${course.min}-${course.max}`}
+                                    {course.isFixed ? course.fixedSalary : `${course.min}-${course.max}`}
                                   </span>
                                 </p>
                               )}
