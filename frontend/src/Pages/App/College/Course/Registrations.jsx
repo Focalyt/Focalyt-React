@@ -4361,13 +4361,13 @@ const CRMDashboard = () => {
 
                                           <div className="resume-document-header">
                                             <div className="resume-profile-section">
-                                              {user?.image ? (
-                                                <img
-                                                  src={`${bucketUrl}/${user.image}`}
-                                                  alt="Profile"
-                                                  className="resume-profile-image"
-                                                />
-                                              ) : (
+                                            {profile._candidate?.personalInfo?.image ? (
+                                                      <img
+                                                        src={`${profile._candidate?.personalInfo?.image}`}
+                                                        alt="Profile"
+                                                        className="resume-profile-image"
+                                                      />
+                                                    ) : (
                                                 <div className="resume-profile-placeholder">
                                                   <i className="bi bi-person-circle"></i>
                                                 </div>
