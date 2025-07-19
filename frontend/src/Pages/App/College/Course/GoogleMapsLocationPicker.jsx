@@ -14,22 +14,50 @@ const GoogleMapsLocationPicker = ({
   const mapRef = useRef(null);
   const autocompleteRef = useRef(null);
 
-  // Check for Google Maps API availability (similar to CandidateProfile)
+  // Load Google Maps API
   useEffect(() => {
-    if (window.googleMapsLoaded) {
-      console.log('Google Maps already loaded, initializing autocomplete...');
-      initializeAutocomplete();
-    } else if (window.google && window.google.maps && window.google.maps.places) {
-      console.log('Google Maps API available, setting flag and initializing...');
-      setMapLoaded(true);
-      window.googleMapsLoaded = true;
-      initializeAutocomplete();
-    } else {
-      console.log('Google Maps not loaded yet, using fallback...');
-      setMapLoaded(true);
-      initializeFallbackAutocomplete();
-    }
-  }, [window.googleMapsLoaded]);
+    const loadGoogleMapsAPI = () => {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        console.log('Google Maps already loaded');
+        setMapLoaded(true);
+        window.googleMapsLoaded = true;
+        initializeAutocomplete();
+        return;
+      }
+
+      // Check if script is already loading
+      if (document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
+        console.log('Google Maps script already loading');
+        return;
+      }
+
+      const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.warn('Google Maps API key not found. Using fallback mode.');
+        setMapLoaded(true);
+        return;
+      }
+
+      console.log('Loading Google Maps API...');
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        console.log('Google Maps API loaded successfully');
+        setMapLoaded(true);
+        window.googleMapsLoaded = true;
+        initializeAutocomplete();
+      };
+      script.onerror = () => {
+        console.error('Failed to load Google Maps API');
+        setMapLoaded(true); // Continue without API
+      };
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMapsAPI();
+  }, []);
 
   // Initialize autocomplete
   const initializeAutocomplete = () => {
@@ -43,7 +71,7 @@ const GoogleMapsLocationPicker = ({
     setTimeout(() => {
       const input = document.getElementById('location-input');
       if (input) {
-        console.log('Initializing Google Maps autocomplete for input:', input);
+        console.log('Initializing autocomplete for input:', input);
         
         // Remove existing autocomplete if any
         if (autocompleteRef.current) {
@@ -67,7 +95,7 @@ const GoogleMapsLocationPicker = ({
 
           autocomplete.addListener('place_changed', () => {
             const place = autocomplete.getPlace();
-            console.log('Google Maps place selected:', place);
+            console.log('Place selected:', place);
             
             if (place.geometry) {
               const location = {
@@ -79,172 +107,22 @@ const GoogleMapsLocationPicker = ({
               };
               setAddress(place.formatted_address);
               onLocationSelect(location);
-              console.log('Google Maps location set:', location);
+              console.log('Location set:', location);
             } else {
               console.log('No geometry found for selected place');
             }
           });
 
           autocompleteRef.current = autocomplete;
-          console.log('Google Maps autocomplete initialized successfully');
+          console.log('Autocomplete initialized successfully');
         } catch (error) {
-          console.error('Error initializing Google Maps autocomplete:', error);
-          // Fallback to basic autocomplete
-          initializeFallbackAutocomplete();
+          console.error('Error initializing autocomplete:', error);
         }
       } else {
-        console.log('Google Maps input not found, retrying...');
+        console.log('Input not found, retrying...');
         setTimeout(initializeAutocomplete, 500);
       }
     }, 100);
-  };
-
-  // Fallback autocomplete for when Google Maps API is not available
-  const initializeFallbackAutocomplete = () => {
-    const input = document.getElementById('location-input');
-    if (!input) {
-      console.log('Input not found for fallback autocomplete');
-      return;
-    }
-
-    console.log('Initializing fallback autocomplete...');
-
-    // Remove existing dropdown if any
-    const existingDropdown = document.getElementById('fallback-dropdown');
-    if (existingDropdown) {
-      existingDropdown.remove();
-    }
-
-    // Create a simple dropdown with common Indian cities
-    const commonCities = [
-      'Mumbai, Maharashtra, India',
-      'Delhi, India',
-      'Bangalore, Karnataka, India',
-      'Hyderabad, Telangana, India',
-      'Chennai, Tamil Nadu, India',
-      'Kolkata, West Bengal, India',
-      'Pune, Maharashtra, India',
-      'Ahmedabad, Gujarat, India',
-      'Jaipur, Rajasthan, India',
-      'Surat, Gujarat, India',
-      'Lucknow, Uttar Pradesh, India',
-      'Kanpur, Uttar Pradesh, India',
-      'Nagpur, Maharashtra, India',
-      'Indore, Madhya Pradesh, India',
-      'Thane, Maharashtra, India',
-      'Bhopal, Madhya Pradesh, India',
-      'Visakhapatnam, Andhra Pradesh, India',
-      'Pimpri-Chinchwad, Maharashtra, India',
-      'Patna, Bihar, India',
-      'Vadodara, Gujarat, India'
-    ];
-
-    let dropdown = document.getElementById('fallback-dropdown');
-    if (!dropdown) {
-      dropdown = document.createElement('div');
-      dropdown.id = 'fallback-dropdown';
-      dropdown.style.cssText = `
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 2px solid #007bff;
-        border-top: none;
-        border-radius: 0 0 8px 8px;
-        max-height: 200px;
-        overflow-y: auto;
-        z-index: 9999;
-        display: none;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        margin-top: 2px;
-      `;
-      input.parentNode.style.position = 'relative';
-      input.parentNode.appendChild(dropdown);
-      console.log('Fallback dropdown created');
-    }
-
-    const showDropdown = (filteredCities) => {
-      console.log('Showing dropdown with cities:', filteredCities);
-      dropdown.innerHTML = '';
-      if (filteredCities.length === 0) {
-        dropdown.style.display = 'none';
-        return;
-      }
-
-      filteredCities.forEach(city => {
-        const item = document.createElement('div');
-        item.textContent = city;
-        item.style.cssText = `
-          padding: 12px 16px;
-          cursor: pointer;
-          border-bottom: 1px solid #f0f0f0;
-          font-size: 14px;
-          transition: background-color 0.2s;
-        `;
-        item.addEventListener('mouseenter', () => {
-          item.style.backgroundColor = '#e3f2fd';
-        });
-        item.addEventListener('mouseleave', () => {
-          item.style.backgroundColor = 'white';
-        });
-        item.addEventListener('click', () => {
-          console.log('City selected:', city);
-          setAddress(city);
-          onLocationSelect({
-            address: city,
-            lat: null,
-            lng: null,
-            placeId: null
-          });
-          dropdown.style.display = 'none';
-        });
-        dropdown.appendChild(item);
-      });
-      dropdown.style.display = 'block';
-      console.log('Dropdown displayed');
-    };
-
-    const hideDropdown = () => {
-      setTimeout(() => {
-        dropdown.style.display = 'none';
-      }, 200);
-    };
-
-    input.addEventListener('input', (e) => {
-      const value = e.target.value.toLowerCase();
-      console.log('Input event triggered with value:', value);
-      
-      if (value.length < 1) {
-        dropdown.style.display = 'none';
-        return;
-      }
-
-      const filtered = commonCities.filter(city => 
-        city.toLowerCase().includes(value)
-      );
-      console.log('Filtered cities:', filtered);
-      showDropdown(filtered);
-    });
-
-    input.addEventListener('focus', () => {
-      if (input.value.length >= 2) {
-        const value = input.value.toLowerCase();
-        const filtered = commonCities.filter(city => 
-          city.toLowerCase().includes(value)
-        );
-        showDropdown(filtered);
-      }
-    });
-
-    input.addEventListener('blur', hideDropdown);
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-        hideDropdown();
-      }
-    });
   };
 
   // Get current location
@@ -392,7 +270,12 @@ const GoogleMapsLocationPicker = ({
     }
   }, [showMap, mapLoaded, selectedLocation]);
 
-
+  // Reinitialize autocomplete when map is loaded
+  useEffect(() => {
+    if (mapLoaded) {
+      initializeAutocomplete();
+    }
+  }, [mapLoaded]);
 
   // Update address when selectedLocation changes
   useEffect(() => {
@@ -404,28 +287,15 @@ const GoogleMapsLocationPicker = ({
   return (
     <div className={`google-maps-location-picker ${className}`}>
       {/* Address Input */}
-      <div className="location-input-group" style={{ position: 'relative' }}>
+      <div className="location-input-group">
         <input
           id="location-input"
           type="text"
           className={`form-control location-input ${disabled ? 'disabled' : ''}`}
           placeholder={placeholder}
           value={address}
-          onChange={(e) => {
-            setAddress(e.target.value);
-            console.log('Input changed:', e.target.value);
-          }}
-          onFocus={() => {
-            console.log('Input focused');
-            // Show dropdown immediately on focus
-            const input = document.getElementById('location-input');
-            if (input && input.value.length >= 1) {
-              const event = new Event('input', { bubbles: true });
-              input.dispatchEvent(event);
-            }
-          }}
+          onChange={(e) => setAddress(e.target.value)}
           disabled={disabled}
-          autoComplete="off"
         />
         <button
           type="button"
@@ -555,43 +425,30 @@ const GoogleMapsLocationPicker = ({
           font-size: 0.875rem;
         }
         
-                 /* Google Maps Autocomplete Styles */
-         .pac-container {
-           z-index: 9999 !important;
-           border-radius: 8px;
-           box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-           border: 1px solid #ddd;
-           margin-top: 2px;
-         }
-         
-         .pac-item {
-           padding: 10px 12px;
-           border-bottom: 1px solid #f0f0f0;
-           cursor: pointer;
-           font-size: 14px;
-         }
-         
-         .pac-item:last-child {
-           border-bottom: none;
-         }
-         
-         .pac-item:hover {
-           background-color: #f8f9fa;
-         }
-         
-         .pac-item-selected {
-           background-color: #e3f2fd;
-         }
-         
-         .pac-item-query {
-           font-weight: 500;
-           color: #333;
-         }
-         
-         .pac-matched {
-           font-weight: bold;
-           color: #007bff;
-         }
+        /* Google Maps Autocomplete Styles */
+        .pac-container {
+          z-index: 9999 !important;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          border: 1px solid #ddd;
+        }
+        
+        .pac-item {
+          padding: 8px 12px;
+          border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .pac-item:last-child {
+          border-bottom: none;
+        }
+        
+        .pac-item:hover {
+          background-color: #f8f9fa;
+        }
+        
+        .pac-item-selected {
+          background-color: #e3f2fd;
+        }
       `}</style>
     </div>
   );

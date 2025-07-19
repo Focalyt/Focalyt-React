@@ -365,7 +365,7 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
 
       // Add new assignment to leadAssignment array
       this.leadAssignment.push({
-        _counsellor: new mongoose.Types.ObjectId(selectedCounselor),
+        counselorId: new mongoose.Types.ObjectId(selectedCounselor),
         counsellorName: counselorName,
         assignDate: new Date(),
         assignedBy: this.registeredBy

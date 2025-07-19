@@ -443,48 +443,36 @@ const B2BSales = () => {
   const [showMap, setShowMap] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Check for Google Maps API availability
+  // Load Google Maps API
   useEffect(() => {
-    const checkGoogleMapsAPI = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        console.log('Google Maps API available');
+    const loadGoogleMapsAPI = () => {
+      if (window.google && window.google.maps) {
         setMapLoaded(true);
-        window.googleMapsLoaded = true;
         initializeAutocomplete();
         return;
       }
 
-      // Check if script is loading from index.html
-      const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api"]');
-      if (existingScript) {
-        console.log('Google Maps script found in index.html, waiting for load...');
-        
-        // Wait for script to load
-        const checkInterval = setInterval(() => {
-          if (window.google && window.google.maps && window.google.maps.places) {
-            console.log('Google Maps API loaded from index.html');
-            setMapLoaded(true);
-            window.googleMapsLoaded = true;
-            initializeAutocomplete();
-            clearInterval(checkInterval);
-          }
-        }, 100);
-
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          if (!window.google || !window.google.maps) {
-            console.warn('Google Maps API not loaded after timeout. Using fallback mode.');
-            setMapLoaded(true);
-          }
-        }, 10000);
-      } else {
-        console.warn('Google Maps script not found. Using fallback mode.');
-        setMapLoaded(true);
+      // Check if script is already loading
+      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        return;
       }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places,geometry`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        setMapLoaded(true);
+        initializeAutocomplete();
+      };
+      script.onerror = () => {
+        console.error('Failed to load Google Maps API');
+        alert('Failed to load Google Maps. Please check your internet connection and try again.');
+      };
+      document.head.appendChild(script);
     };
 
-    checkGoogleMapsAPI();
+    loadGoogleMapsAPI();
   }, []);
 
   // Initialize Google Maps Autocomplete
