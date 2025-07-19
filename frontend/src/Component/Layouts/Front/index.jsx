@@ -15,6 +15,21 @@ const FrontLayout = ({ children }) => {
       </main>
       {/* <FrontFooter /> */}
       {!hideFooter && <FrontFooter />}
+
+      <style>
+        {
+          `
+          @media (max-width: 768px) {
+            main {
+              overflow-x: hidden;
+            }
+              .images{
+              gap:10px;
+              }
+          }
+          `
+        }
+      </style>
     </div>
     
   );

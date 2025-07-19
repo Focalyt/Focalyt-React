@@ -43,7 +43,21 @@ const CourseDetails = () => {
   const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
   
 
-  
+  const getFileUrl = (file) => {
+
+    if (typeof file === 'string') {
+      // Check if the file is already a URL starting with Amazon bucket URL
+      if (file.includes(bucketUrl) || file.includes('http') || file.includes('blob')) {
+        return file; // Return the file URL as is if it starts with the bucket URL
+      } else {
+        return `${bucketUrl}/${file}`; // Prepend the bucket URL to the file path if it's not already a complete URL
+      }
+    } else if (file instanceof File) {
+      // For new video files, create an object URL
+      return URL.createObjectURL(file);
+    }
+    return '';
+  };
 
   useEffect(() => {
 
@@ -572,7 +586,7 @@ const CourseDetails = () => {
                             >
                               <img
                                 id="videoPlay"
-                                src={course.thumbnail ? `${bucketUrl}/${course.thumbnail}` : '/images/pages/video_thum1.png'}
+                                src={course.thumbnail ? getFileUrl(course.thumbnail) : '/images/pages/video_thum1.png'}
                                 className="video_thum img-fluid"
                                 alt="Video thumbnail"
                               />
@@ -595,7 +609,7 @@ const CourseDetails = () => {
                             >
                               <img
                                 id="videoPlay"
-                                src={course.thumbnail ? `${bucketUrl}/${course.thumbnail}` : '/images/pages/video_thum1.png'}
+                                src={course.thumbnail ? getFileUrl(course.thumbnail) : '/images/pages/video_thum1.png'}
                                 className="video_thum img-fluid"
                                 alt="Video thumbnail"
                               />
@@ -5573,7 +5587,7 @@ button.carousel-control-prev {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
+  max-width: 57%;
 }
 .set-lineh{
   overflow-wrap: break-word;
@@ -6947,6 +6961,14 @@ display: none;
   .breadcrumb-item a {
     color: #FC2B5A;
         }
+@media (max-width: 768px) {
+
+.jobDetails-wrap {
+max-width: 100%;
+}
+}
+
+
         `
       }
     </style>
