@@ -214,6 +214,7 @@ const appliedCoursesSchema = new Schema(
 );
 
 // Lead Assignment Method - अब save नहीं करेगा
+// Lead Assignment Method - Fixed version
 appliedCoursesSchema.methods.assignCounselor = async function() {
   try {
     const LeadAssignmentRule = mongoose.model('LeadAssignmentRule');
@@ -314,10 +315,12 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
     const counselorAssignments = [];
 
     for (let counselorId of allCounselors) {
-      // Find last assignment for this counselor with same course and center (sorted by createdAt)
+      // FIXED: Use correct field name '_counsellor' instead of 'counselorId'
       const lastAssignment = await AppliedCourses.findOne({
-        'leadAssignment.counselorId': counselorId
+        'leadAssignment._counsellor': counselorId
       }).sort({ createdAt: -1 });
+
+      console.log(lastAssignment, 'lastAssignment', counselorId, 'counselorId');
 
       let lastAssignmentDate = null;
       if (lastAssignment) {
@@ -359,13 +362,13 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
 
     // Step 5: Assign the selected counselor (DON'T SAVE HERE)
     if (selectedCounselor) {
-
       const counselorDetails = await User.findById(selectedCounselor);
-      const counselorName = counselorDetails.name;
+      const counselorName = counselorDetails ? counselorDetails.name : 'Unknown';
 
+      // FIXED: Use correct field name '_counsellor' instead of 'counselorId'
       // Add new assignment to leadAssignment array
       this.leadAssignment.push({
-        counselorId: new mongoose.Types.ObjectId(selectedCounselor),
+        _counsellor: new mongoose.Types.ObjectId(selectedCounselor), // Changed from counselorId to _counsellor
         counsellorName: counselorName,
         assignDate: new Date(),
         assignedBy: this.registeredBy
@@ -373,7 +376,6 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
 
       this.courseStatus = 1; // Assigned
 
-     
       return selectedCounselor;
     }
 

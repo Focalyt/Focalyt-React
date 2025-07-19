@@ -688,7 +688,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				const searchTerm = name.trim();
 				const searchRegex = new RegExp(searchTerm, 'i');
 
-				
+
 
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
@@ -851,7 +851,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			counselorArray
 		});
 
-	// Apply pagination
+		// Apply pagination
 		const totalCount = results.length;
 		const paginatedResult = results.slice(skip, skip + limit);
 
@@ -1829,7 +1829,7 @@ router.route("/myprofile")
 			req.flash("success", "Company updated successfully!");
 			res.send({ status: 200, message: "Profile Updated Successfully" });
 		} catch (err) {
-			
+
 			req.flash("error", err.message || "Something went wrong!");
 			return res.send({ status: "failure", error: "Something went wrong!" });
 		}
@@ -1884,7 +1884,7 @@ router.get('/availablejobs', [isCollege], async (req, res) => {
 		let skills = await Skill.find({ status: true })
 		res.render(`${req.vPath}/app/college/searchjob`, { menu: 'Jobs', jobs, allQualification, allIndustry, allStates, data, skills })
 	} catch (err) {
-		
+
 		req.flash("error", err.message || "Something went wrong!");
 		return res.redirect("back");
 	}
@@ -1910,7 +1910,7 @@ router.get('/job/:jobId', [isCollege], async (req, res) => {
 
 		res.render(`${req.vPath}/app/college/viewjob`, { menu: 'Jobs', jobDetails, state, city })
 	} catch (err) {
-		
+
 		req.flash("error", err.message || "Something went wrong!");
 		return res.redirect("back");
 	}
@@ -1955,7 +1955,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 		await readXlsxFile(
 			path.join(__dirname, "../../../public/" + filename)
 		).then((rows) => {
-			
+
 			if (
 				rows[0][0] !== 'name' ||
 				rows[0][1] !== 'email' ||
@@ -2186,7 +2186,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							errorMessages.push(`Candidate not created for row ${index + 1}.`)
 							continue;
 						}
-						
+
 					} else {
 						errorMessages.push(`Candidate/User with mobile ${mobile} already exists for row ${index + 1}.`)
 					}
@@ -2197,7 +2197,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					status: "Completed",
 					record: allRows.length
 				};
-				
+
 				await CandidateImport.create(imports);
 				await fs.promises.unlink("public/" + filename).then(() => {
 					return res.redirect("/college/uploadCandidates");
@@ -3074,7 +3074,7 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 	try {
 		let collegeId = req.user.college._id;
 		let projectId = req.query.projectId;
-	
+
 
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
 
@@ -4387,7 +4387,7 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 			}
 
 			const key = `Documents for course/${appliedCourse._course._id}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
-			
+
 			const params = {
 				Bucket: bucketName,
 				Key: key,
@@ -4464,7 +4464,7 @@ router.get("/leads/my-followups", async (req, res) => {
 		} else {
 			to = new Date(new Date().setHours(23, 59, 59, 999));
 		}
-		
+
 		const skip = (parseInt(page) - 1) * parseInt(limit);
 
 		// First, get the documents that match our criteria
@@ -6840,6 +6840,159 @@ router.route('/refer-leads')
 			});
 		}
 	})
+
+router.post('/fix-counselor-names', async (req, res) => {
+	try {
+		//   const { counselors } = req.body;
+		const college = await College.findById('684ff35edc197327bc92deca').populate('_concernPerson._id')
+		const teams = college._concernPerson
+		let counselors = []
+		teams.forEach(team => {
+			counselors.push({id:team._id._id, name:team._id.name})
+		})
+		console.log(counselors, 'counselors')
+	
+		// Validation
+		if (!counselors || !Array.isArray(counselors) || counselors.length === 0) {
+			return res.status(400).json({
+				success: false,
+				message: 'counselors array is required and cannot be empty'
+			});
+		}
+
+		// Validate counselor data
+		for (let i = 0; i < counselors.length; i++) {
+			const counselor = counselors[i];
+			if (!counselor.id || !counselor.name) {
+				return res.status(400).json({
+					success: false,
+					message: `counselors[${i}] must have both 'id' and 'name' fields`
+				});
+			}
+
+			if (!mongoose.Types.ObjectId.isValid(counselor.id)) {
+				return res.status(400).json({
+					success: false,
+					message: `counselors[${i}].id is not a valid ObjectId: ${counselor.id}`
+				});
+			}
+		}
+
+		console.log(`Starting counselor ID assignment for courses with names but missing IDs...`);
+
+		// Create a map for quick lookup: counselorName -> counselorId
+		const counselorNameMap = {};
+		counselors.forEach(counselor => {
+			counselorNameMap[counselor.name.toLowerCase().trim()] = counselor.id;
+		});
+
+		console.log('Counselor name mapping created:', Object.keys(counselorNameMap).length, 'entries');
+
+		// Find applied courses where counsellor name exists but _counsellor ID is missing
+		const appliedCourses = await AppliedCourses.find({
+			'leadAssignment.0': { $exists: true }, // leadAssignment array exists and has at least one element
+			'leadAssignment.counsellorName': { $exists: true, $ne: null, $ne: '' }, // counsellor name exists and is not empty
+			$or: [
+			  { 'leadAssignment._counsellor': { $exists: false } }, // _counsellor field doesn't exist
+			  { 'leadAssignment._counsellor': null }, // _counsellor is null
+			]
+		  });
+
+		console.log(`Found ${appliedCourses.length} applied courses with counsellor names but missing IDs`);
+
+		let totalProcessed = 0;
+		let totalAssigned = 0;
+		let totalFailed = 0;
+		const assignmentDetails = [];
+
+		for (const appliedCourse of appliedCourses) {
+			try {
+				totalProcessed++;
+				let hasUpdates = false;
+				const courseAssignments = [];
+
+				// Check each assignment in the leadAssignment array
+				for (let i = 0; i < appliedCourse.leadAssignment.length; i++) {
+					const assignment = appliedCourse.leadAssignment[i];
+
+					// Check if assignment has counsellor name but missing _counsellor ID
+					if (assignment.counsellorName &&
+						assignment.counsellorName.trim() !== '' &&
+						(!assignment._counsellor || assignment._counsellor === null)) {
+
+						const counsellorName = assignment.counsellorName.toLowerCase().trim();
+
+						// Find matching counselor ID from provided list
+						if (counselorNameMap[counsellorName]) {
+							const counselorId = counselorNameMap[counsellorName];
+							console.log(counselorId, 'counselorId')
+
+							// Assign the _counsellor ID
+							assignment._counsellor = new mongoose.Types.ObjectId(counselorId);
+							hasUpdates = true;
+
+							courseAssignments.push({
+								assignmentIndex: i,
+								counsellorName: assignment.counsellorName,
+								assignedCounselorId: counselorId,
+								action: 'ID_assigned'
+							});
+
+							console.log(`Assigned ID to ${appliedCourse._id}: ${assignment.counsellorName} -> ${counselorId}`);
+						} else {
+							courseAssignments.push({
+								assignmentIndex: i,
+								counsellorName: assignment.counsellorName,
+								action: 'no_match_found',
+								error: 'No matching counselor found in provided list'
+							});
+							console.log(`No match found for: ${assignment.counsellorName} in ${appliedCourse._id}`);
+						}
+					}
+				}
+
+				// Save if there are updates
+				if (hasUpdates) {
+					await appliedCourse.save();
+					totalAssigned++;
+
+					assignmentDetails.push({
+						appliedCourseId: appliedCourse._id,
+						assignments: courseAssignments
+					});
+				}
+
+			} catch (error) {
+				console.error(`Error processing ${appliedCourse._id}:`, error.message);
+				totalFailed++;
+			}
+		}
+
+		console.log('Counselor assignment completed');
+
+		// Response with summary
+		res.status(200).json({
+			success: true,
+			message: `Counselor assignment completed successfully!`,
+			data: {
+				providedCounselors: counselors.length,
+				totalProcessed: totalProcessed,
+				totalAssigned: totalAssigned,
+				totalFailed: totalFailed,
+				summary: `Assigned counselors to ${totalAssigned} out of ${totalProcessed} unassigned courses. ${totalFailed} failed.`,
+				assignmentDetails: assignmentDetails.slice(0, 10) // Show first 10 assignments for reference
+			}
+		});
+
+	} catch (error) {
+		console.error('Error in counselor assignment:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Internal server error',
+			error: error.message
+		});
+	}
+});
 
 
 
