@@ -3582,7 +3582,7 @@ const CRMDashboard = () => {
                             <div className="card border-0 shadow-sm mb-0 mt-2">
                               <div className="card-body px-1 py-0 my-2">
                                 <div className="row align-items-center">
-                                  <div className="col-md-6">
+                                  <div className="col-md-7">
                                     <div className="d-flex align-items-center">
                                       <div className="form-check me-3">
                                         <input onChange={(e) => handleCheckboxChange(profile, e.target.checked)} className="form-check-input" type="checkbox" />
@@ -3621,7 +3621,7 @@ const CRMDashboard = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-4">
+                                  <div className="col-md-3">
                                     <div className="d-flex gap-2">
                                       <div className="flex-grow-1">
                                         <input
@@ -3665,7 +3665,7 @@ const CRMDashboard = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+                                  <div className="col-md-1 text-end d-md-none d-sm-block d-block">
                                     <div className="btn-group">
 
                                       <div style={{ position: "relative", display: "inline-block" }}>
@@ -3841,7 +3841,7 @@ const CRMDashboard = () => {
                                     </div>
                                   </div>
 
-                                  <div className="col-md-2 text-end d-md-block d-sm-none d-none">
+                                  <div className="col-md-1 text-end d-md-block d-sm-none d-none">
                                     <div className="btn-group">
 
                                       <div style={{ position: "relative", display: "inline-block" }}>

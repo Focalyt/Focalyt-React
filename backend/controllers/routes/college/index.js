@@ -240,8 +240,6 @@ router.route("/login")
 			}, "name _concernPerson");
 
 			if (!college || college === null) {
-				console.log('Missing College!');
-
 				return res.json({ status: false, message: 'Missing College!' });
 
 			};
@@ -369,7 +367,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			center,
 			counselor
 		} = req.query;
-		console.log('req.query', req.query)
 
 		// Parse multi-select filter values
 		let projectsArray = [];
@@ -691,8 +688,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				const searchTerm = name.trim();
 				const searchRegex = new RegExp(searchTerm, 'i');
 
-				console.log('searchTerm', searchTerm)
-				console.log('searchRegex', searchRegex)
+				
 
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
@@ -855,10 +851,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			counselorArray
 		});
 
-		console.log('crmFilterCounts', crmFilterCounts)
-
-
-		// Apply pagination
+	// Apply pagination
 		const totalCount = results.length;
 		const paginatedResult = results.slice(skip, skip + limit);
 
@@ -889,9 +882,6 @@ async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters =
 	const counts = { all: 0 };
 
 	try {
-
-		console.log('appliedFilters', appliedFilters)
-		// First get all statuses from the database
 		const allStatuses = await Status.find({}).select('_id title milestone');
 
 		// Initialize counts for each status
@@ -1839,7 +1829,7 @@ router.route("/myprofile")
 			req.flash("success", "Company updated successfully!");
 			res.send({ status: 200, message: "Profile Updated Successfully" });
 		} catch (err) {
-			console.log('====================>!err ', err)
+			
 			req.flash("error", err.message || "Something went wrong!");
 			return res.send({ status: "failure", error: "Something went wrong!" });
 		}
@@ -1894,7 +1884,7 @@ router.get('/availablejobs', [isCollege], async (req, res) => {
 		let skills = await Skill.find({ status: true })
 		res.render(`${req.vPath}/app/college/searchjob`, { menu: 'Jobs', jobs, allQualification, allIndustry, allStates, data, skills })
 	} catch (err) {
-		console.log('===============> err', err)
+		
 		req.flash("error", err.message || "Something went wrong!");
 		return res.redirect("back");
 	}
@@ -1920,7 +1910,7 @@ router.get('/job/:jobId', [isCollege], async (req, res) => {
 
 		res.render(`${req.vPath}/app/college/viewjob`, { menu: 'Jobs', jobDetails, state, city })
 	} catch (err) {
-		console.log('===============> err ', err)
+		
 		req.flash("error", err.message || "Something went wrong!");
 		return res.redirect("back");
 	}
@@ -1950,9 +1940,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 		}
 		var checkFileError = true;
 		let extension = req.files.filename.name.split(".").pop();
-		console.log(extension, " -- Extension --");
 		if (extension !== "ods" && extension !== "xlsx" && extension !== "xls" && extension !== "xl") {
-			console.log("upload excel file only");
 			req.flash("error", "Excel format not matched.");
 			return res.redirect("/college/uploadCandidates");
 		}
@@ -1964,11 +1952,10 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 				return res.redirect("/college/uploadCandidates");
 			});
 		let errorMessages = []
-		console.log(__dirname, "../../../public/" + filename)
 		await readXlsxFile(
 			path.join(__dirname, "../../../public/" + filename)
 		).then((rows) => {
-			console.log(rows[0])
+			
 			if (
 				rows[0][0] !== 'name' ||
 				rows[0][1] !== 'email' ||
@@ -1992,7 +1979,6 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 			}
 
 		}).catch(err => {
-			console.log('readClsxFile error========>>>>>>', err.message)
 			req.flash("error", "Caught error while reading file.");
 			return res.redirect("/college/uploadCandidates");
 		})
@@ -2130,7 +2116,6 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 						role: 3,
 					});
 					if (isExistUser) {
-						console.log('===> User exists')
 						errorMessages.push(`User with mobile ${mobile} already exists for row ${index + 1}.`)
 						continue;
 					}
@@ -2140,7 +2125,6 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					});
 
 					if (isExistCandidate) {
-						console.log('==> isExistCandidate exists')
 						errorMessages.push(`Candidate with mobile ${mobile} already exists for row ${index + 1}.`)
 						continue;
 					}
@@ -2202,36 +2186,7 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 							errorMessages.push(`Candidate not created for row ${index + 1}.`)
 							continue;
 						}
-						// else{
-						// 	let city = await City.findOne({_id:cityId}).select("name")
-						// 	let state = await State.findOne({_id:stateId}).select("name")
-						//  if(env.toLowerCase()==='production'){
-						// 	 let dataFormat = {
-						// 		Source: "mipie",
-						// 		FirstName: name,
-						// 		MobileNumber:mobile,
-						// 		LeadSource: "Website",
-						// 		LeadType:"Online",
-						// 		LeadName: "app",
-						// 		Course:"Mipie general",
-						// 		Center:"Padget",
-						// 		Location:"Technician",
-						// 		Country: "India",
-						// 		LeadStatus: "Signed Up",
-						// 		ReasonCode:"27" ,
-						// 		City: city.name,
-						// 		State: state.name
-						// 	  }
-						// 	  let edgeBody = JSON.stringify(dataFormat)
-						// 	  let header = { 'AuthToken': extraEdgeAuthToken, "Content-Type": "multipart/form-data" }
-						// 	  let extraEdge = await axios.post(extraEdgeUrl,edgeBody,header).then(res=>{
-						// 		console.log(res.data)
-						// 	  }).catch(err=>{
-						// 		console.log(err, "Couldn't send data in extraEdge","row number is ===>",recordCount)
-						// 	    errorMessages.push(`Falied to send data in Extra edge for row ${index + 1}.`)
-						// 	  })
-						//  }
-						// }
+						
 					} else {
 						errorMessages.push(`Candidate/User with mobile ${mobile} already exists for row ${index + 1}.`)
 					}
@@ -2242,12 +2197,8 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 					status: "Completed",
 					record: allRows.length
 				};
-				console.log(
-					"--------------------- REcord INSERTED ---------------------------"
-				);
-				console.log(imports);
+				
 				await CandidateImport.create(imports);
-				console.log('========================> allRows ', allRows.length)
 				await fs.promises.unlink("public/" + filename).then(() => {
 					return res.redirect("/college/uploadCandidates");
 				})
@@ -2268,7 +2219,6 @@ router.post('/uploadfiles', [isCollege], async (req, res) => {
 
 router.get("/uploadcandidates", async (req, res) => {
 	const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
-	console.log('======================> 1', ipAddress, req.session.user)
 
 	if (req.session && req.session.user && req.session.user._id) {
 		const perPage = 5;
@@ -2986,7 +2936,6 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 			status = false;
 		}
 
-		console.log(collegeId, 'collegeId');
 
 		const newCenter = new Center({
 			name,
@@ -2998,7 +2947,6 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 		});
 
 		const savedCenter = await newCenter.save();
-		console.log(savedCenter, 'savedCenter');
 
 		res.status(201).json({ success: true, message: 'Center added successfully', data: savedCenter });
 	} catch (error) {
@@ -3126,8 +3074,7 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 	try {
 		let collegeId = req.user.college._id;
 		let projectId = req.query.projectId;
-		console.log('projectId', projectId)
-		console.log('collegeId', collegeId)
+	
 
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
 
@@ -3139,7 +3086,6 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 			if (typeof projectId !== 'string') { projectId = new mongoose.Types.ObjectId(projectId); }
 
 			const projectDetails = await Project.findById(projectId);
-			console.log('projectDetails', projectDetails)
 			if (!projectDetails) {
 				return res.status(404).json({ success: false, message: 'Project not found.' });
 			}
@@ -3285,7 +3231,6 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		if (actionParts.length === 0) {
 			actionParts.push('No changes made to status or followup');
 		}
-		console.log(userId, 'userId')
 		// Add a log entry for the update
 		// Add a log entry for the update with proper validation
 		const newLogEntry = {
@@ -3295,8 +3240,7 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			timestamp: new Date() // Add timestamp if your schema supports it
 		};
 
-		// Validate the log entry before pushing
-		console.log('New log entry:', newLogEntry);
+
 
 		doc.logs.push(newLogEntry);
 
@@ -3312,9 +3256,7 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 	try {
-		console.log('api working')
 		const { selectedProfiles, _leadStatus, _leadSubStatus, remarks } = req.body;
-		console.log(req.body, 'body')
 		if (!selectedProfiles || !_leadStatus || !_leadSubStatus) {
 			let missingFields = [];
 
@@ -3338,7 +3280,6 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 		const updatePromises = selectedProfiles.map(async (id) => {
 			// Find the AppliedCourse document by ID
 			const doc = await AppliedCourses.findById(id);
-			console.log('doc', doc)
 			if (!doc) {
 				throw new Error(`AppliedCourse with ID ${id} not found`);
 			}
@@ -3387,15 +3328,12 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 				timestamp: new Date()
 			};
 
-			// Validate the log entry before pushing
-			console.log('New log entry:', newLogEntry);
 
 			// Add log entry to the document
 			doc.logs.push(newLogEntry);
 
 			// Save the updated document
 			const newDocDetails = await doc.save();
-			console.log('newDocDetails', newDocDetails)
 		});
 
 		// Wait for all updates to complete
@@ -3619,7 +3557,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			center,
 			counselor
 		} = req.query;
-		console.log(req.query, 'req.query')
 
 		// Parse multi-select filter values
 		let projectsArray = [];
@@ -3932,9 +3869,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				const searchTerm = name.trim();
 				const searchRegex = new RegExp(searchTerm, 'i');
 
-				console.log('searchTerm', searchTerm)
-				console.log('searchRegex', searchRegex)
-
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
 					{ '_candidate.name': searchRegex },
@@ -4046,7 +3980,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				}
 			});
 
-			console.log(allDocs, 'allDocs')
 
 			// Count calculations
 			let verifiedCount = 0;
@@ -4335,7 +4268,6 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 			}
 		});
 
-		console.log(finalCounts, 'finalCounts')
 
 		return finalCounts;
 
@@ -4455,7 +4387,7 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 			}
 
 			const key = `Documents for course/${appliedCourse._course._id}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
-			console.log('key', key);
+			
 			const params = {
 				Bucket: bucketName,
 				Key: key,
@@ -4532,7 +4464,7 @@ router.get("/leads/my-followups", async (req, res) => {
 		} else {
 			to = new Date(new Date().setHours(23, 59, 59, 999));
 		}
-		console.log(from, to, 'from, to')
+		
 		const skip = (parseInt(page) - 1) * parseInt(limit);
 
 		// First, get the documents that match our criteria
@@ -4705,7 +4637,6 @@ router.get("/leads/my-followups", async (req, res) => {
 		});
 
 
-		console.log(result, 'result')
 
 		res.status(200).json({
 			success: true,
@@ -4745,7 +4676,6 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 
 		const docId = profile.uploadedDocs.find(doc => doc._id.toString() === validUploadId.toString()).docsId;
 
-		console.log(docId, 'docId');
 
 		//merge docsRequired and uploadedDocs
 
@@ -4812,33 +4742,27 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 			console.log("Course not found or no docs required");
 		};
 
-		console.log(uploadId, 'uploadId');
 
-		console.log(combinedDocs, 'combinedDocs');
 
 
 
 		const isCurrentDoccumentMandatory = !!combinedDocs?.find(doc => doc._id.toString() === docId.toString() && doc.mandatory === true);
 
-		console.log(isCurrentDoccumentMandatory, 'isCurrentDoccumentMandatory');
 
 		const requiredCount = combinedDocs?.filter(doc => doc.mandatory === true).length || 0;
 		let verifiedCount = isCurrentDoccumentMandatory ? 1 : 0;
 
-		console.log(verifiedCount, 'verifiedCount before');
 
 
 
 		// Count already verified docs (excluding the current one)
 		for (const doc of combinedDocs || []) {
 
-			console.log(doc, 'doc');
 			if (doc._id.toString() !== docId.toString() && doc.uploads?.[doc.uploads.length - 1]?.status === 'Verified' && doc.mandatory === true) {
 				verifiedCount++;
 			}
 		}
 
-		console.log(verifiedCount, 'verifiedCount', requiredCount, 'requiredCount');
 
 		// Find and update the current doc
 		for (const doc of profile.uploadedDocs || []) {
@@ -4910,7 +4834,6 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		} = req.query;
 		// Parse multi-select filter values
 
-		console.log(req.query, 'req.query');
 		let projectsArray = [];
 		let verticalsArray = [];
 		let courseArray = [];
@@ -5224,7 +5147,6 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			centerArray,
 			counselorArray
 		});
-		console.log(crmFilterCounts, 'crmFilterCounts');
 		const paginatedResult = results.slice(skip, skip + limit);
 		res.status(200).json({
 			success: true,
@@ -5445,7 +5367,6 @@ router.get("/generate-application-form/:id", async (req, res) => {
 		};
 		const applicationNumber = await generateApplicationNumber()
 
-		console.log('applicationNumber', applicationNumber)
 
 
 		let data = await AppliedCourses.findById(id)
@@ -5483,7 +5404,6 @@ router.get("/generate-application-form/:id", async (req, res) => {
 				}
 			})
 		if (!data._candidate?.personalInfo?.image || data._candidate.personalInfo.image.trim() === '') {
-			console.log('pic required')
 			return res.status(500).json({ status: false, message: "Profile pic required" });
 		}
 
@@ -5554,7 +5474,6 @@ router.get("/generate-application-form/:id", async (req, res) => {
 				console.log("Course not found or no docs required");
 			};
 
-			console.log(combinedDocs, 'combinedDocs')
 		}
 
 		const formatDate = (date) => {
@@ -6456,7 +6375,6 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 
 		let counselors = []
 		college._concernPerson.forEach(person => {
-			console.log(person._id, 'person');
 			let data = {
 				_id: person._id._id,
 				name: person._id.name
@@ -6465,7 +6383,6 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 
 		})
 
-		console.log(counselors, 'counselors');
 
 		res.json({
 			status: true,
@@ -6518,7 +6435,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 
 		// Add status filter
 		if (req.query.status && req.query.status !== 'all') {
-			console.log("req.query.status", req.query.status);
 
 			if (req.query.status === "admission") {
 				query.admissionDone = { $in: [true] };
@@ -6666,7 +6582,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 				batchFreeze: allFilteredAppliedCourses.filter(doc => (doc.isBatchFreeze === true && doc.dropout === false)).length,
 				admission: allFilteredAppliedCourses.filter(doc => (doc.admissionDone === true && doc.isZeroPeriodAssigned === false && doc.isBatchFreeze === false && doc.dropout === false)).length,
 			};
-			console.log("counts", counts);
 
 			return counts;
 		};
@@ -6855,7 +6770,6 @@ router.route('/refer-leads')
 		try {
 			const user = req.user;
 			const college = await College.findOne({ '_concernPerson._id': user._id }).populate('_concernPerson._id').select('_concernPerson');
-			console.log(college._concernPerson, 'college');
 			if (!college) {
 				return res.status(404).json({ status: false, message: 'College not found' });
 			}
@@ -6871,7 +6785,6 @@ router.route('/refer-leads')
 
 			})
 
-			console.log(counselors, 'counsellor');
 			res.status(200).json({
 				success: true,
 				data: counselors
