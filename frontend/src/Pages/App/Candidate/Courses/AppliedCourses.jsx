@@ -176,7 +176,6 @@ const AppliedCourses = () => {
     text-align: center;
     vertical-align: middle;
     user-select: none;
-    background-color: transparent;
     border: 0 solid transparent;
     padding: 0.9rem 2rem;
     font-size: 1rem;

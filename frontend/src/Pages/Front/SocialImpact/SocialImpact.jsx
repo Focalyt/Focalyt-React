@@ -102,7 +102,15 @@ function SocialImpact() {
 
         return () => {
             // Cleanup: Destroy sliders when unmounting
-            $(".slick-initialized").slick("unslick");
+            try {
+                $(".slick-initialized").each(function() {
+                    if ($(this).hasClass('slick-initialized')) {
+                        $(this).slick("unslick");
+                    }
+                });
+            } catch (error) {
+                console.warn('Error destroying slick sliders:', error);
+            }
         };
     }, []);
 

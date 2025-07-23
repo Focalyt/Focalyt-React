@@ -149,13 +149,11 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   };
 
   const fetchProjects = async () => {
-    // Get verticalId from selectedVertical prop or URL (for refresh cases)
-    const verticalId = selectedVertical?.id || new URLSearchParams(window.location.search).get('verticalId');
-    
-    if (!verticalId) {
-      console.warn('No verticalId available from selectedVertical or URL');
+    // Pehle check karo ke selectedVertical properly set hai ya nahi
+    if (!selectedVertical || !selectedVertical.id) {
+      console.warn('selectedVertical or selectedVertical.id not available:', selectedVertical);
       setProjects([]);
-      setError('No vertical context available');
+      setError('No vertical selected');
       return;
     }
 
@@ -166,12 +164,12 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
       return;
     }
 
-    console.log('Fetching projects for verticalId:', verticalId);
+    console.log('Fetching projects for selectedVertical:', selectedVertical);
     setLoading(true);
     setError(null);
 
     try {
-      const url = `${backendUrl}/college/list-projects?vertical=${verticalId}`;
+      const url = `${backendUrl}/college/list-projects?vertical=${selectedVertical.id}`;
       console.log('Fetching from URL:', url);
       
       const response = await fetch(url, {
@@ -234,14 +232,11 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   };
 
   useEffect(() => {
-    if (!token) return;
+    // Component mount hone par immediately fetch mat karo
+    // Pehle check karo ke selectedVertical properly set hai
+    console.log('useEffect triggered with selectedVertical:', selectedVertical);
     
-    // Get verticalId from selectedVertical prop or URL
-    const verticalId = selectedVertical?.id || new URLSearchParams(window.location.search).get('verticalId');
-    
-    console.log('useEffect for fetching projects:', { selectedVertical: !!selectedVertical, verticalId, token: !!token });
-    
-    if (verticalId) {
+    if (selectedVertical && selectedVertical.id && token) {
       // Small delay add karo to ensure component properly mounted hai
       const timeoutId = setTimeout(() => {
         fetchProjects();
@@ -249,7 +244,11 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
       
       return () => clearTimeout(timeoutId);
     } else {
-      console.log('No verticalId available, not fetching projects');
+      console.log('Not fetching projects:', { 
+        hasSelectedVertical: !!selectedVertical, 
+        hasId: !!selectedVertical?.id, 
+        hasToken: !!token 
+      });
       setProjects([]);
       setLoading(false);
     }
@@ -342,39 +341,31 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
   };
 
   useEffect(() => {
-    // URL-based restoration logic - only run when projects are loaded
+    // URL-based restoration logic
     const { stage, projectId } = getProjectState();
   
-    console.log('Project component - URL restoration:', { stage, projectId, projectsLoaded: projects.length > 0 });
+    console.log('Project component - Restoring state from URL:', { stage, projectId });
   
-    // Don't make any decisions until projects are loaded
-    if (projects.length === 0) {
-      console.log('Projects not loaded yet, skipping URL restoration');
-      return;
-    }
-  
-    if ((stage === "center" || stage === "course" || stage === "batch") && projectId) {
+    if (stage === "center" && projectId && projects.length > 0) {
       // We have projectId in URL and projects are loaded, find the project
       const foundProject = projects.find(p => (p._id || p.id) === projectId);
       if (foundProject) {
         setSelectedProjectForCenters(foundProject);
         setShowCenters(true);
-        console.log('Found project from URL and restored to center/course/batch view:', foundProject.name);
+        console.log('Found project from URL and restored to center view:', foundProject.name);
       } else {
         // Project not found, reset to project view
         console.warn('Project not found, resetting to project view');
         updateProjectURL('project');
         setShowCenters(false);
       }
-    } else if (stage === 'project') {
-      // User is on project page - keep them there
-      setShowCenters(false);
-      console.log('Staying on project view (no URL change needed)');
     } else {
-      // Any other stage - default to project view
+      // Default to project view
       setShowCenters(false);
-      updateProjectURL('project');
-      console.log('Redirecting to project view from unknown stage:', stage);
+      if (stage !== 'project') {
+        updateProjectURL('project');
+      }
+      console.log('Restored to project view');
     }
   }, [projects]); // Added projects as dependency
 

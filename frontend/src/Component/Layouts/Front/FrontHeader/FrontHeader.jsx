@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import "./FrontHeader.css";
 
 const FrontHeader = () => {
@@ -159,31 +160,31 @@ const FrontHeader = () => {
                   
                   <ul className="site-menu-main" ref={menuMainRef} onClick={handleMenuClick}>
                     <li className="nav-item">
-                      <a className='nav-link-item drop-trigger' href="/" style={navLinkStyles}>Home</a>
+                      <Link className='nav-link-item drop-trigger' to="/" style={navLinkStyles}>Home</Link>
                     </li>
                     <li className="nav-item nav-item-has-children">
-                      <a href="/about" className="nav-link-item drop-trigger" style={navLinkStyles}>About Us</a>
+                      <Link to="/about" className="nav-link-item drop-trigger" style={navLinkStyles}>About Us</Link>
                     </li>
                     <li className="nav-item">
-                      <a className='nav-link-item drop-trigger' href="/socialimpact" style={navLinkStyles}>Social Impact</a>
+                      <Link className='nav-link-item drop-trigger' to="/socialimpact" style={navLinkStyles}>Social Impact</Link>
                     </li>
                     <li className="nav-item">
-                      <a className='nav-link-item drop-trigger' href="/joblisting" style={navLinkStyles}>Jobs</a>
+                      <Link className='nav-link-item drop-trigger' to="/joblisting" style={navLinkStyles}>Jobs</Link>
                     </li>
                     <li className="nav-item">
-                      <a className='nav-link-item drop-trigger' href='/courses' style={navLinkStyles}>Courses</a>
+                      <Link className='nav-link-item drop-trigger' to='/courses' style={navLinkStyles}>Courses</Link>
                     </li>
                     <li className="nav-item">
-                      <a className='nav-link-item drop-trigger' href='/labs' style={navLinkStyles}>Labs</a>
+                      <Link className='nav-link-item drop-trigger' to='/labs' style={navLinkStyles}>Labs</Link>
                     </li>
                     <li className="nav-item">
-                      <a className='nav-link-item drop-trigger' href='/events' style={navLinkStyles}>Events</a>
+                      <Link className='nav-link-item drop-trigger' to='/events' style={navLinkStyles}>Events</Link>
                     </li>
                     <li className="nav-item d-xl-none d-lg-none d-md-none d-sm-block d-block">
-                      <a className='nav-link-item drop-trigger' href='/contact' style={navLinkStyles}>Contact Us</a>
+                      <Link className='nav-link-item drop-trigger' to='/contact' style={navLinkStyles}>Contact Us</Link>
                     </li>
                     <li className="nav-item d-xl-flex d-lg-flex d-md-flex d-sm-none d-none">
-                      <a className='nav-link-item drop-trigger' href='/contact' style={navLinkStyles}>Contact Us</a>
+                      <Link className='nav-link-item drop-trigger' to='/contact' style={navLinkStyles}>Contact Us</Link>
                     </li>
                     
                     {/* Fixed Login Dropdown */}
@@ -203,14 +204,14 @@ const FrontHeader = () => {
 
                         <ul className="dropdown-menu" id="loginDropdown">
                           <li>
-                            <a href={`${backendUrl}/company/login`} className="dropdown-item">
+                            <Link to={`${backendUrl}/company/login`} className="dropdown-item">
                               Login as Corporate
-                            </a>
+                            </Link>
                           </li>
                           <li>
-                            <a href="/candidate/login" className="dropdown-item">
+                            <Link to="/candidate/login" className="dropdown-item">
                               Login as Student
-                            </a>
+                            </Link>
                           </li>
                         </ul>
                       </div>

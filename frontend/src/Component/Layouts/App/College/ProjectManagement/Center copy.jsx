@@ -245,18 +245,27 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
         }
     }, [centers, selectedProject, selectedVertical]); // Depend on centers, selectedProject, and selectedVertical
 
-    // Removed duplicate useEffect that was conflicting with URL restoration
+    
+    useEffect(() => {
+        const urlParams = getURLParams();
+        if (urlParams.stage === 'course' && urlParams.centerId) {
+            // If the URL shows 'course' stage and a centerId, go to courses
+            const center = centers.find(c => c._id === urlParams.centerId);
+            if (center) {
+                setSelectedCenterForCourses(center);
+                setShowCourses(true);
+            }
+        } else {
+            // Default to 'center' stage
+            setShowCourses(false);
+        }
+    }, [centers]);
 
     useEffect(() => {
-        // Get projectId from selectedProject prop or URL
-        const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
-        
-        if (projectId && token) {
-            fetchCenters();
-        } else {
-            console.log('No projectId or token available, not fetching centers');
-        }
-    }, [selectedProject?._id, token]);
+
+        fetchCenters();
+
+    }, []);
 
     useEffect(() => {
 
@@ -266,20 +275,10 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
     }, [alignCenter]);
 
     const fetchCenters = async () => {
-        // Get projectId from selectedProject prop or URL (for refresh cases)
-        const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
-        
-        if (!projectId) {
-            console.warn('No projectId available from selectedProject or URL');
-            setCenters([]);
-            setError('No project context available');
-            return;
-        }
-
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch(`${backendUrl}/college/list-centers?projectId=${projectId}`, {
+            const response = await fetch(`${backendUrl}/college/list-centers?projectId=${selectedProject._id}`, {
                 headers: {
                     'x-auth': token,
                 },

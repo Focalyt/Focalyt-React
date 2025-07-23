@@ -1732,7 +1732,7 @@ const KYCManagement = () => {
             height: 'auto' // Auto height
           }}>
             <iframe
-              src={fileUrl}
+              src={fileUrl + '#navpanes=0&toolbar=0'}
               className={`document-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
                 width: '100%',
