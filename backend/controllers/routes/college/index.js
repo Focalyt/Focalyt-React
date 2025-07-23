@@ -5938,6 +5938,8 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			counselor
 		} = req.query;
 
+		console.log(req.query, 'req.query');
+
 		// Parse multi-select filter values
 		let projectsArray = [];
 		let verticalsArray = [];
