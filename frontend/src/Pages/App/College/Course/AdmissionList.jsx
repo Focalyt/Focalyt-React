@@ -1742,7 +1742,8 @@ const AdmissionList = () => {
         return (
           <div style={{ position: 'relative', overflow: 'hidden' }}>
             <iframe
-              src={fileUrl}
+              // src={fileUrl}
+              src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
               className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
                 width: isSmall ? '100%' : '150px',
@@ -1792,7 +1793,8 @@ const AdmissionList = () => {
         return (
           <div style={{ position: 'relative' }}>
             <iframe
-              src={fileUrl}
+              // src={fileUrl}
+              src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
               className={`document-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
                 width: isSmall ? '100%' : '150px',
@@ -1886,7 +1888,8 @@ const AdmissionList = () => {
                             return (
                               <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
                                 <iframe
-                                  src={fileUrl}
+                                  // src={fileUrl}
+                                  src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                                   width="100%"
                                   height="100%"
                                   style={{

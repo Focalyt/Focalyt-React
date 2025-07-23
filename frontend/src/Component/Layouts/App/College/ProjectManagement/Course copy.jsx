@@ -51,16 +51,8 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
   }, [selectedCenter]);
 
   useEffect(() => {
-    // Get IDs from props or URL
-    const centerId = selectedCenter?._id || new URLSearchParams(window.location.search).get('centerId');
-    const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
-    
-    if (centerId && projectId && token) {
-      fetchCourses();
-    } else {
-      console.log('Missing centerId, projectId, or token for fetching courses');
-    }
-  }, [selectedCenter?._id, selectedProject?._id, token]);
+    fetchCourses()
+  }, []);
 
   useEffect(() => {
     const urlParams = getURLParams();
@@ -84,24 +76,16 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
   const fetchCourses = async (params) => {
     try {
-      // Get IDs from props or URL (for refresh cases)
-      const centerId = selectedCenter?._id || new URLSearchParams(window.location.search).get('centerId');
-      const projectId = selectedProject?._id || new URLSearchParams(window.location.search).get('projectId');
-      
-      if (!centerId || !projectId) {
-        console.warn('Missing centerId or projectId for fetching courses');
-        setCourses([]);
-        return;
-      }
 
       const headers = {
         'x-auth': token,
       };
 
+
       const response = await axios.get(`${backendUrl}/college/all_courses_centerwise`, {
         params: {
-          centerId: centerId,
-          projectId: projectId
+          centerId: selectedCenter._id,
+          projectId: selectedProject._id
         },
         headers: headers // make sure headers are passed correctly
       });
@@ -396,17 +380,17 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
           <div className="d-flex align-items-center gap-3">
 
             <div className='d-flex align-items-center'>
-              <h5 style={{ cursor: 'pointer' , fontSize: '0.9rem'}} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToVerticals} className="me-2">{selectedVertical.name} Vertical</h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' , fontSize: '0.9rem'}} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToProjects} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedProject.name} Project
               </h5>
               <span className="mx-2"> &gt; </span>
-              <h5 style={{ cursor: 'pointer' , fontSize: '0.9rem'}} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
+              <h5 style={{ cursor: 'pointer' }} onClick={onBackToCenters} className="breadcrumb-item mb-0" aria-current="page">
                 {selectedCenter.name} Centers
               </h5>
               <span className="mx-2"> &gt; </span>
-              <h5 className="breadcrumb-item mb-0" aria-current="page" style={{ fontSize: '0.9rem' }}>
+              <h5 className="breadcrumb-item mb-0" aria-current="page">
                 All Courses
               </h5>
             </div>
@@ -675,7 +659,7 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
         overflow-y :scroll !important;
         } 
         h5{
-        fomt-size:0.9rem;
+        font-size: 0.9rem;
         }
         `}
       </style>

@@ -447,10 +447,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   }, [batches, selectedCourse, selectedCenter, selectedProject, selectedVertical]);
 
-  const handleBatchAssign = async (e) => {
-    e?.preventDefault(); // Prevent form submission
-    e?.stopPropagation(); // Stop event bubbling
-    
+  const handleBatchAssign = async () => {
     console.log(selectedBatch, 'selectedBatch');
     console.log(selectedProfile, 'selectedProfile');
     try {
@@ -637,9 +634,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                 CLOSE
               </button>
               <button
-                type="button"
+                type="submit"
                 className="btn text-white"
-                onClick={(e) => handleBatchAssign(e)}
+                onClick={handleBatchAssign}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 

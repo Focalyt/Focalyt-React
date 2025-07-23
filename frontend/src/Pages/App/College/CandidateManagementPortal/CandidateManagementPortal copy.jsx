@@ -194,18 +194,12 @@ const CandidateManagementPortal = () => {
   };
 
   useEffect(() => {
-    // URL-based restoration logic - only run when verticals are loaded
+    // URL-based restoration logic only
     const { stage, verticalId } = getInitialState();
   
-    console.log('Restoring state from URL:', { stage, verticalId, verticalsLoaded: verticals.length > 0 });
+    console.log('Restoring state from URL:', { stage, verticalId });
   
-    // Don't make any decisions until verticals are loaded
-    if (verticals.length === 0) {
-      console.log('Verticals not loaded yet, skipping URL restoration');
-      return;
-    }
-  
-    if (stage === "project" && verticalId) {
+    if (stage === "project" && verticalId && verticals.length > 0) {
       // We have verticalId in URL and verticals are loaded, find the vertical
       const foundVertical = verticals.find(v => v.id === verticalId);
       if (foundVertical) {
@@ -220,47 +214,14 @@ const CandidateManagementPortal = () => {
         setShowVertical(true);
         setShowProjects(false);
       }
-    } else if (stage === "center" && verticalId) {
-      // Center view is rendered inside Project component, so set up project view
-      const foundVertical = verticals.find(v => v.id === verticalId);
-      if (foundVertical) {
-        setSelectedVerticalForProjects(foundVertical);
-        setShowProjects(true);
-        setShowVertical(false);
-        console.log('Found vertical from URL and restored to center view (via project):', foundVertical.name);
-      } else {
-        // Vertical not found, reset to vertical view
-        console.warn('Vertical not found for center view, resetting to vertical view');
-        updateURL('vertical');
-        setShowVertical(true);
-        setShowProjects(false);
-      }
-    } else if ((stage === "course" || stage === "batch") && verticalId) {
-      // Course/Batch view is rendered inside Project->Center->Course, so set up project view
-      const foundVertical = verticals.find(v => v.id === verticalId);
-      if (foundVertical) {
-        setSelectedVerticalForProjects(foundVertical);
-        setShowProjects(true);
-        setShowVertical(false);
-        console.log('Found vertical from URL and restored to course/batch view (via project):', foundVertical.name);
-      } else {
-        // Vertical not found, reset to vertical view
-        console.warn('Vertical not found for course/batch view, resetting to vertical view');
-        updateURL('vertical');
-        setShowVertical(true);
-        setShowProjects(false);
-      }
-    } else if (stage === 'vertical') {
-      // User is on verticals page - keep them there
-      setShowVertical(true);
-      setShowProjects(false);
-      console.log('Staying on vertical view (no URL change needed)');
     } else {
-      // Any other stage - default to vertical view
+      // Default to vertical view
       setShowVertical(true);
       setShowProjects(false);
-      updateURL('vertical');
-      console.log('Redirecting to vertical view from unknown stage:', stage);
+      if (stage !== 'vertical') {
+        updateURL('vertical');
+      }
+      console.log('Restored to vertical view');
     }
   }, [verticals]); // Added verticals as dependency
 

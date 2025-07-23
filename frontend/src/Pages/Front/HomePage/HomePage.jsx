@@ -64,8 +64,12 @@ const HomePage = () => {
 
     // Cleanup function to prevent memory leaks
     return () => {
-      if ($(".how_sliderdual").slick) {
-        $(".how_sliderdual").slick('unslick');
+      try {
+        if ($(".how_sliderdual").hasClass('slick-initialized')) {
+          $(".how_sliderdual").slick('unslick');
+        }
+      } catch (error) {
+        console.warn('Error destroying slick slider:', error);
       }
     };
   }, []);

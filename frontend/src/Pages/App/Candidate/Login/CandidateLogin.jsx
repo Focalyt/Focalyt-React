@@ -270,7 +270,7 @@ const CandidateLogin = () => {
                                 fullAddress: address,
                                 latitude: String(latitude),
                                 longitude: String(longitude),
-                                pincode: pincode
+                               
                             },
                             permanentAddress: {
                                 type: "Point",
@@ -280,7 +280,6 @@ const CandidateLogin = () => {
                                 longitude: String(permanentLng),
                                 city: permanentCity,
                                 state: permanentState,
-                                pincode: permanentPincode
                             }
                         }
                     };
