@@ -190,7 +190,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   // Sub-tab states
   const [batchSubTab, setBatchSubTab] = useState('Active Batches'); // For Batches main tab
   const [admissionSubTab, setAdmissionSubTab] = useState('Batch Assigned'); // For All Admissions main tab
-
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   // CRM Dashboard exact same states for admissions
   const [allAdmissions, setAllAdmissions] = useState([]);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -380,13 +380,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     'Documents'
   ];
 
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
+ 
 
-  useEffect(() => {
-    fetchProfileData();
-  }, [currentPage]);
+
 
   useEffect(() => {
     fetchSubStatus()
@@ -447,60 +443,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   }, [batches, selectedCourse, selectedCenter, selectedProject, selectedVertical]);
 
-  const handleBatchAssign = async () => {
-    console.log(selectedBatch, 'selectedBatch');
-    console.log(selectedProfile, 'selectedProfile');
-    try {
-      const response = await axios.post(`${backendUrl}/college/candidate/assign-batch`, {
-        batchId: selectedBatch,
-        appliedCourseId: selectedProfile._id
-      }, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-
-      if (response.data.status) {
-        const message = alert('Batch assigned successfully!');
-        if (message) {
-
-
-        }
-      } else {
-        alert(response.data.message || 'Failed to assign batch');
-      }
-    } catch (error) {
-      console.error('Error assigning batch:', error);
-      alert('Failed to assign batch');
-    }
-    await fetchProfileData();
-    closePanel();
-  }
-
-  const fetchProfileData = async () => {
-    try {
-      if (!token) {
-        console.warn('No token found in session storage.');
-        return;
-      }
-      // Replace with your actual profile API endpoint
-      const response = await axios.get(`${backendUrl}/college/appliedCandidates?page=${currentPage}`, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-      if (response.data.success && response.data.data) {
-        const data = response.data.data; // create array 
-        setAllProfiles(response.data.data);
-        setAllProfilesData(response.data.data)
-        setTotalPages(response.data.totalPages);
-      } else {
-        console.error('Failed to fetch profile data', response.data.message);
-      }
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-    }
-  };
+ 
+ 
 
   const fetchSubStatus = async () => {
     try {
@@ -537,37 +481,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     setSelectedBatch(e.target.value);
   }
 
-  const handleReferLead = async () => {
-    console.log(selectedConcernPerson, 'selectedConcernPerson');
-    try {
-      const response = await axios.post(`${backendUrl}/college/refer-leads`, {
-        counselorId: selectedConcernPerson,
-        appliedCourseId: selectedProfile._id
-      }, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-
-      if (response.data.status) {
-        const message = alert('Lead referred successfully!');
-        if (message) {
-
-
-        }
-      } else {
-        alert(response.data.message || 'Failed to refer lead');
-      }
-      await fetchProfileData();
-      closePanel();
-
-
-
-    } catch (error) {
-      console.error('Error referring lead:', error);
-      alert('Failed to refer lead');
-    }
-  }
 
   const renderBatchAssignPanel = () => {
     const panelContent = (
@@ -633,15 +546,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
               >
                 CLOSE
               </button>
-              <button
-                type="submit"
-                className="btn text-white"
-                onClick={handleBatchAssign}
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
-              >
-
-                BatchAssign
-              </button>
+            
             </div>
           </form>
         </div>
@@ -837,11 +742,11 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     // 'All Batches' shows everything
 
     // Search filter
-    return batch.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      batch.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      batch.course.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      batch.instructor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      batch.centerName.toLowerCase().includes(searchQuery.toLowerCase());
+    return batch.name.toLowerCase() ||
+      batch.code.toLowerCase() ||
+      batch.course.toLowerCase() ||
+      batch.instructor.toLowerCase()||
+      batch.centerName.toLowerCase();
   });
 
   // Filter admissions based on current sub-tab and search
@@ -857,25 +762,18 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     // 'All List' shows everything
 
     // Search filter
-    if (searchQuery.trim()) {
-      filtered = filtered.filter(admission =>
-        admission._candidate?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        admission._candidate?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        admission._candidate?.mobile.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        admission._course?.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+   
 
     setFilteredAdmissions(filtered);
   }, [allAdmissions, admissionSubTab, searchQuery]);
 
   // Fetch admissions data
-  const fetchAdmissionsData = async () => {
+  const fetchAdmissionsData = async (customSearchQuery = null) => {
+    const searchParam = customSearchQuery !== null ? customSearchQuery : searchQuery;
     if (mainTab !== 'All Admissions') return;
-
-    setLoadingAdmissions(true);
+    setIsLoadingProfiles(true);
     try {
-      const response = await axios.get(`${backendUrl}/college/admission-list/${selectedCourse?._id}/${selectedCenter?._id}`, {
+      const response = await axios.get(`${backendUrl}/college/admission-list/${selectedCourse?._id}/${selectedCenter?._id}?name=${searchParam}`, {
 
         headers: {
           'x-auth': token
@@ -891,7 +789,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       console.error('Error fetching admissions:', err);
       setError('Server error while fetching admissions');
     } finally {
-      setLoadingAdmissions(false);
+      setIsLoadingProfiles(false);
     }
   };
 
@@ -1274,38 +1172,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   };
 
-  const handleMoveToKyc = async (profile) => {
-    console.log('Function called');
-    try {
 
-      console.log('Function in try');
-      // Prepare the request body
-      const updatedData = {
-        kycStage: true
-      };
-
-      // Send PUT request to backend API
-      const response = await axios.put(`${backendUrl}/college/update/${profile._id}`, updatedData, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('API response:', response.data);
-
-      if (response.data.success) {
-        alert('Lead moved to KYC Section successfully!');
-        // Optionally refresh data here
-        fetchProfileData()
-      } else {
-        alert('Failed to update status');
-      }
-    } catch (error) {
-      console.error('Error updating status:', error);
-      // alert('An error occurred while updating status');
-    }
-  };
 
   const DocumentControls = React.memo(({
     onZoomIn,
@@ -1494,55 +1361,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   };
 
-  //  Simulate file upload with progress
-  const handleFileUpload = async () => {
-    if (!selectedFile || !selectedDocumentForUpload) return;
-
-    console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      // Simulate upload progress
-      for (let i = 0; i <= 100; i += 10) {
-        setUploadProgress(i);
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('doc', selectedDocumentForUpload.docsId);
-
-      const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'multipart/form-data',
-        }
-      });
-
-      console.log('response', response)
-
-      if (response.data.status) {
-        alert('Document uploaded successfully! Status: Pending Review');
-
-        // Optionally refresh data here
-        closeUploadModal();
-        fetchProfileData()
-      } else {
-        alert('Failed to upload file');
-      }
-
-
-
-
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   // Document functions
 
@@ -1558,567 +1376,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   };
 
 
-  const DocumentModal = () => {
-    const [showRejectionForm, setShowRejectionForm] = useState(false);
-    const [rejectionReason, setRejectionReason] = useState('');
-    const [documentZoom, setDocumentZoom] = useState(1);
-    const [documentRotation, setDocumentRotation] = useState(0);
-
-    const latestUpload = useMemo(() => {
-      if (!selectedDocument) return null;
-      return selectedDocument.uploads && selectedDocument.uploads.length > 0
-        ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-        : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
-    }, [selectedDocument]);
-
-    const handleZoomIn = useCallback(() => {
-      setDocumentZoom(prev => Math.min(prev + 0.1, 2));
-    }, []);
-
-    const handleZoomOut = useCallback(() => {
-      setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
-    }, []);
-
-    const handleRotate = useCallback(() => {
-      setDocumentRotation(prev => (prev + 90) % 360);
-    }, []);
-
-    const handleReset = useCallback(() => {
-      setDocumentZoom(1);
-      setDocumentRotation(0);
-    }, []);
-
-    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-    const fileType = fileUrl ? getFileType(fileUrl) : null;
-
-    const handleRejectClick = useCallback(() => {
-      setShowRejectionForm(true);
-    }, []);
-
-    const handleCancelRejection = useCallback(() => {
-      setShowRejectionForm(false);
-      setRejectionReason('');
-    }, []);
-
-    const handleConfirmRejection = useCallback(() => {
-      if (rejectionReason.trim()) {
-        updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
-        handleCancelRejection();
-      }
-    }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
-
-    if (!showDocumentModal || !selectedDocument) return null;
-
-    // Helper function to render document preview thumbnail using iframe/img
-    const renderDocumentThumbnail = (upload, isSmall = true) => {
-      const fileUrl = upload?.fileUrl;
-      if (!fileUrl) {
-        return (
-          <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#f8f9fa',
-            border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            width: isSmall ? '100%' : '150px',
-            height: isSmall ? '100%' : '100px',
-            fontSize: isSmall ? '16px' : '24px',
-            color: '#6c757d'
-          }}>
-            📄
-          </div>
-        );
-      }
-
-      const fileType = getFileType(fileUrl);
-
-      if (fileType === 'image') {
-        return (
-          <img
-            src={fileUrl}
-            alt="Document Preview"
-            className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-            style={{
-              width: isSmall ? '100%' : '150px',
-              height: isSmall ? '100%' : '100px',
-              objectFit: 'cover',
-              borderRadius: '4px',
-              border: '1px solid #dee2e6',
-              cursor: 'pointer'
-            }}
-            onClick={() => {
-              if (isSmall) {
-                // Set this upload as the current preview
-                setCurrentPreviewUpload(upload);
-              }
-            }}
-          />
-        );
-      } else if (fileType === 'pdf') {
-        return (
-          <div style={{ position: 'relative', overflow: 'hidden', height: '100%' }}>
-            <iframe
-              src={fileUrl}
-              className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
-              style={{
-                width: isSmall ? '100%' : '150px',
-                height: isSmall ? '360px' : '360px',
-                border: '1px solid #dee2e6',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                pointerEvents: 'none',
-                transformOrigin: 'top left',
-                overflow: 'hidden'
-              }}
-              title="PDF Thumbnail"
-              onClick={() => {
-                if (isSmall) {
-                  setCurrentPreviewUpload(upload);
-                }
-              }}
-            />
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(220, 53, 69, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#dc3545',
-              fontSize: isSmall ? '10px' : '12px',
-              fontWeight: 'bold',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-              onClick={() => {
-                if (isSmall) {
-                  setCurrentPreviewUpload(upload);
-                }
-              }}>
-              PDF
-            </div>
-          </div>
-        );
-      } else {
-        // For other document types, try to use iframe as well
-        return (
-          <div style={{ position: 'relative' }}>
-            <iframe
-              src={fileUrl}
-              className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-              style={{
-                width: isSmall ? '100%' : '150px',
-                height: isSmall ? '100%' : '100px',
-                border: '1px solid #dee2e6',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                pointerEvents: 'none',
-                backgroundColor: '#f8f9fa'
-              }}
-              title="Document Thumbnail"
-              onClick={() => {
-                if (isSmall) {
-                  setCurrentPreviewUpload(upload);
-                }
-              }}
-            />
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 123, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#007bff',
-              fontSize: isSmall ? '16px' : '24px',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-              onClick={() => {
-                if (isSmall) {
-                  setCurrentPreviewUpload(upload);
-                }
-              }}>
-              {fileType === 'document' ? '📄' :
-                fileType === 'spreadsheet' ? '📊' : '📁'}
-            </div>
-          </div>
-        );
-      }
-    };
-
-
-    return (
-      <div className="document-modal-overlay" onClick={closeDocumentModal}>
-        <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h3>{selectedDocument.Name} Verification</h3>
-            <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
-          </div>
-
-          <div className="modal-body">
-            <div className="document-preview-section">
-              <div className="document-preview-container">
-                {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
-                  (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
-                  <>
-                    {(() => {
-                      console.log('selectedDocument:', selectedDocument);
-                      console.log('latestUpload:', latestUpload);
-
-                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-                      const hasDocument = fileUrl ||
-                        (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
-
-                      console.log('fileUrl:', fileUrl);
-                      console.log('hasDocument:', hasDocument);
-
-                      if (hasDocument) {
-                        // If we have a file URL, show the appropriate viewer
-                        if (fileUrl) {
-                          const fileType = getFileType(fileUrl);
-
-                          if (fileType === 'image') {
-                            return (
-                              <img
-                                src={fileUrl}
-                                alt="Document Preview"
-                                style={{
-                                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                                  transition: 'transform 0.3s ease',
-                                  maxWidth: '100%',
-                                  objectFit: 'contain'
-                                }}
-                              />
-                            );
-                          } else if (fileType === 'pdf') {
-                            return (
-                              <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
-                                <iframe
-                                  src={fileUrl + '#navpanes=0&toolbar=0'}
-                                  width="100%"
-                                  height="100%"
-                                  style={{
-                                    border: 'none',
-                                    position: 'absolute',
-                                    top: '50%',
-                                    left: '50%',
-                                    transform: `translate(-50%, -50%) scale(${documentZoom})`,
-                                    transformOrigin: 'center center',
-                                    transition: 'transform 0.3s ease',
-                                    willChange: 'transform'
-                                  }}
-                                  title="PDF Document"
-                                />
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                                <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                                  {fileType === 'document' ? '📄' :
-                                    fileType === 'spreadsheet' ? '📊' : '📁'}
-                                </div>
-                                <h4>Document Preview</h4>
-                                <p>Click download to view this file</p>
-                                {fileUrl ? (
-                                  <a
-                                    href={fileUrl}
-                                    download
-                                    className="btn btn-primary"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <i className="fas fa-download me-2"></i>
-                                    Download & View
-                                  </a>
-                                ) : (
-                                  <button
-                                    className="btn btn-secondary"
-                                    disabled
-                                    title="File URL not available"
-                                  >
-                                    <i className="fas fa-download me-2"></i>
-                                    File Not Available
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          }
-                        } else {
-                          // Document exists but no file URL - show document uploaded message
-                          return (
-                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
-                              <h4>Document Uploaded</h4>
-                              <p>Document is available for verification</p>
-                              <p><strong>Status:</strong> {selectedDocument?.status}</p>
-                            </div>
-                          );
-                        }
-                      } else {
-                        return (
-                          <div className="no-document">
-                            <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                            <p>No document uploaded</p>
-                          </div>
-                        );
-                      }
-                    })()}
-                    <DocumentControls
-                      onZoomIn={handleZoomIn}
-                      onZoomOut={handleZoomOut}
-                      onRotate={handleRotate}
-                      onReset={handleReset}
-                      onDownload={fileUrl}
-                      zoomLevel={documentZoom}
-                      fileType={fileType}
-                    />
-                  </>
-                ) : (
-                  <div className="no-document">
-                    <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                    <p>No document uploaded</p>
-                  </div>
-                )}
-              </div>
-
-              {/* document preview container  */}
-
-              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-                <div className="info-card mt-4">
-                  <h4>Document History</h4>
-                  <div className="document-history">
-                    {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
-                      <div key={index} className="history-item" style={{
-                        display: 'block',
-                        padding: '12px',
-                        marginBottom: '8px',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        height: '100%'
-                      }}>
-                        {/* Document Preview Thumbnail using iframe/img */}
-                        <div className="history-preview" style={{ marginRight: '0px', height: '100%' }}>
-                          {renderDocumentThumbnail(upload, true)}
-                        </div>
-
-                        {/* Document Info */}
-                        <div className="history-info" style={{ flex: 1 }}>
-                          <div className="history-date" style={{
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            color: '#495057',
-                            marginBottom: '4px'
-                          }}>
-                            {formatDate(upload.uploadedAt)}
-                          </div>
-                          <div className="history-status">
-                            <span className={`${getStatusBadgeClass(upload.status)}`} style={{
-                              fontSize: '12px',
-                              padding: '4px 8px'
-                            }}>
-                              {upload.status}
-                            </span>
-                          </div>
-                          {upload.fileUrl && (
-                            <div className="history-actions" style={{ marginTop: '8px' }}>
-                              <a
-                                href={upload.fileUrl}
-                                download
-                                className="btn btn-sm btn-outline-primary"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '2px 8px',
-                                  textDecoration: 'none'
-                                }}
-                              >
-                                <i className="fas fa-download me-1"></i>
-                                Download
-                              </a>
-                              <button
-                                className="btn btn-sm btn-outline-secondary ms-2"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '2px 8px'
-                                }}
-                                onClick={() => {
-                                  // Switch main preview to this upload
-                                  setCurrentPreviewUpload(upload);
-                                }}
-                              >
-                                <i className="fas fa-eye me-1"></i>
-                                Preview
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="document-info-section">
-              <div className="info-card">
-                <h4>Document Information</h4>
-                <div className="info-row">
-                  <strong>Document Name:</strong> {selectedDocument.Name}
-                </div>
-                <div className="info-row">
-                  <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
-                    new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric'
-                    }) : 'N/A'}
-                </div>
-                <div className="info-row">
-                  <strong>Status:</strong>
-                  <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
-                    {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
-                  </span>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const UploadModal = () => {
-    if (!showUploadModal || !selectedDocumentForUpload) return null;
-
-    return (
-      <div className="upload-modal-overlay" onClick={closeUploadModal}>
-        <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="upload-modal-header">
-            <h3>
-              <i className="fas fa-cloud-upload-alt me-2"></i>
-              Upload {selectedDocumentForUpload.Name}
-            </h3>
-            <button className="close-btn" onClick={closeUploadModal}>&times;</button>
-          </div>
-
-          <div className="upload-modal-body">
-            <div className="upload-section">
-              {!selectedFile ? (
-                <div className="file-drop-zone">
-                  <div className="drop-zone-content">
-                    <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                    <h4>Choose a file to upload</h4>
-                    <p>Drag and drop a file here, or click to select</p>
-                    <div className="file-types">
-                      <span>Supported: JPG, PNG, GIF, PDF</span>
-                      <span>Max size: 10MB</span>
-                    </div>
-                    <input
-                      type="file"
-                      id="file-input"
-                      accept=".jpg,.jpeg,.png,.gif,.pdf"
-                      onChange={handleFileSelect}
-                      style={{ display: 'none' }}
-                    />
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => document.getElementById('file-input').click()}
-                    >
-                      <i className="fas fa-folder-open me-2"></i>
-                      Choose File
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="file-preview-section">
-                  <div className="selected-file-info">
-                    <h4>Selected File:</h4>
-                    <div className="file-details">
-                      <div className="file-icon">
-                        <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
-                      </div>
-                      <div className="file-info">
-                        <p className="file-name">{selectedFile.name}</p>
-                        <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                      </div>
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        onClick={() => {
-                          setSelectedFile(null);
-                          setUploadPreview(null);
-                        }}
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-
-                  {uploadPreview && (
-                    <div className="upload-preview">
-                      <h5>Preview:</h5>
-                      <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                    </div>
-                  )}
-
-                  {isUploading && (
-                    <div className="upload-progress-section">
-                      <h5>Uploading...</h5>
-                      <div className="progress-bar-container">
-                        <div
-                          className="progress-bar"
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                      <p>{uploadProgress}% Complete</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="upload-modal-footer">
-            <button
-              className="btn btn-secondary"
-              onClick={closeUploadModal}
-              disabled={isUploading}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleFileUpload}
-              disabled={!selectedFile || isUploading}
-            >
-              {isUploading ? (
-                <>
-                  <i className="fas fa-spinner fa-spin me-2"></i>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-upload me-2"></i>
-                  Upload Document
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+ 
   const DeleteModal = () => {
     if (!showDeleteModal || !batchToDelete) return null;
 
@@ -2282,13 +1540,38 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                   ))
                 }
               </ul>
-              <input
-                type="text"
-                className="form-control w-25"
-                placeholder={`Search ${mainTab.toLowerCase()}...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+              <div className="input-group" style={{ maxWidth: '300px' }}>
+                <input
+                  type="text"
+                  className="form-control w-25"
+                  placeholder={`Search`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {/* Clear (X) button */}
+                {searchQuery && !loadingAdmissions && (
+                  <button
+                    className="btn btn-outline-secondary"
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      fetchAdmissionsData(''); // Empty string explicitly pass karo
+                    }}
+                    title="Clear search"
+                  >
+                    <i className="fas fa-times"></i>
+                  </button>
+                )}
+                <button
+                  onClick={() => fetchAdmissionsData()}
+                  className={`btn btn-outline-primary`}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <i className={`fas fa-search me-1`}></i>
+                  Search
+                </button>
+              </div>
+
             </div>
           </div>
 
@@ -2408,6 +1691,19 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                   <div className={`col-12 rounded equal-height-2 coloumn-2`}>
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
+                      {isLoadingProfiles && (
+                          <div className="col-12 text-center py-5">
+                            <div className="d-flex flex-column align-items-center">
+                              <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+                                <span className="visually-hidden">Loading...</span>
+                              </div>
+                              <h5 className="text-muted">Loading profiles...</h5>
+                            </div>
+                          </div>
+                        )}
+
+                        {!isLoadingProfiles && (
+                          <>
 
                         {filteredAdmissions.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
@@ -3689,8 +2985,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                               })()}
                                             </div>
 
-                                            <DocumentModal />
-                                            <UploadModal />
+                                         
                                           </div>
                                         );
                                       })()}
@@ -3702,6 +2997,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                             </div>
                           </div>
                         ))}
+                        </>
+
+                      )}
 
 
                       </div>
