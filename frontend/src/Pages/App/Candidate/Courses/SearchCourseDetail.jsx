@@ -174,6 +174,7 @@ const CourseDetails = () => {
     }
   }, [candidate]);
   const applyCourse = async (courseId) => {
+    
     try {
 
       console.log('selectedCenter', selectedCenter)
@@ -192,6 +193,8 @@ const CourseDetails = () => {
         sourceUrl: window.location.href,
       });
       // Close modal
+
+        
       document.getElementById('apply').classList.remove('show');
       document.getElementsByClassName('modal-backdrop')[0]?.remove();
       document.body.classList.remove('modal-open');
@@ -202,10 +205,9 @@ const CourseDetails = () => {
       if (course.registrationCharges > 0) {
         handlePayment(courseId);
       } else {
+        setShowCongratulationModal(true);
         // Show completion modal
-        document.getElementById('completeRegistration').classList.add('show');
-        document.getElementById('completeRegistration').style.display = 'block';
-        document.body.classList.add('modal-open');
+        
       }
     } catch (error) {
       console.error('Error applying for course:', error);
@@ -376,7 +378,7 @@ const CourseDetails = () => {
       document.getElementsByClassName('modal-backdrop')[0]?.remove();
 
       setShowCongratulationModal(true);
-      window.location.reload();
+      // window.location.reload();
     } catch (err) {
       console.error("Profile update or apply failed:", err);
     }
@@ -1247,7 +1249,6 @@ const CourseDetails = () => {
                   <>
                     {centerRequired && (
                       <button
-
                         className="btn btn-primary"
                         id="back-btn"
                         onClick={() => backBtnClick()}
@@ -1255,10 +1256,9 @@ const CourseDetails = () => {
                         Back
                       </button>)}
                     <button
-                      type="submit"
                       className="btn btn-primary"
                       id="apply-btn"
-                      onClick={() => applyCourse(course._id)}
+                      onClick={(e) => { e.preventDefault(); applyCourse(course._id); }}
                     >
                       Proceed
                     </button>
@@ -1375,6 +1375,7 @@ const CourseDetails = () => {
                   type="button"
                   className="close"
                   onClick={() => {
+
                     document.getElementById('completeRegistration').classList.remove('show');
                     document.getElementById('completeRegistration').style.display = 'none';
                     document.body.classList.remove('modal-open');
