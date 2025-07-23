@@ -845,6 +845,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
       if (response.data.success) {
         setAllAdmissions(response.data.data);
+        console.log(response.data.data, 'response.data.data')
       } else {
         setError('Failed to fetch admissions data');
       }
@@ -1806,6 +1807,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                           <i className="fab fa-whatsapp"></i>
                                         </button>
                                       </div>
+                                      <div style={{ marginLeft: '15px', backgroundColor: `${profile?.batch?.name ? 'green' : 'red'}`,margin: '0px 10px', padding: '0px 10px', borderRadius: '10px', color: 'white' }}>
+                                      <h6>{profile?.batch?.name || 'Batch Assiment Pending'}</h6>
+                                      </div>
                                     </div>
                                   </div>
 
@@ -2069,7 +2073,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                             </div>
                                             <div className="info-group">
                                               <div className="info-label">BATCH NAME</div>
-                                              <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                              <div className="info-value">{profile.batch.name || 'N/A'}</div>
                                             </div>
                                           </div>
 
@@ -2104,7 +2108,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                             </div>
                                             <div className="info-group">
                                               <div className="info-label">BRANCH NAME</div>
-                                              <div className="info-value">PSD Chandauli Center</div>
+                                              <div className="info-value">{profile._center?.name}</div>
                                             </div>
                                             <div className="info-group">
                                               <div className="info-label">LEAD MODIFICATION DATE</div>
@@ -2143,7 +2147,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                    <div className="info-value">{profile.batch.name || 'N/A'}</div>
                                                   </div>
                                                 </div>
 
@@ -2178,7 +2182,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">PSD Chandauli Center</div>
+                                                    <div className="info-value">{profile._center?.name}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION DATE</div>
@@ -2249,14 +2253,14 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                    <div className="info-value">{profile.batch.name || 'N/A'}</div>
                                                   </div>
                                                 </div>
 
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._course?.college || 'N/A'}</div>
+                                                    <div className="info-value">{profile._center?.name}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
@@ -2394,6 +2398,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                     <i className="bi bi-envelope-fill"></i>
                                                     <span>{profile._candidate?.email}</span>
                                                   </div>
+
+                                                  
 
                                                   {profile._candidate?.dob && (
                                                     <div className="resume-contact-item">
