@@ -188,9 +188,14 @@ router
 		try {
 			const { files } = req;
 			let body = req.body;
+			console.log(body, 'body')
 
 			const courseName = body.name || 'unnamed';
 			const bucketName = process.env.AWS_BUCKET_NAME;
+
+			if(body.trainingCenter?.length > 0){
+				body.center = JSON.parse(body.trainingCenter);
+			}
 
 			// Parse JSON fields
 			body.docsRequired = JSON.parse(body.docsRequired || '[]');
@@ -263,13 +268,13 @@ router
 			}
 
 
+
 			// Convert the string ID to an ObjectId
 			body.createdByType = 'college'
 
-
 			// Save course
-			const newCourse = await Courses.create(body);
-			res.json({ status: true, message: "Record added!", data: newCourse });
+			// const newCourse = await Courses.create(body);
+			// res.json({ status: true, message: "Record added!", data: newCourse });
 
 		} catch (err) {
 			console.error("Error in course upload:", err);
@@ -387,7 +392,7 @@ router
 			const courseId = req.params.id;
 			const { files } = req;
 			let body = req.body;
-
+			console.log(body, 'body')
 			if (Array.isArray(body.sectors)) {
 				// If the first element is a string (ObjectId in string format), convert each element in the array to an ObjectId
 				body.sectors = body.sectors.map(id => new mongoose.Types.ObjectId(id));

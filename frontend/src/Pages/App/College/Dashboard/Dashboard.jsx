@@ -1112,6 +1112,477 @@ const LeadAnalyticsDashboard = () => {
     return courseDocs;
   };
 
+  // ====== NEW: Course-Counsellor Status Table ======
+  const getCourseCounsellorStatusMatrix = () => {
+    // Group data by course, then by counsellor
+    const matrix = {};
+    filteredData.forEach(lead => {
+      const course = lead._course?.name || 'Unknown';
+      let counsellor = 'Unknown';
+      if (lead.leadAssignment && lead.leadAssignment.length > 0) {
+        counsellor = lead.leadAssignment[lead.leadAssignment.length - 1].counsellorName;
+      }
+      if (!matrix[course]) matrix[course] = {};
+      if (!matrix[course][counsellor]) {
+        matrix[course][counsellor] = {
+          'Pending for KYC': 0,
+          'KYC Done': 0,
+          'Admission Done': 0,
+          'Batch Assigned': 0,
+          'In Zero Period': 0,
+          'In Batch Freezed': 0,
+          'DropOut': 0
+        };
+      }
+      // Status mapping logic (customize as per your data)
+      if (!lead.kyc && lead.kycStage) matrix[course][counsellor]['Pending for KYC']++;
+      if (lead.kyc) matrix[course][counsellor]['KYC Done']++;
+      // Admission Done: count only if admissionDate exists
+      if (lead.admissionDate) matrix[course][counsellor]['Admission Done']++;
+      if (lead.batchAssigned) matrix[course][counsellor]['Batch Assigned']++;
+      if (lead.inZeroPeriod) matrix[course][counsellor]['In Zero Period']++;
+      if (lead.inBatchFreezed) matrix[course][counsellor]['In Batch Freezed']++;
+      if (lead.dropout) matrix[course][counsellor]['DropOut']++;
+    });
+    return matrix;
+  };
+
+  const [drilldown, setDrilldown] = useState({
+    open: false,
+    loading: false,
+    leads: [],
+    group: null,
+    statusType: '',
+    statusLabel: '',
+  });
+  
+  const fetchDrilldownLeads = async (row, statusType, statusLabel) => {
+    setDrilldown({ open: true, loading: true, leads: [], group: row, statusType, statusLabel });
+    try {
+      const params = new URLSearchParams();
+      if (row.projectId) params.append('projectId', row.projectId);
+      if (row.courseId) params.append('courseId', row.courseId);
+      if (row.centerId) params.append('centerId', row.centerId);
+      if (row.counsellorId) params.append('counsellorId', row.counsellorId);
+      if (counsellorStatusDateFrom) params.append('dateFrom', counsellorStatusDateFrom);
+      if (counsellorStatusDateTo) params.append('dateTo', counsellorStatusDateTo);
+      if (showAllTime) params.append('allTime', 'true');
+      params.append('statusType', statusType);
+      const url = `${backendUrl}/college/counsellor-status-leads?${params.toString()}`;
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const res = await axios.get(url, { headers: { 'x-auth': token } });
+      setDrilldown(prev => ({ ...prev, loading: false, leads: res.data.data || [] }));
+    } catch (err) {
+      setDrilldown(prev => ({ ...prev, loading: false, leads: [] }));
+      alert('Failed to fetch lead details');
+    }
+  };
+
+  const courseCounsellorMatrix = getCourseCounsellorStatusMatrix();
+
+  // ====== NEW: Course-Counsellor Status Table (API Integrated) ======
+  const [counsellorStatusData, setCounsellorStatusData] = useState([]);
+  const [counsellorStatusLoading, setCounsellorStatusLoading] = useState(true);
+  const [counsellorStatusError, setCounsellorStatusError] = useState(null);
+  
+  // Date filter state for counsellor status table
+  const [counsellorStatusDateFrom, setCounsellorStatusDateFrom] = useState('');
+  const [counsellorStatusDateTo, setCounsellorStatusDateTo] = useState('');
+  const [showAllTime, setShowAllTime] = useState(false);
+  const [showCounsellorDatePicker, setShowCounsellorDatePicker] = useState(false);
+
+  // Transform API data into nested structure: Course > Center > Counsellor
+  const groupedStatusData = useMemo(() => {
+    const grouped = {};
+    counsellorStatusData.forEach(row => {
+      if (!row.courseName) row.courseName = 'Unknown';
+      if (!row.centerName) row.centerName = 'Unknown';
+      if (!row.counsellorName) row.counsellorName = 'Unknown';
+      if (!grouped[row.courseName]) grouped[row.courseName] = {};
+      if (!grouped[row.courseName][row.centerName]) grouped[row.courseName][row.centerName] = [];
+      grouped[row.courseName][row.centerName].push(row);
+    });
+    return grouped;
+  }, [counsellorStatusData]);
+
+  // Function to fetch counsellor status data with date filters
+  const fetchCounsellorStatusData = async (dateFrom = '', dateTo = '', showAllTime = false) => {
+    setCounsellorStatusLoading(true);
+    setCounsellorStatusError(null);
+    
+    try {
+      const params = new URLSearchParams();
+      if (showAllTime) {
+        params.append('allTime', 'true');
+      } else if (dateFrom && dateTo) {
+        params.append('dateFrom', dateFrom);
+        params.append('dateTo', dateTo);
+      }
+      
+      const url = `${backendUrl}/college/counsellor-status-table${params.toString() ? '?' + params.toString() : ''}`;
+      
+      const res = await axios.get(url, {
+        headers: {
+          'x-auth': token
+        }
+      });
+      
+      setCounsellorStatusData(res.data.data || []);
+      setCounsellorStatusLoading(false);
+    } catch (err) {
+      setCounsellorStatusError('Failed to load counsellor status table');
+      setCounsellorStatusLoading(false);
+      console.error('Error fetching counsellor status data:', err);
+    }
+  };
+
+  // Function to handle date filter changes
+  const handleCounsellorStatusDateFilter = () => {
+    fetchCounsellorStatusData(counsellorStatusDateFrom, counsellorStatusDateTo, false);
+  };
+
+  // Function to show all time data
+  const showAllTimeData = () => {
+    setCounsellorStatusDateFrom('');
+    setCounsellorStatusDateTo('');
+    setShowAllTime(true);
+    fetchCounsellorStatusData('', '', true);
+  };
+
+  // Function to clear date filters
+  const clearCounsellorStatusDateFilter = () => {
+    setCounsellorStatusDateFrom('');
+    setCounsellorStatusDateTo('');
+    setShowAllTime(false);
+    fetchCounsellorStatusData();
+  };
+
+  // Function to handle date selection from modern date picker
+  const handleCounsellorDateSelect = (startDate, endDate) => {
+    setCounsellorStatusDateFrom(startDate);
+    setCounsellorStatusDateTo(endDate);
+    setShowAllTime(false);
+    fetchCounsellorStatusData(startDate, endDate, false);
+  };
+
+  useEffect(() => {
+    fetchCounsellorStatusData();
+  }, []);
+
+  // Modern Date Picker Component for Counsellor Status Table
+  const ModernDatePicker = ({ isOpen, onClose, onDateSelect }) => {
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [selectedStartDate, setSelectedStartDate] = useState(null);
+    const [selectedEndDate, setSelectedEndDate] = useState(null);
+    const [selectedQuickRange, setSelectedQuickRange] = useState('custom');
+
+    const today = new Date();
+
+    const quickRanges = [
+      { id: 'today', label: 'Today' },
+      { id: 'yesterday', label: 'Yesterday' },
+      { id: 'todayYesterday', label: 'Today and yesterday' },
+      { id: 'last7', label: 'Last 7 days' },
+      { id: 'last14', label: 'Last 14 days' },
+      { id: 'last28', label: 'Last 28 days' },
+      { id: 'last30', label: 'Last 30 days' },
+      { id: 'thisWeek', label: 'This week' },
+      { id: 'thisMonth', label: 'This month' },
+      { id: 'lastMonth', label: 'Last month' },
+      { id: 'maximum', label: 'Maximum' },
+      { id: 'custom', label: 'Custom' }
+    ];
+
+    const getDaysInMonth = (date) => {
+      return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    };
+
+    const getFirstDayOfMonth = (date) => {
+      return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    };
+
+    const formatDate = (date) => {
+      return date.toISOString().split('T')[0];
+    };
+
+    const formatDisplayDate = (date) => {
+      return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
+    const getQuickRangeDates = (rangeId) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let startDate = new Date(today);
+      let endDate = new Date(today);
+
+      switch (rangeId) {
+        case 'today':
+          return { startDate, endDate };
+        case 'yesterday':
+          startDate.setDate(today.getDate() - 1);
+          endDate = new Date(startDate);
+          return { startDate, endDate };
+        case 'todayYesterday':
+          startDate.setDate(today.getDate() - 1);
+          return { startDate, endDate };
+        case 'last7':
+          startDate.setDate(today.getDate() - 6);
+          return { startDate, endDate };
+        case 'last14':
+          startDate.setDate(today.getDate() - 13);
+          return { startDate, endDate };
+        case 'last28':
+          startDate.setDate(today.getDate() - 27);
+          return { startDate, endDate };
+        case 'last30':
+          startDate.setDate(today.getDate() - 29);
+          return { startDate, endDate };
+        case 'thisWeek':
+          startDate.setDate(today.getDate() - today.getDay());
+          return { startDate, endDate };
+        case 'thisMonth':
+          startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          return { startDate, endDate };
+        case 'lastMonth':
+          startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+          return { startDate, endDate };
+        case 'maximum':
+          startDate = new Date('2020-01-01');
+          return { startDate, endDate };
+        default:
+          return { startDate: null, endDate: null };
+      }
+    };
+
+    const handleQuickRangeSelect = (rangeId) => {
+      setSelectedQuickRange(rangeId);
+      if (rangeId !== 'custom') {
+        const { startDate, endDate } = getQuickRangeDates(rangeId);
+        setSelectedStartDate(startDate);
+        setSelectedEndDate(endDate);
+      } else {
+        setSelectedStartDate(null);
+        setSelectedEndDate(null);
+      }
+    };
+
+    const isDateInRange = (date) => {
+      if (!selectedStartDate || !selectedEndDate) return false;
+      const checkDate = new Date(date);
+      return checkDate >= selectedStartDate && checkDate <= selectedEndDate;
+    };
+
+    const isDateSelected = (date) => {
+      const checkDate = new Date(date);
+      return (selectedStartDate && formatDate(checkDate) === formatDate(selectedStartDate)) ||
+             (selectedEndDate && formatDate(checkDate) === formatDate(selectedEndDate));
+    };
+
+    const handleDateClick = (day) => {
+      const clickedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      
+      if (!selectedStartDate || (selectedStartDate && selectedEndDate)) {
+        setSelectedStartDate(clickedDate);
+        setSelectedEndDate(null);
+        setSelectedQuickRange('custom');
+      } else {
+        if (clickedDate >= selectedStartDate) {
+          setSelectedEndDate(clickedDate);
+          setSelectedQuickRange('custom');
+        } else {
+          setSelectedStartDate(clickedDate);
+          setSelectedEndDate(selectedStartDate);
+          setSelectedQuickRange('custom');
+        }
+      }
+    };
+
+    const handleApply = () => {
+      if (selectedStartDate && selectedEndDate) {
+        onDateSelect(formatDate(selectedStartDate), formatDate(selectedEndDate));
+        onClose();
+      }
+    };
+
+    const handleCancel = () => {
+      setSelectedStartDate(null);
+      setSelectedEndDate(null);
+      setSelectedQuickRange('custom');
+      onClose();
+    };
+
+    const renderCalendar = () => {
+      const daysInMonth = getDaysInMonth(currentMonth);
+      const firstDay = getFirstDayOfMonth(currentMonth);
+      const days = [];
+
+      // Add empty cells for days before the first day of the month
+      for (let i = 0; i < firstDay; i++) {
+        days.push(<td key={`empty-${i}`} className="p-1"></td>);
+      }
+
+      // Add days of the month
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        const isToday = formatDate(date) === formatDate(today);
+        const isFuture = date > today;
+        const isInRange = isDateInRange(date);
+        const isSelected = isDateSelected(date);
+        
+        let className = "p-1 text-center";
+        let buttonClassName = "w-100 h-100 border-0 rounded d-flex align-items-center justify-content-center";
+        let buttonStyle = { minHeight: '32px', minWidth: '32px' };
+        
+        if (isFuture) {
+          buttonClassName += " text-muted bg-transparent";
+        } else if (isToday) {
+          buttonClassName += " text-primary fw-bold bg-transparent";
+        } else if (isSelected) {
+          buttonClassName += " bg-primary text-white";
+        } else if (isInRange) {
+          buttonClassName += " bg-primary bg-opacity-25 text-primary";
+        } else {
+          buttonClassName += " bg-transparent hover:bg-light";
+        }
+
+        days.push(
+          <td key={day} className={className}>
+            <button
+              className={buttonClassName}
+              onClick={() => !isFuture && handleDateClick(day)}
+              disabled={isFuture}
+              style={buttonStyle}
+            >
+              {day}
+            </button>
+          </td>
+        );
+      }
+
+      return days;
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+           style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+        <div className="bg-white rounded-lg shadow-lg" style={{ maxWidth: '700px', width: '95%' }}>
+          <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
+            <h5 className="mb-0">Select Date Range</h5>
+            <button className="btn-close" onClick={onClose}></button>
+          </div>
+          
+          <div className="d-flex">
+            {/* Left Panel - Quick Select Options */}
+            <div className="border-end p-3" style={{ width: '180px', backgroundColor: '#f8f9fa' }}>
+              <h6 className="mb-3 small fw-bold">Quick Select</h6>
+              <div className="d-flex flex-column gap-1">
+                {quickRanges.map((range) => (
+                  <div key={range.id} className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="quickRange"
+                      id={range.id}
+                      checked={selectedQuickRange === range.id}
+                      onChange={() => handleQuickRangeSelect(range.id)}
+                    />
+                    <label className="form-check-label small" htmlFor={range.id}>
+                      {range.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right Panel - Calendar */}
+            <div className="flex-grow-1 p-3">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                >
+                  ←
+                </button>
+                <h6 className="mb-0">
+                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </h6>
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                  disabled={currentMonth.getMonth() === today.getMonth() && currentMonth.getFullYear() === today.getFullYear()}
+                >
+                  →
+                </button>
+              </div>
+              
+              <table className="w-100 table table-borderless">
+                <thead>
+                  <tr>
+                    <th className="p-1 text-center text-muted small fw-normal">Sun</th>
+                    <th className="p-1 text-center text-muted small fw-normal">Mon</th>
+                    <th className="p-1 text-center text-muted small fw-normal">Tue</th>
+                    <th className="p-1 text-center text-muted small fw-normal">Wed</th>
+                    <th className="p-1 text-center text-muted small fw-normal">Thu</th>
+                    <th className="p-1 text-center text-muted small fw-normal">Fri</th>
+                    <th className="p-1 text-center text-muted small fw-normal">Sat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const allDays = renderCalendar();
+                    const weeks = [];
+                    for (let i = 0; i < allDays.length; i += 7) {
+                      weeks.push(allDays.slice(i, i + 7));
+                    }
+                    return weeks.map((week, weekIndex) => (
+                      <tr key={weekIndex}>
+                        {week}
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Bottom Section */}
+          <div className="border-top p-3">
+            <div className="d-flex justify-content-between align-items-center">
+              <div className="d-flex align-items-center gap-2">
+                <span className="text-muted small">Selected Range:</span>
+                <span className="fw-bold small">
+                  {selectedStartDate && selectedEndDate 
+                    ? `${formatDisplayDate(selectedStartDate)} - ${formatDisplayDate(selectedEndDate)}`
+                    : 'No date range selected'
+                  }
+                </span>
+              </div>
+              <div className="d-flex gap-2">
+                <button className="btn btn-outline-secondary btn-sm" onClick={handleCancel}>
+                  Cancel
+                </button>
+                <button 
+                  className="btn btn-primary btn-sm" 
+                  onClick={handleApply}
+                  disabled={!selectedStartDate || !selectedEndDate}
+                >
+                  Update
+                </button>
+              </div>
+            </div>
+            <div className="mt-2">
+              <small className="text-muted">Dates are shown in local timezone</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
       {/* Header */}
@@ -1140,6 +1611,13 @@ const LeadAnalyticsDashboard = () => {
               onClose={() => setShowDatePicker(false)}
             />
           )}
+
+          {/* Modern Date Picker for Counsellor Status Table */}
+          <ModernDatePicker
+            isOpen={showCounsellorDatePicker}
+            onClose={() => setShowCounsellorDatePicker(false)}
+            onDateSelect={handleCounsellorDateSelect}
+          />
 
           {/* Filters */}
           <div className="card shadow-sm mb-4">
@@ -1910,6 +2388,119 @@ const LeadAnalyticsDashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* ====== NEW: Course-Counsellor Status Table ====== */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h2 className="h5 fw-semibold mb-0">Course-Counsellor Status Table</h2>
+                
+                {/* Date Filter Controls */}
+                <div className="d-flex gap-2 align-items-center">
+                  <button
+                    className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                    onClick={() => setShowCounsellorDatePicker(true)}
+                    disabled={counsellorStatusLoading}
+                  >
+                    <CalendarDays size={16} />
+                    {counsellorStatusDateFrom && counsellorStatusDateTo 
+                      ? `${counsellorStatusDateFrom} to ${counsellorStatusDateTo}`
+                      : 'Select Date Range'
+                    }
+                  </button>
+                  <button
+                    className={`btn btn-sm ${showAllTime ? 'btn-success' : 'btn-outline-success'}`}
+                    onClick={showAllTimeData}
+                    disabled={counsellorStatusLoading}
+                  >
+                    All Time
+                  </button>
+                  <button
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={clearCounsellorStatusDateFilter}
+                    disabled={counsellorStatusLoading}
+                  >
+                    Today
+                  </button>
+                </div>
+              </div>
+              {counsellorStatusLoading ? (
+                <div className="text-center py-4">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-3 text-muted">Loading counsellor status data...</p>
+                </div>
+              ) : counsellorStatusError ? (
+                <div className="alert alert-danger">{counsellorStatusError}</div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-bordered align-middle">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Project</th>
+                        <th>Course</th>
+                        <th>Center</th>
+                        <th>Counsellor Name</th>
+                        <th>Total Leads</th>
+                        <th>Pending for KYC</th>
+                        <th>KYC Done</th>
+                        <th>Admission Done</th>
+                        <th>Batch Assigned</th>
+                        <th>In Zero Period</th>
+                        <th>In Batch Freezed</th>
+                        <th>DropOut</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(groupedStatusData).length === 0 ? (
+                        <tr><td colSpan={11} className="text-center">No data found</td></tr>
+                      ) : (
+                        Object.entries(groupedStatusData).map(([courseName, centers]) => {
+                          const courseRowSpan = Object.values(centers).reduce((sum, arr) => sum + arr.length, 0);
+                          let courseRendered = false;
+                          return Object.entries(centers).map(([centerName, counsellors], centerIdx) => {
+                            const centerRowSpan = counsellors.length;
+                            let centerRendered = false;
+                            return counsellors.map((row, idx) => {
+                              const renderCourse = !courseRendered;
+                              const renderCenter = !centerRendered;
+                              const tr = (
+                                <tr key={`${courseName}-${centerName}-${row.counsellorId || row.counsellorName}`}>
+                                  {/* Project column left blank for now, can be filled if available in row */}
+                                  {renderCourse && (
+                                    <td rowSpan={courseRowSpan}>{row.projectName || ''}</td>
+                                  )}
+                                  {renderCourse && (
+                                    <td rowSpan={courseRowSpan}>{courseName}</td>
+                                  )}
+                                  {renderCenter && (
+                                    <td rowSpan={centerRowSpan}>{centerName}</td>
+                                  )}
+                                  <td>{row.counsellorName}</td>
+                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'totalLeads', 'Total Leads')}>{row.totalLeads}</td>
+                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'pendingKYC', 'Pending for KYC')}>{row.pendingKYC}</td>
+                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'kycDone', 'KYC Done')}>{row.kycDone}</td>
+                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'admissionDone', 'Admission Done')}>{row.admissionDone}</td>
+                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'batchAssigned', 'Batch Assigned')}>{row.batchAssigned}</td>
+                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'inZeroPeriod', 'In Zero Period')}>{row.inZeroPeriod}</td>
+                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'inBatchFreezed', 'In Batch Freezed')}>{row.inBatchFreezed}</td>
+                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'dropOut', 'DropOut')}>{row.dropOut}</td>
+                                </tr>
+                              );
+                              if (!courseRendered) courseRendered = true;
+                              if (!centerRendered) centerRendered = true;
+                              return tr;
+                            });
+                          });
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         </>
       )}
 
@@ -1946,6 +2537,68 @@ const LeadAnalyticsDashboard = () => {
           color: #0a58ca;
         }
       `}</style>
+
+{drilldown.open && (
+  <div className="card shadow-sm mb-4">
+    <div className="card-body">
+      <div className="d-flex justify-content-between align-items-center mb-2">
+        <h5 className="mb-0">{drilldown.statusLabel} - Lead Details</h5>
+        <button
+          className="btn btn-sm btn-outline-secondary"
+          onClick={() => setDrilldown({ open: false, loading: false, leads: [], group: null, statusType: '', statusLabel: '' })}
+        >
+          Close
+        </button>
+      </div>
+      {drilldown.loading ? (
+        <div className="text-center py-4">
+          <div className="spinner-border text-primary" role="status"></div>
+        </div>
+      ) : drilldown.leads.length === 0 ? (
+        <div className="text-center text-muted">No leads found.</div>
+      ) : (
+        <div className="table-responsive">
+          <table className="table table-bordered align-middle">
+            <thead className="table-light">
+              <tr>
+                <th>Candidate Name</th>
+                <th>Mobile</th>
+                <th>KYC</th>
+                <th>Admission</th>
+                <th>Batch Assigned</th>
+                <th>Zero Period</th>
+                <th>Batch Freezed</th>
+                <th>Dropout</th>
+                <th>Created At</th>
+                <th>Course</th>
+                <th>Center</th>
+                <th>Counsellor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {drilldown.leads.map((lead, idx) => (
+                <tr key={idx}>
+                  <td>{lead.candidateName}</td>
+                  <td>{lead.candidateMobile}</td>
+                  <td>{lead.kyc ? 'Yes' : 'No'}</td>
+                  <td>{lead.admissionDone ? 'Yes' : 'No'}</td>
+                  <td>{lead.isBatchAssigned ? 'Yes' : 'No'}</td>
+                  <td>{lead.isZeroPeriodAssigned ? 'Yes' : 'No'}</td>
+                  <td>{lead.isBatchFreeze ? 'Yes' : 'No'}</td>
+                  <td>{lead.dropout ? 'Yes' : 'No'}</td>
+                  <td>{lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : ''}</td>
+                  <td>{lead.courseName}</td>
+                  <td>{lead.centerName}</td>
+                  <td>{lead.counsellorName}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
       {!isFilterCollapsed && (
         <div
@@ -2087,11 +2740,11 @@ const LeadAnalyticsDashboard = () => {
                     </h6>
                   </div>
 
-                  {/* Created Date Range */}
-                  <div className="col-md-4">
+                  {/* Single Date Range Filter */}
+                  <div className="col-md-6">
                     <label className="form-label small fw-bold text-dark">
                       <i className="fas fa-calendar-plus me-1 text-success"></i>
-                      Lead Creation Date Range
+                      Date Range
                     </label>
                     <div className="card border-0 bg-light p-3">
                       <div className="row g-2">
@@ -2143,130 +2796,7 @@ const LeadAnalyticsDashboard = () => {
                           disabled={!filterData.createdFromDate && !filterData.createdToDate}
                         >
                           <i className="fas fa-times me-1"></i>
-                          Clear Created Date
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Modified Date Range */}
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-calendar-edit me-1 text-warning"></i>
-                      Lead Modification Date Range
-                    </label>
-                    <div className="card border-0 bg-light p-3">
-                      <div className="row g-2">
-                        <div className="col-6">
-                          <label className="form-label small">From Date</label>
-                          <DatePicker
-                            onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
-                            value={filterData.modifiedFromDate}
-                            format="dd/MM/yyyy"
-                            className="form-control p-0"
-                            clearIcon={null}
-                            calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                            maxDate={filterData.modifiedToDate || new Date()}
-                          />
-                        </div>
-                        <div className="col-6">
-                          <label className="form-label small">To Date</label>
-                          <DatePicker
-                            onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
-                            value={filterData.modifiedToDate}
-                            format="dd/MM/yyyy"
-                            className="form-control p-0"
-                            clearIcon={null}
-                            calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                            minDate={filterData.modifiedFromDate}
-                            maxDate={new Date()}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Show selected dates */}
-                      {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                        <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
-                          <small className="text-warning">
-                            <i className="fas fa-info-circle me-1"></i>
-                            <strong>Selected:</strong>
-                            {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                            {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
-                            {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
-                          </small>
-                        </div>
-                      )}
-
-                      {/* Clear button */}
-                      <div className="mt-2">
-                        <button
-                          className="btn btn-sm btn-outline-danger w-100"
-                          onClick={() => clearDateFilter('modified')}
-                          disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
-                        >
-                          <i className="fas fa-times me-1"></i>
-                          Clear Modified Date
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Next Action Date Range */}
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-calendar-check me-1 text-info"></i>
-                      Next Action Date Range
-                    </label>
-                    <div className="card border-0 bg-light p-3">
-                      <div className="row g-2">
-                        <div className="col-6">
-                          <label className="form-label small">From Date</label>
-                          <DatePicker
-                            onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
-                            value={filterData.nextActionFromDate}
-                            format="dd/MM/yyyy"
-                            className="form-control p-0"
-                            clearIcon={null}
-                            calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                            maxDate={filterData.nextActionToDate}
-                          />
-                        </div>
-                        <div className="col-6">
-                          <label className="form-label small">To Date</label>
-                          <DatePicker
-                            onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
-                            value={filterData.nextActionToDate}
-                            format="dd/MM/yyyy"
-                            className="form-control p-0"
-                            clearIcon={null}
-                            calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                            minDate={filterData.nextActionFromDate}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Show selected dates */}
-                      {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                        <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
-                          <small className="text-info">
-                            <i className="fas fa-info-circle me-1"></i>
-                            <strong>Selected:</strong>
-                            {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                            {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
-                            {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
-                          </small>
-                        </div>
-                      )}
-
-                      {/* Clear button */}
-                      <div className="mt-2">
-                        <button
-                          className="btn btn-sm btn-outline-danger w-100"
-                          onClick={() => clearDateFilter('nextAction')}
-                          disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
-                        >
-                          <i className="fas fa-times me-1"></i>
-                          Clear Next Action Date
+                          Clear Date Filter
                         </button>
                       </div>
                     </div>

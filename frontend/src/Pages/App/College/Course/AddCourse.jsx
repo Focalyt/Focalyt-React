@@ -36,7 +36,7 @@ const AddCourse = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
   const navigate = useNavigate();
-  const trainingCenterRef = useRef(null);
+  const centerRef = useRef(null);
   const choicesInstance = useRef(null);
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -81,7 +81,7 @@ const AddCourse = () => {
       trainingMode: '',
       onlineTrainingTiming: '',
       offlineTrainingTiming: '',
-      trainingCenter: [],
+      center: [],
       address: '',
       city: '',
       state: '',
@@ -108,7 +108,7 @@ const AddCourse = () => {
     });
 
   // Document requirements
-  const [docsRequired, setDocsRequired] = useState([{name: '', mandatory: false}]);
+  const [docsRequired, setDocsRequired] = useState([]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -198,7 +198,7 @@ const AddCourse = () => {
 
     // Initialize Choices.js when training center field is visible and centers are available
     if (showTrainingFields.trainingCenter &&
-      trainingCenterRef.current &&
+      centerRef.current &&
       centers.length > 0) {
 
       // Clean up any existing instance first
@@ -206,7 +206,7 @@ const AddCourse = () => {
 
       try {
         // Initialize new Choices instance
-        choicesInstance.current = new Choices(trainingCenterRef.current, {
+        choicesInstance.current = new Choices(centerRef.current, {
           removeItemButton: true,
           searchEnabled: true,
           itemSelectText: '',
@@ -353,11 +353,11 @@ const AddCourse = () => {
   };
 
   // Handle multi-select training center field
-  const handleTrainingCenterChange = (selectedOptions) => {
+  const handlecenterChange = (selectedOptions) => {
     const selectedValues = Array.from(selectedOptions).map(option => option.value);
     setFormData({
       ...formData,
-      trainingCenter: selectedValues
+      center: selectedValues ? [selectedValues] : []
     });
   };
 
@@ -935,6 +935,9 @@ const AddCourse = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    console.log(docsRequired, 'docsRequired')
+    
+
     if (!validateForm()) return;
 
     const user = JSON.parse(sessionStorage.getItem('user'));
@@ -943,10 +946,26 @@ const AddCourse = () => {
 
     // Append basic fields
     Object.entries(formData).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        value.forEach(v => form.append(`${key}[]`, v));
-      } else {
-        form.append(key, value);
+      if (key !== 'photos' && key !== 'videos' && key !== 'testimonialvideos' &&
+        key !== 'brochure' && key !== 'thumbnail') {
+
+        // Special handling for sectors
+        if (key === 'sectors' && Array.isArray(value)) {
+          // Send multiple values with same field name
+          value.forEach(v => form.append('sectors', v));
+        }
+        // Keep center as array format
+        else if (key === 'center' && Array.isArray(value)) {
+          value.forEach(v => form.append(`center`, v));
+        }
+        // Handle other arrays (if any)
+        else if (Array.isArray(value)) {
+          value.forEach(v => form.append(`${key}[]`, v));
+        }
+        // Handle single values
+        else {
+          form.append(key, value);
+        }
       }
     });
 
@@ -971,8 +990,19 @@ const AddCourse = () => {
       selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
     }
 
+    console.log(docsRequired.map(doc => ({
+      Name: doc.name,
+      mandatory: doc.mandatory
+    })), 'docsRequired')
+
     // Append JSON fields
-    form.append('docsRequired', JSON.stringify(docsRequired));
+    if(docsRequired.length > 0){
+      form.append('docsRequired', JSON.stringify(docsRequired.map(doc => ({
+        Name: doc.name,
+        mandatory: doc.mandatory
+      }))));
+    }
+    
     form.append('questionAnswers', JSON.stringify(questionAnswers));
 
     // CreatedBy & college
@@ -1319,11 +1349,11 @@ const AddCourse = () => {
                           <label htmlFor="trainingCenter">Training Center</label>
                           <select
                             className="form-control"
-                            name="trainingCenter"
-                            id="trainingCenter"
+                            name="center"
+                            id="center"
                             multiple
-                            ref={trainingCenterRef}
-                            onChange={(e) => handleTrainingCenterChange(e.target.selectedOptions)}
+                            ref={centerRef}
+                            onChange={(e) => handlecenterChange(e.target.selectedOptions)}
                           >
                             {Array.isArray(centers) && centers.length > 0 ? (
                               centers.map((center, i) => (
@@ -2158,16 +2188,17 @@ const AddCourse = () => {
               type="button"
               onClick={resetForm}
               className="btn btn-danger waves-effect waves-light mr-2"
-              disabled={isSubmitting}
+              // disabled={isSubmitting}
             >
               Reset
             </button>
             <button
               type="submit"
               className="btn btn-success px-lg-4 waves-effect waves-light ms-2"
-              disabled={isSubmitting}
+              // disabled={isSubmitting}
             >
-              {isSubmitting ? 'Saving...' : 'Save'}
+              {/* {isSubmitting ? 'Saving...' : 'Save'} */}
+              Save
             </button>
           </div>
         </div>

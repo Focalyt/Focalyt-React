@@ -37,7 +37,7 @@ const EditCourse = () => {
   const [selectedTestimonialPreviews, setSelectedTestimonialPreviews] = useState([]);
   const [selectedBrochurePreview, setSelectedBrochurePreview] = useState(null);
   // Document requirements
-  const [docsRequired, setDocsRequired] = useState([ {name: '', mandatory: false} ]);
+  const [docsRequired, setDocsRequired] = useState([ ]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([

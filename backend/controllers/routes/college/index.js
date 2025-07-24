@@ -711,7 +711,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 			// Sort by creation date
 			aggregationPipeline.push({
-				$sort: { updatedAt: 1 }
+				$sort: { updatedAt: -1 }
 			});
 
 			// Execute aggregation
@@ -3483,7 +3483,7 @@ router.put('/update/:id', isCollege, async (req, res) => {
 		const { id } = req.params;
 		const updateData = req.body;
 
-		const appliedCourse = await AppliedCourses.findById(id);
+		const appliedCourse = await AppliedCourses.findById(id).populate('_course');
 		if (!appliedCourse) {
 			return res.status(404).json({ success: false, message: "Applied course not found" });
 		}
@@ -3493,7 +3493,7 @@ router.put('/update/:id', isCollege, async (req, res) => {
 			appliedCourse[key] = updateData[key];
 		});
 
-		// Add log for Move to KYC
+		
 		if (typeof updateData.kycStage !== 'undefined' && updateData.kycStage === true) {
 			appliedCourse.logs.push({
 				user: user._id,
@@ -3501,7 +3501,13 @@ router.put('/update/:id', isCollege, async (req, res) => {
 				action: 'Moved to KYC',
 				remarks: 'Profile moved to KYC by College'
 			});
+
+			if(!appliedCourse._course.documentRequired){
+				appliedCourse.kyc = true;
+			}
 		}
+
+		i
 
 		// Add log for Move to Admission List
 		if (typeof updateData.admissionDone !== 'undefined' && updateData.admissionDone === true) {
@@ -3923,7 +3929,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 			// Sort by creation date
 			aggregationPipeline.push({
-				$sort: { createdAt: -1 }
+				$sort: { updatedAt: -1 }
 			});
 
 			// Execute aggregation
@@ -5107,7 +5113,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			if (Object.keys(additionalMatches).length > 0) {
 				aggregationPipeline.push({ $match: additionalMatches });
 			}
-			aggregationPipeline.push({ $sort: { createdAt: -1 } });
+			aggregationPipeline.push({ $sort: { updatedAt: -1 } });
 			const response = await AppliedCourses.aggregate(aggregationPipeline);
 			response.forEach(doc => {
 				if (!allFilteredResults.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
@@ -6034,39 +6040,48 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 		// Build date filter
 		let dateFilter = {};
 
-		if (createdFromDate || createdToDate) {
-			dateFilter.createdAt = {};
-			if (createdFromDate) {
-				dateFilter.createdAt.$gte = new Date(createdFromDate);
+		// If no date filter is provided, default to today
+		if (!createdFromDate && !createdToDate && !modifiedFromDate && !modifiedToDate && !nextActionFromDate && !nextActionToDate) {
+			const todayStart = new Date();
+			todayStart.setHours(0, 0, 0, 0);
+			const todayEnd = new Date();
+			todayEnd.setHours(23, 59, 59, 999);
+			dateFilter.createdAt = { $gte: todayStart, $lte: todayEnd };
+		} else {
+			if (createdFromDate || createdToDate) {
+				dateFilter.createdAt = {};
+				if (createdFromDate) {
+					dateFilter.createdAt.$gte = new Date(createdFromDate);
+				}
+				if (createdToDate) {
+					const toDate = new Date(createdToDate);
+					toDate.setHours(23, 59, 59, 999);
+					dateFilter.createdAt.$lte = toDate;
+				}
 			}
-			if (createdToDate) {
-				const toDate = new Date(createdToDate);
-				toDate.setHours(23, 59, 59, 999);
-				dateFilter.createdAt.$lte = toDate;
-			}
-		}
 
-		if (modifiedFromDate || modifiedToDate) {
-			dateFilter.updatedAt = {};
-			if (modifiedFromDate) {
-				dateFilter.updatedAt.$gte = new Date(modifiedFromDate);
+			if (modifiedFromDate || modifiedToDate) {
+				dateFilter.updatedAt = {};
+				if (modifiedFromDate) {
+					dateFilter.updatedAt.$gte = new Date(modifiedFromDate);
+				}
+				if (modifiedToDate) {
+					const toDate = new Date(modifiedToDate);
+					toDate.setHours(23, 59, 59, 999);
+					dateFilter.updatedAt.$lte = toDate;
+				}
 			}
-			if (modifiedToDate) {
-				const toDate = new Date(modifiedToDate);
-				toDate.setHours(23, 59, 59, 999);
-				dateFilter.updatedAt.$lte = toDate;
-			}
-		}
 
-		if (nextActionFromDate || nextActionToDate) {
-			dateFilter.followupDate = {};
-			if (nextActionFromDate) {
-				dateFilter.followupDate.$gte = new Date(nextActionFromDate);
-			}
-			if (nextActionToDate) {
-				const toDate = new Date(nextActionToDate);
-				toDate.setHours(23, 59, 59, 999);
-				dateFilter.followupDate.$lte = toDate;
+			if (nextActionFromDate || nextActionToDate) {
+				dateFilter.followupDate = {};
+				if (nextActionFromDate) {
+					dateFilter.followupDate.$gte = new Date(nextActionFromDate);
+				}
+				if (nextActionToDate) {
+					const toDate = new Date(nextActionToDate);
+					toDate.setHours(23, 59, 59, 999);
+					dateFilter.followupDate.$lte = toDate;
+				}
 			}
 		}
 
@@ -6652,38 +6667,10 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 								foreignField: '_id',
 								as: '_appliedCourses',
 								pipeline: [
-									{
-										$lookup: {
-											from: 'courses',
-											localField: '_course',
-											foreignField: '_id',
-											as: '_course'
-										}
-									},
-									{
-										$lookup: {
-											from: 'users',
-											localField: 'registeredBy',
-											foreignField: '_id',
-											as: 'registeredBy'
-										}
-									},
-									{
-										$lookup: {
-											from: 'centers',
-											localField: '_center',
-											foreignField: '_id',
-											as: '_center'
-										}
-									},
-									{
-										$lookup: {
-											from: 'status',
-											localField: '_leadStatus',
-											foreignField: '_id',
-											as: '_leadStatus'
-										}
-									}
+									{ $lookup: { from: 'courses', localField: '_course', foreignField: '_id', as: '_course' } },
+									{ $lookup: { from: 'users', localField: 'registeredBy', foreignField: '_id', as: 'registeredBy' } },
+									{ $lookup: { from: 'centers', localField: '_center', foreignField: '_id', as: '_center' } },
+									{ $lookup: { from: 'status', localField: '_leadStatus', foreignField: '_id', as: '_leadStatus' } }
 								]
 							}
 						}
@@ -7222,14 +7209,335 @@ router.post('/fix-counselor-names', async (req, res) => {
 });
 
 
+router.get('/counsellor-status-table', [isCollege], async (req, res) => {
+  try {
+    const user = req.user;
+    // Find the college for the current user
+    const college = await College.findOne({ '_concernPerson._id': user._id });
+    if (!college) {
+      return res.status(404).json({ status: false, message: 'College not found' });
+    }
 
+    // Get date filters from query parameters
+    const { dateFrom, dateTo, allTime } = req.query;
+    
+    let dateFilter = {};
+    
+    if (allTime === 'true') {
+      // Show all time data - no date filter
+      dateFilter = {};
+    } else if (dateFrom && dateTo) {
+      // Use provided date range
+      const startDate = moment(dateFrom).startOf('day').toDate();
+      const endDate = moment(dateTo).endOf('day').toDate();
+      dateFilter = {
+        createdAt: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      };
+    } else {
+      // Default to today's date range
+      const todayStart = moment().startOf('day').toDate();
+      const todayEnd = moment().endOf('day').toDate();
+      dateFilter = {
+        createdAt: {
+          $gte: todayStart,
+          $lte: todayEnd
+        }
+      };
+    }
 
+    // Aggregate appliedCourses for this college, grouped by course, center, and counsellor
+    const pipeline = [
+      {
+        $lookup: {
+          from: 'courses',
+          localField: '_course',
+          foreignField: '_id',
+          as: '_course'
+        }
+      },
+      { $unwind: '$_course' },
+      // Add project lookup
+      {
+        $lookup: {
+          from: 'projects',
+          localField: '_course.project',
+          foreignField: '_id',
+          as: 'projectObj'
+        }
+      },
+      { $addFields: { projectObj: { $arrayElemAt: ['$projectObj', 0] } } },
+      {
+        $lookup: {
+          from: 'centers',
+          localField: '_center',
+          foreignField: '_id',
+          as: '_center'
+        }
+      },
+      { $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+      {
+        $match: {
+          '_course.college': college._id,
+          ...dateFilter
+        }
+      },
+      // Get latest counsellor assignment
+      {
+        $addFields: {
+          latestAssignment: { $arrayElemAt: ['$leadAssignment', -1] }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            projectId: '$projectObj._id',
+            projectName: '$projectObj.name',
+            courseId: '$_course._id',
+            courseName: '$_course.name',
+            centerId: '$_center._id',
+            centerName: '$_center.name',
+            counsellorId: '$latestAssignment._counsellor',
+            counsellorName: '$latestAssignment.counsellorName'
+          },
+          pendingKYC: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$kyc', false] },
+                    { $eq: ['$kycStage', true] },
+                    {
+                      $or: [
+                        { $gt: [{ $size: '$_course.docsRequired' }, 0] },
+                        { $ne: ['$_course.docsRequired', null] }
+                      ]
+                    }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          kycDone: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$kyc', true] },
+                    {
+                      $and: [
+                        { $eq: ['$kyc', false] },
+                        {
+                          $or: [
+                            { $eq: [{ $size: '$_course.docsRequired' }, 0] },
+                            { $eq: ['$_course.docsRequired', null] }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          admissionDone: {
+            $sum: {
+              $cond: [ { $eq: ['$admissionDone', true] }, 1, 0 ]
+            }
+          },
+          batchAssigned: {
+			$sum: {
+			  $cond: [
+				{ $eq: ['$isBatchAssigned', true] },
+				1,
+				0
+			  ]
+			}
+		  },
+          inZeroPeriod: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$isZeroPeriodAssigned', true] },
+                    { $ne: ['$isBatchAssigned', true] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          inBatchFreezed: {
+            $sum: {
+              $cond: [ { $eq: ['$isBatchFreeze', true] }, 1, 0 ]
+            }
+          },
+          dropOut: {
+            $sum: {
+              $cond: [ { $eq: ['$dropout', true] }, 1, 0 ]
+            }
+          },
+          totalLeads: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          projectId: '$_id.projectId',
+          projectName: '$_id.projectName',
+          courseId: '$_id.courseId',
+          courseName: '$_id.courseName',
+          centerId: '$_id.centerId',
+          centerName: '$_id.centerName',
+          counsellorId: '$_id.counsellorId',
+          counsellorName: '$_id.counsellorName',
+          pendingKYC: 1,
+          kycDone: 1,
+          admissionDone: 1,
+          batchAssigned: 1,
+          inZeroPeriod: 1,
+          inBatchFreezed: 1,
+          dropOut: 1,
+          totalLeads: 1
+        }
+      },
+      { $sort: { projectName: 1, courseName: 1, centerName: 1, counsellorName: 1 } }
+    ];
 
+    const result = await AppliedCourses.aggregate(pipeline);
 
+	console.log(result, 'result')
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+// ====== END: Course-Counsellor Status Table API ======
 
+// API: Get leads for a specific group and statusType (for drilldown table)
+router.get('/counsellor-status-leads', [isCollege], async (req, res) => {
+  try {
+    const { projectId, courseId, centerId, counsellorId, statusType, dateFrom, dateTo, allTime } = req.query;
+    let dateFilter = {};
+    if (allTime === 'true') {
+      dateFilter = {};
+    } else if (dateFrom && dateTo) {
+      const startDate = new Date(dateFrom);
+      const endDate = new Date(dateTo);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter = {
+        createdAt: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      };
+    } else {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      dateFilter = {
+        createdAt: {
+          $gte: todayStart,
+          $lte: todayEnd
+        }
+      };
+    }
 
-module.exports = router;
+    // Build match stage
+    const matchStage = {
+      ...dateFilter
+    };
+    if (projectId) matchStage['_course.project'] = projectId;
+    if (courseId) matchStage['_course'] = courseId;
+    if (centerId) matchStage['_center'] = centerId;
+    if (counsellorId) matchStage['leadAssignment._counsellor'] = counsellorId;
 
+    // Add statusType filter
+    if (statusType === 'pendingKYC') {
+      matchStage.kyc = false;
+      matchStage.kycStage = true;
+      matchStage['$expr'] = {
+        $gt: [ { $size: '$_course.docsRequired' }, 0 ]
+      };
+    } else if (statusType === 'kycDone') {
+      matchStage.kyc = true;
+    } else if (statusType === 'admissionDone') {
+      matchStage.admissionDone = true;
+    } else if (statusType === 'batchAssigned') {
+      matchStage.isBatchAssigned = true;
+    } else if (statusType === 'inZeroPeriod') {
+      matchStage.isZeroPeriodAssigned = true;
+      matchStage.isBatchAssigned = { $ne: true };
+    } else if (statusType === 'inBatchFreezed') {
+      matchStage.isBatchFreeze = true;
+    } else if (statusType === 'dropOut') {
+      matchStage.dropout = true;
+    }
 
+    // Lookup for course, center, candidate
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'courses',
+          localField: '_course',
+          foreignField: '_id',
+          as: '_course'
+        }
+      },
+      { $unwind: '$_course' },
+      {
+        $lookup: {
+          from: 'centers',
+          localField: '_center',
+          foreignField: '_id',
+          as: '_center'
+        }
+      },
+      { $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'candidateprofiles',
+          localField: '_candidate',
+          foreignField: '_id',
+          as: '_candidate'
+        }
+      },
+      { $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          candidateName: '$_candidate.name',
+          candidateMobile: '$_candidate.mobile',
+          kyc: 1,
+          kycStage: 1,
+          admissionDone: 1,
+          isBatchAssigned: 1,
+          isZeroPeriodAssigned: 1,
+          isBatchFreeze: 1,
+          dropout: 1,
+          createdAt: 1,
+          courseName: '$_course.name',
+          centerName: '$_center.name',
+          counsellorName: { $arrayElemAt: ['$leadAssignment.counsellorName', -1] }
+        }
+      }
+    ];
+
+    const leads = await AppliedCourses.aggregate(pipeline);
+    res.json({ success: true, data: leads });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
 
 module.exports = router;
