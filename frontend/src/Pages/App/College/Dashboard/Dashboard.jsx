@@ -1155,37 +1155,13 @@ const LeadAnalyticsDashboard = () => {
     statusType: '',
     statusLabel: '',
   });
-  
-  const fetchDrilldownLeads = async (row, statusType, statusLabel) => {
-    setDrilldown({ open: true, loading: true, leads: [], group: row, statusType, statusLabel });
-    try {
-      const params = new URLSearchParams();
-      if (row.projectId) params.append('projectId', row.projectId);
-      if (row.courseId) params.append('courseId', row.courseId);
-      if (row.centerId) params.append('centerId', row.centerId);
-      if (row.counsellorId) params.append('counsellorId', row.counsellorId);
-      if (counsellorStatusDateFrom) params.append('dateFrom', counsellorStatusDateFrom);
-      if (counsellorStatusDateTo) params.append('dateTo', counsellorStatusDateTo);
-      if (showAllTime) params.append('allTime', 'true');
-      params.append('statusType', statusType);
-      const url = `${backendUrl}/college/counsellor-status-leads?${params.toString()}`;
-      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-      const token = userData.token;
-      const res = await axios.get(url, { headers: { 'x-auth': token } });
-      setDrilldown(prev => ({ ...prev, loading: false, leads: res.data.data || [] }));
-    } catch (err) {
-      setDrilldown(prev => ({ ...prev, loading: false, leads: [] }));
-      alert('Failed to fetch lead details');
-    }
-  };
 
-  const courseCounsellorMatrix = getCourseCounsellorStatusMatrix();
 
   // ====== NEW: Course-Counsellor Status Table (API Integrated) ======
   const [counsellorStatusData, setCounsellorStatusData] = useState([]);
   const [counsellorStatusLoading, setCounsellorStatusLoading] = useState(true);
   const [counsellorStatusError, setCounsellorStatusError] = useState(null);
-  
+
   // Date filter state for counsellor status table
   const [counsellorStatusDateFrom, setCounsellorStatusDateFrom] = useState('');
   const [counsellorStatusDateTo, setCounsellorStatusDateTo] = useState('');
@@ -1208,9 +1184,10 @@ const LeadAnalyticsDashboard = () => {
 
   // Function to fetch counsellor status data with date filters
   const fetchCounsellorStatusData = async (dateFrom = '', dateTo = '', showAllTime = false) => {
+    setDrilldown({ open: false, loading: false, leads: [], group: null, statusType: '', statusLabel: '' });
     setCounsellorStatusLoading(true);
     setCounsellorStatusError(null);
-    
+
     try {
       const params = new URLSearchParams();
       if (showAllTime) {
@@ -1219,15 +1196,15 @@ const LeadAnalyticsDashboard = () => {
         params.append('dateFrom', dateFrom);
         params.append('dateTo', dateTo);
       }
-      
+
       const url = `${backendUrl}/college/counsellor-status-table${params.toString() ? '?' + params.toString() : ''}`;
-      
+
       const res = await axios.get(url, {
         headers: {
           'x-auth': token
         }
       });
-      
+
       setCounsellorStatusData(res.data.data || []);
       setCounsellorStatusLoading(false);
     } catch (err) {
@@ -1377,12 +1354,12 @@ const LeadAnalyticsDashboard = () => {
     const isDateSelected = (date) => {
       const checkDate = new Date(date);
       return (selectedStartDate && formatDate(checkDate) === formatDate(selectedStartDate)) ||
-             (selectedEndDate && formatDate(checkDate) === formatDate(selectedEndDate));
+        (selectedEndDate && formatDate(checkDate) === formatDate(selectedEndDate));
     };
 
     const handleDateClick = (day) => {
       const clickedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-      
+
       if (!selectedStartDate || (selectedStartDate && selectedEndDate)) {
         setSelectedStartDate(clickedDate);
         setSelectedEndDate(null);
@@ -1430,11 +1407,11 @@ const LeadAnalyticsDashboard = () => {
         const isFuture = date > today;
         const isInRange = isDateInRange(date);
         const isSelected = isDateSelected(date);
-        
+
         let className = "p-1 text-center";
         let buttonClassName = "w-100 h-100 border-0 rounded d-flex align-items-center justify-content-center";
         let buttonStyle = { minHeight: '32px', minWidth: '32px' };
-        
+
         if (isFuture) {
           buttonClassName += " text-muted bg-transparent";
         } else if (isToday) {
@@ -1467,14 +1444,14 @@ const LeadAnalyticsDashboard = () => {
     if (!isOpen) return null;
 
     return (
-      <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
-           style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+      <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
         <div className="bg-white rounded-lg shadow-lg" style={{ maxWidth: '700px', width: '95%' }}>
           <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
             <h5 className="mb-0">Select Date Range</h5>
             <button className="btn-close" onClick={onClose}></button>
           </div>
-          
+
           <div className="d-flex">
             {/* Left Panel - Quick Select Options */}
             <div className="border-end p-3" style={{ width: '180px', backgroundColor: '#f8f9fa' }}>
@@ -1501,7 +1478,7 @@ const LeadAnalyticsDashboard = () => {
             {/* Right Panel - Calendar */}
             <div className="flex-grow-1 p-3">
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <button 
+                <button
                   className="btn btn-sm btn-outline-secondary"
                   onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
                 >
@@ -1510,7 +1487,7 @@ const LeadAnalyticsDashboard = () => {
                 <h6 className="mb-0">
                   {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </h6>
-                <button 
+                <button
                   className="btn btn-sm btn-outline-secondary"
                   onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
                   disabled={currentMonth.getMonth() === today.getMonth() && currentMonth.getFullYear() === today.getFullYear()}
@@ -1518,7 +1495,7 @@ const LeadAnalyticsDashboard = () => {
                   →
                 </button>
               </div>
-              
+
               <table className="w-100 table table-borderless">
                 <thead>
                   <tr>
@@ -1548,14 +1525,14 @@ const LeadAnalyticsDashboard = () => {
               </table>
             </div>
           </div>
-          
+
           {/* Bottom Section */}
           <div className="border-top p-3">
             <div className="d-flex justify-content-between align-items-center">
               <div className="d-flex align-items-center gap-2">
                 <span className="text-muted small">Selected Range:</span>
                 <span className="fw-bold small">
-                  {selectedStartDate && selectedEndDate 
+                  {selectedStartDate && selectedEndDate
                     ? `${formatDisplayDate(selectedStartDate)} - ${formatDisplayDate(selectedEndDate)}`
                     : 'No date range selected'
                   }
@@ -1565,8 +1542,8 @@ const LeadAnalyticsDashboard = () => {
                 <button className="btn btn-outline-secondary btn-sm" onClick={handleCancel}>
                   Cancel
                 </button>
-                <button 
-                  className="btn btn-primary btn-sm" 
+                <button
+                  className="btn btn-primary btn-sm"
                   onClick={handleApply}
                   disabled={!selectedStartDate || !selectedEndDate}
                 >
@@ -1581,6 +1558,21 @@ const LeadAnalyticsDashboard = () => {
         </div>
       </div>
     );
+  };
+
+  // Add a new function to fetch lead details by IDs
+  const fetchLeadDetailsByIds = async (ids, statusLabel) => {
+    setDrilldown({ open: true, loading: true, leads: [], group: null, statusType: '', statusLabel });
+    try {
+
+      const res = await axios.post(`${backendUrl}/college/lead-details-by-ids`, { ids }, { headers: { 'x-auth': token } });
+      console.log(res, 'res')
+      // const res = await axios.get(url, { headers: { 'x-auth': token } });
+      setDrilldown(prev => ({ ...prev, loading: false, leads: res.data.data || [] }));
+    } catch (err) {
+      setDrilldown(prev => ({ ...prev, loading: false, leads: [] }));
+      alert('Failed to fetch lead details');
+    }
   };
 
   return (
@@ -2394,7 +2386,7 @@ const LeadAnalyticsDashboard = () => {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <h2 className="h5 fw-semibold mb-0">Course-Counsellor Status Table</h2>
-                
+
                 {/* Date Filter Controls */}
                 <div className="d-flex gap-2 align-items-center">
                   <button
@@ -2403,7 +2395,7 @@ const LeadAnalyticsDashboard = () => {
                     disabled={counsellorStatusLoading}
                   >
                     <CalendarDays size={16} />
-                    {counsellorStatusDateFrom && counsellorStatusDateTo 
+                    {counsellorStatusDateFrom && counsellorStatusDateTo
                       ? `${counsellorStatusDateFrom} to ${counsellorStatusDateTo}`
                       : 'Select Date Range'
                     }
@@ -2447,9 +2439,12 @@ const LeadAnalyticsDashboard = () => {
                         <th>KYC Done</th>
                         <th>Admission Done</th>
                         <th>Batch Assigned</th>
-                        <th>In Zero Period</th>
+                        <th>In Zero Period (At Center)</th>
                         <th>In Batch Freezed</th>
                         <th>DropOut</th>
+                        <th>Leads vs Admission %</th>
+                        <th>Admission vs AtCenter %</th>
+
                       </tr>
                     </thead>
                     <tbody>
@@ -2478,14 +2473,25 @@ const LeadAnalyticsDashboard = () => {
                                     <td rowSpan={centerRowSpan}>{centerName}</td>
                                   )}
                                   <td>{row.counsellorName}</td>
-                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'totalLeads', 'Total Leads')}>{row.totalLeads}</td>
-                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'pendingKYC', 'Pending for KYC')}>{row.pendingKYC}</td>
-                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'kycDone', 'KYC Done')}>{row.kycDone}</td>
-                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'admissionDone', 'Admission Done')}>{row.admissionDone}</td>
-                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'batchAssigned', 'Batch Assigned')}>{row.batchAssigned}</td>
-                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'inZeroPeriod', 'In Zero Period')}>{row.inZeroPeriod}</td>
-                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'inBatchFreezed', 'In Batch Freezed')}>{row.inBatchFreezed}</td>
-                                  <td className="text-center" onClick={() => fetchDrilldownLeads(row, 'dropOut', 'DropOut')}>{row.dropOut}</td>
+                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.totalLeadIds, 'Total Leads')}>{row.totalLeads}</td>
+
+                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, 'Pending for KYC')}>{row.pendingKYC}</td>
+                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, 'KYC Done')}>{row.kycDone}</td>
+                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, 'Admission Done')}>{row.admissionDone}</td>
+                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.batchAssignedIds, 'Batch Assigned')}>{row.batchAssigned}</td>
+                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.inZeroPeriodIds, 'In Zero Period')}>{row.inZeroPeriod}</td>
+                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.inBatchFreezedIds, 'In Batch Freezed')}>{row.inBatchFreezed}</td>
+                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.dropOutIds, 'DropOut')}>{row.dropOut}</td>
+                                  <td className="text-center">
+                                    {row.totalLeads > 0
+                                      ? ((row.admissionDoneIds.length / row.totalLeads) * 100).toFixed(1) + '%'
+                                      : '0%'}
+                                  </td>
+                                  <td className="text-center">
+                                    {row.inZeroPeriodIds && row.inZeroPeriodIds.length > 0
+                                      ? (( row.inZeroPeriodIds.length/row.admissionDoneIds.length ) * 100).toFixed(1) + '%'
+                                      : '0%'}
+                                  </td>
                                 </tr>
                               );
                               if (!courseRendered) courseRendered = true;
@@ -2538,67 +2544,51 @@ const LeadAnalyticsDashboard = () => {
         }
       `}</style>
 
-{drilldown.open && (
-  <div className="card shadow-sm mb-4">
-    <div className="card-body">
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <h5 className="mb-0">{drilldown.statusLabel} - Lead Details</h5>
-        <button
-          className="btn btn-sm btn-outline-secondary"
-          onClick={() => setDrilldown({ open: false, loading: false, leads: [], group: null, statusType: '', statusLabel: '' })}
-        >
-          Close
-        </button>
-      </div>
-      {drilldown.loading ? (
-        <div className="text-center py-4">
-          <div className="spinner-border text-primary" role="status"></div>
-        </div>
-      ) : drilldown.leads.length === 0 ? (
-        <div className="text-center text-muted">No leads found.</div>
-      ) : (
-        <div className="table-responsive">
-          <table className="table table-bordered align-middle">
-            <thead className="table-light">
-              <tr>
-                <th>Candidate Name</th>
-                <th>Mobile</th>
-                <th>KYC</th>
-                <th>Admission</th>
-                <th>Batch Assigned</th>
-                <th>Zero Period</th>
-                <th>Batch Freezed</th>
-                <th>Dropout</th>
-                <th>Created At</th>
-                <th>Course</th>
-                <th>Center</th>
-                <th>Counsellor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drilldown.leads.map((lead, idx) => (
-                <tr key={idx}>
-                  <td>{lead.candidateName}</td>
-                  <td>{lead.candidateMobile}</td>
-                  <td>{lead.kyc ? 'Yes' : 'No'}</td>
-                  <td>{lead.admissionDone ? 'Yes' : 'No'}</td>
-                  <td>{lead.isBatchAssigned ? 'Yes' : 'No'}</td>
-                  <td>{lead.isZeroPeriodAssigned ? 'Yes' : 'No'}</td>
-                  <td>{lead.isBatchFreeze ? 'Yes' : 'No'}</td>
-                  <td>{lead.dropout ? 'Yes' : 'No'}</td>
-                  <td>{lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : ''}</td>
-                  <td>{lead.courseName}</td>
-                  <td>{lead.centerName}</td>
-                  <td>{lead.counsellorName}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {drilldown.open && (
+        <div className="card shadow-sm mb-4">
+          <div className="card-body">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <h5 className="mb-0">{drilldown.statusLabel} - Lead Details</h5>
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => setDrilldown({ open: false, loading: false, leads: [], group: null, statusType: '', statusLabel: '' })}
+              >
+                Close
+              </button>
+            </div>
+            {drilldown.loading ? (
+              <div className="text-center py-4">
+                <div className="spinner-border text-primary" role="status"></div>
+              </div>
+            ) : drilldown.leads.length === 0 ? (
+              <div className="text-center text-muted">No leads found.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-bordered align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Candidate Name</th>
+                      <th>Mobile</th>
+                      <th>Email</th>
+
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drilldown.leads.map((lead, idx) => (
+                      <tr key={idx}>
+                        <td>{lead.candidateName}</td>
+                        <td>{lead.candidateMobile}</td>
+                        <td>{lead.candidateEmail ? lead.candidateEmail : 'NA'}</td>
+
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
-    </div>
-  </div>
-)}
 
       {!isFilterCollapsed && (
         <div

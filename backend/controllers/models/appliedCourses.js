@@ -63,6 +63,7 @@ const appliedCoursesSchema = new Schema(
       type: ObjectId,
       default: new mongoose.Types.ObjectId('64ab1234abcd5678ef901235')
     },
+    
     _initialStatus: {
       type: String,
       enum: ['Hot', 'Warm', 'Cold'],
