@@ -273,8 +273,8 @@ router
 			body.createdByType = 'college'
 
 			// Save course
-			// const newCourse = await Courses.create(body);
-			// res.json({ status: true, message: "Record added!", data: newCourse });
+			const newCourse = await Courses.create(body);
+			res.json({ status: true, message: "Record added!", data: newCourse });
 
 		} catch (err) {
 			console.error("Error in course upload:", err);
