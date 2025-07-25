@@ -2698,7 +2698,7 @@ form #debt-amount-slider input:checked:nth-child(1)~#debt-amount-pos {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 150px;
+  max-width: 120px;
 }
 
 /* Job action buttons */

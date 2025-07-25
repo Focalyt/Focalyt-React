@@ -39,12 +39,14 @@ const coursesRoutes = require("./courses");
 
 //b2b routes
 const b2bRoutes = require("./b2b/b2b");
+const androidAppRoutes = require("./androidApp");
 const statusB2bRoutes = require("./b2b/statusB2b");
 const router = express.Router();
 const moment = require('moment')
 
 router.use("/b2b", isCollege, b2bRoutes);
 router.use("/statusB2b", statusB2bRoutes);
+router.use("/androidApp", androidAppRoutes);
 
 router.use("/todo", isCollege, todoRoutes);
 router.use("/attendance", isCollege, attendanceRoutes);

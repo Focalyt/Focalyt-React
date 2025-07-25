@@ -74,7 +74,7 @@
     "tunnel-ssh": "^4.1.6",
     "uuid": "^3.3.2",
     "voucher-code-generator": "^1.1.1",
-    "ws": "^8.14.2",
+    "ws": "^8.18.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

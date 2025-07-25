@@ -105,6 +105,7 @@ import B2BSales from './Pages/App/College/Course/B2BSales';
 import StatusB2C from './Pages/App/College/Status/statusB2C'
 import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
 import TermsOfService from './Pages/App/College/Register/termsOfService';
+import Attendance from './Pages/App/College/Attendance/Attendance';
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -225,7 +226,7 @@ const Layout = () => {
           {/* <Route path = 'addleads' element={<AddLeads/>}/> */}
           <Route path="/institute/viewcourse/:courseId/candidate/addleads" element={<AddLeads />} />
           <Route path='batch' element={<Batch/>}/>
-          <Route path='attendance' element={<AttendanceManagement/>}/>
+          <Route path='attendance' element={<Attendance/>}/>
           <Route path='whatapp' element={<Whatapp/>}/>
           <Route path='whatappTemplate' element={<WhatappTemplate/>}/>
           <Route path='sales' element={<B2BSales/>}/>

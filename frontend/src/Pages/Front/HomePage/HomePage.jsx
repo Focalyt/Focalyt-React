@@ -313,7 +313,7 @@ const HomePage = () => {
                       <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 mt-0" >
                         <div className="content m-0">
                           <div className="content-text-block">
-                            <h2 className="content-title text-capitalize heading-md how_focal">
+                            <h2 className="content-title text-capitalize heading-md how_focal color-pink">
                               What Focalyt Does
                             </h2>
                           </div>
@@ -565,7 +565,7 @@ const HomePage = () => {
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ --> */}
       <section class="">
         <div class="container">
-          <h2 class="section-title py-md-4 text-center">Empowering Minds Through Future Technology</h2>
+          <h2 class="section-title py-md-4 text-center color-pink">Empowering Minds Through Future Technology</h2>
           <div class="row g-4">
 
             <div class="col-md-5 large-images">

@@ -32,9 +32,9 @@ const SearchCourses = () => {
 
   // ✅ Get course thumbnail image
   const getCourseImageUrl = (course) => {
-    return course.thumbnail
-      ? `${bucketUrl}/${course.thumbnail}`
-      : "/Assets/public_assets/images/newjoblisting/course_img.svg";
+    if (!course.thumbnail) return "/Assets/public_assets/images/newjoblisting/course_img.svg";
+    if (course.thumbnail.includes(bucketUrl)) return course.thumbnail;
+    return `${bucketUrl}/${course.thumbnail}`;
   };
 
   const handleVideoClick = (videoUrl) => {

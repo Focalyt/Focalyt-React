@@ -325,8 +325,8 @@ const KYCManagement = () => {
   // 🎯 eKYC Filters Configuration
   // ========================================
   const [ekycFilters, setEkycFilters] = useState([
-    { _id: 'pendingEkyc', name: 'Ekyc Pending', count: 0, milestone: '' },
-    { _id: 'doneEkyc', name: 'Ekyc Verified', count: 0, milestone: 'Ekyc Done' },
+    { _id: 'pendingEkyc', name: 'kyc Pending', count: 0, milestone: '' },
+    { _id: 'doneEkyc', name: 'kyc Verified', count: 0, milestone: 'Ekyc Done' },
     { _id: 'All', name: 'All', count: 0, milestone: '' }
 
   ]);
@@ -3303,7 +3303,7 @@ const KYCManagement = () => {
                                                 <i className="fas fa-phone"></i>
                                               </button>
                                               <img
-                                                src="/Assets/public_assets/images/ekyc_done.png"
+                                                src="/Assets/public_assets/images/kyc_done.png"
                                                 alt="ekyc done"
                                                 style={{ width: 100, height: 'auto', display: profile.kyc === true || profile?.docCounts?.totalRequired === 0 ? 'inline-block' : 'none' }}
                                               />
