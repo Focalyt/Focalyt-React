@@ -1278,6 +1278,7 @@ const KYCManagement = () => {
         page: page.toString(),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
+        ...(filters.kyc && { kyc: filters.kyc }),
         ...(filters.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
         ...(filters.sector && { sector: filters.sector }),
@@ -3360,7 +3361,7 @@ const KYCManagement = () => {
                                                   display: showPopup === profileIndex ? "block" : "none"
                                                 }}
                                               >
-                                                {Boolean(profile.kyc) && (
+                                                {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
                                                   <button
                                                     className="dropdown-item"
                                                     style={{
@@ -3510,7 +3511,7 @@ const KYCManagement = () => {
                                                   display: showPopup === profileIndex ? "block" : "none"
                                                 }}
                                               >
-                                                {Boolean(profile.kyc) && (
+                                                {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
                                                   <button
                                                     className="dropdown-item"
                                                     style={{

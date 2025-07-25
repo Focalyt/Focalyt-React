@@ -47,9 +47,15 @@ const LeadAssignmentRule = ({ users = [], enhancedEntities = {} }) => {
     assignedCounselors: []
   });
 
+
   // Sample data for dropdowns
   const centers = enhancedEntities.CENTER || [];
   const courses = enhancedEntities.COURSE || [];
+
+  useEffect(() => {
+    console.log(courses, 'courses')
+  }, [courses])
+
 
   // API Base URL - adjust according to your setup
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -144,36 +150,13 @@ const LeadAssignmentRule = ({ users = [], enhancedEntities = {} }) => {
     }
   };
 
-  // Delete rule
-  // const deleteRule = async (ruleId) => {
-  //   if (!window.confirm('Are you sure you want to delete this rule?')) {
-  //     return;
-  //   }
 
-  //   try {
-  //     const response = await fetch(`${API_BASE_URL}/lead-assignment-rules/${ruleId}`, {
-  //       method: 'DELETE'
-  //     });
-
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
-
-  //     const data = await response.json();
-
-  //     if (data.success) {
-  //       setRules(prev => prev.filter(rule => rule._id !== ruleId));
-  //     } else {
-  //       throw new Error(data.message || 'Failed to delete rule');
-  //     }
-  //   } catch (error) {
-  //     console.error('Error deleting rule:', error);
-  //     setError(error.message || 'Failed to delete rule');
-  //   }
-  // };
-
-  // getFilteredCourses function
+  
+  
+  
   const getFilteredCourses = useCallback(() => {
+
+    console.log(formData.center, 'formData.center')
     if (formData.center.type === 'any') {
       return courses;
     }
