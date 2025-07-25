@@ -203,7 +203,7 @@ const loadGoogleMapsScript = () => {
 
   const script = document.createElement('script');
   // Replace with your actual API key
-  script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBFGEMN8aEu7J6b9K2TqGF8n4Hs2Xm7E8Q&libraries=geometry,places&callback=initMap`;
+//  add secret key here from env 
   script.async = true;
   script.defer = true;
   
