@@ -756,6 +756,80 @@ const LeadAnalyticsDashboard = () => {
     }
   };
 
+  const downloadTableData = () => {
+    if (!groupedStatusData || Object.keys(groupedStatusData).length === 0) {
+      alert('No data available to download');
+      return;
+    }
+
+    // Create CSV content
+    const headers = [
+      'Project',
+      'Course',
+      'Center',
+      'Counsellor Name',
+      'Total Leads',
+      'Pending for KYC',
+      'KYC Done',
+      'Admission Done',
+      'Batch Assigned',
+      'In Zero Period (At Center)',
+      'In Batch Freezed',
+      'DropOut',
+      'Leads vs Admission %',
+      'Admission vs AtCenter %'
+    ];
+
+    const csvRows = [headers.join(',')];
+
+    Object.entries(groupedStatusData).forEach(([courseName, centers]) => {
+      Object.entries(centers).forEach(([centerName, counsellors]) => {
+        counsellors.forEach((row) => {
+          const leadsVsAdmission = row.totalLeads > 0
+            ? ((row.admissionDoneIds?.length || 0) / row.totalLeads * 100).toFixed(1) + '%'
+            : '0%';
+
+          const admissionVsAtCenter = row.inZeroPeriodIds && row.inZeroPeriodIds.length > 0 && row.admissionDoneIds && row.admissionDoneIds.length > 0
+            ? ((row.inZeroPeriodIds.length / row.admissionDoneIds.length) * 100).toFixed(1) + '%'
+            : '0%';
+
+          const csvRow = [
+            row.projectName || '',
+            courseName,
+            centerName,
+            row.counsellorName || '',
+            row.totalLeads || 0,
+            row.pendingKYC || 0,
+            row.kycDone || 0,
+            row.admissionDone || 0,
+            row.batchAssigned || 0,
+            row.inZeroPeriod || 0,
+            row.inBatchFreezed || 0,
+            row.dropOut || 0,
+            leadsVsAdmission,
+            admissionVsAtCenter
+          ].map(field => `"${field}"`).join(',');
+
+          csvRows.push(csvRow);
+        });
+      });
+    });
+
+    const csvContent = csvRows.join('\n');
+    const filename = `counsellor-status-table-${new Date().toISOString().split('T')[0]}.csv`;
+
+    // Download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
 
   // After fetching data, add a fake substatus to the first lead for testing
   if (appliedCoursesData.length > 0) {
@@ -1574,6 +1648,229 @@ const LeadAnalyticsDashboard = () => {
       alert('Failed to fetch lead details');
     }
   };
+
+  // ====== DOWNLOAD FUNCTIONS ======
+
+  // Function to convert data to CSV format
+  const convertToCSV = (data) => {
+    console.log('Converting data to CSV:', data);
+    if (!data || Object.keys(data).length === 0) {
+      console.log('No data available for CSV conversion');
+      return '';
+    }
+
+    const headers = [
+      'Project',
+      'Course',
+      'Center',
+      'Counsellor Name',
+      'Total Leads',
+      'Pending for KYC',
+      'KYC Done',
+      'Admission Done',
+      'Batch Assigned',
+      'In Zero Period (At Center)',
+      'In Batch Freezed',
+      'DropOut',
+      'Leads vs Admission %',
+      'Admission vs AtCenter %'
+    ];
+
+    const csvRows = [headers.join(',')];
+
+    Object.entries(data).forEach(([courseName, centers]) => {
+      Object.entries(centers).forEach(([centerName, counsellors]) => {
+        counsellors.forEach((row) => {
+          const leadsVsAdmission = row.totalLeads > 0
+            ? ((row.admissionDoneIds?.length || 0) / row.totalLeads * 100).toFixed(1) + '%'
+            : '0%';
+
+          const admissionVsAtCenter = row.inZeroPeriodIds && row.inZeroPeriodIds.length > 0 && row.admissionDoneIds && row.admissionDoneIds.length > 0
+            ? ((row.inZeroPeriodIds.length / row.admissionDoneIds.length) * 100).toFixed(1) + '%'
+            : '0%';
+
+          const csvRow = [
+            row.projectName || '',
+            courseName,
+            centerName,
+            row.counsellorName || '',
+            row.totalLeads || 0,
+            row.pendingKYC || 0,
+            row.kycDone || 0,
+            row.admissionDone || 0,
+            row.batchAssigned || 0,
+            row.inZeroPeriod || 0,
+            row.inBatchFreezed || 0,
+            row.dropOut || 0,
+            leadsVsAdmission,
+            admissionVsAtCenter
+          ].map(field => `"${field}"`).join(',');
+
+          csvRows.push(csvRow);
+        });
+      });
+    });
+
+    const result = csvRows.join('\n');
+    console.log('CSV content generated:', result.substring(0, 200) + '...');
+    return result;
+  };
+
+ 
+
+  // Function to download as Excel (XLSX)
+  const downloadExcel = async () => {
+    console.log('Starting Excel download...');
+    console.log('Grouped status data:', groupedStatusData);
+
+    if (!groupedStatusData || Object.keys(groupedStatusData).length === 0) {
+      alert('No data available to download');
+      return;
+    }
+
+    try {
+      // Dynamic import to avoid bundling issues
+      const XLSX = await import('xlsx');
+      console.log('XLSX library loaded successfully');
+
+      const worksheetData = [];
+      const headers = [
+        'Project',
+        'Course',
+        'Center',
+        'Counsellor Name',
+        'Total Leads',
+        'Pending for KYC',
+        'KYC Done',
+        'Admission Done',
+        'Batch Assigned',
+        'In Zero Period (At Center)',
+        'In Batch Freezed',
+        'DropOut',
+        'Leads vs Admission %',
+        'Admission vs AtCenter %'
+      ];
+
+      worksheetData.push(headers);
+
+      Object.entries(groupedStatusData).forEach(([courseName, centers]) => {
+        Object.entries(centers).forEach(([centerName, counsellors]) => {
+          counsellors.forEach((row) => {
+            const leadsVsAdmission = row.totalLeads > 0
+              ? ((row.admissionDoneIds?.length || 0) / row.totalLeads * 100).toFixed(1) + '%'
+              : '0%';
+
+            const admissionVsAtCenter = row.inZeroPeriodIds && row.inZeroPeriodIds.length > 0 && row.admissionDoneIds && row.admissionDoneIds.length > 0
+              ? ((row.inZeroPeriodIds.length / row.admissionDoneIds.length) * 100).toFixed(1) + '%'
+              : '0%';
+
+            worksheetData.push([
+              row.projectName || '',
+              courseName,
+              centerName,
+              row.counsellorName || '',
+              row.totalLeads || 0,
+              row.pendingKYC || 0,
+              row.kycDone || 0,
+              row.admissionDone || 0,
+              row.batchAssigned || 0,
+              row.inZeroPeriod || 0,
+              row.inBatchFreezed || 0,
+              row.dropOut || 0,
+              leadsVsAdmission,
+              admissionVsAtCenter
+            ]);
+          });
+        });
+      });
+
+      console.log('Worksheet data prepared:', worksheetData.length, 'rows');
+
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Counsellor Status');
+
+      // Auto-size columns
+      const colWidths = headers.map(header => ({ wch: Math.max(header.length, 15) }));
+      worksheet['!cols'] = colWidths;
+
+      const fileName = `counsellor-status-table-${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      console.log('Excel download completed:', fileName);
+    } catch (error) {
+      console.error('Error downloading Excel file:', error);
+      alert('Failed to download Excel file. Please try downloading as CSV instead.');
+    }
+  };
+
+  // Function to show download options dropdown
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+
+  // Test function to check data availability
+  const testDataAvailability = () => {
+    console.log('=== DATA AVAILABILITY TEST ===');
+    console.log('groupedStatusData:', groupedStatusData);
+    console.log('Object.keys(groupedStatusData):', Object.keys(groupedStatusData));
+    console.log('Data length:', Object.keys(groupedStatusData).length);
+
+    if (Object.keys(groupedStatusData).length > 0) {
+      const firstCourse = Object.keys(groupedStatusData)[0];
+      const firstCenter = Object.keys(groupedStatusData[firstCourse])[0];
+      const firstRow = groupedStatusData[firstCourse][firstCenter][0];
+      console.log('Sample row data:', firstRow);
+    }
+  };
+
+  // Fallback download method using window.open
+  const downloadFallback = (content, filename, type) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+ 
+
+  // Close download dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showDownloadDropdown && !event.target.closest('.dropdown')) {
+        setShowDownloadDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDownloadDropdown]);
+
+  // Browser compatibility check
+  const checkBrowserSupport = () => {
+    console.log('=== BROWSER COMPATIBILITY CHECK ===');
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Blob support:', typeof Blob !== 'undefined');
+    console.log('URL.createObjectURL support:', typeof URL !== 'undefined' && typeof URL.createObjectURL !== 'undefined');
+    console.log('Download attribute support:', 'download' in document.createElement('a'));
+
+    const isChrome = /Chrome/.test(navigator.userAgent);
+    const isFirefox = /Firefox/.test(navigator.userAgent);
+    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+    const isEdge = /Edg/.test(navigator.userAgent);
+
+    console.log('Browser detected:', {
+      Chrome: isChrome,
+      Firefox: isFirefox,
+      Safari: isSafari,
+      Edge: isEdge
+    });
+  };
+
 
   return (
     <div className="container-fluid py-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
@@ -2414,6 +2711,24 @@ const LeadAnalyticsDashboard = () => {
                   >
                     Today
                   </button>
+
+                  {/* Download Button */}
+                  <div className="position-relative">
+                    <button
+                      className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                      type="button"
+                      onClick={() => {
+                        console.log('Download button clicked, current state:', showDownloadDropdown);
+                        downloadTableData();
+                        console.log('New state will be:', !showDownloadDropdown);
+                      }}
+                      disabled={counsellorStatusLoading || Object.keys(groupedStatusData).length === 0}
+                    >
+                      <i className="fas fa-download"></i>
+                      Download
+                      <i className="fas fa-chevron-down ms-1"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
               {counsellorStatusLoading ? (
@@ -2426,30 +2741,29 @@ const LeadAnalyticsDashboard = () => {
               ) : counsellorStatusError ? (
                 <div className="alert alert-danger">{counsellorStatusError}</div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table table-bordered align-middle">
-                    <thead className="table-light">
+                <div className="table-container" style={{ maxHeight: '600px', overflow: 'auto' }}>
+                  <table className="table table-bordered align-middle table-fixed">
+                    <thead className="table-light sticky-header">
                       <tr>
-                        <th>Project</th>
-                        <th>Course</th>
-                        <th>Center</th>
-                        <th>Counsellor Name</th>
-                        <th>Total Leads</th>
-                        <th>Pending for KYC</th>
-                        <th>KYC Done</th>
-                        <th>Admission Done</th>
-                        <th>Batch Assigned</th>
-                        <th>In Zero Period (At Center)</th>
-                        <th>In Batch Freezed</th>
-                        <th>DropOut</th>
-                        <th>Leads vs Admission %</th>
-                        <th>Admission vs AtCenter %</th>
-
+                        <th style={{ minWidth: '120px', width: '120px' }}>Project</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>Course</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>Center</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>Counsellor Name</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>Total Leads</th>
+                        <th style={{ minWidth: '140px', width: '140px' }}>Pending for KYC</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>KYC Done</th>
+                        <th style={{ minWidth: '140px', width: '140px' }}>Admission Done</th>
+                        <th style={{ minWidth: '140px', width: '140px' }}>Batch Assigned</th>
+                        <th style={{ minWidth: '180px', width: '180px' }}>In Zero Period (At Center)</th>
+                        <th style={{ minWidth: '150px', width: '150px' }}>In Batch Freezed</th>
+                        <th style={{ minWidth: '120px', width: '120px' }}>DropOut</th>
+                        <th style={{ minWidth: '160px', width: '160px' }}>Leads vs Admission %</th>
+                        <th style={{ minWidth: '180px', width: '180px' }}>Admission vs AtCenter %</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Object.entries(groupedStatusData).length === 0 ? (
-                        <tr><td colSpan={11} className="text-center">No data found</td></tr>
+                        <tr><td colSpan={14} className="text-center">No data found</td></tr>
                       ) : (
                         Object.entries(groupedStatusData).map(([courseName, centers]) => {
                           const courseRowSpan = Object.values(centers).reduce((sum, arr) => sum + arr.length, 0);
@@ -2473,15 +2787,15 @@ const LeadAnalyticsDashboard = () => {
                                     <td rowSpan={centerRowSpan}>{centerName}</td>
                                   )}
                                   <td>{row.counsellorName}</td>
-                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.totalLeadIds, 'Total Leads')}>{row.totalLeads}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.totalLeadIds, 'Total Leads')}>{row.totalLeads}</td>
 
-                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, 'Pending for KYC')}>{row.pendingKYC}</td>
-                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, 'KYC Done')}>{row.kycDone}</td>
-                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, 'Admission Done')}>{row.admissionDone}</td>
-                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.batchAssignedIds, 'Batch Assigned')}>{row.batchAssigned}</td>
-                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.inZeroPeriodIds, 'In Zero Period')}>{row.inZeroPeriod}</td>
-                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.inBatchFreezedIds, 'In Batch Freezed')}>{row.inBatchFreezed}</td>
-                                  <td className="text-center" onClick={() => fetchLeadDetailsByIds(row.dropOutIds, 'DropOut')}>{row.dropOut}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.pendingKYCIds, 'Pending for KYC')}>{row.pendingKYC}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.kycDoneIds, 'KYC Done')}>{row.kycDone}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.admissionDoneIds, 'Admission Done')}>{row.admissionDone}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.batchAssignedIds, 'Batch Assigned')}>{row.batchAssigned}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inZeroPeriodIds, 'In Zero Period')}>{row.inZeroPeriod}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.inBatchFreezedIds, 'In Batch Freezed')}>{row.inBatchFreezed}</td>
+                                  <td className="text-center clickable-cell" onClick={() => fetchLeadDetailsByIds(row.dropOutIds, 'DropOut')}>{row.dropOut}</td>
                                   <td className="text-center">
                                     {row.totalLeads > 0
                                       ? ((row.admissionDoneIds.length / row.totalLeads) * 100).toFixed(1) + '%'
@@ -2489,7 +2803,7 @@ const LeadAnalyticsDashboard = () => {
                                   </td>
                                   <td className="text-center">
                                     {row.inZeroPeriodIds && row.inZeroPeriodIds.length > 0
-                                      ? (( row.inZeroPeriodIds.length/row.admissionDoneIds.length ) * 100).toFixed(1) + '%'
+                                      ? ((row.inZeroPeriodIds.length / row.admissionDoneIds.length) * 100).toFixed(1) + '%'
                                       : '0%'}
                                   </td>
                                 </tr>
@@ -2541,6 +2855,173 @@ const LeadAnalyticsDashboard = () => {
           border-left-color: #0d6efd;
           background-color: #e7f1ff;
           color: #0a58ca;
+        }
+        
+        /* Frozen Header Table Styles */
+        .table-container {
+          position: relative;
+          border: 1px solid #dee2e6;
+          border-radius: 0.375rem;
+          background: white;
+        }
+        
+        .table-container .table {
+          margin-bottom: 0;
+          border-collapse: separate;
+          border-spacing: 0;
+        }
+        
+        .sticky-header {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background-color: #f8f9fa;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .sticky-header th {
+          background-color: #f8f9fa;
+          border-bottom: 2px solid #dee2e6;
+          font-weight: 600;
+          color: #495057;
+          white-space: nowrap;
+          padding: 12px 8px;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+        
+        .table-fixed {
+          table-layout: fixed;
+          width: 100%;
+        }
+        
+        .table-fixed th,
+        .table-fixed td {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          padding: 8px;
+          vertical-align: middle;
+          border: 1px solid #dee2e6;
+        }
+        
+        .clickable-cell {
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+        }
+        
+        .clickable-cell:hover {
+          background-color: #e3f2fd !important;
+          color: #1976d2;
+        }
+        
+        /* Scrollbar styling */
+        .table-container::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        
+        .table-container::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+        
+        .table-container::-webkit-scrollbar-thumb {
+          background: #c1c1c1;
+          border-radius: 4px;
+        }
+        
+        .table-container::-webkit-scrollbar-thumb:hover {
+          background: #a8a8a8;
+        }
+        
+        /* Ensure header stays on top during scroll */
+        .table-container thead {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+        
+        /* Table body scroll optimization */
+        .table-container tbody {
+          position: relative;
+        }
+        
+        /* Row hover effects */
+        .table-container tbody tr:hover {
+          background-color: #f8f9fa;
+        }
+        
+        /* Ensure proper border rendering */
+        .table-container .table-bordered {
+          border: 1px solid #dee2e6;
+        }
+        
+        .table-container .table-bordered th,
+        .table-container .table-bordered td {
+          border: 1px solid #dee2e6;
+        }
+        
+        /* Header shadow for better visual separation */
+        .sticky-header::after {
+          content: '';
+          position: absolute;
+          bottom: -2px;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: linear-gradient(to bottom, rgba(0,0,0,0.1), transparent);
+          pointer-events: none;
+        }
+        
+        /* Download dropdown styles */
+        .dropdown-menu {
+          border: 1px solid #dee2e6;
+          box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+          border-radius: 0.375rem;
+          padding: 0.5rem 0;
+          min-width: 200px;
+        }
+        
+        .dropdown-item {
+          padding: 0.5rem 1rem;
+          color: #495057;
+          text-decoration: none;
+          transition: all 0.2s ease;
+        }
+        
+        .dropdown-item:hover {
+          background-color: #f8f9fa;
+          color: #212529;
+        }
+        
+        .dropdown-item:active {
+          background-color: #e9ecef;
+        }
+        
+        .dropdown-item i {
+          width: 16px;
+          text-align: center;
+        }
+        
+        /* Force dropdown visibility */
+        .dropdown-menu.show {
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+        }
+        
+        /* Ensure dropdown is above other elements */
+        .dropdown.position-relative {
+          z-index: 1001;
+        }
+        
+        /* Debug styles */
+        .debug-dropdown {
+          background-color: #ff0000 !important;
+          color: white !important;
+          border: 2px solid yellow !important;
         }
       `}</style>
 
