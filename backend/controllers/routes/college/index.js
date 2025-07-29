@@ -3914,12 +3914,10 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': searchRegex },
 					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm }, // Try both number and string
 					{ '_candidate.email': searchRegex }
 				] : [
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': searchRegex },
 					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 					{ '_candidate.email': searchRegex }
 				];
@@ -4267,15 +4265,16 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 			}
 
 			if (appliedFilters.name && appliedFilters.name.trim()) {
+				const searchTerm = appliedFilters.name.trim();
 				const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 					{ '_candidate.email': searchRegex }
 				] : [
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 					{ '_candidate.email': searchRegex }
 				];
 			}
@@ -5339,15 +5338,16 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 				additionalMatches['_center._id'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 			}
 			if (appliedFilters.name && appliedFilters.name.trim()) {
+				const searchTerm = appliedFilters.name.trim();
 				const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
 				additionalMatches.$or = additionalMatches.$or ? [
 					...additionalMatches.$or,
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) ||searchRegex },
 					{ '_candidate.email': searchRegex }
 				] : [
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': searchRegex },
+					{ '_candidate.mobile': parseInt(searchTerm) || searchRegex },
 					{ '_candidate.email': searchRegex }
 				];
 			}
@@ -6752,7 +6752,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 			
 			additionalMatches.$or = [
 				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': searchRegex },
 				{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 				{ '_candidate.email': searchRegex }
 			];
@@ -6770,7 +6769,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 					{
 						$or: [
 							{ '_candidate.name': searchRegex },
-							{ '_candidate.mobile': searchRegex },
 							{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 							{ '_candidate.email': searchRegex }
 						]
@@ -6780,7 +6778,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 			} else {
 				additionalMatches.$or = [
 					{ '_candidate.name': searchRegex },
-					{ '_candidate.mobile': searchRegex },
 					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 					{ '_candidate.email': searchRegex }
 				];

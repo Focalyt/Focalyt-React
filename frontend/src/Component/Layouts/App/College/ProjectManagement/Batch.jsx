@@ -239,7 +239,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
 
   // Documents specific state
@@ -472,34 +471,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       console.error('Error assigning batch:', error);
       alert('Failed to assign batch');
     }
-    await fetchProfileData();
+    await fetchAdmissionsData();
     closePanel();
   }
 
-  const fetchProfileData = async () => {
-    try {
-      if (!token) {
-        console.warn('No token found in session storage.');
-        return;
-      }
-      // Replace with your actual profile API endpoint
-      const response = await axios.get(`${backendUrl}/college/appliedCandidates?page=${currentPage}`, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-      if (response.data.success && response.data.data) {
-        const data = response.data.data; // create array 
-        setAllProfiles(response.data.data);
-        setAllProfilesData(response.data.data)
-        setTotalPages(response.data.totalPages);
-      } else {
-        console.error('Failed to fetch profile data', response.data.message);
-      }
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-    }
-  };
 
   const fetchSubStatus = async () => {
     try {

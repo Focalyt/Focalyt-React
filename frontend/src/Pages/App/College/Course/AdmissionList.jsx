@@ -268,13 +268,13 @@ const AdmissionList = () => {
 
   const candidateRef = useRef();
 
-  const fetchProfile = (id) => {
-    if (candidateRef.current) {
-      console.log('start fetching', id)
-      candidateRef.current.fetchProfile(id);
-      fetchProfileData();
-    }
-  };
+  // const fetchProfile = (id) => {
+  //   if (candidateRef.current) {
+  //     console.log('start fetching', id)
+  //     candidateRef.current.fetchProfile(id);
+  //     fetchProfileData();
+  //   }
+  // };
 
 
   const handleSaveCV = async () => {
@@ -459,8 +459,8 @@ const AdmissionList = () => {
     { _id: 'alladmission', name: 'All Lists', count: 0, milestone: '' },
 
     { _id: 'pendingBatchAssign', name: 'Pending For Batch Assign', count: 0, milestone: '' },
-    { _id: 'batchAssigned', name: 'Pending For Zero Period', count: 0, milestone: 'Completed' },
-    { _id: 'zeroPeriod', name: 'Pending For Batch Freeze', count: 0, milestone: '' },
+    { _id: 'batchAssigned', name: 'Batch Assigned', count: 0, milestone: 'Completed' },
+    { _id: 'zeroPeriod', name: 'At Zero Period', count: 0, milestone: '' },
     { _id: 'batchFreeze', name: 'Batch Freezed Students', count: 0, milestone: '' },
     { _id: 'dropout', name: 'Dropout', count: 0, milestone: '' }
   ]);
@@ -795,27 +795,7 @@ const AdmissionList = () => {
     console.log('seletectedSubStatus', seletectedSubStatus)
   }, [seletectedSubStatus]);
 
-  // Format date range for display
-  const formatDateRange = (fromDate, toDate) => {
-    if (!fromDate && !toDate) {
-      return 'Select Date Range';
-    }
-    if (fromDate && !toDate) {
-      return `From ${fromDate.toLocaleDateString('en-GB')}`;
-    }
-    if (!fromDate && toDate) {
-      return `Until ${toDate.toLocaleDateString('en-GB')}`;
-    }
-    if (fromDate && toDate) {
-      const from = fromDate.toLocaleDateString('en-GB');
-      const to = toDate.toLocaleDateString('en-GB');
-      if (from === to) {
-        return from;
-      }
-      return `${from} - ${to}`;
-    }
-    return 'Select Date Range';
-  };
+ 
 
   // Date range handlers
   const handleDateFilterChange = (date, fieldName) => {
@@ -867,54 +847,7 @@ const AdmissionList = () => {
     
   };
 
-  const handleDateChange = (date, fieldName) => {
-    setFilterData(prev => ({
-      ...prev,
-      [fieldName]: date
-    }));
 
-    setTimeout(() => {
-      const newFilterData = {
-        ...filterData,
-        [fieldName]: date
-      };
-    }, 100);
-  };
-
-  const clearCreatedDate = () => {
-    setFilterData(prev => ({
-      ...prev,
-      createdFromDate: null,
-      createdToDate: null
-    }));
-    
-  };
-
-  const clearModifiedDate = () => {
-    setFilterData(prev => ({
-      ...prev,
-      modifiedFromDate: null,
-      modifiedToDate: null
-    }));
-   
-  };
-
-  const clearNextActionDate = () => {
-    setFilterData(prev => ({
-      ...prev,
-      nextActionFromDate: null,
-      nextActionToDate: null
-    }));
-    
-  };
-
-  const handleSearch = (searchTerm) => {
-   const searchItem = searchTerm.trim();
-   setFilterData(prev => ({ ...prev, name: searchItem }));
-   
-  };
-
- 
 
   // Helper function for status icons
   const getStatusIcon = (statusName) => {
@@ -1281,9 +1214,6 @@ const AdmissionList = () => {
     fetchProfileData();
   }, []);
 
-  useEffect(() => {
-    fetchProfileData();
-  }, [currentPage, filterData]);
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
@@ -1331,8 +1261,8 @@ const AdmissionList = () => {
         const filter = [
           { _id: 'alladmission', name: 'All Lists', count: crmFilterCounts.all, milestone: '' },
           { _id: 'pendingBatchAssign', name: 'Pending For Batch Assign', count: crmFilterCounts.pendingBatchAssign, milestone: '' },
-          { _id: 'batchAssigned', name: 'Pending For Zero Period', count: crmFilterCounts.batchAssigned, milestone: 'Completed' },
-          { _id: 'zeroPeriod', name: 'Pending For Batch Freeze', count: crmFilterCounts.zeroPeriod, milestone: '' },
+          { _id: 'batchAssigned', name: 'Batch Assigned', count: crmFilterCounts.batchAssigned, milestone: 'Completed' },
+          { _id: 'zeroPeriod', name: 'At Zero Period', count: crmFilterCounts.zeroPeriod, milestone: '' },
           { _id: 'batchFreeze', name: 'Batch Freezed Students', count: crmFilterCounts.batchFreeze, milestone: '' },
           { _id: 'dropout', name: 'Dropout', count: crmFilterCounts.dropout, milestone: '' }
 
@@ -1478,12 +1408,7 @@ const AdmissionList = () => {
     setOpenModalId(profile._id);
   }
 
-  useEffect(() => {
-    console.log('useeffect', selectedProfile);
-    if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
-      fetchProfile(selectedProfile._candidate._id);
-    }
-  }, [selectedProfile]);
+
 
   const openWhatsappPanel = () => {
     setShowWhatsappPanel(true);
@@ -2798,49 +2723,46 @@ const AdmissionList = () => {
                 </div>
 
                 <div className="col-md-4">
-                  <div className="d-flex justify-content-end align-items-center gap-2">
-                    <div className="input-group" style={{ maxWidth: '300px' }}>
-                      <span className="input-group-text bg-white border-end-0 input-height">
-                        <i className="fas fa-search text-muted"></i>
-                      </span>
-                      <input
-                        type="text"
-                        name="name"
-                        className="form-control border-start-0 m-0"
-                        placeholder="Quick search..."
-                        value={filterData.name}
-                        onChange={handleFilterChange}
-                      />
-                      {filterData.name && (
-                        <button
-                          className="btn btn-outline-secondary border-start-0"
-                          type="button"
-                          onClick={() => {
-                            setFilterData(prev => ({ ...prev, name: '' }));                            
-                          }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      )}
+                    <div className="d-flex justify-content-end align-items-center gap-2">
+                      <div className="input-group" style={{ maxWidth: '300px' }}>
+                       
+                        <input
+                          type="text"
+                          name="name"
+                          className="form-control border-start-0 m-0"
+                          placeholder="Quick search..."
+                          value={filterData.name}
+                          onChange={handleFilterChange}
+                        />
+                         <button
+                        onClick={() => fetchProfileData()}
+                        className={`btn btn-outline-primary`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-search me-1`}></i>
+                        Search
+                        
+                      </button>
+                      </div>
+                     
+
+                      <button
+                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                        Filters
+                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                          <span className="bg-light text-dark ms-1">
+                            {Object.values(filterData).filter(val => val && val !== 'true').length}
+                          </span>
+                        )}
+                      </button>
+
+                    
                     </div>
-
-                    <button
-                      onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                      className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                      style={{ whiteSpace: 'nowrap' }}
-                    >
-                      <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                      Filters
-                      {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                        <span className="bg-light text-dark ms-1">
-                          {Object.values(filterData).filter(val => val && val !== 'true').length}
-                        </span>
-                      )}
-                    </button>
-
-                   
                   </div>
-                </div>
               </div>
             </div>
           </nav>
@@ -3237,7 +3159,7 @@ const AdmissionList = () => {
                         <button
                           className="btn btn-primary"
                           onClick={() => {
-                            fetchProfileData(filterData);
+                            fetchProfileData(filterData, 1);
                             setIsFilterCollapsed(true);
                           }}
                         >
@@ -3314,6 +3236,10 @@ const AdmissionList = () => {
                                             alt="ekyc pending"
                                             style={{ width: 100, height: 'auto', display:  profile.docCounts?.totalRequired === 0? 'inline-block' : 'none' }}
                                           />
+                                        </div>
+                                       
+                                        <div>
+
                                         </div>
                                       </div>
                                     </div>

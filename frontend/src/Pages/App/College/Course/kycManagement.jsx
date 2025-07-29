@@ -1262,7 +1262,7 @@ const KYCManagement = () => {
     fetchProfileData();
     console.log(filterData, 'filterData')
 
-  }, [filterData, currentPage]);
+  }, [currentPage]);
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
@@ -3314,6 +3314,14 @@ const KYCManagement = () => {
                                                 style={{ width: 100, height: 'auto', display: profile.kyc === false && profile?.docCounts?.totalRequired > 0 ? 'inline-block' : 'none' }}
                                               />
                                             </div>
+
+                                            {profile.batch && (
+                                          <div style={{marginLeft: '15px', backgroundColor: 'green', padding: '5px', borderRadius: '5px'}}>
+
+                                            <h5 style={{ fontWeight: 'bold', color: 'white'}}>Batch Assigned</h5>
+
+                                          </div>
+                                        )}
                                           </div>
                                         </div>
 
