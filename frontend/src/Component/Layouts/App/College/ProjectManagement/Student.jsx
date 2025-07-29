@@ -20,27 +20,22 @@ const useNavHeight = (dependencies = []) => {
 
 
   const calculateHeightAndWidth = useCallback(() => {
-    console.log('🔍 Calculating nav height and width...');
 
     if (navRef.current) {
       // Calculate Height
       const height = navRef.current.offsetHeight;
-      console.log('📏 Found nav height:', height);
 
       if (height > 0) {
         setNavHeight(height);
-        console.log('✅ Nav height set to:', height + 'px');
       }
 
       // Calculate Width from parent (position-relative container)
       const parentContainer = navRef.current.closest('.position-relative');
       if (parentContainer) {
         const parentWidth = parentContainer.offsetWidth;
-        console.log('📐 Parent width:', parentWidth);
 
         if (parentWidth > 0) {
           setNavWidth(parentWidth + 'px');
-          console.log('✅ Width set to:', parentWidth + 'px');
         }
       }
 
@@ -49,13 +44,11 @@ const useNavHeight = (dependencies = []) => {
       if (subTabsElement) {
         const subTabsElementHeight = subTabsElement.offsetHeight;
         setSubTabsHeight(subTabsElementHeight);
-        console.log('📏 SubTabs height:', subTabsElementHeight);
       }
 
       // Calculate total margin-top for content-body
       const totalMarginTop = height + (subTabsElement ? subTabsElement.offsetHeight : 0);
       setContentMarginTop(totalMarginTop);
-      console.log('📏 Total margin-top for content:', totalMarginTop);
     } else {
       console.log('❌ navRef.current is null');
     }
@@ -1922,7 +1915,7 @@ const Student = ({
       const queryParams = new URLSearchParams({
         page: currentPage.toString(),
         limit: '50',
-        tab: activeTab,
+        status: activeTab,
       });
 
       // Add search query
@@ -1943,16 +1936,13 @@ const Student = ({
 
 
       if (response.data.success && response.data.data) {
+
+        console.log('response.data.data', response.data.data);
         setAllProfiles(response.data.data);
         setTotalPages(response.data.totalPages);
 
 
-        const getStartandEndDate = () => {
-          const startDate = new Date(response.data.data[0].batch.zeroPeriodStartDate);
-          const endDate = new Date(response.data.data[0].batch.endDate);
-          return { startDate, endDate };
-        }
-        setRegisterDateRange(getStartandEndDate());
+       
 
         // Update tab counts if available
         if (response.data.filterCounts) {
