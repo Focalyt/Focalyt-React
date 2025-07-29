@@ -1594,7 +1594,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                     type="button"
                     onClick={() => {
                       setSearchQuery('');
-                      fetchAdmissionsData(''); // Empty string explicitly pass karo
                     }}
                     title="Clear search"
                   >
