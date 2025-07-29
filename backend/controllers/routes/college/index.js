@@ -7499,6 +7499,7 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                 {
                   $and: [
                     { $eq: ['$isBatchAssigned', true] },
+					{ $eq: ['$dropout', false] },
                     // Date filter for batch assigned (batchAssignedAt)
                     allTime === 'true' || (startDate && endDate && {
                       $and: [
@@ -7519,6 +7520,7 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                 {
                   $and: [
                     { $eq: ['$isBatchAssigned', true] },
+					{ $eq: ['$dropout', false] },
                     // Date filter for batch assigned (batchAssignedAt)
                     allTime === 'true' || (startDate && endDate && {
                       $and: [
@@ -7540,6 +7542,7 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                 {
                   $and: [
                     { $eq: ['$isZeroPeriodAssigned', true] },
+					{ $eq: ['$dropout', false] },
                     // Date filter for zero period assigned (zeroPeriodAssignedAt)
                     allTime === 'true' || (startDate && endDate && {
                       $and: [
@@ -7560,6 +7563,7 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                 {
                   $and: [
                     { $eq: ['$isZeroPeriodAssigned', true] },
+					{ $eq: ['$dropout', false] },
                     // Date filter for zero period assigned (zeroPeriodAssignedAt)
                     allTime === 'true' || (startDate && endDate && {
                       $and: [
@@ -7581,6 +7585,7 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                 {
                   $and: [
                     { $eq: ['$isBatchFreeze', true] },
+					{ $eq: ['$dropout', false] },
                     // Date filter for batch freeze (batchFreezeAt)
                     allTime === 'true' || (startDate && endDate && {
                       $and: [
@@ -7601,6 +7606,7 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                 {
                   $and: [
                     { $eq: ['$isBatchFreeze', true] },
+					{ $eq: ['$dropout', false] },
                     // Date filter for batch freeze (batchFreezeAt)
                     allTime === 'true' || (startDate && endDate && {
                       $and: [
