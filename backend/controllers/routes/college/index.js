@@ -4852,6 +4852,8 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 		// If this is the last required doc being verified, set KYC true
 		if (status === 'Verified' && verifiedCount === requiredCount) {
 			profile.kyc = true;
+			profile.kycDoneAt = new Date();
+			profile.kycDoneBy = req.user._id;
 		}
 
 		await profile.save();
@@ -7222,30 +7224,19 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
     const { dateFrom, dateTo, allTime } = req.query;
     
     let dateFilter = {};
+    let startDate, endDate;
     
     if (allTime === 'true') {
       // Show all time data - no date filter
       dateFilter = {};
     } else if (dateFrom && dateTo) {
       // Use provided date range
-      const startDate = moment(dateFrom).startOf('day').toDate();
-      const endDate = moment(dateTo).endOf('day').toDate();
-      dateFilter = {
-        createdAt: {
-          $gte: startDate,
-          $lte: endDate
-        }
-      };
+      startDate = moment(dateFrom).startOf('day').toDate();
+      endDate = moment(dateTo).endOf('day').toDate();
     } else {
       // Default to today's date range
-      const todayStart = moment().startOf('day').toDate();
-      const todayEnd = moment().endOf('day').toDate();
-      dateFilter = {
-        createdAt: {
-          $gte: todayStart,
-          $lte: todayEnd
-        }
-      };
+      startDate = moment().startOf('day').toDate();
+      endDate = moment().endOf('day').toDate();
     }
 
     // Aggregate appliedCourses for this college, grouped by course, center, and counsellor
@@ -7280,8 +7271,7 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
       { $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
       {
         $match: {
-          '_course.college': college._id,
-          ...dateFilter
+          '_course.college': college._id
         }
       },
       // Get latest counsellor assignment
@@ -7302,6 +7292,36 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
             counsellorId: '$latestAssignment._counsellor',
             counsellorName: '$latestAssignment.counsellorName'
           },
+          // Total Leads - filtered by createdAt
+          totalLeads: {
+            $sum: {
+              $cond: [
+                allTime === 'true' || (startDate && endDate && {
+                  $and: [
+                    { $gte: ['$createdAt', startDate] },
+                    { $lte: ['$createdAt', endDate] }
+                  ]
+                }),
+                1,
+                0
+              ]
+            }
+          },
+          totalLeadIds: {
+            $push: {
+              $cond: [
+                allTime === 'true' || (startDate && endDate && {
+                  $and: [
+                    { $gte: ['$createdAt', startDate] },
+                    { $lte: ['$createdAt', endDate] }
+                  ]
+                }),
+                '$_id',
+                '$$REMOVE'
+              ]
+            }
+          },
+          // Pending KYC - filtered by createdAt (when KYC stage is true but KYC is not done)
           pendingKYC: {
             $sum: {
               $cond: [
@@ -7314,7 +7334,14 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                         { $gt: [{ $size: '$_course.docsRequired' }, 0] },
                         { $ne: ['$_course.docsRequired', null] }
                       ]
-                    }
+                    },
+                    // Date filter for pending KYC (createdAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$createdAt', startDate] },
+                        { $lte: ['$createdAt', endDate] }
+                      ]
+                    })
                   ]
                 },
                 1,
@@ -7334,7 +7361,14 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                         { $gt: [{ $size: '$_course.docsRequired' }, 0] },
                         { $ne: ['$_course.docsRequired', null] }
                       ]
-                    }
+                    },
+                    // Date filter for pending KYC (createdAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$createdAt', startDate] },
+                        { $lte: ['$createdAt', endDate] }
+                      ]
+                    })
                   ]
                 },
                 '$_id',
@@ -7342,23 +7376,35 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
               ]
             }
           },
+          // KYC Done - filtered by kycDoneAt
           kycDone: {
             $sum: {
               $cond: [
                 {
-                  $or: [
-                    { $eq: ['$kyc', true] },
+                  $and: [
                     {
-                      $and: [
-                        { $eq: ['$kyc', false] },
+                      $or: [
+                        { $eq: ['$kyc', true] },
                         {
-                          $or: [
-                            { $eq: [{ $size: '$_course.docsRequired' }, 0] },
-                            { $eq: ['$_course.docsRequired', null] }
+                          $and: [
+                            { $eq: ['$kyc', false] },
+                            {
+                              $or: [
+                                { $eq: [{ $size: '$_course.docsRequired' }, 0] },
+                                { $eq: ['$_course.docsRequired', null] }
+                              ]
+                            }
                           ]
                         }
                       ]
-                    }
+                    },
+                    // Date filter for KYC done (kycDoneAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$kycDoneAt', startDate] },
+                        { $lte: ['$kycDoneAt', endDate] }
+                      ]
+                    })
                   ]
                 },
                 1,
@@ -7370,19 +7416,30 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
             $push: {
               $cond: [
                 {
-                  $or: [
-                    { $eq: ['$kyc', true] },
+                  $and: [
                     {
-                      $and: [
-                        { $eq: ['$kyc', false] },
+                      $or: [
+                        { $eq: ['$kyc', true] },
                         {
-                          $or: [
-                            { $eq: [{ $size: '$_course.docsRequired' }, 0] },
-                            { $eq: ['$_course.docsRequired', null] }
+                          $and: [
+                            { $eq: ['$kyc', false] },
+                            {
+                              $or: [
+                                { $eq: [{ $size: '$_course.docsRequired' }, 0] },
+                                { $eq: ['$_course.docsRequired', null] }
+                              ]
+                            }
                           ]
                         }
                       ]
-                    }
+                    },
+                    // Date filter for KYC done (kycDoneAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$kycDoneAt', startDate] },
+                        { $lte: ['$kycDoneAt', endDate] }
+                      ]
+                    })
                   ]
                 },
                 '$_id',
@@ -7390,20 +7447,63 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
               ]
             }
           },
+          // Admission Done - filtered by admissionDate
           admissionDone: {
             $sum: {
-              $cond: [ { $eq: ['$admissionDone', true] }, 1, 0 ]
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$admissionDone', true] },
+                    // Date filter for admission done (admissionDate)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$admissionDate', startDate] },
+                        { $lte: ['$admissionDate', endDate] }
+                      ]
+                    })
+                  ]
+                },
+                1,
+                0
+              ]
             }
           },
           admissionDoneIds: {
             $push: {
-              $cond: [ { $eq: ['$admissionDone', true] }, '$_id', '$$REMOVE' ]
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$admissionDone', true] },
+                    // Date filter for admission done (admissionDate)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$admissionDate', startDate] },
+                        { $lte: ['$admissionDate', endDate] }
+                      ]
+                    })
+                  ]
+                },
+                '$_id',
+                '$$REMOVE'
+              ]
             }
           },
+          // Batch Assigned - filtered by batchAssignedAt
           batchAssigned: {
             $sum: {
               $cond: [
-                { $eq: ['$isBatchAssigned', true] },
+                {
+                  $and: [
+                    { $eq: ['$isBatchAssigned', true] },
+                    // Date filter for batch assigned (batchAssignedAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$batchAssignedAt', startDate] },
+                        { $lte: ['$batchAssignedAt', endDate] }
+                      ]
+                    })
+                  ]
+                },
                 1,
                 0
               ]
@@ -7411,16 +7511,38 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
           },
           batchAssignedIds: {
             $push: {
-              $cond: [ { $eq: ['$isBatchAssigned', true] }, '$_id', '$$REMOVE' ]
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$isBatchAssigned', true] },
+                    // Date filter for batch assigned (batchAssignedAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$batchAssignedAt', startDate] },
+                        { $lte: ['$batchAssignedAt', endDate] }
+                      ]
+                    })
+                  ]
+                },
+                '$_id',
+                '$$REMOVE'
+              ]
             }
           },
+          // In Zero Period - filtered by zeroPeriodAssignedAt
           inZeroPeriod: {
             $sum: {
               $cond: [
                 {
                   $and: [
                     { $eq: ['$isZeroPeriodAssigned', true] },
-                    { $ne: ['$isBatchAssigned', true] }
+                    // Date filter for zero period assigned (zeroPeriodAssignedAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$zeroPeriodAssignedAt', startDate] },
+                        { $lte: ['$zeroPeriodAssignedAt', endDate] }
+                      ]
+                    })
                   ]
                 },
                 1,
@@ -7434,7 +7556,13 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
                 {
                   $and: [
                     { $eq: ['$isZeroPeriodAssigned', true] },
-                    { $ne: ['$isBatchAssigned', true] }
+                    // Date filter for zero period assigned (zeroPeriodAssignedAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$zeroPeriodAssignedAt', startDate] },
+                        { $lte: ['$zeroPeriodAssignedAt', endDate] }
+                      ]
+                    })
                   ]
                 },
                 '$_id',
@@ -7442,28 +7570,88 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
               ]
             }
           },
+          // In Batch Freezed - filtered by batchFreezeAt
           inBatchFreezed: {
             $sum: {
-              $cond: [ { $eq: ['$isBatchFreeze', true] }, 1, 0 ]
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$isBatchFreeze', true] },
+                    // Date filter for batch freeze (batchFreezeAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$batchFreezeAt', startDate] },
+                        { $lte: ['$batchFreezeAt', endDate] }
+                      ]
+                    })
+                  ]
+                },
+                1,
+                0
+              ]
             }
           },
           inBatchFreezedIds: {
             $push: {
-              $cond: [ { $eq: ['$isBatchFreeze', true] }, '$_id', '$$REMOVE' ]
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$isBatchFreeze', true] },
+                    // Date filter for batch freeze (batchFreezeAt)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$batchFreezeAt', startDate] },
+                        { $lte: ['$batchFreezeAt', endDate] }
+                      ]
+                    })
+                  ]
+                },
+                '$_id',
+                '$$REMOVE'
+              ]
             }
           },
+          // DropOut - filtered by dropoutDate
           dropOut: {
             $sum: {
-              $cond: [ { $eq: ['$dropout', true] }, 1, 0 ]
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$dropout', true] },
+                    // Date filter for dropout (dropoutDate)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$dropoutDate', startDate] },
+                        { $lte: ['$dropoutDate', endDate] }
+                      ]
+                    })
+                  ]
+                },
+                1,
+                0
+              ]
             }
           },
           dropOutIds: {
             $push: {
-              $cond: [ { $eq: ['$dropout', true] }, '$_id', '$$REMOVE' ]
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$dropout', true] },
+                    // Date filter for dropout (dropoutDate)
+                    allTime === 'true' || (startDate && endDate && {
+                      $and: [
+                        { $gte: ['$dropoutDate', startDate] },
+                        { $lte: ['$dropoutDate', endDate] }
+                      ]
+                    })
+                  ]
+                },
+                '$_id',
+                '$$REMOVE'
+              ]
             }
-          },
-          totalLeads: { $sum: 1 },
-          totalLeadIds: { $push: '$_id' }
+          }
         }
       },
       {
