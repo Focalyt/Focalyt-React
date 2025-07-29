@@ -474,10 +474,9 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                         <i className="bi bi-book text-info fs-3 me-2"></i>
                         <div>
                           {/* <h5 className="card-title mb-1">{course.code}</h5> */}
-                          <p className="text-muted mb-1">{course.courseLevel}</p>
+                          <p className="text-muted mb-1">{course.name}</p>
                         </div>
                       </div>
-                      <p className="text-muted small mb-2">{course.name}</p>
                       <div className="d-flex flex-wrap gap-2 mb-2">
                         <span className={`${course.status === 'active' ? 'text-success' : 'text-secondary'}`}>
                           {course.status}
@@ -485,99 +484,17 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
 
                         <span className="bg-primary">{course.sectors && course.sectors.length > 0 ? course.sectors[0].name : 'N/A'}
                         </span>
-                        {/* ======== ADD THIS: Show center code badge ======== */}
-                        {selectedCenter && (
-                          <span className="text-secondary">
-                            {course.centerCode}
-                          </span>
-                        )}
+                       
                       </div>
-                      {/* <div className="small text-muted mb-2">
-                        <i className="bi bi-person-fill me-1"></i>
-                        <strong>Instructor:</strong> {course.instructor}
-                      </div> */}
+                     
                     </div>
-                    {/* ======== MODIFY THIS: Add stopPropagation to action buttons ======== */}
-                    <div className="text-end">
-                      {/* <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Share" onClick={(e) => { e.stopPropagation(); handleShare(course); }}>
-                        <i className="bi bi-share-fill"></i>
-                      </button> */}
-                      <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(course); }}>
-                        <i className="bi bi-pencil-square"></i>
-                      </button>
-                      {/* <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(course); }}>
-                        <i className="bi bi-trash"></i>
-                      </button> */}
-                    </div>
+                   
                   </div>
 
-                  {/* Enrollment Progress */}
-                  {/* <div className="mb-2">
-                    <div className="d-flex justify-content-between small text-muted mb-1">
-                      <span>Enrollment</span>
-                      <span>{course.enrolledStudents}/{course.maxStudents} ({enrollmentPercentage}%)</span>
-                    </div>
-                    <div className="progress" style={{ height: '4px' }}>
-                      <div
-                        className="progress-bar bg-info"
-                        role="progressbar"
-                        style={{ width: `${enrollmentPercentage}%` }}
-                      ></div>
-                    </div>
-                  </div> */}
+                  
+                 
 
-                  {/* Completion Progress */}
-                  {/* <div className="mb-3">
-                    <div className="d-flex justify-content-between small text-muted mb-1">
-                      <span>Completion</span>
-                      <span>{course.completedStudents}/{course.enrolledStudents} ({completionPercentage}%)</span>
-                    </div>
-                    <div className="progress" style={{ height: '4px' }}>
-                      <div
-                        className="progress-bar bg-success"
-                        role="progressbar"
-                        style={{ width: `${completionPercentage}%` }}
-                      ></div>
-                    </div>
-                  </div> */}
-
-                  {/* ======== MODIFY THIS: Add batches display in stats ======== */}
-                  <div className="row small text-muted">
-                    {/* <div className="col-2 text-center">
-                      <div className="fw-bold text-primary">{course.credits}</div>
-                      <div>Credits</div>
-                    </div> */}
-                    {/* <div className="col-2 text-center">
-                      <div className="fw-bold text-info">{course.duration}</div>
-                      <div>Duration</div>
-                    </div> */}
-                    {/* <div className="col-2 text-center">
-                      <div className="fw-bold text-warning">{course.enrolledStudents}</div>
-                      <div>Enrolled</div>
-                    </div> */}
-
-                    {/* <div className="col-2 text-center">
-                      <span 
-                        className="fw-bold text-danger" 
-                        style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                        onClick={() => handleCourseClick(course)}
-                      >
-                        {course.batches}
-                      </span>
-                      <div>Batches</div>
-                    </div> */}
-                  </div>
-
-                  <div className="small text-muted mt-3">
-                    <div className="row">
-                      <div className="col-6">
-                        <i className="bi bi-calendar-event me-1"></i>Start: <strong>{course.startDate}</strong>
-                      </div>
-                      <div className="col-6">
-                        <i className="bi bi-calendar-check me-1"></i>End: <strong>{course.endDate}</strong>
-                      </div>
-                    </div>
-                  </div>
+                  
                 </div>
               </div>
             </div>

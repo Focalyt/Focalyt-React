@@ -18,6 +18,7 @@ const useNavHeight = (dependencies = []) => {
   const [subTabsHeight, setSubTabsHeight] = useState(0);
   const [contentMarginTop, setContentMarginTop] = useState(0);
 
+
   const calculateHeightAndWidth = useCallback(() => {
     console.log('🔍 Calculating nav height and width...');
 
@@ -267,6 +268,8 @@ const Student = ({
   const [allProfiles, setAllProfiles] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [loadingData, setLoadingData] = useState(false);
+
 
   // Filter state
   const [filterData, setFilterData] = useState({
@@ -592,116 +595,7 @@ const Student = ({
     }
   };
 
-  useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-        const token = userData.token;
-        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-        const res = await axios.get(`${backendUrl}/college/filters-data`, {
-          headers: { 'x-auth': token }
-        });
-        if (res.data.status) {
-          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
-          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
-          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
-        }
-      } catch (err) {
-        console.error('Failed to fetch filter options:', err);
-      }
-    };
-    fetchFilterOptions();
-  }, []);
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    mobile: "",
-    enrollmentNumber: "",
-    batchId: selectedBatch?.id || "",
-    admissionDate: "",
-    address: "",
-    parentName: "",
-    parentMobile: "",
-    status: "all",
-    password: "",
-    confirmPassword: "",
-  });
 
-  const handleFilterChange = (e) => {
-    try {
-      const { name, value } = e.target;
-      const newFilterData = { ...filterData, [name]: value };
-      setFilterData(newFilterData);
-
-      if (newFilterData.name) {
-        handleSearch(newFilterData.name);
-      } else {
-        applyFilters(newFilterData);
-      }
-    } catch (error) {
-      console.error('Filter change error:', error);
-    }
-  };
-
-  // const handleCriteriaChange = (criteria, values) => {
-  //   setFormData((prevState) => ({
-  //     ...prevState,
-  //     [criteria]: {
-  //       type: "includes",
-  //       values: values
-  //     }
-  //   }));
-  // };
-
-  const [dropdownStates, setDropdownStates] = useState({
-    projects: false,
-    verticals: false,
-    course: false,
-    center: false,
-    counselor: false,
-    sector: false
-  });
-
-  const clearDateFilter = (filterType) => {
-    let newFilterData = { ...filterData };
-
-    if (filterType === 'created') {
-      newFilterData.createdFromDate = null;
-      newFilterData.createdToDate = null;
-    } else if (filterType === 'modified') {
-      newFilterData.modifiedFromDate = null;
-      newFilterData.modifiedToDate = null;
-    } else if (filterType === 'nextAction') {
-      newFilterData.nextActionFromDate = null;
-      newFilterData.nextActionToDate = null;
-    }
-
-    setFilterData(newFilterData);
-    applyFilters(newFilterData);
-  };
-
-  const handleDateFilterChange = (date, fieldName) => {
-    const newFilterData = {
-      ...filterData,
-      [fieldName]: date
-    };
-    setFilterData(newFilterData);
-    applyFilters(newFilterData);
-  };
-
-  const toggleDropdown = (filterName) => {
-    setDropdownStates(prev => {
-      // Close all other dropdowns and toggle the current one
-      const newState = Object.keys(prev).reduce((acc, key) => {
-        acc[key] = key === filterName ? !prev[key] : false;
-        return acc;
-      }, {});
-      return newState;
-    });
-  };
 
 
   // Tab definitions for each student card - Updated with 5 required tabs
@@ -2017,8 +1911,10 @@ const Student = ({
 
   const fetchProfileData = async () => {
     try {
+      setLoadingData(true);
       if (!token) {
         console.warn("No token found in session storage.");
+        setLoadingData(false);
         return;
       }
 
@@ -2034,43 +1930,7 @@ const Student = ({
         queryParams.append('search', searchQuery.trim());
       }
 
-      // Add filter data
-      if (filterData.status && filterData.status !== 'all') {
-        queryParams.append('status', filterData.status);
-      }
-      if (filterData.fromDate) {
-        queryParams.append('fromDate', filterData.fromDate);
-      }
-      if (filterData.toDate) {
-        queryParams.append('toDate', filterData.toDate);
-      }
-      if (filterData.courseType) {
-        queryParams.append('courseType', filterData.courseType);
-      }
-      if (filterData.leadStatus) {
-        queryParams.append('leadStatus', filterData.leadStatus);
-      }
-      if (filterData.sector) {
-        queryParams.append('sector', filterData.sector);
-      }
-      if (filterData.createdFromDate) {
-        queryParams.append('createdFromDate', filterData.createdFromDate);
-      }
-      if (filterData.createdToDate) {
-        queryParams.append('createdToDate', filterData.createdToDate);
-      }
-      if (filterData.modifiedFromDate) {
-        queryParams.append('modifiedFromDate', filterData.modifiedFromDate);
-      }
-      if (filterData.modifiedToDate) {
-        queryParams.append('modifiedToDate', filterData.modifiedToDate);
-      }
-      if (filterData.nextActionFromDate) {
-        queryParams.append('nextActionFromDate', filterData.nextActionFromDate);
-      }
-      if (filterData.nextActionToDate) {
-        queryParams.append('nextActionToDate', filterData.nextActionToDate);
-      }
+      
 
       const response = await axios.get(
         `${backendUrl}/college/admission-list/${selectedCourse?._id}/${selectedCenter?._id}?${queryParams.toString()}`,
@@ -2085,6 +1945,7 @@ const Student = ({
       if (response.data.success && response.data.data) {
         setAllProfiles(response.data.data);
         setTotalPages(response.data.totalPages);
+
 
         const getStartandEndDate = () => {
           const startDate = new Date(response.data.data[0].batch.zeroPeriodStartDate);
@@ -2104,30 +1965,13 @@ const Student = ({
     } catch (error) {
       console.error("Error fetching profile data:", error);
     }
+    finally{
+      setLoadingData(false);
+    }
   };
 
-  const handleSearch = (searchTerm) => {
-    setSearchQuery(searchTerm);
-    setCurrentPage(1); // Reset to first page on search
-    // fetchProfileData will be called automatically due to useEffect dependency
-  };
+ 
 
-  const applyFilters = (filters = filterData) => {
-    setFilterData(filters);
-    setCurrentPage(1); // Reset to first page on filter change
-    // fetchProfileData will be called automatically due to useEffect dependency
-  };
-
-  const [experiences, setExperiences] = useState([
-    {
-      jobTitle: "",
-      companyName: "",
-      from: null,
-      to: null,
-      jobDescription: "",
-      currentlyWorking: false,
-    },
-  ]);
 
   const [user, setUser] = useState({
     image: "",
@@ -3626,7 +3470,7 @@ const Student = ({
     if (selectedCourse && selectedCenter) {
       fetchProfileData();
     }
-  }, [selectedCourse, selectedCenter, currentPage, activeTab, searchQuery, filterData]);
+  }, [selectedCourse, selectedCenter, currentPage, activeTab]);
 
 
   const handleImagesClick = (date, files) => {
@@ -4175,46 +4019,39 @@ const Student = ({
 
 
                       {/* Search */}
-                      <div
-                        className="input-group"
-                        style={{ maxWidth: "200px" }}
-                      >
-                        <span className="input-group-text bg-white border-end-0 input-height">
-                          <i className="fas fa-search text-muted"></i>
-                        </span>
-                        <input
-                          type="text"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Search students..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        {searchQuery && (
-                          <button
-                            className="btn btn-outline-secondary border-start-0"
-                            type="button"
-                            onClick={() => setSearchQuery("")}
-                          >
-                            <i className="fas fa-times"></i>
-                          </button>
-                        )}
-                      </div>
+                      <div className="input-group" style={{ maxWidth: '300px' }}>
+                <input
+                  type="text"
+                  className="form-control w-25"
+                  placeholder={`Search`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {/* Clear (X) button */}
+                {searchQuery && !loadingData && (
+                  <button
+                    className="btn btn-outline-secondary"
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      
+                    }}
+                    title="Clear search"
+                  >
+                    <i className="fas fa-times"></i>
+                  </button>
+                )}
+                <button
+                  onClick={() => fetchProfileData('')}
+                  className={`btn btn-outline-primary ${loadingData ? 'disabled' : ''}`}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <i className={`fas fa-search me-1`}></i>
+                  Search
+                </button>
+              </div>
 
-                      {/* Filter & View Controls */}
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed
-                          ? "btn-primary"
-                          : "btn-outline-primary"
-                          }`}
-                        style={{ whiteSpace: "nowrap" }}
-                      >
-                        <i
-                          className={`fas fa-filter me-1 ${!isFilterCollapsed ? "fa-spin" : ""
-                            }`}
-                        ></i>
-                        Filters
-                      </button>
+                  
 
 
                       {onBackToBatches && (
@@ -4657,6 +4494,19 @@ const Student = ({
                   <div className="col-12 rounded equal-height-2 coloumn-2">
                     <div className="card px-3">
                       <div className="row" id="students-main-row">
+                      {loadingData && (
+                          <div className="col-12 text-center py-5">
+                            <div className="d-flex flex-column align-items-center">
+                              <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+                                <span className="visually-hidden">Loading...</span>
+                              </div>
+                              <h5 className="text-muted">Loading profiles...</h5>
+                            </div>
+                          </div>
+                        )}
+
+                           {!loadingData && (  
+                            <> 
                         {allProfiles.map((profile, studentIndex) => {
                           const courseInfo = formatDuration(profile);
                           const filteredStats = getFilteredAttendanceData(profile);
@@ -6459,6 +6309,8 @@ const Student = ({
                             </div>
                           );
                         })}
+                        </>
+                      )}
                       </div>
                     </div>
                   </div>
