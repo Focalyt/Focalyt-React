@@ -662,25 +662,35 @@ const Student = ({
 
 
   const handleMoveCandidate = async (profile, e) => {
-
+    console.log('e', e);
+    let body = {status:e}
     const confirmed = window.confirm(`Are you sure you want to move this student to ${e === 'Move in Zero Period' ? 'Zero Period' : e === 'Move in Batch Freeze' ? 'Batch Freeze' : 'Dropout'}`)
+    let dropoutReason = '';
+    if (e === 'Dropout' ) {
+      dropoutReason = window.prompt('Enter the remarks for dropout');
+      if (!dropoutReason) {
+        window.alert('Please enter the remarks for dropout');
+        return;
+      }
+      body.dropoutReason = dropoutReason;
+    }
 
     if (confirmed) {
       try {
-        const response = await axios.post(`${backendUrl}/college/candidate/move-candidate-status/${profile._id}`, {
-          status: e,
-        }, {
+       
+
+        const response = await axios.post(`${backendUrl}/college/candidate/move-candidate-status/${profile._id}`, body, {
           headers: {
             "x-auth": token,
           },
         });
         if (response.status === 200) {
-          window.alert("Student moved to zero period successfully");
+          window.alert(response.data.message);
           await fetchProfileData();
         }
       } catch (error) {
-        console.error("Error moving student to zero period:", error);
-        window.alert("Failed to move student to zero period. Please try again.");
+        console.error("Error moving student:", error);
+        window.alert(error.response.data.message);
       }
     }
   };

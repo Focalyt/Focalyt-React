@@ -695,12 +695,6 @@ const KYCManagement = () => {
   };
 
 
-
-
-
-  // ========================================
-  // 🎯 Filter Click Handler
-  // ========================================
   const handleCrmFilterClick = (filter, index) => {
     if (index === 0) {
       setFilterData({
@@ -721,12 +715,13 @@ const KYCManagement = () => {
     } else if (index === 2) {
       setFilterData({
         ...filterData,
-        kyc: '',
+        kyc: 'all',
       })
       setActiveCrmFilter(index);
       return;
     }
     setActiveCrmFilter(index);
+   
   };
 
   // Filter state from Registration component
@@ -1262,7 +1257,7 @@ const KYCManagement = () => {
     fetchProfileData();
     console.log(filterData, 'filterData')
 
-  }, [currentPage]);
+  }, [currentPage, activeCrmFilter]);
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
@@ -1295,6 +1290,8 @@ const KYCManagement = () => {
         ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
         ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
+
+      console.log('queryParams', queryParams)
 
       const response = await axios.get(`${backendUrl}/college/kycCandidates?${queryParams}`, {
         headers: {
@@ -2694,12 +2691,18 @@ const KYCManagement = () => {
         return;
       }
 
+      const dropoutReason = window.prompt('Enter the reason for dropout');
+      if (!dropoutReason) {
+        alert('Please enter the reason for dropout');
+        return;
+      }
+
       // Send PUT request to backend API to update status
       const response = await axios.put(
         `${backendUrl}/college/update/${profile._id}`,
         {
-          isDropout: true, // Set dropout status
-          remarks: 'Marked as dropout'
+          dropout: true, // Set dropout status
+          dropoutReason: dropoutReason
         },
         {
           headers: {

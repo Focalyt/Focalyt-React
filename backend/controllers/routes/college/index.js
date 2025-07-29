@@ -3491,10 +3491,17 @@ router.put('/update/:id', isCollege, async (req, res) => {
 			return res.status(404).json({ success: false, message: "Applied course not found" });
 		}
 
+		
+
 		// Update fields
 		Object.keys(updateData).forEach(key => {
 			appliedCourse[key] = updateData[key];
 		});
+
+		if(updateData.dropout){
+			appliedCourse.dropoutBy = user._id;
+			appliedCourse.dropoutDate = new Date();		
+		}
 
 		
 		if (typeof updateData.kycStage !== 'undefined' && updateData.kycStage === true) {
@@ -3566,7 +3573,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			center,
 			counselor
 		} = req.query;
-		console.log(req.query, 'req.query')
+		console.log(req.query.kyc, 'req.query.kyc')
 
 		// Parse multi-select filter values
 		let projectsArray = [];
@@ -3652,10 +3659,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				}
 			}
 
-			// Status filters
-			if (status && status !== 'true') {
-				baseMatchStage._leadStatus = new mongoose.Types.ObjectId(status);
-			}
+			
 			if (leadStatus) {
 				baseMatchStage._leadStatus = new mongoose.Types.ObjectId(leadStatus);
 			}
@@ -4068,7 +4072,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			name,
 			courseType,
 			sector,
-			kyc,
 			createdFromDate,
 			createdToDate,
 			modifiedFromDate,
@@ -4983,6 +4986,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			// Status filters
 			if (status === 'pendingBatchAssign') {
 				baseMatchStage.batch = { $in: [null] };
+				baseMatchStage.dropOut= {$nin:[true]}
 			}
 			if (status === 'batchAssigned') {
 				baseMatchStage.batch = { $ne: null };
@@ -6850,7 +6854,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 		};
 
 		const filterCounts = await calculateFilterCounts();
-
+		console.log('filterCounts', filterCounts);
 		// Process results for document counts and other formatting
 		const result = appliedCourses.map(doc => {
 			let selectedSubstatus = null;
