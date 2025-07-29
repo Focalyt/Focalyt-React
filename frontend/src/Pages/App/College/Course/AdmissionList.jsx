@@ -4317,6 +4317,13 @@ const AdmissionList = () => {
                                                             Rejected
                                                             <span className="badge">{backendCounts.RejectedCount || 0}</span>
                                                           </button>
+                                                          <button
+                                                            className={`filter-btn`}
+                                                            >
+                                                            <i className="fas fa-download"></i>
+                                                            Download All 
+                                                           
+                                                          </button>
                                                         </>
                                                       );
                                                     })()}
