@@ -398,22 +398,22 @@ const DocumentModal = memo(({
                       );
                     }
                   })()}
-                 {fileUrl && (
-              <div className="preview-controls">
-                <button className="control-btn" onClick={handleZoomIn}>
-                  <i className="fas fa-search-plus"></i>
-                </button>
-                <button className="control-btn" onClick={handleZoomOut}>
-                  <i className="fas fa-search-minus"></i>
-                </button>
-                <button className="control-btn" onClick={handleRotate}>
-                  <i className="fas fa-redo"></i>
-                </button>
-                <button className="control-btn" onClick={handleReset}>
-                  <i className="fas fa-compress"></i>
-                </button>
-              </div>
-            )}
+                  {fileUrl && (
+                    <div className="preview-controls">
+                      <button className="control-btn" onClick={handleZoomIn}>
+                        <i className="fas fa-search-plus"></i>
+                      </button>
+                      <button className="control-btn" onClick={handleZoomOut}>
+                        <i className="fas fa-search-minus"></i>
+                      </button>
+                      <button className="control-btn" onClick={handleRotate}>
+                        <i className="fas fa-redo"></i>
+                      </button>
+                      <button className="control-btn" onClick={handleReset}>
+                        <i className="fas fa-compress"></i>
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="no-document">
@@ -574,12 +574,12 @@ const useNavHeight = (dependencies = []) => {
     });
 
     window.addEventListener('resize', handleResize);
-    
+
     if (navRef.current) {
-      observer.observe(navRef.current, { 
-        childList: true, 
-        subtree: true, 
-        attributes: true 
+      observer.observe(navRef.current, {
+        childList: true,
+        subtree: true,
+        attributes: true
       });
     }
 
@@ -624,12 +624,12 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     });
 
     window.addEventListener('resize', handleResize);
-    
+
     if (widthRef.current) {
-      observer.observe(widthRef.current, { 
-        childList: true, 
-        subtree: true, 
-        attributes: true ,
+      observer.observe(widthRef.current, {
+        childList: true,
+        subtree: true,
+        attributes: true,
         attributeFilter: ['class']
       });
     }
@@ -643,7 +643,7 @@ const useMainWidth = (dependencies = []) => {// Default fallback
   // Recalculate when dependencies change
   useEffect(() => {
     setTimeout(calculateWidth, 100);
-  }, dependencies); 
+  }, dependencies);
 
   return { widthRef, width };
 };
@@ -656,7 +656,7 @@ const useScrollBlur = (navbarHeight = 140) => {
     const handleScroll = () => {
       const currentScrollY = window.pageYOffset;
       const shouldBlur = currentScrollY > navbarHeight / 3;
-      
+
       setIsScrolled(shouldBlur);
       setScrollY(currentScrollY);
     };
@@ -686,11 +686,11 @@ const useScrollBlur = (navbarHeight = 140) => {
 const CRMDashboard = () => {
 
   const candidateRef = useRef();
-  
+
   useEffect(() => {
     console.log('CandidateRef initialized:', candidateRef.current);
   }, []);
-  
+
   useEffect(() => {
     console.log('CandidateRef current changed:', candidateRef.current);
   }, [candidateRef.current]);
@@ -710,9 +710,24 @@ const CRMDashboard = () => {
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
+
       console.log(result, 'result')
-      if (result === true) {
-        setOpenModalId(null); setSelectedProfile(null)
+      if (result.isvalid === true) {
+        // Find and update the candidate in allProfiles
+        setAllProfiles(prevProfiles => 
+          prevProfiles.map(profile => {
+            if (profile._id === selectedProfile._id) {
+              // Update the _candidate data with the updated profile from result
+              return {
+                ...profile,
+                _candidate: result.data // result.data contains the updated candidate profile
+              };
+            }
+            return profile;
+          })
+        );
+        setOpenModalId(null); 
+        setSelectedProfile(null)
       }
     }
   };
@@ -920,9 +935,9 @@ const CRMDashboard = () => {
 
         // Optionally refresh data here
         const closeButton = document.querySelector('#staticBackdrop .btn-close');
-      if (closeButton) {
-        closeButton.click();
-      }
+        if (closeButton) {
+          closeButton.click();
+        }
         fetchProfileData()
       } else {
         alert('Failed to upload file');
@@ -1002,7 +1017,7 @@ const CRMDashboard = () => {
     alert(`Document ${status} successfully!`);
     closeDocumentModal();
   }, [closeDocumentModal]);
-  
+
   // const updateDocumentStatus = (uploadId, status) => {
   //   // In real app, this would make an API call
   //   console.log(`Updating document ${uploadId} to ${status}`);
@@ -1479,7 +1494,7 @@ const CRMDashboard = () => {
     }
   }, [seletectedStatus]);
 
- 
+
 
   //Advance filter
 
@@ -1525,7 +1540,7 @@ const CRMDashboard = () => {
     }
 
     setFilterData(newFilterData);
-    
+
   };
 
 
@@ -1951,9 +1966,7 @@ const CRMDashboard = () => {
 
   // Inside CRMDashboard component:
 
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
+ 
 
   useEffect(() => {
     fetchProfileData(filterData, currentPage);
@@ -2235,6 +2248,8 @@ const CRMDashboard = () => {
 
     } else if (panel === 'Reffer') {
       setShowPanel('Reffer');
+    } else if (panel === 'AddAllLeads') {
+      setShowPanel('AddAllLeads');
     }
 
     if (!isMobile) {
@@ -2683,6 +2698,340 @@ const CRMDashboard = () => {
     ) : null;
   };
 
+  const renderAllLeadPanel = () => {
+    const panelContent = (
+      <div className="card border-0 shadow-sm" style={{ height: 'calc(100vh - 150px)', overflow: 'auto' }}>
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-user-edit text-secondary"></i>
+            </div>
+            <h6 className="mb-0 followUp fw-medium">
+              {showPanel === 'AddAllLeads' && (`Add Leads`)}
+
+            </h6>
+          </div>
+          <div>
+            <button className="btn-close" type="button" onClick={closePanel}>
+              {/* <i className="fa-solid fa-xmark"></i> */}
+            </button>
+          </div>
+        </div>
+
+        <div className="card-body">
+          <form>
+
+
+            <>
+
+
+              {/* Form Fields with Improved Styling */}
+              <div className="mb-3">
+                <label className="form-label fw-semibold text-dark mb-2">
+
+                  Candidate Number <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="tel"
+                  id="candidateNumber"
+                  className="form-control border-0 shadow-sm"
+                  placeholder="Enter 10 digit candidate number"
+                  maxLength="10"
+                  onInput={(e) => {
+                    e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                  }}
+                  style={{
+                    height: '48px',
+                    padding: '12px 16px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid #e9ecef'
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold text-dark mb-2">
+                  Select Course<span className="text-danger">*</span>
+                </label>
+                <div className="position-relative">
+                  <select
+                    className="form-select border-0 shadow-sm"
+                    id="course"
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef',
+
+                    }}
+
+                  >
+                    <option value="">Select Course</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold text-dark mb-2">
+                  Select Training Center<span className="text-danger">*</span>
+                </label>
+                <div className="position-relative">
+                  <select
+                    className="form-select border-0 shadow-sm"
+                    id="trainingCenter"
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef',
+                    }}
+                  >
+                    <option value="">Select Training Center</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="candidateName" className="form-label fw-semibold text-dark mb-2">
+                  Name <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="candidateName"
+                  className="form-control border-0 shadow-sm"
+                  placeholder="Enter candidate name"
+                  style={{
+                    height: '48px',
+                    padding: '12px 16px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid #e9ecef'
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="candidateEmail" className="form-label fw-semibold text-dark mb-2">
+                  Email <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="email"
+                  id="candidateEmail"
+                  className="form-control border-0 shadow-sm"
+                  placeholder="Enter email address"
+                  required
+                  style={{
+                    height: '48px',
+                    padding: '12px 16px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid #e9ecef'
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="candidateAddress" className="form-label fw-semibold text-dark mb-2">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  id="candidateAddress"
+                  className="form-control border-0 shadow-sm"
+                  placeholder="Enter your address"
+                  style={{
+                    height: '48px',
+                    padding: '12px 16px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid #e9ecef'
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="candidateGender" className="form-label fw-semibold text-dark mb-2">
+                  Gender <span className="text-danger">*</span>
+                </label>
+                <div className="position-relative">
+                  <select
+                    id="candidateGender"
+                    className="form-select border-0 shadow-sm"
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef'
+                    }}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="candidateDob" className="form-label fw-semibold text-dark mb-2">
+                  Date Of Birth <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="date"
+                  id="candidateDob"
+                  className="form-control border-0 shadow-sm"
+                  style={{
+                    height: '48px',
+                    padding: '12px 16px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid #e9ecef'
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="candidateWhatsapp" className="form-label fw-semibold text-dark mb-2">
+                  WhatsApp Number <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="tel"
+                  id="candidateWhatsapp"
+                  className="form-control border-0 shadow-sm"
+                  placeholder="Enter WhatsApp number"
+                  maxLength="10"
+                  onInput={(e) => {
+                    e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                  }}
+                  style={{
+                    height: '48px',
+                    padding: '12px 16px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid #e9ecef'
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold text-dark mb-2">
+                  Highest Qualification<span className="text-danger">*</span>
+                </label>
+                <div className="position-relative">
+                  <select
+                    className="form-select border-0 shadow-sm"
+                    id="highestQualification"
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef'
+                    }}
+                  >
+                    <option value="">Select Highest Qualification</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold text-dark mb-2">
+                  Counselor Name<span className="text-danger">*</span>
+                </label>
+                <div className="position-relative">
+                  <select
+                    className="form-select border-0 shadow-sm"
+                    id="counselorName"
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef'
+                    }}
+                  >
+                    <option value="">Select Counselor name</option>
+                  </select>
+                </div>
+              </div>
+
+            </>
+
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn"
+                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                onClick={closePanel}
+              >
+                CLOSE
+              </button>
+              <button
+                type="submit"
+                className="btn text-white"
+                onClick={() => console.log('add lead')}
+                style={{ backgroundColor: '#fb2d5e', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+              >
+
+                {showPanel === 'AddAllLeads' ? 'ADD LEAD' : 'ADD BULK LEAD'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+
+    if (isMobile) {
+      return (showPanel === 'AddAllLeads') ? (
+        <div
+          className={'modal show d-block'}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      ) : null;
+    }
+
+    return (showPanel === 'AddAllLeads') ? (
+      <div className="col-12 transition-col" id="addLeadPanel">
+        {panelContent}
+      </div>
+    ) : null;
+  };
+
 
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
   const renderWhatsAppPanel = () => {
@@ -2972,11 +3321,11 @@ const CRMDashboard = () => {
     <div className="container-fluid">
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
-        <div 
+          <div
             className="content-blur-overlay"
             style={{
               position: 'fixed',
-              top:0,
+              top: 0,
               left: 0,
               right: 0,
               height: `${navHeight + 50}px`,
@@ -2996,12 +3345,14 @@ const CRMDashboard = () => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef}  className="" style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${width}px` , backdropFilter: `blur(${blurIntensity}px)`,
-        WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-        boxShadow: isScrolled 
-          ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)' 
-          : '0 4px 25px 0 #0000001a',paddingBlock: '10px',
-          transition: 'all 0.3s ease',}}
+            <nav ref={navRef} className="" style={{
+              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${width}px`, backdropFilter: `blur(${blurIntensity}px)`,
+              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+              boxShadow: isScrolled
+                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
+                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
+              transition: 'all 0.3s ease',
+            }}
             >
               <div className="container-fluid">
                 <div className="row align-items-center">
@@ -3022,7 +3373,7 @@ const CRMDashboard = () => {
                   <div className="col-md-6">
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       <div className="input-group" style={{ maxWidth: '300px' }}>
-                       
+
                         <input
                           type="text"
                           name="name"
@@ -3031,17 +3382,17 @@ const CRMDashboard = () => {
                           value={filterData.name}
                           onChange={handleFilterChange}
                         />
-                         <button
-                        onClick={() => fetchProfileData()}
-                        className={`btn btn-outline-primary`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-search me-1`}></i>
-                        Search
-                        
-                      </button>
+                        <button
+                          onClick={() => fetchProfileData()}
+                          className={`btn btn-outline-primary`}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas fa-search me-1`}></i>
+                          Search
+
+                        </button>
                       </div>
-                     
+
 
                       <button
                         onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
@@ -3057,7 +3408,7 @@ const CRMDashboard = () => {
                         )}
                       </button>
 
-                    
+
                     </div>
                   </div>
 
@@ -3509,13 +3860,31 @@ const CRMDashboard = () => {
 
 
           {/* Main Content */}
-          <div className="content-body marginTopMobile" style={{ 
-              marginTop: `${navHeight + 10}px`,
-              transition: 'margin-top 0.2s ease-in-out'
-            }}>
+          <div className="content-body marginTopMobile" style={{
+            marginTop: `${navHeight + 10}px`,
+            transition: 'margin-top 0.2s ease-in-out'
+          }}>
             <section className="list-view">
               <div className="row">
                 <div className="d-flex justify-content-end gap-2">
+
+                  <button className="btn btn-sm btn-outline-primary" style={{
+                    padding: "6px 12px",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                    onClick={() => {
+                      openRefferPanel(null, 'AddAllLeads');
+                      console.log('Add leads');
+                    }}
+                  >
+                    <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
+                    Add Leads
+                  </button>
+
                   <button
                     className="btn btn-sm btn-outline-primary"
                     disabled={isLoadingProfiles || allProfiles.length === 0}
@@ -3607,7 +3976,7 @@ const CRMDashboard = () => {
                                             <i className="fas fa-phone"></i>
                                           </a>
                                         </button>
-                                        
+
                                         <a
                                           className="btn btn-outline-success btn-sm border-0"
                                           href={`https://wa.me/${profile._candidate?.mobile}`}
@@ -4361,13 +4730,13 @@ const CRMDashboard = () => {
 
                                           <div className="resume-document-header">
                                             <div className="resume-profile-section">
-                                            {profile._candidate?.personalInfo?.image ? (
-                                                      <img
-                                                        src={`${profile._candidate?.personalInfo?.image}`}
-                                                        alt="Profile"
-                                                        className="resume-profile-image"
-                                                      />
-                                                    ) : (
+                                              {profile._candidate?.personalInfo?.image ? (
+                                                <img
+                                                  src={`${profile._candidate?.personalInfo?.image}`}
+                                                  alt="Profile"
+                                                  className="resume-profile-image"
+                                                />
+                                              ) : (
                                                 <div className="resume-profile-placeholder">
                                                   <i className="bi bi-person-circle"></i>
                                                 </div>
@@ -4529,7 +4898,7 @@ const CRMDashboard = () => {
                                                   <div className="resume-skills-list">
                                                     {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
                                                       <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                        <div className="resume-skill-name">{skill?.skillName || skill}</div>
+                                                        <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
                                                         {skill?.skillPercent && (
                                                           <div className="resume-skill-bar-container">
                                                             <div
@@ -4553,7 +4922,7 @@ const CRMDashboard = () => {
                                                   <div className="resume-languages-list">
                                                     {profile._candidate.personalInfo.languages.map((lang, index) => (
                                                       <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                        <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                        <div className="resume-language-name">{lang.name || lang.lname || 'Language'}</div>
                                                         {lang.level && (
                                                           <div className="resume-language-level">
                                                             {[1, 2, 3, 4, 5].map(dot => (
@@ -4670,7 +5039,7 @@ const CRMDashboard = () => {
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              {experiences.map((job, index) => (
+                                              {profile._candidate?.experiences?.map((job, index) => (
                                                 <tr key={index}>
                                                   <td>{index + 1}</td>
                                                   <td>{job.companyName}</td>
@@ -5329,7 +5698,8 @@ const CRMDashboard = () => {
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row " style={{ zIndex:15,
+            <div className="row " style={{
+              zIndex: 15,
               transition: 'margin-top 0.2s ease-in-out',
               position: 'fixed'
             }}>
@@ -5337,6 +5707,7 @@ const CRMDashboard = () => {
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
+              {renderAllLeadPanel()}
             </div>
           </div>
         )}
@@ -5346,6 +5717,7 @@ const CRMDashboard = () => {
         {isMobile && renderRefferPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
+        {isMobile && renderAllLeadPanel()}
 
       </div>
       <UploadModal />
