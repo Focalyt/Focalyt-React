@@ -714,7 +714,7 @@ const CRMDashboard = () => {
       console.log(result, 'result')
       if (result.isvalid === true) {
         // Find and update the candidate in allProfiles
-        setAllProfiles(prevProfiles => 
+        setAllProfiles(prevProfiles =>
           prevProfiles.map(profile => {
             if (profile._id === selectedProfile._id) {
               // Update the _candidate data with the updated profile from result
@@ -726,7 +726,7 @@ const CRMDashboard = () => {
             return profile;
           })
         );
-        setOpenModalId(null); 
+        setOpenModalId(null);
         setSelectedProfile(null)
       }
     }
@@ -1966,7 +1966,7 @@ const CRMDashboard = () => {
 
   // Inside CRMDashboard component:
 
- 
+
 
   useEffect(() => {
     fetchProfileData(filterData, currentPage);
@@ -2133,7 +2133,7 @@ const CRMDashboard = () => {
   };
 
 
-  
+
 
   const handleCriteriaChange = (criteria, values) => {
     setFormData((prevState) => ({
@@ -2342,6 +2342,22 @@ const CRMDashboard = () => {
 
     setShowPopup(null);
     setShowPanel('leadHistory');
+    setSelectedConcernPerson(null);
+    setSelectedProfiles(null);
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+  };
+
+  const openChangeCenterPanel = async (profile = null) => {
+    if (profile) {
+      // Set selected profile
+      setSelectedProfile(profile);
+
+    }
+
+    setShowPopup(null);
+    setShowPanel('changeCenter');
     setSelectedConcernPerson(null);
     setSelectedProfiles(null);
     if (!isMobile) {
@@ -3315,7 +3331,148 @@ const CRMDashboard = () => {
     ) : null;
   };
 
+  const renderChangeCenterPanel = () => {
+    const panelContent = (
+      <div className="card border-0 shadow-sm h-100">
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-history text-primary"></i>
+            </div>
+            <h6 className="mb-0 fw-medium">Change Center</h6>
+          </div>
+          <button className="btn-close" type="button" onClick={closePanel}>
+          </button>
+        </div>
 
+        <div className="card-body p-0 d-flex flex-column h-100">
+          {/* Scrollable Content Area */}
+          <div
+            className="flex-grow-1 overflow-auto px-3 py-2"
+            style={{
+              maxHeight: isMobile ? '60vh' : '65vh',
+              minHeight: '200px'
+            }}
+          >
+            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
+              <div className="timeline">
+                {selectedProfile.logs.map((log, index) => (
+                  <div key={index} className="timeline-item mb-4">
+                    <div className="timeline-marker">
+                      <div className="timeline-marker-icon">
+                        <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
+                      </div>
+                      {index !== selectedProfile.logs.length - 1 && (
+                        <div className="timeline-line"></div>
+                      )}
+                    </div>
+
+                    <div className="timeline-content">
+                      <div className="card border-0 shadow-sm">
+                        <div className="card-body p-3">
+                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
+                            <span className="bg-light text-dark border">
+                              {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              }) : 'Unknown Date'}
+                            </span>
+                            <small className="text-muted">
+                              <i className="fas fa-user me-1"></i>
+                              Modified By: {log.user?.name || 'Unknown User'}
+                            </small>
+                          </div>
+
+                          <div className="mb-2">
+                            <label className="form-label fw-semibold text-dark mb-2">
+                              Select Center<span className="text-danger">*</span>
+                            </label>
+                            <div className="position-relative">
+                              <select
+                                className="form-select border-0 shadow-sm"
+                                id="course"
+                                style={{
+                                  height: '48px',
+                                  padding: '12px 16px',
+                                  backgroundColor: '#f8f9fa',
+                                  borderRadius: '8px',
+                                  fontSize: '14px',
+                                  transition: 'all 0.3s ease',
+                                  border: '1px solid #e9ecef',
+
+                                }}
+
+                              >
+                                <option value="">Select Center</option>
+                              </select>
+                            </div>
+                          </div>
+
+
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                <div className="mb-3">
+                  <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                </div>
+                <h6 className="text-muted mb-2">No Center Available</h6>
+                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
+
+               
+
+              </div>
+            )}
+          </div>
+
+          {/* Fixed Footer */}
+          <div className="border-top px-3 py-3 bg-light">
+            <div className="d-flex justify-content-end">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={closePanel}
+              >
+                <i className="fas fa-times me-1"></i>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (isMobile) {
+      return showPanel === 'changeCenter' ? (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+            <div className="modal-content" style={{ height: '85vh' }}>
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      ) : null;
+    }
+
+    return showPanel === 'changeCenter' ? (
+      <div className="col-12 transition-col" id="changeCenterPanel" style={{ height: '80vh' }}>
+        {panelContent}
+      </div>
+    ) : null;
+  };
 
   return (
     <div className="container-fluid">
@@ -4193,6 +4350,27 @@ const CRMDashboard = () => {
                                             Profile Edit
                                           </button>
 
+                                          <button
+                                            className="btn btn-primary border-0 text-black"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              openChangeCenterPanel(profile);
+                                              console.log('change center')
+
+                                            }}
+                                          >
+                                            Change Center
+                                          </button>
+
 
                                         </div>
                                       </div>
@@ -4363,7 +4541,26 @@ const CRMDashboard = () => {
                                           >
                                             Profile Edit
                                           </button>
+                                          <button
+                                            className="btn btn-primary border-0 text-black"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              openChangeCenterPanel(profile);
+                                              console.log('change center')
 
+                                            }}
+                                          >
+                                            Change Center
+                                          </button>
 
                                         </div>
                                       </div>
@@ -5708,6 +5905,7 @@ const CRMDashboard = () => {
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
               {renderAllLeadPanel()}
+              {renderChangeCenterPanel()}
             </div>
           </div>
         )}
@@ -5718,7 +5916,7 @@ const CRMDashboard = () => {
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
         {isMobile && renderAllLeadPanel()}
-
+        {isMobile && renderChangeCenterPanel()}
       </div>
       <UploadModal />
 

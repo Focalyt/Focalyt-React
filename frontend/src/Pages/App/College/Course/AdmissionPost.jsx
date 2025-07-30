@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import DatePicker from 'react-date-picker';
 import KYCManagement from './kycManagement';
 import AdmissionList from './AdmissionList';
+import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -11,305 +12,1266 @@ import axios from 'axios'
 
 // Add this at the top of the file, after imports
 const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
-  const [reason, setReason] = useState('');
-  const reasonRef = useRef('');
+    const [reason, setReason] = useState('');
+    const reasonRef = useRef('');
 
-  const handleReasonChange = (e) => {
-    reasonRef.current = e.target.value;
-    setReason(e.target.value);
-  };
+    const handleReasonChange = (e) => {
+        reasonRef.current = e.target.value;
+        setReason(e.target.value);
+    };
 
-  const handleConfirm = () => {
-    onConfirm(reasonRef.current);
-  };
+    const handleConfirm = () => {
+        onConfirm(reasonRef.current);
+    };
 
-  return (
-    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
-      <h4>Provide Rejection Reason</h4>
-      <textarea
-        value={reason}
-        onChange={handleReasonChange}
-        placeholder="Please provide a detailed reason for rejection..."
-        rows="8"
-        className="form-control mb-3"
-      />
-      <div className="d-flex gap-2">
-        <button
-          className="btn btn-danger"
-          onClick={handleConfirm}
-          disabled={!reason.trim()}
-        >
-          Confirm Rejection
-        </button>
-        <button
-          className="btn btn-secondary"
-          onClick={onCancel}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
+
+    return (
+        <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+            <h4>Provide Rejection Reason</h4>
+            <textarea
+                value={reason}
+                onChange={handleReasonChange}
+                placeholder="Please provide a detailed reason for rejection..."
+                rows="8"
+                className="form-control mb-3"
+            />
+            <div className="d-flex gap-2">
+                <button
+                    className="btn btn-danger"
+                    onClick={handleConfirm}
+                    disabled={!reason.trim()}
+                >
+                    Confirm Rejection
+                </button>
+                <button
+                    className="btn btn-secondary"
+                    onClick={onCancel}
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
 });
 
 
-  const useNavHeight = (dependencies = []) => {
+const useNavHeight = (dependencies = []) => {
     const navRef = useRef(null);
     const [navHeight, setNavHeight] = useState(140);
     const [navWidth, setNavWidth] = useState('100%');
-  
+
     const calculateHeightAndWidth = useCallback(() => {
-      
-      if (navRef.current) {
-        // Calculate Height
-        const height = navRef.current.offsetHeight;
-        
-        if (height > 0) {
-          setNavHeight(height);
-          
+
+        if (navRef.current) {
+            // Calculate Height
+            const height = navRef.current.offsetHeight;
+
+            if (height > 0) {
+                setNavHeight(height);
+
+            }
+
+            // Calculate Width from parent (position-relative container)
+            const parentContainer = navRef.current.closest('.position-relative');
+            if (parentContainer) {
+                const parentWidth = parentContainer.offsetWidth;
+
+                if (parentWidth > 0) {
+                    setNavWidth(parentWidth + 'px');
+                }
+            }
+        } else {
+            console.log('❌ navRef.current is null');
         }
-  
-        // Calculate Width from parent (position-relative container)
-        const parentContainer = navRef.current.closest('.position-relative');
-        if (parentContainer) {
-          const parentWidth = parentContainer.offsetWidth;
-          
-          if (parentWidth > 0) {
-            setNavWidth(parentWidth + 'px');
-          }
-        }
-      } else {
-        console.log('❌ navRef.current is null');
-      }
     }, []);
-  
+
     useEffect(() => {
-      // Calculate immediately and with delays
-      calculateHeightAndWidth();
-      setTimeout(calculateHeightAndWidth, 100);
-      setTimeout(calculateHeightAndWidth, 500);
-  
-      // Resize listener
-      const handleResize = () => {
+        // Calculate immediately and with delays
+        calculateHeightAndWidth();
         setTimeout(calculateHeightAndWidth, 100);
-      };
-  
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
+        setTimeout(calculateHeightAndWidth, 500);
+
+        // Resize listener
+        const handleResize = () => {
+            setTimeout(calculateHeightAndWidth, 100);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, [calculateHeightAndWidth]);
-  
+
     // Recalculate when dependencies change
     useEffect(() => {
-      setTimeout(calculateHeightAndWidth, 100);
+        setTimeout(calculateHeightAndWidth, 100);
     }, dependencies);
-  
+
     return { navRef, navHeight, navWidth };
-  };
-  const useScrollBlur = (navbarHeight = 140) => {
+};
+const useScrollBlur = (navbarHeight = 140) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [scrollY, setScrollY] = useState(0);
     const contentRef = useRef(null);
-  
+
     useEffect(() => {
-      const handleScroll = () => {
-        const currentScrollY = window.pageYOffset;
-        const shouldBlur = currentScrollY > navbarHeight / 3;
-        
-        setIsScrolled(shouldBlur);
-        setScrollY(currentScrollY);
-      };
-  
-      // Throttle scroll event for better performance
-      let ticking = false;
-      const throttledScroll = () => {
-        if (!ticking) {
-          requestAnimationFrame(() => {
-            handleScroll();
-            ticking = false;
-          });
-          ticking = true;
-        }
-      };
-  
-      window.addEventListener('scroll', throttledScroll, { passive: true });
-      handleScroll(); // Initial check
-  
-      return () => {
-        window.removeEventListener('scroll', throttledScroll);
-      };
+        const handleScroll = () => {
+            const currentScrollY = window.pageYOffset;
+            const shouldBlur = currentScrollY > navbarHeight / 3;
+
+            setIsScrolled(shouldBlur);
+            setScrollY(currentScrollY);
+        };
+
+        // Throttle scroll event for better performance
+        let ticking = false;
+        const throttledScroll = () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    handleScroll();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', throttledScroll, { passive: true });
+        handleScroll(); // Initial check
+
+        return () => {
+            window.removeEventListener('scroll', throttledScroll);
+        };
     }, [navbarHeight]);
-  
+
     return { isScrolled, scrollY, contentRef };
-  };
+};
 
 const CRMDashboard = () => {
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  const token = userData.token;
-  // ========================================
-  // 🎯 Main Tab State
-  // ========================================
-  const [mainTab, setMainTab] = useState('kyc'); // 'kyc' or 'AllAdmission'
-  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const [showPanel, setShowPanel] = useState('')
+    const token = userData.token;
 
-  const [activeTab, setActiveTab] = useState({});
-  const [showPopup, setShowPopup] = useState(null);
-  const [activeCrmFilter, setActiveCrmFilter] = useState(0);
-  const [showEditPanel, setShowEditPanel] = useState(false);
-  const [showFollowupPanel, setShowFollowupPanel] = useState(false);
-  const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
-  const [mainContentClass, setMainContentClass] = useState('col-12');
-  const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
-  const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
-  const [viewMode, setViewMode] = useState('grid');
-  const [isMobile, setIsMobile] = useState(false);
-  const [allProfiles, setAllProfiles] = useState([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [allProfilesData, setAllProfilesData] = useState([]);
-  const [selectedProfile, setSelectedProfile] = useState(null);
+    const [isPanelOpen, setIsPanelOpen] = useState(false);
+    // ========================================OpenPanel
+    // 🎯 Main Tab State
+    // ========================================
+    const [mainTab, setMainTab] = useState('kyc'); // 'kyc' or 'AllAdmission'
+    const [isNewModalOpen, setIsNewModalOpen] = useState(false);
 
-  // Documents specific state
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState(null);
-  const [documentZoom, setDocumentZoom] = useState(1);
-  const [documentRotation, setDocumentRotation] = useState(0);
-  const [showRejectionForm, setShowRejectionForm] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const rejectionReasonRef = useRef('');
-  const [uploadingDoc, setUploadingDoc] = useState(null);
-  const fileInputRef = useRef(null);
-  const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
+    const [activeTab, setActiveTab] = useState({});
+    const [showPopup, setShowPopup] = useState(null);
+    const [activeCrmFilter, setActiveCrmFilter] = useState(0);
+    const [showEditPanel, setShowEditPanel] = useState(false);
+    const [showFollowupPanel, setShowFollowupPanel] = useState(false);
+    const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
+    const [mainContentClass, setMainContentClass] = useState('col-12');
+    const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
+    const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+    const [viewMode, setViewMode] = useState('grid');
+    const [isMobile, setIsMobile] = useState(false);
+    const [allProfiles, setAllProfiles] = useState([]);
+    const [totalPages, setTotalPages] = useState(1);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [allProfilesData, setAllProfilesData] = useState([]);
+    const [selectedProfile, setSelectedProfile] = useState(null);
 
-  const { navRef, navHeight, navWidth } = useNavHeight([mainTab]);
-  const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
-  const blurIntensity = Math.min(scrollY / 10, 15);
-  const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
-  // ========================================
-  // 🎯 Main Tab Change Handler
-  // ========================================
-  const handleMainTabChange = (tabName) => {
-    setMainTab(tabName);
-    setActiveCrmFilter(0); 
+    // Documents specific state
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [showDocumentModal, setShowDocumentModal] = useState(false);
+    const [selectedDocument, setSelectedDocument] = useState(null);
+    const [documentZoom, setDocumentZoom] = useState(1);
+    const [documentRotation, setDocumentRotation] = useState(0);
+    const [showRejectionForm, setShowRejectionForm] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const rejectionReasonRef = useRef('');
+    const [uploadingDoc, setUploadingDoc] = useState(null);
+    const fileInputRef = useRef(null);
+    const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
-  };
+    const { navRef, navHeight, navWidth } = useNavHeight([mainTab, mainContentClass]);
+    const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
+    const blurIntensity = Math.min(scrollY / 10, 15);
+    const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
 
-  
+    const [openModalId, setOpenModalId] = useState(null);
+    const [seletectedStatus, setSelectedStatus] = useState('');
+    const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
+    const [followupDate, setFollowupDate] = useState('');
+    const [followupTime, setFollowupTime] = useState('');
+    const [remarks, setRemarks] = useState('');
+    const [subStatuses, setSubStatuses] = useState([]);
+    const [statuses, setStatuses] = useState([
+        { _id: '', name: '', count: 0 },
+    ]);
+    const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
+    const [ekycFilters, setEkycFilters] = useState([
+        { _id: 'pendingEkyc', name: 'kyc Pending', count: 0, milestone: '' },
+        { _id: 'doneEkyc', name: 'kyc Verified', count: 0, milestone: 'Ekyc Done' },
+        { _id: 'All', name: 'All', count: 0, milestone: '' }
 
- 
+    ]);
 
-  // Helper function for status icons
-  const getStatusIcon = (statusName) => {
-    const statusName_lower = statusName.toLowerCase();
-    if (statusName_lower.includes('hot') || statusName_lower.includes('urgent')) return '🔥';
-    if (statusName_lower.includes('warm') || statusName_lower.includes('interested')) return '⚡';
-    if (statusName_lower.includes('cold') || statusName_lower.includes('not')) return '❄️';
-    if (statusName_lower.includes('new') || statusName_lower.includes('fresh')) return '🆕';
-    if (statusName_lower.includes('follow') || statusName_lower.includes('pending')) return '⏳';
-    if (statusName_lower.includes('converted') || statusName_lower.includes('success')) return '✅';
-    return '🎯';
-  };
+    //filte stats
 
-  const renderMainTabContent = () => {
-    switch (mainTab) {
-      case 'kyc':
-        return <KYCManagement />;
-      case 'AllAdmission':
-        return <AdmissionList />;
-      default:
-        return null;
+    const [formData, setFormData] = useState({
+        projects: {
+            type: "includes",
+            values: []
+        },
+        verticals: {
+            type: "includes",
+            values: []
+        },
+        course: {
+            type: "includes",
+            values: []
+        },
+        center: {
+            type: "includes",
+            values: []
+        },
+        counselor: {
+            type: "includes",
+            values: []
+        },
+        sector: {
+            type: "includes",
+            values: []
+        }
+    })
+
+    const today = new Date();
+
+    const candidateRef = useRef();
+
+    const fetchProfile = (id) => {
+        if (candidateRef.current) {
+            console.log('start fetching', id)
+            candidateRef.current.fetchProfile(id);
+            fetchProfileData()
+        }
+    };
+
+    const fetchProfileData = async (filters = filterData, page = currentPage) => {
+        try {
+            console.log('filters', filters)
+            setIsLoadingProfiles(true);
+            if (!token) {
+                console.warn('No token found in session storage.');
+                setIsLoadingProfiles(false);
+                return;
+            }
+
+            const queryParams = new URLSearchParams({
+                page: page.toString(),
+                ...(filters.name && { name: filters.name }),
+                ...(filters.courseType && { courseType: filters.courseType }),
+                ...(filters.kyc && { kyc: filters.kyc }),
+                ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+                ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+                ...(filters.sector && { sector: filters.sector }),
+                ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+                ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+                ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+                ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+                ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+                ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+                // Multi-select filters
+                ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+                ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+                ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+                ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+                ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+            });
+
+            console.log('queryParams', queryParams)
+
+            const response = await axios.get(`${backendUrl}/college/kycCandidates?${queryParams}`, {
+                headers: {
+                    'x-auth': token,
+                },
+            });
+
+            if (response.data.success && response.data.data) {
+                const { crmFilterCounts } = response.data;
+
+                const filter = [
+                    { _id: 'pendingEkyc', name: 'kyc Pending', count: crmFilterCounts.pendingKyc, milestone: '' },
+                    { _id: 'doneEkyc', name: 'kyc Verified', count: crmFilterCounts.doneKyc, milestone: 'kyc Done' },
+                    { _id: 'All', name: 'All', count: crmFilterCounts.all, milestone: '' }
+                ];
+
+                setEkycFilters(filter);
+                console.log('backend response', response.data)
+                setAllProfiles(response.data.data);
+                setTotalPages(response.data.totalPages)
+
+
+            } else {
+                console.error('Failed to fetch profile data', response.data.message);
+            }
+        } catch (error) {
+            console.error('Error fetching profile data:', error);
+        } finally {
+            setIsLoadingProfiles(false);
+        }
+    };
+
+    const handleFilterChange = (e) => {
+        try {
+            const { name, value } = e.target;
+            const newFilterData = { ...filterData, [name]: value };
+            setFilterData(newFilterData);
+        } catch (error) {
+            console.error('Filter change error:', error);
+        }
+    };
+
+    const openEditPanel = async (profile = null, panel) => {
+        console.log('panel', panel);
+
+        if (profile) {
+            setSelectedProfile(profile);
+        }
+
+        setShowEditPanel(false);
+        setShowFollowupPanel(false);
+        setShowWhatsappPanel(false);
+
+        if (panel === 'StatusChange') {
+            if (profile) {
+                const newStatus = profile?._leadStatus?._id || '';
+                setSelectedStatus(newStatus);
+
+                if (newStatus) {
+                    await fetchSubStatus(newStatus);
+                }
+
+                setSelectedSubStatus(profile?.selectedSubstatus || '');
+            }
+            setShowEditPanel(true);
+        }
+        else if (panel === 'SetFollowup') {
+            setShowPopup(null)
+            setShowFollowupPanel(true);
+        }
+
+        if (!isMobile) {
+            setMainContentClass('col-8');
+        }
+    };
+
+    const closeEditPanel = () => {
+        setShowEditPanel(false);
+        setShowFollowupPanel(false);
+        if (!isMobile) {
+            // setMainContentClass('col-12');
+            const hasOtherPanelsOpen = leadHistoryPanel || showWhatsappPanel;
+            setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
+        }
+    };
+
+
+    const handleFetchCandidate = async (profile = null) => {
+        setShowPopup(null)
+        setSelectedProfile(profile)
+        setOpenModalId(profile._id);
     }
-  };
 
-  return (
-    <div className="container-fluid admissionMobileResponsive">
-      <div className="row">
-        <div className={`${isMobile ? 'col-12' : mainContentClass} mobileResponsive`}>
-          {/* Header */}
-          <div 
-            className="content-blur-overlay"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: `${navHeight + 50}px`,
-              background: `linear-gradient(
-                180deg,
-                rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
-                rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
-                rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
-                transparent 100%
-              )`,
-              backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
-              WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
-              pointerEvents: 'none',
-              zIndex: 9,
-              transition: 'all 0.3s ease',
-              opacity: isScrolled ? 1 : 0
-            }}
-          />
-          <div className='position-relative' >
-          <div ref={navRef} className="bg-white shadow-sm border-bottom mb-3 
-        " style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${navWidth}` ,backdropFilter: `blur(${blurIntensity}px)`,
-        WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-        boxShadow: isScrolled 
-          ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)' 
-          : '0 4px 25px 0 #0000001a',paddingBlock: '10px',
-          transition: 'all 0.3s ease',}}>
-            <div className="container-fluid py-2">
-              <div className="row align-items-center justify-content-between">
-                <div className="col-md-12 d-md-block d-sm-none">
-                  <div className="main-tabs-container">
-                    <ul className="nav nav-tabs nav-tabs-main border-0">
-                      {/* kyc Management Tab */}
-                      <li className="nav-item">
-                        <button
-                          className={`nav-link main-tab ${mainTab === 'kyc' ? 'active' : ''}`}
-                          onClick={() => handleMainTabChange('kyc')}
-                        >
-                          <i className="fas fa-id-card me-2"></i>
-                          KYC Management
-                          <span className="tab-badge">
-                          </span>
-                        </button>
-                      </li>
-                      {/* All Admission Tab */}
-                      <li className="nav-item">
-                        <button
-                          className={`nav-link main-tab ${mainTab === 'AllAdmission' ? 'active' : ''}`}
-                          onClick={() => handleMainTabChange('AllAdmission')}
-                        >
-                          <i className="fas fa-graduation-cap me-2"></i>
-                          Admission List
-                          <span className="tab-badge">
-                          </span>
-                        </button>
-                      </li>
-                    </ul>
-                  </div>
+    useEffect(() => {
+        console.log('useeffect', selectedProfile);
+        if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
+            fetchProfile(selectedProfile._candidate._id);
+        }
+    }, [selectedProfile]);
+
+    const openWhatsappPanel = () => {
+        setShowWhatsappPanel(true);
+        setShowEditPanel(false);
+        if (!isMobile) {
+            setMainContentClass('col-8');
+        }
+    };
+
+    const closeWhatsappPanel = () => {
+        setShowWhatsappPanel(false);
+        if (!isMobile) {
+            // setMainContentClass(showEditPanel ? 'col-8' : 'col-12');
+            const hasOtherPanelsOpen = showEditPanel || showFollowupPanel || showWhatsappPanel;
+            setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
+        }
+    };
+
+    const handleSubStatusChange = (e) => {
+        const selectedSubStatusId = e.target.value;
+        const selectedSubStatusObject = subStatuses.find(status => status._id === selectedSubStatusId);
+        setSelectedSubStatus(selectedSubStatusObject || null);
+    }
+
+    const handleStatusChange = (e) => {
+        setSelectedStatus(e.target.value);
+    };
+
+    const fetchSubStatus = async () => {
+        try {
+
+
+            const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
+                headers: { 'x-auth': token }
+            });
+
+            if (response.data.success) {
+                setSubStatuses(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching roles:', error);
+            alert('Failed to fetch SubStatus');
+        }
+    };
+
+    const [filterData, setFilterData] = useState({
+        name: '',
+        courseType: '',
+        status: 'true',
+        kyc: false,
+        leadStatus: '',
+        sector: '',
+        createdFromDate: null,
+        createdToDate: null,
+        modifiedFromDate: null,
+        modifiedToDate: null,
+        nextActionFromDate: null,
+        nextActionToDate: null
+
+    });
+
+
+    // ========================================
+    // 🎯 Main Tab Change Handler
+    // ========================================
+    const handleMainTabChange = (tabName) => {
+        setMainTab(tabName);
+        setActiveCrmFilter(0);
+
+    };
+
+    const handleUpdateStatus = async () => {
+        console.log('Function called');
+
+        try {
+            if (showEditPanel) {
+                // Validation checks
+                if (!selectedProfile || !selectedProfile._id) {
+                    alert('No profile selected');
+                    return;
+                }
+
+                if (!seletectedStatus) {
+                    alert('Please select a status');
+                    return;
+                }
+
+                // Combine date and time into a single Date object (if both are set)
+                let followupDateTime = '';
+                if (followupDate && followupTime) {
+                    // Create proper datetime string
+                    const dateStr = followupDate instanceof Date
+                        ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+                        : followupDate;
+
+                    followupDateTime = new Date(`${dateStr}T${followupTime}`);
+
+                    // Validate the datetime
+                    if (isNaN(followupDateTime.getTime())) {
+                        alert('Invalid date/time combination');
+                        return;
+                    }
+                }
+
+                // Prepare the request body
+                const data = {
+                    _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
+                    _leadSubStatus: seletectedSubStatus?._id || null,
+                    followup: followupDateTime ? followupDateTime.toISOString() : null,
+                    remarks: remarks || ''
+                };
+
+
+
+                // Check if backend URL and token exist
+                if (!backendUrl) {
+                    alert('Backend URL not configured');
+                    return;
+                }
+
+                if (!token) {
+                    alert('Authentication token missing');
+                    return;
+                }
+
+                // Send PUT request to backend API
+                const response = await axios.put(
+                    `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+                    data,
+                    {
+                        headers: {
+                            'x-auth': token,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                console.log('API response:', response.data);
+
+                if (response.data.success) {
+                    alert('Status updated successfully!');
+
+                    // Reset form
+                    setSelectedStatus('');
+                    setSelectedSubStatus(null);
+                    setFollowupDate('');
+                    setFollowupTime('');
+                    setRemarks('');
+
+                    // Refresh data and close panel
+                    await fetchProfileData();
+                    closeEditPanel();
+                } else {
+                    console.error('API returned error:', response.data);
+                    alert(response.data.message || 'Failed to update status');
+                }
+
+            }
+            if (showFollowupPanel) {
+
+
+                // Combine date and time into a single Date object (if both are set)
+                let followupDateTime = '';
+                if (followupDate && followupTime) {
+                    // Create proper datetime string
+                    const dateStr = followupDate instanceof Date
+                        ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
+                        : followupDate;
+
+                    followupDateTime = new Date(`${dateStr}T${followupTime}`);
+
+                    // Validate the datetime
+                    if (isNaN(followupDateTime.getTime())) {
+                        alert('Invalid date/time combination');
+                        return;
+                    }
+                }
+
+                // Prepare the request body
+                const data = {
+                    followup: followupDateTime ? followupDateTime.toISOString() : null,
+                    remarks: remarks || ''
+                };
+
+
+
+                // Check if backend URL and token exist
+                if (!backendUrl) {
+                    alert('Backend URL not configured');
+                    return;
+                }
+
+                if (!token) {
+                    alert('Authentication token missing');
+                    return;
+                }
+
+                // Send PUT request to backend API
+                const response = await axios.put(
+                    `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+                    data,
+                    {
+                        headers: {
+                            'x-auth': token,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                console.log('API response:', response.data);
+
+                if (response.data.success) {
+                    alert('Status updated successfully!');
+
+                    // Reset form
+                    setSelectedStatus('');
+                    setSelectedSubStatus(null);
+                    setFollowupDate('');
+                    setFollowupTime('');
+                    setRemarks('');
+
+                    // Refresh data and close panel
+                    await fetchProfileData();
+                    closeEditPanel();
+                } else {
+                    console.error('API returned error:', response.data);
+                    alert(response.data.message || 'Failed to update status');
+                }
+
+            }
+        }
+        catch (error) {
+            console.error('Error updating status:', error);
+
+            // More detailed error handling
+            if (error.response) {
+                // Server responded with error status
+                console.error('Error Response:', error.response.data);
+                console.error('Error Status:', error.response.status);
+                alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
+            } else if (error.request) {
+                // Request was made but no response received
+                console.error('No response received:', error.request);
+                alert('Network error: Unable to reach server');
+            } else {
+                // Something else happened
+                console.error('Error:', error.message);
+                alert(`Error: ${error.message}`);
+            }
+        }
+    };
+
+    const handleTimeChange = (e) => {
+        if (!followupDate) {
+            alert('Select date first');
+            return;
+        }
+
+        const time = e.target.value;
+        const [hours, minutes] = time.split(':');
+        const selectedDateTime = new Date(followupDate);
+        selectedDateTime.setHours(parseInt(hours, 10));
+        selectedDateTime.setMinutes(parseInt(minutes, 10));
+        selectedDateTime.setSeconds(0);
+        selectedDateTime.setMilliseconds(0);
+
+        const now = new Date();
+
+        if (selectedDateTime < now) {
+            alert('Select future time');
+            return;
+        }
+
+        setFollowupTime(time);
+    };
+
+
+
+
+    // Helper function for status icons
+    const getStatusIcon = (statusName) => {
+        const statusName_lower = statusName.toLowerCase();
+        if (statusName_lower.includes('hot') || statusName_lower.includes('urgent')) return '🔥';
+        if (statusName_lower.includes('warm') || statusName_lower.includes('interested')) return '⚡';
+        if (statusName_lower.includes('cold') || statusName_lower.includes('not')) return '❄️';
+        if (statusName_lower.includes('new') || statusName_lower.includes('fresh')) return '🆕';
+        if (statusName_lower.includes('follow') || statusName_lower.includes('pending')) return '⏳';
+        if (statusName_lower.includes('converted') || statusName_lower.includes('success')) return '✅';
+        return '🎯';
+    };
+
+    const renderMainTabContent = () => {
+        switch (mainTab) {
+            case 'kyc':
+                return <KYCManagement openPanel={openPanel} closePanel={closePanel}  isPanelOpen={isPanelOpen} />;
+            case 'AllAdmission':
+                return <AdmissionList openPanel={openPanel} />;
+            default:
+                return null;
+        }
+    };
+
+
+    // ========================================
+
+    const handleSaveCV = async () => {
+        if (candidateRef.current) {
+            const result = await candidateRef.current.handleSaveCV();
+
+            console.log(result, 'result')
+            if (result.isvalid === true) {
+                // Find and update the candidate in allProfiles
+                setAllProfiles(prevProfiles =>
+                    prevProfiles.map(profile => {
+                        if (profile._id === selectedProfile._id) {
+                            // Update the _candidate data with the updated profile from result
+                            return {
+                                ...profile,
+                                _candidate: result.data // result.data contains the updated candidate profile
+                            };
+                        }
+                        return profile;
+                    })
+                );
+                setOpenModalId(null);
+                setSelectedProfile(null)
+            }
+        }
+    };
+
+
+
+    const openPanel = (panelName, profile = null) => {
+        console.log('Opening panel:', panelName);       
+        setShowPanel(panelName)
+        setMainContentClass('col-8')
+        setIsPanelOpen(true)
+        setSelectedProfile(profile)
+    }
+
+    const closePanel = () => {
+        setShowPanel('')
+        setMainContentClass('col-12')
+        setIsPanelOpen(false)
+        setSelectedProfile(null)
+    }
+
+
+
+
+
+    // Leads Panel
+
+    const renderLeadHistoryPanel = () => {
+        const panelContent = (
+            <div className="card border-0 shadow-sm h-100">
+                <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+                    <div className="d-flex align-items-center">
+                        <div className="me-2">
+                            <i className="fas fa-history text-primary"></i>
+                        </div>
+                        <h6 className="mb-0 fw-medium">Lead History</h6>
+                    </div>
+                    <button className="btn-close" type="button" onClick={closePanel}>
+                    </button>
                 </div>
 
-               
-              </div>
-            </div>
+                <div className="card-body p-0 d-flex flex-column h-100">
+                    {/* Scrollable Content Area */}
+                    <div
+                        className="flex-grow-1 overflow-auto px-3 py-2"
+                        style={{
+                            maxHeight: isMobile ? '60vh' : '65vh',
+                            minHeight: '200px'
+                        }}
+                    >
+                        {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
+                            <div className="timeline">
+                                {selectedProfile.logs.map((log, index) => (
+                                    <div key={index} className="timeline-item mb-4">
+                                        <div className="timeline-marker">
+                                            <div className="timeline-marker-icon">
+                                                <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
+                                            </div>
+                                            {index !== selectedProfile.logs.length - 1 && (
+                                                <div className="timeline-line"></div>
+                                            )}
+                                        </div>
 
-            
-          </div>
-          </div>
-          {/* Main Content */}
-          <div className="main-content" style={{marginTop: `${navHeight + 30}px`}}>
-            {renderMainTabContent()}
-          </div>
-        </div>
-      </div>
-      <style> {
-          ` .bg-gradient-primary {
+                                        <div className="timeline-content">
+                                            <div className="card border-0 shadow-sm">
+                                                <div className="card-body p-3">
+                                                    <div className="d-flex justify-content-between align-items-start mb-2 flex-column">
+                                                        <span className="bg-light text-dark border">
+                                                            {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                year: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            }) : 'Unknown Date'}
+                                                        </span>
+                                                        <small className="text-muted">
+                                                            <i className="fas fa-user me-1"></i>
+                                                            Modified By: {log.user?.name || 'Unknown User'}
+                                                        </small>
+                                                    </div>
+
+                                                    <div className="mb-2">
+                                                        <strong className="text-dark d-block mb-1">Action:</strong>
+                                                        <div className="text-muted small" style={{ lineHeight: '1.6' }}>
+                                                            {log.action ? (
+                                                                log.action.split(';').map((actionPart, actionIndex) => (
+                                                                    <div key={actionIndex} className="mb-1">
+                                                                        • {actionPart.trim()}
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <div className="text-muted">No action specified</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {log.remarks && (
+                                                        <div>
+                                                            <strong className="text-dark d-block mb-1">Remarks:</strong>
+                                                            <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
+                                                                {log.remarks}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                                <div className="mb-3">
+                                    <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                                </div>
+                                <h6 className="text-muted mb-2">No History Available</h6>
+                                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Fixed Footer */}
+                    <div className="border-top px-3 py-3 bg-light">
+                        <div className="d-flex justify-content-end">
+                            <button
+                                type="button"
+                                className="btn btn-outline-secondary"
+                                onClick={closeleadHistoryPanel}
+                            >
+                                <i className="fas fa-times me-1"></i>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        if (isMobile) {
+            return (
+                <div
+                    className={`modal ${showPanel === 'leadHistory' ? 'show d-block' : 'd-none'}`}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) closeleadHistoryPanel();
+                    }}
+                >
+                    <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+                        <div className="modal-content" style={{ height: '85vh' }}>
+                            {panelContent}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return showPanel === 'leadHistory' ? (
+            <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
+                {panelContent}
+            </div>
+        ) : null;
+    };
+
+    const closeleadHistoryPanel = () => {
+        setLeadHistoryPanel(false)
+        if (!isMobile) {
+            // setMainContentClass(showEditPanel || showWhatsappPanel ? 'col-8' : 'col-12');
+            const hasOtherPanelsOpen = showEditPanel || showFollowupPanel || showWhatsappPanel;
+            setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
+        }
+    };
+
+    // Render followup Panel
+    const renderEditPanel = () => {
+        const panelContent = (
+            <div className="card border-0 shadow-sm">
+                <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+                    <div className="d-flex align-items-center">
+                        <div className="me-2">
+                            <i className="fas fa-user-edit text-secondary"></i>
+                        </div>
+                        <h6 className="mb-0 followUp fw-medium">
+                            {showEditPanel && 'Edit Status for '}
+                            {showFollowupPanel && 'Set Followup for '}
+                            {selectedProfile?._candidate?.name || 'Unknown'}
+                        </h6>
+                    </div>
+                    <div>
+                        <button className="btn-close" type="button" onClick={closePanel}></button>
+                    </div>
+                </div>
+
+                <div className="card-body">
+                    <form>
+                        
+
+                        {(showPanel === 'SetFollowup') && (
+                            <div className="row mb-1">
+                                <div className="col-6">
+                                    <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
+                                        Next Action Date <span className="text-danger">*</span>
+                                    </label>
+                                    <div className="input-group">
+                                        <DatePicker
+                                            className="form-control border-0 bgcolor"
+                                            onChange={setFollowupDate}
+                                            value={followupDate}
+                                            format="dd/MM/yyyy"
+                                            minDate={today}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="col-6">
+                                    <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
+                                        Time <span className="text-danger">*</span>
+                                    </label>
+                                    <div className="input-group">
+                                        <input
+                                            type="time"
+                                            className="form-control border-0 bgcolor"
+                                            id="actionTime"
+                                            onChange={handleTimeChange}
+                                            value={followupTime}
+                                            style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {( showPanel === 'SetFollowup') && (
+                            <div className="mb-1">
+                                <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
+                                <textarea
+                                    className="form-control border-0 bgcolor"
+                                    id="comment"
+                                    rows="4"
+                                    onChange={(e) => setRemarks(e.target.value)}
+                                    style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
+                                ></textarea>
+                            </div>
+                        )}
+
+                        <div className="d-flex justify-content-end gap-2 mt-4">
+                            <button
+                                type="button"
+                                className="btn"
+                                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                                onClick={closePanel}
+                            >
+                                CLOSE
+                            </button>
+                            <button
+                                type="submit"
+                                className="btn text-white"
+                                onClick={handleUpdateStatus}
+                                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+                            >
+                                SET FOLLOWUP
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        );
+
+        if (isMobile) {
+            return (
+                <div
+                    className={`modal ${showPanel === 'SetFollowup' ? 'show d-block' : 'd-none'}`}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) closeEditPanel();
+                    }}
+                >
+                    <div className="modal-dialog modal-dialog-centered modal-lg">
+                        <div className="modal-content">
+                            {panelContent}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return showPanel === 'SetFollowup' ? (
+            <div className="col-12 transition-col" id="editFollowupPanel">
+                {panelContent}
+            </div>
+        ) : null;
+    };
+
+    // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
+    const renderWhatsAppPanel = () => {
+        const panelContent = (
+            <div className="whatsapp-chat right-side-panel">
+                <section className="topbar-container">
+                    <div className="left-topbar">
+                        <div className="img-container">
+                            <div className="small-avatar" title="Ram Ruhela">RR</div>
+                        </div>
+                        <div className="flex-column">
+                            <span title="Ram Ruhela" className="lead-name">Ram Ruhela</span><br />
+                            <span className="selected-number">Primary: 918875426236</span>
+                        </div>
+                    </div>
+                    <div className="right-topbar">
+                        <a className="margin-horizontal-4" href="#">
+                            <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="whatsAppAccount" title="whatsAppChatList.title.whatsAppAccount" />
+                        </a>
+                        <a className="margin-horizontal-5" href="#">
+                            <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
+                        </a>
+                        <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={closeWhatsappPanel}
+                            title="Close WhatsApp"
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
+                </section>
+
+                <section className="chat-view">
+                    <ul className="chat-container" id="messageList">
+                        <div className="counselor-msg-container">
+                            <div className="chatgroupdate"><span>03/26/2025</span></div>
+                            <div className="counselor-msg-0 counselor-msg macro">
+                                <div className="text text-r">
+                                    <div>
+                                        <span className="message-header-name student-messages">Anjali</span><br />
+                                        <div className="d-flex">
+                                            <pre className="text-message">
+                                                <br /><span><span style={{ fontSize: '16px' }}>🎯</span>&nbsp;फ्री&nbsp;होटल&nbsp;मैनेजमेंट&nbsp;कोर्स&nbsp;-&nbsp;सुनहरा&nbsp;मौका&nbsp;<span style={{ fontSize: '16px' }}>🎯</span><br /><br />अब&nbsp;बने&nbsp;Guest&nbsp;Service&nbsp;Executive&nbsp;(Front&nbsp;Office)&nbsp;और&nbsp;होटल&nbsp;इंडस्ट्री&nbsp;में&nbsp;पाएं&nbsp;शानदार&nbsp;करियर&nbsp;की&nbsp;शुरुआत।<br /><br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;आयु&nbsp;सीमा:&nbsp;18&nbsp;से&nbsp;29&nbsp;वर्ष<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;योग्यता:&nbsp;12वीं&nbsp;पास<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;कोर्स&nbsp;अवधि:&nbsp;3&nbsp;से&nbsp;4&nbsp;महीने<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;100%&nbsp;जॉब&nbsp;प्लेसमेंट&nbsp;गारंटी</span>
+                                                <span className="messageTime text-message-time" id="time_0" style={{ marginTop: '12px' }}>
+                                                    12:31 PM
+                                                    <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
+                                                </span>
+                                            </pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="counselor-msg-container">
+                            <div className="chatgroupdate"><span>04/07/2025</span></div>
+                            <div className="counselor-msg-1 counselor-msg macro">
+                                <div className="text text-r">
+                                    <div className="d-flex">
+                                        <pre className="text-message">
+                                            <span className="message-header-name student-messages">Mr. Parveen Bansal</span><br />
+                                            <span><h6>Hello</h6></span>
+                                            <span className="messageTime text-message-time" id="time_1" style={{ marginTop: '7px' }}>
+                                                04:28 PM
+                                                <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
+                                            </span>
+                                        </pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="sessionExpiredMsg">
+                            <span>Your session has come to end. It will start once you receive a WhatsApp from the lead.<br />Meanwhile, you can send a Business Initiated Messages (BIM).</span>
+                        </div>
+                    </ul>
+                </section>
+
+                <section className="footer-container">
+                    <div className="footer-box">
+                        <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
+                            <textarea
+                                placeholder="Choose a template"
+                                className="disabled-style message-input"
+                                disabled
+                                rows="1"
+                                id="message-input"
+                                style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
+                            ></textarea>
+                        </div>
+                        <hr className="divider" />
+                        <div className="message-container-input">
+                            <div className="left-footer">
+                                <span className="disabled-style margin-bottom-5">
+                                    <a className="margin-right-10" href="#" title="Emoji">
+                                        <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="Emoji" />
+                                    </a>
+                                </span>
+                                <span className="disabled-style">
+                                    <input name="fileUpload" type="file" title="Attach File" className="fileUploadIcon" />
+                                </span>
+                                <span className="input-template">
+                                    <a title="Whatsapp Template">
+                                        <img src="/Assets/public_assets/images/whatapp/orange-template-whatsapp.svg" alt="Whatsapp Template" />
+                                    </a>
+                                </span>
+                            </div>
+                            <div className="right-footer">
+                                <span className="disabled-style">
+                                    <a className="send-button" href="#" title="Send">
+                                        <img className="send-img" src="/Assets/public_assets/images/whatapp/paper-plane.svg" alt="Send" />
+                                    </a>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        );
+
+        if (isMobile) {
+            return (
+                <div
+                    className={`modal ${showWhatsappPanel ? 'show d-block' : 'd-none'}`}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) closeWhatsappPanel();
+                    }}
+                >
+                    <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+                        <div className="modal-content" style={{ height: '80vh' }}>
+                            {panelContent}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return showWhatsappPanel ? (
+            <div className="col-12 transition-col" id="whatsappPanel">
+                {panelContent}
+            </div>
+        ) : null;
+    };
+
+
+    return (
+        <div className="container-fluid admissionMobileResponsive">
+            <div className="row">
+                <div className={`${isMobile ? 'col-12' : mainContentClass} mobileResponsive`}>
+                    {/* Header */}
+                    <div
+                        className="content-blur-overlay"
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: `${navHeight + 50}px`,
+                            background: `linear-gradient(
+                            180deg,
+                            rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
+                            rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
+                            rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
+                            transparent 100%
+                             )`,
+                            backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+                            WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+                            pointerEvents: 'none',
+                            zIndex: 9,
+                            transition: 'all 0.3s ease',
+                            opacity: isScrolled ? 1 : 0
+                        }}
+                    />
+                    <div className='position-relative' >
+                        <div ref={navRef} className="bg-white shadow-sm border-bottom mb-3 
+        " style={{
+                                zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
+                                WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+                                boxShadow: isScrolled
+                                    ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
+                                    : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
+                                transition: 'all 0.3s ease',
+                            }}>
+                            <div className="container-fluid py-2">
+                                <div className="row align-items-center justify-content-between">
+                                    <div className="col-md-12 d-md-block d-sm-none">
+                                        <div className="main-tabs-container">
+                                            <ul className="nav nav-tabs nav-tabs-main border-0">
+                                                {/* kyc Management Tab */}
+                                                <li className="nav-item">
+                                                    <button
+                                                        className={`nav-link main-tab ${mainTab === 'kyc' ? 'active' : ''}`}
+                                                        onClick={() => handleMainTabChange('kyc')}
+                                                    >
+                                                        <i className="fas fa-id-card me-2"></i>
+                                                        KYC Management
+                                                        <span className="tab-badge">
+                                                        </span>
+                                                    </button>
+                                                </li>
+                                                {/* All Admission Tab */}
+                                                <li className="nav-item">
+                                                    <button
+                                                        className={`nav-link main-tab ${mainTab === 'AllAdmission' ? 'active' : ''}`}
+                                                        onClick={() => handleMainTabChange('AllAdmission')}
+                                                    >
+                                                        <i className="fas fa-graduation-cap me-2"></i>
+                                                        Admission List
+                                                        <span className="tab-badge">
+                                                        </span>
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+
+                                </div>
+                            </div>
+
+
+                        </div>
+                    </div>
+                    {/* Main Content */}
+                    <div className="main-content" style={{ marginTop: `${navHeight + 20}px` }}>
+                        {renderMainTabContent()}
+                    </div>
+                </div>
+
+                {!isMobile && (
+                    <div className="col-4">
+                        <div className="row site-header--sticky--admission--post--panel">
+                            {renderEditPanel()}
+                            {renderWhatsAppPanel()}
+                            {renderLeadHistoryPanel()}
+                        </div>
+                    </div>
+                )}
+
+                {/* Mobile Modals */}
+                {isMobile && renderEditPanel()}
+                {isMobile && renderWhatsAppPanel()}
+                {isMobile && renderLeadHistoryPanel()}
+
+                {openModalId === selectedProfile?._id && (
+                    <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                        <div className="modal-dialog modal-dialog-scrollable m-0 mt-2">
+                            <div className="modal-content new-modal-content">
+                                <div className="modal-header">
+                                    <h1 className="modal-title fs-5">Candidate Profile</h1>
+                                    <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
+                                </div>
+                                <div className="modal-body">
+                                    <CandidateProfile ref={candidateRef} />
+                                </div>
+                                <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
+                                    <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <style> {
+                ` .bg-gradient-primary {
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           }
 
@@ -538,6 +1500,21 @@ const CRMDashboard = () => {
               width: 100%;
               height: 73dvh;
           }
+
+ .site-header--sticky--admission--post:not(.mobile-sticky-enable){
+          top: 195px;
+          z-index: 10;
+          }
+          .site-header--sticky--admission--post--panel:not(.mobile-sticky-enable){
+          z-index: 10;
+          }
+           #editFollowupPanel {
+    max-height: calc(100vh - 220px); /* Adjust based on your header height */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+}
 
           .whatsapp-chat .topbar-container {
               background-color: #fff;
@@ -2830,11 +3807,11 @@ const CRMDashboard = () => {
           }
 
           `
-      }
+            }
 
-      </style>
-    </div>
-  );
+            </style>
+        </div>
+    );
 };
 
 export default CRMDashboard;

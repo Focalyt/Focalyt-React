@@ -222,12 +222,14 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
-const KYCManagement = () => {
+const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const user = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+  
+  const [showPanel, setShowPanel] = useState('')
 
   const candidateRef = useRef();
 
@@ -239,12 +241,39 @@ const KYCManagement = () => {
     }
   };
 
+
+
+  // const handleSaveCV = async () => {
+  //   if (candidateRef.current) {
+  //     const result = await candidateRef.current.handleSaveCV();
+  //     console.log(result, 'result')
+  //     if (result === true) {
+  //       setOpenModalId(null); setSelectedProfile(null)
+  //     }
+  //   }
+  // };
+
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
+
       console.log(result, 'result')
-      if (result === true) {
-        setOpenModalId(null); setSelectedProfile(null)
+      if (result.isvalid === true) {
+        // Find and update the candidate in allProfiles
+        setAllProfiles(prevProfiles => 
+          prevProfiles.map(profile => {
+            if (profile._id === selectedProfile._id) {
+              // Update the _candidate data with the updated profile from result
+              return {
+                ...profile,
+                _candidate: result.data // result.data contains the updated candidate profile
+              };
+            }
+            return profile;
+          })
+        );
+        setOpenModalId(null); 
+        setSelectedProfile(null)
       }
     }
   };
@@ -330,11 +359,9 @@ const KYCManagement = () => {
     { _id: 'All', name: 'All', count: 0, milestone: '' }
 
   ]);
-  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters, showEditPanel, 
-    showFollowupPanel, 
-    leadHistoryPanel, 
-    showWhatsappPanel,
-    mainContentClass]);
+
+
+  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters, showEditPanel,showFollowupPanel, leadHistoryPanel, showWhatsappPanel, mainContentClass, isPanelOpen]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -413,7 +440,62 @@ const KYCManagement = () => {
     fetchFilterOptions();
   }, []);
 
+  // ========================================
+  // 🎯 Modal Scroll Management
+  // ========================================
+  useEffect(() => {
+    // Prevent background scrolling when any modal or panel is open
+    if (showDocumentModal || showUploadModal || showEditPanel || showWhatsappPanel) {
+      // Store the current scroll position
+      const scrollY = window.scrollY;
+      
+      // Add styles to prevent scrolling
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+      
+      // Return function to restore scrolling when modal closes
+      return () => {
+        // Restore body styles
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        
+        // Restore scroll position
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [showDocumentModal, showUploadModal, showEditPanel, showWhatsappPanel]);
 
+  // ========================================
+  // 🎯 Prevent Modal Re-rendering on Scroll
+  // ========================================
+  useEffect(() => {
+    if (showDocumentModal || showUploadModal) {
+      // Prevent scroll events from causing modal re-renders
+      const preventScrollRerender = (e) => {
+        // Stop propagation of scroll events to prevent modal re-rendering
+        e.stopPropagation();
+      };
+
+      // Add event listeners to modal elements
+      const modalOverlays = document.querySelectorAll('.document-modal-overlay, .upload-modal-overlay');
+      modalOverlays.forEach(overlay => {
+        overlay.addEventListener('wheel', preventScrollRerender, { passive: false });
+        overlay.addEventListener('scroll', preventScrollRerender, { passive: false });
+      });
+
+      return () => {
+        // Remove event listeners
+        modalOverlays.forEach(overlay => {
+          overlay.removeEventListener('wheel', preventScrollRerender);
+          overlay.removeEventListener('scroll', preventScrollRerender);
+        });
+      };
+    }
+  }, [showDocumentModal, showUploadModal]);
 
   const handleCriteriaChange = (criteria, values) => {
     setFormData((prevState) => ({
@@ -580,7 +662,6 @@ const KYCManagement = () => {
     // Only reset when actually closing modal
     setDocumentZoom(1);
     setDocumentRotation(0);
-    document.body?.classList.remove('no-scroll');
   };
 
 
@@ -1431,7 +1512,7 @@ const KYCManagement = () => {
     }
   };
 
-  const openleadHistoryPanel = async (profile = null) => {
+  const openChangeCenterPanel = async (profile = null) => {
     if (profile) {
       setSelectedProfile(profile);
     }
@@ -1440,6 +1521,23 @@ const KYCManagement = () => {
     setLeadHistoryPanel(true)
     setShowWhatsappPanel(false);
     setShowEditPanel(false);
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+  };
+
+  const openleadHistoryPanel = async (profile = null) => {
+    if (profile) {
+      // Set selected profile
+      setSelectedProfile(profile);
+
+    }
+
+    setShowPopup(null);
+    setShowPanel('leadHistory');
+    setShowPanel('SetFollowup')
+    // setSelectedConcernPerson(null);
+    // setSelectedProfiles(null);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -1497,7 +1595,7 @@ const KYCManagement = () => {
           style={{ whiteSpace: 'nowrap' }}
           title="Zoom In"
         >
-          <i className="fas fa-search-plus"></i> Zoom In
+          <i className="fas fa-search-plus"></i> 
         </button>
 
         <button
@@ -1506,7 +1604,7 @@ const KYCManagement = () => {
           style={{ whiteSpace: 'nowrap' }}
           title="Zoom Out"
         >
-          <i className="fas fa-search-minus"></i> Zoom Out
+          <i className="fas fa-search-minus"></i> 
         </button>
 
         {/* Show rotation button only for images */}
@@ -1517,7 +1615,7 @@ const KYCManagement = () => {
             style={{ whiteSpace: 'nowrap' }}
             title="Rotate 90°"
           >
-            <i className="fas fa-redo"></i> Rotate
+            <i className="fas fa-redo"></i> 
           </button>
         )}
 
@@ -1528,7 +1626,7 @@ const KYCManagement = () => {
           style={{ whiteSpace: 'nowrap' }}
           title="Reset View"
         >
-          <i className="fas fa-sync-alt"></i> Reset
+          <i className="fas fa-sync-alt"></i>
         </button>
 
         {/* Download Button */}
@@ -1541,7 +1639,7 @@ const KYCManagement = () => {
           style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
           title="Download Document"
         >
-          <i className="fas fa-download"></i> Download
+          <i className="fas fa-download"></i> 
         </a>
 
         {/* Zoom Level Indicator */}
@@ -2202,465 +2300,9 @@ const KYCManagement = () => {
     }
   };
 
-  // Render Edit Panel
-  const renderEditPanel = () => {
-    const panelContent = (
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-user-edit text-secondary"></i>
-            </div>
-            <h6 className="mb-0 followUp fw-medium">
-              {showEditPanel && 'Edit Status for '}
-              {showFollowupPanel && 'Set Followup for '}
-              {selectedProfile?._candidate?.name || 'Unknown'}
-            </h6>
-          </div>
-          <div>
-            <button className="btn-close" type="button" onClick={closeEditPanel}></button>
-          </div>
-        </div>
-
-        <div className="card-body">
-          <form>
-            {!showFollowupPanel && (
-              <>
-                <div className="mb-1">
-                  <label htmlFor="status" className="form-label small fw-medium text-dark">
-                    Status<span className="text-danger">*</span>
-                  </label>
-                  <div className="d-flex">
-                    <div className="form-floating flex-grow-1">
-                      <select
-                        className="form-select border-0 bgcolor"
-                        id="status"
-                        value={seletectedStatus}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          paddingInline: '10px',
-                          width: '100%',
-                          backgroundColor: '#f1f2f6'
-                        }}
-                        onChange={handleStatusChange}
-                      >
-                        <option value="">Select Status</option>
-                        {statuses.map((filter, index) => (
-                          <option key={filter._id} value={filter._id}>{filter.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-1">
-                  <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                    Sub-Status<span className="text-danger">*</span>
-                  </label>
-                  <div className="d-flex">
-                    <div className="form-floating flex-grow-1">
-                      <select
-                        className="form-select border-0 bgcolor"
-                        id="subStatus"
-                        value={seletectedSubStatus?._id || ''}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          backgroundColor: '#f1f2f6',
-                          paddingInline: '10px',
-                          width: '100%'
-                        }}
-                        onChange={handleSubStatusChange}
-                      >
-                        <option value="">Select Sub-Status</option>
-                        {subStatuses.map((filter, index) => (
-                          <option key={filter._id} value={filter._id}>{filter.title}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {((seletectedSubStatus && seletectedSubStatus.hasFollowup) || showFollowupPanel) && (
-              <div className="row mb-1">
-                <div className="col-6">
-                  <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                    Next Action Date <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    <DatePicker
-                      className="form-control border-0 bgcolor"
-                      onChange={setFollowupDate}
-                      value={followupDate}
-                      format="dd/MM/yyyy"
-                      minDate={today}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-6">
-                  <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                    Time <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    <input
-                      type="time"
-                      className="form-control border-0 bgcolor"
-                      id="actionTime"
-                      onChange={handleTimeChange}
-                      value={followupTime}
-                      style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || showFollowupPanel) && (
-              <div className="mb-1">
-                <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
-                <textarea
-                  className="form-control border-0 bgcolor"
-                  id="comment"
-                  rows="4"
-                  onChange={(e) => setRemarks(e.target.value)}
-                  style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-                ></textarea>
-              </div>
-            )}
-
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <button
-                type="button"
-                className="btn"
-                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closeEditPanel}
-              >
-                CLOSE
-              </button>
-              <button
-                type="submit"
-                className="btn text-white"
-                onClick={handleUpdateStatus}
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
-              >
-                SET FOLLOWUP
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-
-    if (isMobile) {
-      return (
-        <div
-          className={`modal ${showEditPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeEditPanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return showEditPanel || showFollowupPanel ? (
-      <div className="col-12 transition-col" id="editFollowupPanel">
-        {panelContent}
-      </div>
-    ) : null;
-  };
-
-  // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
-  const renderWhatsAppPanel = () => {
-    const panelContent = (
-      <div className="whatsapp-chat right-side-panel">
-        <section className="topbar-container">
-          <div className="left-topbar">
-            <div className="img-container">
-              <div className="small-avatar" title="Ram Ruhela">RR</div>
-            </div>
-            <div className="flex-column">
-              <span title="Ram Ruhela" className="lead-name">Ram Ruhela</span><br />
-              <span className="selected-number">Primary: 918875426236</span>
-            </div>
-          </div>
-          <div className="right-topbar">
-            <a className="margin-horizontal-4" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="whatsAppAccount" title="whatsAppChatList.title.whatsAppAccount" />
-            </a>
-            <a className="margin-horizontal-5" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
-            </a>
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={closeWhatsappPanel}
-              title="Close WhatsApp"
-            >
-              <i className="fas fa-times"></i>
-            </button>
-          </div>
-        </section>
-
-        <section className="chat-view">
-          <ul className="chat-container" id="messageList">
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>03/26/2025</span></div>
-              <div className="counselor-msg-0 counselor-msg macro">
-                <div className="text text-r">
-                  <div>
-                    <span className="message-header-name student-messages">Anjali</span><br />
-                    <div className="d-flex">
-                      <pre className="text-message">
-                        <br /><span><span style={{ fontSize: '16px' }}>🎯</span>&nbsp;फ्री&nbsp;होटल&nbsp;मैनेजमेंट&nbsp;कोर्स&nbsp;-&nbsp;सुनहरा&nbsp;मौका&nbsp;<span style={{ fontSize: '16px' }}>🎯</span><br /><br />अब&nbsp;बने&nbsp;Guest&nbsp;Service&nbsp;Executive&nbsp;(Front&nbsp;Office)&nbsp;और&nbsp;होटल&nbsp;इंडस्ट्री&nbsp;में&nbsp;पाएं&nbsp;शानदार&nbsp;करियर&nbsp;की&nbsp;शुरुआत।<br /><br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;आयु&nbsp;सीमा:&nbsp;18&nbsp;से&nbsp;29&nbsp;वर्ष<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;योग्यता:&nbsp;12वीं&nbsp;पास<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;कोर्स&nbsp;अवधि:&nbsp;3&nbsp;से&nbsp;4&nbsp;महीने<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;100%&nbsp;जॉब&nbsp;प्लेसमेंट&nbsp;गारंटी</span>
-                        <span className="messageTime text-message-time" id="time_0" style={{ marginTop: '12px' }}>
-                          12:31 PM
-                          <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
-                        </span>
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>04/07/2025</span></div>
-              <div className="counselor-msg-1 counselor-msg macro">
-                <div className="text text-r">
-                  <div className="d-flex">
-                    <pre className="text-message">
-                      <span className="message-header-name student-messages">Mr. Parveen Bansal</span><br />
-                      <span><h6>Hello</h6></span>
-                      <span className="messageTime text-message-time" id="time_1" style={{ marginTop: '7px' }}>
-                        04:28 PM
-                        <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
-                      </span>
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="sessionExpiredMsg">
-              <span>Your session has come to end. It will start once you receive a WhatsApp from the lead.<br />Meanwhile, you can send a Business Initiated Messages (BIM).</span>
-            </div>
-          </ul>
-        </section>
-
-        <section className="footer-container">
-          <div className="footer-box">
-            <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
-              <textarea
-                placeholder="Choose a template"
-                className="disabled-style message-input"
-                disabled
-                rows="1"
-                id="message-input"
-                style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
-              ></textarea>
-            </div>
-            <hr className="divider" />
-            <div className="message-container-input">
-              <div className="left-footer">
-                <span className="disabled-style margin-bottom-5">
-                  <a className="margin-right-10" href="#" title="Emoji">
-                    <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="Emoji" />
-                  </a>
-                </span>
-                <span className="disabled-style">
-                  <input name="fileUpload" type="file" title="Attach File" className="fileUploadIcon" />
-                </span>
-                <span className="input-template">
-                  <a title="Whatsapp Template">
-                    <img src="/Assets/public_assets/images/whatapp/orange-template-whatsapp.svg" alt="Whatsapp Template" />
-                  </a>
-                </span>
-              </div>
-              <div className="right-footer">
-                <span className="disabled-style">
-                  <a className="send-button" href="#" title="Send">
-                    <img className="send-img" src="/Assets/public_assets/images/whatapp/paper-plane.svg" alt="Send" />
-                  </a>
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
-
-    if (isMobile) {
-      return (
-        <div
-          className={`modal ${showWhatsappPanel ? 'show d-block' : 'd-none'}`}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeWhatsappPanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content" style={{ height: '80vh' }}>
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return showWhatsappPanel ? (
-      <div className="col-12 transition-col" id="whatsappPanel">
-        {panelContent}
-      </div>
-    ) : null;
-  };
 
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
-  const renderLeadHistoryPanel = () => {
-    const panelContent = (
-      <div className="card border-0 shadow-sm h-100">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-history text-primary"></i>
-            </div>
-            <h6 className="mb-0 fw-medium">Lead History</h6>
-          </div>
-          <button className="btn-close" type="button" onClick={closeleadHistoryPanel}>
-          </button>
-        </div>
 
-        <div className="card-body p-0 d-flex flex-column h-100">
-          {/* Scrollable Content Area */}
-          <div
-            className="flex-grow-1 overflow-auto px-3 py-2"
-            style={{
-              maxHeight: isMobile ? '60vh' : '65vh',
-              minHeight: '200px'
-            }}
-          >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
-              <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
-                  <div key={index} className="timeline-item mb-4">
-                    <div className="timeline-marker">
-                      <div className="timeline-marker-icon">
-                        <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
-                      </div>
-                      {index !== selectedProfile.logs.length - 1 && (
-                        <div className="timeline-line"></div>
-                      )}
-                    </div>
-
-                    <div className="timeline-content">
-                      <div className="card border-0 shadow-sm">
-                        <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2">
-                            <span className="bg-light text-dark border">
-                              {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : 'Unknown Date'}
-                            </span>
-                            <small className="text-muted">
-                              <i className="fas fa-user me-1"></i>
-                              Modified By: {log.user?.name || 'Unknown User'}
-                            </small>
-                          </div>
-
-                          <div className="mb-2">
-                            <strong className="text-dark d-block mb-1">Action:</strong>
-                            <div className="text-muted small" style={{ lineHeight: '1.6' }}>
-                              {log.action ? (
-                                log.action.split(';').map((actionPart, actionIndex) => (
-                                  <div key={actionIndex} className="mb-1">
-                                    • {actionPart.trim()}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-muted">No action specified</div>
-                              )}
-                            </div>
-                          </div>
-
-                          {log.remarks && (
-                            <div>
-                              <strong className="text-dark d-block mb-1">Remarks:</strong>
-                              <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
-                                {log.remarks}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                <div className="mb-3">
-                  <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                </div>
-                <h6 className="text-muted mb-2">No History Available</h6>
-                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Fixed Footer */}
-          <div className="border-top px-3 py-3 bg-light">
-            <div className="d-flex justify-content-end">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={closeleadHistoryPanel}
-              >
-                <i className="fas fa-times me-1"></i>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-
-    if (isMobile) {
-      return (
-        <div
-          className={`modal ${leadHistoryPanel ? 'show d-block' : 'd-none'}`}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeleadHistoryPanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content" style={{ height: '85vh' }}>
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return leadHistoryPanel ? (
-      <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
-        {panelContent}
-      </div>
-    ) : null;
-  };
 
   const handleRejectionReasonChange = (e) => {
     rejectionReasonRef.current = e.target.value;
@@ -3417,9 +3059,13 @@ const KYCManagement = () => {
                                                     fontSize: "12px",
                                                     fontWeight: "600"
                                                   }}
+                                                  // onClick={() => {
+                                                  //   openleadHistoryPanel(profile);
+                                                  //   console.log('selectedProfile', profile);
+                                                  // }}
                                                   onClick={() => {
-                                                    openleadHistoryPanel(profile);
-                                                    console.log('selectedProfile', profile);
+                                                    setShowPopup(null)
+                                                    openPanel('leadHistory', profile)
                                                   }}
                                                 >
                                                   History List
@@ -3436,9 +3082,13 @@ const KYCManagement = () => {
                                                     fontSize: "12px",
                                                     fontWeight: "600"
                                                   }}
+                                                  // onClick={() => {
+                                                  //   openEditPanel(profile, 'SetFollowup');
+                                                  //   console.log('selectedProfile', profile);
+                                                  // }}
                                                   onClick={() => {
-                                                    openEditPanel(profile, 'SetFollowup');
-                                                    console.log('selectedProfile', profile);
+                                                    setShowPopup(null)
+                                                    openPanel('SetFollowup', profile)
                                                   }}
                                                 >
                                                   Set Followup
@@ -3567,7 +3217,12 @@ const KYCManagement = () => {
                                                     fontSize: "12px",
                                                     fontWeight: "600"
                                                   }}
-                                                  onClick={() => openleadHistoryPanel(profile)}
+                                                  // onClick={() => openleadHistoryPanel(profile)}
+                                                  onClick={() => {
+                                                    setShowPopup(null)
+                                                    openPanel('leadHistory', profile)
+                                                  }}
+
                                                 >
                                                   History List
                                                 </button>
@@ -3583,9 +3238,13 @@ const KYCManagement = () => {
                                                     fontSize: "12px",
                                                     fontWeight: "600"
                                                   }}
+                                                  // onClick={() => {
+                                                  //   openEditPanel(profile, 'SetFollowup');
+                                                  //   console.log('selectedProfile', profile);
+                                                  // }}
                                                   onClick={() => {
-                                                    openEditPanel(profile, 'SetFollowup');
-                                                    console.log('selectedProfile', profile);
+                                                    setShowPopup(null)
+                                                    openPanel('SetFollowup', profile)
                                                   }}
                                                 >
                                                   Set Followup
@@ -4688,21 +4347,7 @@ const KYCManagement = () => {
 
         </div>
 
-        {/* Right Sidebar for Desktop - Panels */}
-        {!isMobile && (
-          <div className="col-4">
-            <div className="row site-header--sticky--admission--post--panel">
-              {renderEditPanel()}
-              {renderWhatsAppPanel()}
-              {renderLeadHistoryPanel()}
-            </div>
-          </div>
-        )}
 
-        {/* Mobile Modals */}
-        {isMobile && renderEditPanel()}
-        {isMobile && renderWhatsAppPanel()}
-        {isMobile && renderLeadHistoryPanel()}
 
         {openModalId === selectedProfile?._id && (
           <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -6081,6 +5726,32 @@ background: #fd2b5a;
     align-items: center;
     z-index: 9999;
     backdrop-filter: blur(5px);
+    /* Prevent zoom and scroll on modal */
+    touch-action: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.upload-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+    /* Prevent zoom and scroll on modal */
+    touch-action: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 .document-modal-content {
@@ -7191,26 +6862,7 @@ background: #fd2b5a;
     }
   }
 
-        .stickyBreakpoints {
-          position: sticky;
-          top: 20px;
-          z-index: 11;
-        }
-          .site-header--sticky--admission--post:not(.mobile-sticky-enable){
-          top: 195px;
-          z-index: 10;
-          }
-          .site-header--sticky--admission--post--panel:not(.mobile-sticky-enable){
-          top: 265px;
-          z-index: 10;
-          }
-           #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
-}
+         
 @media (min-width: 992px) {
     .site-header--sticky--admission--post:not(.mobile-sticky-enable) {
         position: fixed !important;
@@ -7560,17 +7212,7 @@ background: #fd2b5a;
            🎯 NEW: Responsive Design (ADD THESE STYLES)
            ======================================== */
         /* Responsive Design */
-        @media(max-width:1920px) {
-          .stickyBreakpoints {
-            top: 20%
-          }
-        }
-
-        @media(max-width:1400px) {
-          .stickyBreakpoints {
-            top: 17%
-          }
-        }
+      
 
         @media(max-width: 768px) {
           .mbResponsive{        

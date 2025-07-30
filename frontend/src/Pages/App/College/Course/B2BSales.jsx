@@ -324,12 +324,37 @@ const B2BSales = () => {
   };
 
 
+  // const handleSaveCV = async () => {
+  //   if (candidateRef.current) {
+  //     const result = await candidateRef.current.handleSaveCV();
+  //     console.log(result, 'result')
+  //     if (result === true) {
+  //       setOpenModalId(null); setSelectedProfile(null)
+  //     }
+  //   }
+  // };
+
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
+
       console.log(result, 'result')
-      if (result === true) {
-        setOpenModalId(null); setSelectedProfile(null)
+      if (result.isvalid === true) {
+        // Find and update the candidate in allProfiles
+        setAllProfiles(prevProfiles => 
+          prevProfiles.map(profile => {
+            if (profile._id === selectedProfile._id) {
+              // Update the _candidate data with the updated profile from result
+              return {
+                ...profile,
+                _candidate: result.data // result.data contains the updated candidate profile
+              };
+            }
+            return profile;
+          })
+        );
+        setOpenModalId(null); 
+        setSelectedProfile(null)
       }
     }
   };

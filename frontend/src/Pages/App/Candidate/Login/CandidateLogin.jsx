@@ -8,7 +8,10 @@ import 'swiper/css';
 import { Pagination, Autoplay } from 'swiper/modules';
 import 'swiper/css/pagination';
 import { useLocation } from 'react-router-dom';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
+import { subYears } from "date-fns";
 const CandidateLogin = () => {
     const urlLocation = useLocation();
     const queryParams = new URLSearchParams(urlLocation.search);
@@ -21,7 +24,7 @@ const CandidateLogin = () => {
     const [otp, setOtp] = useState('');
     const [fullName, setFullName] = useState('');
     const [Email, setEmail] = useState('');
-    const [dob, setDob] = useState('');
+    const [dob, setDob] = useState(null);
     const [gender, setGender] = useState('');
     const [address, setAddress] = useState('');
     const [city, setCity] = useState('');
@@ -270,7 +273,7 @@ const CandidateLogin = () => {
                                 fullAddress: address,
                                 latitude: String(latitude),
                                 longitude: String(longitude),
-                               
+
                             },
                             permanentAddress: {
                                 type: "Point",
@@ -290,8 +293,8 @@ const CandidateLogin = () => {
                     }
 
                     // Only add dob if it's not empty
-                    if (dob && dob.trim() !== '') {
-                        body.dob = dob.trim();
+                    if (dob) {
+                        body.dob = dob.toISOString().split('T')[0]; // YYYY-MM-DD format
                     }
 
                     // Only add highestQualification if it's not empty
@@ -339,7 +342,7 @@ const CandidateLogin = () => {
 
                             });
                             await trackMetaConversion({
-                                eventName:  "Login",
+                                eventName: "Login",
                                 sourceUrl: window.location.href
                             });
                         } else {
@@ -537,14 +540,23 @@ const CandidateLogin = () => {
                                                 onChange={(e) => setFullName(e.target.value)}
                                             />
                                         </div>
-                                        <div className="mb-3">
-                                            <input
-                                                type="date"
+                                        <div className="mb-3 datepicker-wrapper">
+
+                                        <DatePicker
+                                                selected={dob}
+                                                onChange={(date) => setDob(date)}
+                                                dateFormat="dd/MM/yyyy"
+                                                placeholderText="Select DOB / जन्म तिथि चुनें"
                                                 className="form-control"
-                                                value={dob}
-                                                onChange={(e) => setDob(e.target.value)}
-                                                 placeholder="mm/dd/yyyy"
+                                                showYearDropdown
+                                                scrollableYearDropdown
+                                                yearDropdownItemNumber={100}
+                                                maxDate={subYears(new Date(), 7)}
+                                                showMonthDropdown
+                                                dropdownMode="select"
+                                                wrapperClassName="datepicker-input-wrapper"
                                             />
+
                                         </div>
                                         <div className="mb-3">
                                             <select
@@ -946,6 +958,9 @@ const CandidateLogin = () => {
     margin: 0;
     padding-block: 5px;
   }
+    .datepicker-input-wrapper{
+    width: 100%;
+    }
                     `
                 }
             </style>
