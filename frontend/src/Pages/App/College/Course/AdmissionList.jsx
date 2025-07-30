@@ -13,7 +13,7 @@ const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
   const [reason, setReason] = useState('');
   const reasonRef = useRef('');
 
-  
+
 
   const handleReasonChange = (e) => {
     reasonRef.current = e.target.value;
@@ -59,12 +59,12 @@ const useNavHeight = (dependencies = []) => {
 
   const calculateHeightAndWidth = useCallback(() => {
     console.log('🔍 Calculating nav height and width...');
-    
+
     if (navRef.current) {
       // Calculate Height
       const height = navRef.current.offsetHeight;
       console.log('📏 Found height:', height);
-      
+
       if (height > 0) {
         setNavHeight(height);
         console.log('✅ Height set to:', height + 'px');
@@ -75,7 +75,7 @@ const useNavHeight = (dependencies = []) => {
       if (parentContainer) {
         const parentWidth = parentContainer.offsetWidth;
         console.log('📐 Parent width:', parentWidth);
-        
+
         if (parentWidth > 0) {
           setNavWidth(parentWidth + 'px');
           console.log('✅ Width set to:', parentWidth + 'px');
@@ -233,7 +233,7 @@ const useScrollBlur = (navbarHeight = 140) => {
     const handleScroll = () => {
       const currentScrollY = window.pageYOffset;
       const shouldBlur = currentScrollY > navbarHeight / 3;
-      
+
       setIsScrolled(shouldBlur);
       setScrollY(currentScrollY);
     };
@@ -327,6 +327,13 @@ const AdmissionList = () => {
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
+
+  //batch asign stats
+
+  const [batches, setBatches] = useState([]);
+  const [selectedBatch, setSelectedBatch] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
     projects: {
@@ -459,16 +466,16 @@ const AdmissionList = () => {
   const [admissionFilters, setAdmissionFilters] = useState([
     { _id: 'alladmission', name: 'All Lists', count: 0, milestone: '' },
 
-    { _id: 'pendingBatchAssign', name: 'Pending For Batch Assign', count: 0, milestone: '' },
+    { _id: 'pendingBatchAssign', name: 'All Admissions', count: 0, milestone: '' },
     { _id: 'batchAssigned', name: 'Batch Assigned', count: 0, milestone: 'Completed' },
     { _id: 'zeroPeriod', name: 'At Zero Period', count: 0, milestone: '' },
     { _id: 'batchFreeze', name: 'Batch Freezed Students', count: 0, milestone: '' },
     { _id: 'dropout', name: 'Dropout', count: 0, milestone: '' }
   ]);
 
-  const { navRef, navHeight, navWidth } = useNavHeight([admissionFilters, showEditPanel, 
-    showFollowupPanel, 
-    leadHistoryPanel, 
+  const { navRef, navHeight, navWidth } = useNavHeight([admissionFilters, showEditPanel,
+    showFollowupPanel,
+    leadHistoryPanel,
     showWhatsappPanel,
     mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
@@ -731,7 +738,7 @@ const AdmissionList = () => {
     setActiveCrmFilter(index);
     console.log('_id', _id)
     setFilterData({ ...filterData, status: _id });
-    
+
   };
 
   // Filter state from Registration component
@@ -796,7 +803,7 @@ const AdmissionList = () => {
     console.log('seletectedSubStatus', seletectedSubStatus)
   }, [seletectedSubStatus]);
 
- 
+
 
   // Date range handlers
   const handleDateFilterChange = (date, fieldName) => {
@@ -804,7 +811,7 @@ const AdmissionList = () => {
       ...filterData,
       [fieldName]: date
     };
-   
+
   };
 
 
@@ -831,7 +838,7 @@ const AdmissionList = () => {
         createdFromDate: null,
         createdToDate: null
       }));
-      
+
     } else if (filterType === 'modified') {
       setFilterData(prev => ({
         ...prev,
@@ -845,7 +852,7 @@ const AdmissionList = () => {
         nextActionToDate: null
       }));
     }
-    
+
   };
 
 
@@ -882,9 +889,9 @@ const AdmissionList = () => {
     setSelectedStatus(e.target.value);
   };
 
- 
 
-  const handleDownloadAdmissionForm = async(profile) => {
+
+  const handleDownloadAdmissionForm = async (profile) => {
     try {
       if (!profile || !profile._id) {
         alert('No profile selected');
@@ -913,33 +920,33 @@ const AdmissionList = () => {
         }
       );
 
-      if(response.data.status === false){
+      if (response.data.status === false) {
         alert(response.data.message || 'Failed to download admission form');
         return;
       }
 
       // Create a blob from the PDF data
       const blob = new Blob([response.data], { type: 'application/pdf' });
-      
+
       // Create a download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `application_form_${profile._id}.pdf`;
-      
+
       // Trigger download
       document.body.appendChild(link);
       link.click();
-      
+
       // Clean up
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       alert('Admission form downloaded successfully!');
-      
+
     } catch (error) {
       console.error('Error downloading admission form:', error);
-      
+
       // Check if it's an error response with a message
       if (error.response && error.response.data) {
         try {
@@ -1213,7 +1220,79 @@ const AdmissionList = () => {
 
   useEffect(() => {
     fetchProfileData();
-  }, []);
+  }, [activeCrmFilter]);
+
+  const fetchBatches = async (profile) => {
+    setError('');
+
+    console.log(profile, 'profile');
+
+    const courseId = profile?._course?._id;
+    const centerId = profile?._center?._id;
+    if (!courseId || !centerId) {
+      alert(`No ${courseId ? 'course' : 'center'} selected`);
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${backendUrl}/college/get_batches`, {
+        params: {
+          courseId: courseId,
+          centerId: centerId
+        },
+        headers: {
+          'x-auth': token  // Pass the token in the headers for authentication
+        }
+      });
+
+      if (response.data.success) {
+        setBatches(response.data.data);
+      } else {
+        setError('Failed to fetch batches');
+      }
+    } catch (err) {
+      console.error('Error fetching batches:', err);
+      setError('Server error');
+    }
+  };
+
+
+  const handleBatchAssign = async (e) => {
+    if (!selectedBatch) {
+      alert('Please select a batch');
+      return;
+    }
+    e?.preventDefault(); // Prevent form submission
+    e?.stopPropagation(); // Stop event bubbling
+
+    console.log(selectedBatch, 'selectedBatch');
+    console.log(selectedProfile, 'selectedProfile');
+    try {
+      const response = await axios.post(`${backendUrl}/college/candidate/assign-batch`, {
+        batchId: selectedBatch,
+        appliedCourseId: selectedProfile._id
+      }, {
+        headers: {
+          'x-auth': token,
+        },
+      });
+
+      if (response.data.status) {
+        const message = alert('Batch assigned successfully!');
+        if (message) {
+
+
+        }
+      } else {
+        alert(response.data.message || 'Failed to assign batch');
+      }
+    } catch (error) {
+      console.error('Error assigning batch:', error);
+      alert('Failed to assign batch');
+    }
+    await fetchProfileData();
+    closeAssignBatchPanel();
+  }
 
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
@@ -1248,7 +1327,7 @@ const AdmissionList = () => {
         ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(filters.center.values) }),
         ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(filters.counselor.values) })
       });
-      
+
 
       const response = await axios.get(`${backendUrl}/college/admission-list?${queryParams}`, {
         headers: {
@@ -1261,7 +1340,7 @@ const AdmissionList = () => {
         const { crmFilterCounts } = response.data;
         const filter = [
           { _id: 'alladmission', name: 'All Lists', count: crmFilterCounts.all, milestone: '' },
-          { _id: 'pendingBatchAssign', name: 'Pending For Batch Assign', count: crmFilterCounts.pendingBatchAssign, milestone: '' },
+          { _id: 'pendingBatchAssign', name: 'All Admissions', count: crmFilterCounts.pendingBatchAssign, milestone: '' },
           { _id: 'batchAssigned', name: 'Batch Assigned', count: crmFilterCounts.batchAssigned, milestone: 'Completed' },
           { _id: 'zeroPeriod', name: 'At Zero Period', count: crmFilterCounts.zeroPeriod, milestone: '' },
           { _id: 'batchFreeze', name: 'Batch Freezed Students', count: crmFilterCounts.batchFreeze, milestone: '' },
@@ -1381,7 +1460,7 @@ const AdmissionList = () => {
       setShowPopup(null)
       setShowFollowupPanel(true);
     }
-    else if(panel === 'AssignBatch') {
+    else if (panel === 'AssignBatch') {
       setShowPopup(null)
       setShowAssignBatchPanel(true);
     }
@@ -1392,7 +1471,7 @@ const AdmissionList = () => {
     setTimeout(() => {
       const event = new Event('resize');
       window.dispatchEvent(event);
-    }, 300);  
+    }, 300);
   };
 
   const closeEditPanel = () => {
@@ -1463,6 +1542,7 @@ const AdmissionList = () => {
     }, 300);
   };
   const openAssignBatchPanel = async (profile = null) => {
+    await fetchBatches(profile);
     if (profile) {
       setSelectedProfile(profile);
     }
@@ -2543,7 +2623,7 @@ const AdmissionList = () => {
                     <div className="timeline-content">
                       <div className="card border-0 shadow-sm">
                         <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2" style={{flexDirection:'column'}}>
+                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
                             <span className="bg-light text-dark border">
                               {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
                                 day: '2-digit',
@@ -2668,19 +2748,18 @@ const AdmissionList = () => {
           >
             {selectedProfile ? (
               <div className="p-3">
-               
+
                 <div className="mb-4">
                   <div className="mb-3">
                     <label className="form-label">Select Batch</label>
                     <select className="form-select" defaultValue="">
                       <option value="">Choose a Batch...</option>
-                      <option value="course1">Batch 1</option>
-                      <option value="course2">Batch 2</option>
-                      <option value="course3">Batch 3</option>
-                      <option value="course4">Batch 4</option>
+                      {batches.map((batch) => (
+                        <option key={batch._id} value={batch._id}>{batch.name}</option>
+                      ))}
                     </select>
                   </div>
-                
+
                 </div>
               </div>
             ) : (
@@ -2811,11 +2890,11 @@ const AdmissionList = () => {
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
-          <div 
+          <div
             className="content-blur-overlay"
             style={{
               position: 'fixed',
-              top:180,
+              top: 180,
               left: 0,
               right: 0,
               height: `${navHeight + 50}px`,
@@ -2835,40 +2914,42 @@ const AdmissionList = () => {
             }}
           />
           <div className="position-relative" >
-          <nav ref={navRef} style={{zIndex: 11 , backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})` ,position:'fixed' , width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
-        WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-        boxShadow: isScrolled 
-          ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)' 
-          : '0 4px 25px 0 #0000001a',paddingBlock: '10px',
-          transition: 'all 0.3s ease'}}>
-            <div className="container-fluid py-2">
-              <div className="row align-items-center justify-content-between">
-                <div className="col-md-7 d-md-block d-sm-none">
-                  <div className="main-tabs-container">
-                    <ul className="nav nav-tabs nav-tabs-main border-0 gap-1">
+            <nav ref={navRef} style={{
+              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
+              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+              boxShadow: isScrolled
+                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
+                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
+              transition: 'all 0.3s ease'
+            }}>
+              <div className="container-fluid py-2">
+                <div className="row align-items-center justify-content-between">
+                  <div className="col-md-7 d-md-block d-sm-none">
+                    <div className="main-tabs-container">
+                      <ul className="nav nav-tabs nav-tabs-main border-0 gap-1">
 
-                      {/* All Admission Tab */}
-                      {getCurrentFilters().map((filter, index) => (
-                        <li className="nav-item">
-                          <button
-                            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                            onClick={() => handleCrmFilterClick(filter._id, index)}
-                          >
+                        {/* All Admission Tab */}
+                        {getCurrentFilters().map((filter, index) => (
+                          <li className="nav-item">
+                            <button
+                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                              onClick={() => handleCrmFilterClick(filter._id, index)}
+                            >
 
-                            {filter.name}
-                            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                              ({filter.count})
-                            </span>
-                          </button>
-                        </li>))}
-                    </ul>
+                              {filter.name}
+                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                                ({filter.count})
+                              </span>
+                            </button>
+                          </li>))}
+                      </ul>
+                    </div>
                   </div>
-                </div>
 
-                <div className="col-md-4">
+                  <div className="col-md-4">
                     <div className="d-flex justify-content-end align-items-center gap-2">
                       <div className="input-group" style={{ maxWidth: '300px' }}>
-                       
+
                         <input
                           type="text"
                           name="name"
@@ -2877,17 +2958,17 @@ const AdmissionList = () => {
                           value={filterData.name}
                           onChange={handleFilterChange}
                         />
-                         <button
-                        onClick={() => fetchProfileData()}
-                        className={`btn btn-outline-primary`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-search me-1`}></i>
-                        Search
-                        
-                      </button>
+                        <button
+                          onClick={() => fetchProfileData()}
+                          className={`btn btn-outline-primary`}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas fa-search me-1`}></i>
+                          Search
+
+                        </button>
                       </div>
-                     
+
 
                       <button
                         onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
@@ -2903,12 +2984,12 @@ const AdmissionList = () => {
                         )}
                       </button>
 
-                    
+
                     </div>
                   </div>
+                </div>
               </div>
-            </div>
-          </nav>
+            </nav>
           </div>
 
           {/* Advanced Filters */}
@@ -3325,7 +3406,7 @@ const AdmissionList = () => {
                   <div className="col-12 rounded equal-height-2 coloumn-2">
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
-                        {isLoadingProfiles? (
+                        {isLoadingProfiles ? (
                           <div className="col-12 text-center py-5">
                             <div className="d-flex flex-column align-items-center">
                               <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
@@ -3334,1372 +3415,1372 @@ const AdmissionList = () => {
                               <h5 className="text-muted">Loading profiles...</h5>
                             </div>
                           </div>
-                        ):(<>
-                        {allProfiles && allProfiles.length > 0 ? (
-                          allProfiles.map((profile, profileIndex) => (
-                            <div className={`card-content transition-col mb-2`} key={profileIndex}>
-                              {/* Profile Header Card */}
-                              <div className="card border-0 shadow-sm mb-0 mt-2">
-                                <div className="card-body px-1 py-0 my-2">
-                                  <div className="row align-items-center justify-content-between">
-                                    <div className="col-md-7">
-                                      <div className="d-flex align-items-center">
-                                        <div className="form-check me-3">
-                                          <input className="form-check-input" type="checkbox" />
-                                        </div>
-                                        <div className="me-3">
-                                          <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
-                                            <svg width="40" height="40">
-                                              <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
-                                              <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
-                                            </svg>
-                                            <div className="progress-text"></div>
+                        ) : (<>
+                          {allProfiles && allProfiles.length > 0 ? (
+                            allProfiles.map((profile, profileIndex) => (
+                              <div className={`card-content transition-col mb-2`} key={profileIndex}>
+                                {/* Profile Header Card */}
+                                <div className="card border-0 shadow-sm mb-0 mt-2">
+                                  <div className="card-body px-1 py-0 my-2">
+                                    <div className="row align-items-center justify-content-between">
+                                      <div className="col-md-7">
+                                        <div className="d-flex align-items-center">
+                                          <div className="form-check me-3">
+                                            <input className="form-check-input" type="checkbox" />
+                                          </div>
+                                          <div className="me-3">
+                                            <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                              <svg width="40" height="40">
+                                                <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
+                                                <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
+                                              </svg>
+                                              <div className="progress-text"></div>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
+                                            <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
+                                          </div>
+                                          <div style={{ marginLeft: '15px' }}>
+                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                              <i className="fas fa-phone"></i>
+                                            </button>
+                                            <img
+                                              src="/Assets/public_assets/images/ekyc_done.png"
+                                              alt="ekyc done"
+                                              style={{ width: 100, height: 'auto', marginLeft: 8, display: (profile.kyc === true && profile.docCounts?.totalRequired > 0) ? 'inline-block' : 'none' }}
+                                            />
+                                            <img
+                                              src="/Assets/public_assets/images/ekyc_pending.png"
+                                              alt="ekyc pending"
+                                              style={{ width: 100, height: 'auto', display: (profile.kyc === false && profile.docCounts?.totalRequired > 0) ? 'inline-block' : 'none' }}
+                                            />
+                                            <img
+                                              src="/Assets/public_assets/images/ekyc_not_required.png"
+                                              alt="ekyc pending"
+                                              style={{ width: 100, height: 'auto', display: profile.docCounts?.totalRequired === 0 ? 'inline-block' : 'none' }}
+                                            />
+                                          </div>
+
+                                          <div>
+
                                           </div>
                                         </div>
-                                        <div>
-                                          <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
-                                          <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
-                                        </div>
-                                        <div style={{ marginLeft: '15px' }}>
-                                          <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                            <i className="fas fa-phone"></i>
-                                          </button>
-                                          <img
-                                            src="/Assets/public_assets/images/ekyc_done.png"
-                                            alt="ekyc done"
-                                            style={{ width: 100, height: 'auto', marginLeft: 8, display: (profile.kyc === true && profile.docCounts?.totalRequired > 0 )? 'inline-block' : 'none' }}
-                                          />
-                                          <img
-                                            src="/Assets/public_assets/images/ekyc_pending.png"
-                                            alt="ekyc pending"
-                                            style={{ width: 100, height: 'auto', display: (profile.kyc === false && profile.docCounts?.totalRequired > 0)? 'inline-block' : 'none' }}
-                                          />
-                                           <img
-                                            src="/Assets/public_assets/images/ekyc_not_required.png"
-                                            alt="ekyc pending"
-                                            style={{ width: 100, height: 'auto', display:  profile.docCounts?.totalRequired === 0? 'inline-block' : 'none' }}
-                                          />
-                                        </div>
-                                       
-                                        <div>
-
-                                        </div>
                                       </div>
-                                    </div>
 
-                                    <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                      <div className="btn-group">
-                                        <div style={{ position: "relative", display: "inline-block" }}>
-                                          <button
-                                            className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => togglePopup(profileIndex)}
-                                            aria-label="Options"
-                                          >
-                                            <i className="fas fa-ellipsis-v"></i>
-                                          </button>
+                                      <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+                                        <div className="btn-group">
+                                          <div style={{ position: "relative", display: "inline-block" }}>
+                                            <button
+                                              className="btn btn-sm btn-outline-secondary border-0"
+                                              onClick={() => togglePopup(profileIndex)}
+                                              aria-label="Options"
+                                            >
+                                              <i className="fas fa-ellipsis-v"></i>
+                                            </button>
 
-                                          {showPopup === profileIndex && (
+                                            {showPopup === profileIndex && (
+                                              <div
+                                                onClick={() => setShowPopup(null)}
+                                                style={{
+                                                  position: "fixed",
+                                                  top: 0,
+                                                  left: 0,
+                                                  width: "100vw",
+                                                  height: "100vh",
+                                                  backgroundColor: "transparent",
+                                                  zIndex: 8,
+                                                }}
+                                              ></div>
+                                            )}
+
                                             <div
-                                              onClick={() => setShowPopup(null)}
                                               style={{
-                                                position: "fixed",
-                                                top: 0,
-                                                left: 0,
-                                                width: "100vw",
-                                                height: "100vh",
-                                                backgroundColor: "transparent",
+                                                position: "absolute",
+                                                top: "28px",
+                                                right: "-100px",
+                                                width: "170px",
+                                                backgroundColor: "white",
+                                                border: "1px solid #ddd",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                borderRadius: "4px",
+                                                padding: "8px 0",
                                                 zIndex: 8,
-                                              }}
-                                            ></div>
-                                          )}
-
-                                          <div
-                                            style={{
-                                              position: "absolute",
-                                              top: "28px",
-                                              right: "-100px",
-                                              width: "170px",
-                                              backgroundColor: "white",
-                                              border: "1px solid #ddd",
-                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                              borderRadius: "4px",
-                                              padding: "8px 0",
-                                              zIndex: 8,
-                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                              transition: "transform 0.3s ease-in-out",
-                                              pointerEvents: showPopup ? "auto" : "none",
-                                              display: showPopup === profileIndex ? "block" : "none"
-                                            }}
-                                          >
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleDownloadAdmissionForm(profile)}
-                                            >
-                                              Download Admission Form
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleMarkDropout(profile)}
-                                            >
-                                              Mark Dropout
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => {
-                                                openleadHistoryPanel(profile);
-                                                console.log('selectedProfile', profile);
+                                                transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                                transition: "transform 0.3s ease-in-out",
+                                                pointerEvents: showPopup ? "auto" : "none",
+                                                display: showPopup === profileIndex ? "block" : "none"
                                               }}
                                             >
-                                              History List
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => {
-                                                openEditPanel(profile, 'SetFollowup');
-                                                console.log('selectedProfile', profile);
-                                              }}
-                                            >
-                                              Set Followup
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                  onClick={() => {
-                                                    handleFetchCandidate(profile);
-                                                    console.log('selectedProfile', profile);
-                                                  }}
-                                            >
-                                              Edit Profile
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                 onClick={() => {
-                                                  openAssignBatchPanel(profile);
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleDownloadAdmissionForm(profile)}
+                                              >
+                                                Download Admission Form
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleMarkDropout(profile)}
+                                              >
+                                                Mark Dropout
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openleadHistoryPanel(profile);
                                                   console.log('selectedProfile', profile);
-                                                 }}
-                                            >
-                                              Assign Batch
-                                            </button>
-                                          </div>
-                                        </div>
-
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => setLeadDetailsVisible(profileIndex)}
-                                        >
-                                          {leadDetailsVisible === profileIndex ? (
-                                            <i className="fas fa-chevron-up"></i>
-                                          ) : (
-                                            <i className="fas fa-chevron-down"></i>
-                                          )}
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                    <div className="col-md-2 text-end d-md-block d-sm-none d-none">
-                                      <div className="btn-group">
-                                        <div style={{ position: "relative", display: "inline-block" }}>
-                                          <button
-                                            className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => togglePopup(profileIndex)}
-                                            aria-label="Options"
-                                          >
-                                            <i className="fas fa-ellipsis-v"></i>
-                                          </button>
-
-                                          {showPopup === profileIndex && (
-                                            <div
-                                              onClick={() => setShowPopup(null)}
-                                              style={{
-                                                position: "fixed",
-                                                top: 0,
-                                                left: 0,
-                                                width: "100vw",
-                                                height: "100vh",
-                                                backgroundColor: "transparent",
-                                                zIndex: 8,
-                                              }}
-                                            ></div>
-                                          )}
-
-                                          <div
-                                            style={{
-                                              position: "absolute",
-                                              top: "28px",
-                                              right: "-100px",
-                                              width: "170px",
-                                              backgroundColor: "white",
-                                              border: "1px solid #ddd",
-                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                              borderRadius: "4px",
-                                              padding: "8px 0",
-                                              zIndex: 8,
-                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                              transition: "transform 0.3s ease-in-out",
-                                              pointerEvents: showPopup === profileIndex ? "auto" : "none",
-                                              display: showPopup === profileIndex ? "block" : "none"
-                                            }}
-                                          >
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleDownloadAdmissionForm(profile)}
-                                            >
-                                              Download Admission Form
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleMarkDropout(profile)}
-                                            >
-                                              Mark Dropout
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => openleadHistoryPanel(profile)}
-                                            >
-                                              History List
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => {
-                                                openEditPanel(profile, 'SetFollowup');
-                                                console.log('selectedProfile', profile);
-                                              }}
-                                            >
-                                              Set Followup
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                  onClick={() => {
-                                                    handleFetchCandidate(profile);
-                                                    console.log('selectedProfile', profile);
-                                                  }}
-                                            >
-                                              Edit Profile
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
+                                                }}
+                                              >
+                                                History List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openEditPanel(profile, 'SetFollowup');
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Set Followup
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  handleFetchCandidate(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Edit Profile
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
                                                 onClick={() => {
                                                   openAssignBatchPanel(profile);
                                                   console.log('selectedProfile', profile);
                                                 }}
-                                            >
-                                              Assign Batch
-                                            </button>
+                                              >
+                                                Assign Batch
+                                              </button>
+                                            </div>
                                           </div>
-                                        </div>
 
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => toggleLeadDetails(profileIndex)}
-                                        >
-                                          {leadDetailsVisible === profileIndex ? (
-                                            <i className="fas fa-chevron-up"></i>
-                                          ) : (
-                                            <i className="fas fa-chevron-down"></i>
-                                          )}
-                                        </button>
+                                          <button
+                                            className="btn btn-sm btn-outline-secondary border-0"
+                                            onClick={() => setLeadDetailsVisible(profileIndex)}
+                                          >
+                                            {leadDetailsVisible === profileIndex ? (
+                                              <i className="fas fa-chevron-up"></i>
+                                            ) : (
+                                              <i className="fas fa-chevron-down"></i>
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="col-md-2 text-end d-md-block d-sm-none d-none">
+                                        <div className="btn-group">
+                                          <div style={{ position: "relative", display: "inline-block" }}>
+                                            <button
+                                              className="btn btn-sm btn-outline-secondary border-0"
+                                              onClick={() => togglePopup(profileIndex)}
+                                              aria-label="Options"
+                                            >
+                                              <i className="fas fa-ellipsis-v"></i>
+                                            </button>
+
+                                            {showPopup === profileIndex && (
+                                              <div
+                                                onClick={() => setShowPopup(null)}
+                                                style={{
+                                                  position: "fixed",
+                                                  top: 0,
+                                                  left: 0,
+                                                  width: "100vw",
+                                                  height: "100vh",
+                                                  backgroundColor: "transparent",
+                                                  zIndex: 8,
+                                                }}
+                                              ></div>
+                                            )}
+
+                                            <div
+                                              style={{
+                                                position: "absolute",
+                                                top: "28px",
+                                                right: "-100px",
+                                                width: "170px",
+                                                backgroundColor: "white",
+                                                border: "1px solid #ddd",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                borderRadius: "4px",
+                                                padding: "8px 0",
+                                                zIndex: 8,
+                                                transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                                transition: "transform 0.3s ease-in-out",
+                                                pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                                display: showPopup === profileIndex ? "block" : "none"
+                                              }}
+                                            >
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleDownloadAdmissionForm(profile)}
+                                              >
+                                                Download Admission Form
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleMarkDropout(profile)}
+                                              >
+                                                Mark Dropout
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => openleadHistoryPanel(profile)}
+                                              >
+                                                History List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openEditPanel(profile, 'SetFollowup');
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Set Followup
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  handleFetchCandidate(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Edit Profile
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openAssignBatchPanel(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Assign Batch
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <button
+                                            className="btn btn-sm btn-outline-secondary border-0"
+                                            onClick={() => toggleLeadDetails(profileIndex)}
+                                          >
+                                            {leadDetailsVisible === profileIndex ? (
+                                              <i className="fas fa-chevron-up"></i>
+                                            ) : (
+                                              <i className="fas fa-chevron-down"></i>
+                                            )}
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              {/* Tab Navigation and Content Card */}
-                              <div className="card border-0 shadow-sm mb-4">
-                                <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                  <ul className="nav nav-pills nav-pills-sm">
-                                    {tabs.map((tab, tabIndex) => (
-                                      <li className="nav-item" key={tabIndex}>
-                                        <button
-                                          className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                          onClick={() => handleTabClick(profileIndex, tabIndex)}
-                                        >
-                                          {tab}
-                                        </button>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
+                                {/* Tab Navigation and Content Card */}
+                                <div className="card border-0 shadow-sm mb-4">
+                                  <div className="card-header bg-white border-bottom-0 py-3 mb-3">
+                                    <ul className="nav nav-pills nav-pills-sm">
+                                      {tabs.map((tab, tabIndex) => (
+                                        <li className="nav-item" key={tabIndex}>
+                                          <button
+                                            className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
+                                            onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                          >
+                                            {tab}
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
 
-                                {/* Tab Content - Only show if leadDetailsVisible is true */}
-                                {leadDetailsVisible === profileIndex && (
-                                  <div className="tab-content">
-                                    {/* Lead Details Tab */}
-                                    {(activeTab[profileIndex] || 0) === 0 && (
-                                      <div className="tab-pane active" id="lead-details">
-                                        <div className="scrollable-container">
-                                          <div className="scrollable-content">
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD AGE</div>
-                                                <div className="info-value">{profile.createdAt ?
-                                                  Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                  : 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">Lead Owner</div>
-                                                <div className="info-value">{(profile.leadOwner && Array.isArray(profile.leadOwner) ? profile.leadOwner.join(', ') : profile.leadOwner) || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">COURSE / JOB NAME</div>
-                                                <div className="info-value">{profile._course?.name}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">BATCH NAME</div>
-                                                <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                              </div>
-                                            </div>
-
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">TYPE OF PROJECT</div>
-                                                <div className="info-value">{profile._course?.typeOfProject}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">PROJECT</div>
-                                                <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">SECTOR</div>
-                                                <div className="info-value">{profile.sector}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD CREATION DATE</div>
-                                                <div className="info-value">{profile.createdAt ?
-                                                  new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                              </div>
-                                            </div>
-
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">STATE</div>
-                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">City</div>
-                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">BRANCH NAME</div>
-                                                <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                <div className="info-value">{profile.updatedAt ?
-                                                  new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                        <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
-
-                                        <div className="desktop-view">
-                                          <div className="row g-4">
-                                            <div className="col-12">
-                                              <div className="scrollable-container">
-                                                <div className="scrollable-content">
-                                                  <div className="info-card">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD AGE</div>
-                                                      <div className="info-value">{profile.createdAt ?
-                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                        : 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">Lead Owner</div>
-                                                      <div className="info-value">{(profile.leadOwner && Array.isArray(profile.leadOwner) ? profile.leadOwner.join(', ') : profile.leadOwner) || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">COURSE / JOB NAME</div>
-                                                      <div className="info-value">{profile._course?.name}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">BATCH NAME</div>
-                                                      <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="info-card">
-                                                    <div className="info-group">
-                                                      <div className="info-label">TYPE OF PROJECT</div>
-                                                      <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">PROJECT</div>
-                                                      <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">SECTOR</div>
-                                                      <div className="info-value">{profile._course?.sectors}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD CREATION DATE</div>
-                                                      <div className="info-value">{profile.createdAt ?
-                                                        new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="info-card">
-                                                    <div className="info-group">
-                                                      <div className="info-label">STATE</div>
-                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">City</div>
-                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">BRANCH NAME</div>
-                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                      <div className="info-value">{profile.updatedAt ?
-                                                        new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD MODIFICATION By</div>
-                                                      <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">Counsellor Name</div>
-                                                      <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
+                                  {/* Tab Content - Only show if leadDetailsVisible is true */}
+                                  {leadDetailsVisible === profileIndex && (
+                                    <div className="tab-content">
+                                      {/* Lead Details Tab */}
+                                      {(activeTab[profileIndex] || 0) === 0 && (
+                                        <div className="tab-pane active" id="lead-details">
+                                          <div className="scrollable-container">
+                                            <div className="scrollable-content">
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD AGE</div>
+                                                  <div className="info-value">{profile.createdAt ?
+                                                    Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                    : 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">Lead Owner</div>
+                                                  <div className="info-value">{(profile.leadOwner && Array.isArray(profile.leadOwner) ? profile.leadOwner.join(', ') : profile.leadOwner) || 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">COURSE / JOB NAME</div>
+                                                  <div className="info-value">{profile._course?.name}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">BATCH NAME</div>
+                                                  <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
                                                 </div>
                                               </div>
-                                              <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                              <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
 
-                                              <div className="desktop-view">
-                                                <div className="row">
-                                                  <div className="col-xl-3 col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD AGE</div>
-                                                      <div className="info-value">{profile.createdAt ?
-                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                        : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">TYPE OF PROJECT</div>
+                                                  <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">PROJECT</div>
+                                                  <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">SECTOR</div>
+                                                  <div className="info-value">{profile.sector}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD CREATION DATE</div>
+                                                  <div className="info-value">{profile.createdAt ?
+                                                    new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                </div>
+                                              </div>
 
-                                                  <div className="col-xl-3 col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">STATE</div>
-                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl-3 col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">City</div>
-                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">COURSE / JOB NAME</div>
-                                                      <div className="info-value">{profile._course?.name}</div>
-                                                    </div>
-                                                  </div>
-                                                 
-
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">BRANCH NAME</div>
-                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">NEXT ACTION DATE</div>
-                                                      <div className="info-value">
-                                                        {profile.followups.length > 0
-                                                          ? (() => {
-                                                            const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                            const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                              day: '2-digit',
-                                                              month: 'short',
-                                                              year: 'numeric',
-                                                            }).replace(/ /g, '/');
-                                                            const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                              hour: '2-digit',
-                                                              minute: '2-digit',
-                                                              hour12: true,
-                                                            });
-                                                            return `${datePart}, ${timePart}`;
-                                                          })()
-                                                          : 'N/A'}
-                                                      </div>
-
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD CREATION DATE</div>
-                                                      <div className="info-value">{profile.createdAt ?
-                                                        new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                      <div className="info-value">{profile.updatedAt ?
-                                                        new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD MODIFICATION BY</div>
-                                                      <div className="info-value">{profile.logs && profile.logs.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">Counsellor Name</div>
-                                                      <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD OWNER</div>
-                                                      <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
-                                                    </div>
-                                                  </div>
+                                              <div className="info-card">
+                                                <div className="info-group">
+                                                  <div className="info-label">STATE</div>
+                                                  <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">City</div>
+                                                  <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">BRANCH NAME</div>
+                                                  <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                </div>
+                                                <div className="info-group">
+                                                  <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                  <div className="info-value">{profile.updatedAt ?
+                                                    new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                 </div>
                                               </div>
                                             </div>
                                           </div>
-                                        </div>
-                                      </div>
-                                    )}
 
-                                    {/* Profile Tab */}
-                                    {(activeTab[profileIndex] || 0) === 1 && (
-                                      <div className="tab-pane active" id="profile">
-                                        <div className="resume-preview-body">
-                                          <div id="resume-download" className="resume-document">
-                                            <div className="resume-document-header">
-                                              <div className="resume-profile-section">
+                                          <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                                          <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+
+                                          <div className="desktop-view">
+                                            <div className="row g-4">
+                                              <div className="col-12">
+                                                <div className="scrollable-container">
+                                                  <div className="scrollable-content">
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD AGE</div>
+                                                        <div className="info-value">{profile.createdAt ?
+                                                          Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                          : 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">Lead Owner</div>
+                                                        <div className="info-value">{(profile.leadOwner && Array.isArray(profile.leadOwner) ? profile.leadOwner.join(', ') : profile.leadOwner) || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">COURSE / JOB NAME</div>
+                                                        <div className="info-value">{profile._course?.name}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">BATCH NAME</div>
+                                                        <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">TYPE OF PROJECT</div>
+                                                        <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">PROJECT</div>
+                                                        <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">SECTOR</div>
+                                                        <div className="info-value">{profile._course?.sectors}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD CREATION DATE</div>
+                                                        <div className="info-value">{profile.createdAt ?
+                                                          new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="info-card">
+                                                      <div className="info-group">
+                                                        <div className="info-label">STATE</div>
+                                                        <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">City</div>
+                                                        <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">BRANCH NAME</div>
+                                                        <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                        <div className="info-value">{profile.updatedAt ?
+                                                          new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION By</div>
+                                                        <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                      </div>
+                                                      <div className="info-group">
+                                                        <div className="info-label">Counsellor Name</div>
+                                                        <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                                <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                                <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
+
+                                                <div className="desktop-view">
+                                                  <div className="row">
+                                                    <div className="col-xl-3 col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD AGE</div>
+                                                        <div className="info-value">{profile.createdAt ?
+                                                          Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                          : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="col-xl-3 col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">STATE</div>
+                                                        <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl-3 col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">City</div>
+                                                        <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">COURSE / JOB NAME</div>
+                                                        <div className="info-value">{profile._course?.name}</div>
+                                                      </div>
+                                                    </div>
+
+
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">BRANCH NAME</div>
+                                                        <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">NEXT ACTION DATE</div>
+                                                        <div className="info-value">
+                                                          {profile.followups.length > 0
+                                                            ? (() => {
+                                                              const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
+                                                              const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                year: 'numeric',
+                                                              }).replace(/ /g, '/');
+                                                              const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: true,
+                                                              });
+                                                              return `${datePart}, ${timePart}`;
+                                                            })()
+                                                            : 'N/A'}
+                                                        </div>
+
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD CREATION DATE</div>
+                                                        <div className="info-value">{profile.createdAt ?
+                                                          new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                        <div className="info-value">{profile.updatedAt ?
+                                                          new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD MODIFICATION BY</div>
+                                                        <div className="info-value">{profile.logs && profile.logs.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">Counsellor Name</div>
+                                                        <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                      </div>
+                                                    </div>
+                                                    <div className="col-xl- col-3">
+                                                      <div className="info-group">
+                                                        <div className="info-label">LEAD OWNER</div>
+                                                        <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Profile Tab */}
+                                      {(activeTab[profileIndex] || 0) === 1 && (
+                                        <div className="tab-pane active" id="profile">
+                                          <div className="resume-preview-body">
+                                            <div id="resume-download" className="resume-document">
+                                              <div className="resume-document-header">
+                                                <div className="resume-profile-section">
                                                   {profile._candidate?.personalInfo?.image ? (
-                                                  <img
-                                                    src={`${profile._candidate?.personalInfo?.image}`}
-                                                    alt="Profile"
-                                                    className="resume-profile-image"
-                                                  />
-                                                ) : (
-                                                  <div className="resume-profile-placeholder">
-                                                    <i className="bi bi-person-circle"></i>
-                                                  </div>
-                                                )}
-
-                                                <div className="resume-header-content">
-                                                  <h1 className="resume-name">
-                                                    {profile._candidate?.name || 'Your Name'}
-                                                  </h1>
-                                                  <p className="resume-title">
-                                                    {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                                  </p>
-                                                  <p className="resume-title">
-                                                    {profile._candidate?.sex || 'Sex'}
-                                                  </p>
-
-                                                  <div className="resume-contact-details">
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-telephone-fill"></i>
-                                                      <span>{profile._candidate?.mobile}</span>
+                                                    <img
+                                                      src={`${profile._candidate?.personalInfo?.image}`}
+                                                      alt="Profile"
+                                                      className="resume-profile-image"
+                                                    />
+                                                  ) : (
+                                                    <div className="resume-profile-placeholder">
+                                                      <i className="bi bi-person-circle"></i>
                                                     </div>
+                                                  )}
 
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-envelope-fill"></i>
-                                                      <span>{profile._candidate?.email}</span>
+                                                  <div className="resume-header-content">
+                                                    <h1 className="resume-name">
+                                                      {profile._candidate?.name || 'Your Name'}
+                                                    </h1>
+                                                    <p className="resume-title">
+                                                      {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                    </p>
+                                                    <p className="resume-title">
+                                                      {profile._candidate?.sex || 'Sex'}
+                                                    </p>
+
+                                                    <div className="resume-contact-details">
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-telephone-fill"></i>
+                                                        <span>{profile._candidate?.mobile}</span>
+                                                      </div>
+
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-envelope-fill"></i>
+                                                        <span>{profile._candidate?.email}</span>
+                                                      </div>
+
+                                                      {profile._candidate?.dob && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-calendar-heart-fill"></i>
+                                                          {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
+                                                            day: '2-digit',
+                                                            month: 'long',
+                                                            year: 'numeric'
+                                                          })}
+                                                        </div>
+                                                      )}
+                                                      {profile._candidate?.personalInfo?.currentAddress?.city && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-geo-alt-fill"></i>
+                                                          <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                        </div>
+                                                      )}
+                                                      {profile._candidate?.personalInfo?.permanentAddress?.city && (
+                                                        <div className="resume-contact-item">
+                                                          <i className="bi bi-house-fill"></i>
+                                                          <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                        </div>
+                                                      )}
                                                     </div>
-
-                                                    {profile._candidate?.dob && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-calendar-heart-fill"></i>
-                                                        {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
-                                                          day: '2-digit',
-                                                          month: 'long',
-                                                          year: 'numeric'
-                                                        })}
-                                                      </div>
-                                                    )}
-                                                    {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-geo-alt-fill"></i>
-                                                        <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
-                                                      </div>
-                                                    )}
-                                                    {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-house-fill"></i>
-                                                        <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
-                                                      </div>
-                                                    )}
                                                   </div>
+                                                </div>
+
+                                                <div className="resume-summary">
+                                                  <h2 className="resume-section-title">Professional Summary <i className="fa fa-clock-o" aria-hidden="true" style={{ fontSize: "16px" }}></i> </h2>
+                                                  <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
                                                 </div>
                                               </div>
 
-                                              <div className="resume-summary">
-                                                <h2 className="resume-section-title">Professional Summary <i className="fa fa-clock-o" aria-hidden="true" style={{ fontSize: "16px" }}></i> </h2>
-                                                <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                              </div>
-                                            </div>
-
-                                            <div className="resume-document-body">
-                                              <div className="resume-column resume-left-column">
-                                                {profile._candidate?.isExperienced === false ? (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Work Experience</h2>
-                                                    <div className="resume-experience-item">
-                                                      <div className="resume-item-header">
-                                                        <h3 className="resume-item-title">Fresher</h3>
-                                                      </div>
-                                                      <div className="resume-item-content">
-                                                        <p>Looking for opportunities to start my career</p>
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                ) : (
-                                                  profile._candidate?.experiences && profile._candidate.experiences.length > 0 && (
+                                              <div className="resume-document-body">
+                                                <div className="resume-column resume-left-column">
+                                                  {profile._candidate?.isExperienced === false ? (
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Work Experience</h2>
-                                                      {profile._candidate.experiences.map((exp, index) => (
-                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                          <div className="resume-item-header">
-                                                            {exp.jobTitle && (
-                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                            )}
-                                                            {exp.companyName && (
-                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                            )}
-                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                              <p className="resume-item-period">
-                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                }) : 'Start Date'}
-                                                                {" - "}
-                                                                {exp.currentlyWorking ? 'Present' :
-                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                    year: 'numeric',
-                                                                    month: 'short',
-                                                                  }) : 'End Date'}
-                                                              </p>
-                                                            )}
-                                                          </div>
-                                                          {exp.jobDescription && (
-                                                            <div className="resume-item-content">
-                                                              <p>{exp.jobDescription}</p>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  )
-                                                )}
-
-                                                {profile._candidate?.qualifications && profile._candidate.qualifications.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Education</h2>
-                                                    {profile._candidate.qualifications.map((edu, index) => (
-                                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                      <div className="resume-experience-item">
                                                         <div className="resume-item-header">
-                                                          {edu.education && (
-                                                            <h3 className="resume-item-title">{edu.education}</h3>
-                                                          )}
-                                                          {edu.course && (
-                                                            <h3 className="resume-item-title">{edu.course}</h3>
-                                                          )}
-                                                          {edu.universityName && (
-                                                            <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                          )}
-                                                          {edu.schoolName && (
-                                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                          )}
-                                                          {edu.collegeName && (
-                                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                          )}
-                                                          {edu.passingYear && (
-                                                            <p className="resume-item-period">{edu.passingYear}</p>
-                                                          )}
+                                                          <h3 className="resume-item-title">Fresher</h3>
                                                         </div>
                                                         <div className="resume-item-content">
-                                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                          {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                          <p>Looking for opportunities to start my career</p>
                                                         </div>
                                                       </div>
-                                                    ))}
-                                                  </div>
-                                                )}
-                                              </div>
-
-                                              <div className="resume-column resume-right-column">
-                                                {profile._candidate?.personalInfo?.skills && profile._candidate.personalInfo.skills.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Skills</h2>
-                                                    <div className="resume-skills-list">
-                                                      {profile._candidate.personalInfo.skills.map((skill, index) => (
-                                                        <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                          <div className="resume-skill-name">{skill.skillName || skill}</div>
-                                                          {skill.skillPercent && (
-                                                            <div className="resume-skill-bar-container">
-                                                              <div
-                                                                className="resume-skill-bar"
-                                                                style={{ width: `${skill.skillPercent}%` }}
-                                                              ></div>
-                                                              <span className="resume-skill-percent">{skill.skillPercent}%</span>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
                                                     </div>
-                                                  </div>
-                                                )}
-
-                                                {profile._candidate?.personalInfo?.languages && profile._candidate.personalInfo.languages.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Languages</h2>
-                                                    <div className="resume-languages-list">
-                                                      {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                        <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                          <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
-                                                          {lang.level && (
-                                                            <div className="resume-language-level">
-                                                              {[1, 2, 3, 4, 5].map(dot => (
-                                                                <span
-                                                                  key={`resume-lang-dot-${index}-${dot}`}
-                                                                  className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                                ></span>
-                                                              ))}
+                                                  ) : (
+                                                    profile._candidate?.experiences && profile._candidate.experiences.length > 0 && (
+                                                      <div className="resume-section">
+                                                        <h2 className="resume-section-title">Work Experience</h2>
+                                                        {profile._candidate.experiences.map((exp, index) => (
+                                                          <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                            <div className="resume-item-header">
+                                                              {exp.jobTitle && (
+                                                                <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                              )}
+                                                              {exp.companyName && (
+                                                                <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                              )}
+                                                              {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                                <p className="resume-item-period">
+                                                                  {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                  }) : 'Start Date'}
+                                                                  {" - "}
+                                                                  {exp.currentlyWorking ? 'Present' :
+                                                                    exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                      year: 'numeric',
+                                                                      month: 'short',
+                                                                    }) : 'End Date'}
+                                                                </p>
+                                                              )}
                                                             </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  </div>
-                                                )}
-
-                                                {profile._candidate?.personalInfo?.certifications && profile._candidate.personalInfo.certifications.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Certifications</h2>
-                                                    <ul className="resume-certifications-list">
-                                                      {profile._candidate.personalInfo.certifications.map((cert, index) => (
-                                                        <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                          <strong>{cert.certificateName || cert.name}</strong>
-                                                          {cert.orgName && (
-                                                            <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                          )}
-                                                          {(cert.month || cert.year) && (
-                                                            <span className="resume-cert-date">
-                                                              {cert.month && cert.year ?
-                                                                ` (${cert.month}/${cert.year})` :
-                                                                cert.month ?
-                                                                  ` (${cert.month})` :
-                                                                  cert.year ?
-                                                                    ` (${cert.year})` :
-                                                                    ''}
-                                                            </span>
-                                                          )}
-                                                        </li>
-                                                      ))}
-                                                    </ul>
-                                                  </div>
-                                                )}
-
-                                                {profile._candidate?.personalInfo?.projects && profile._candidate.personalInfo.projects.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Projects</h2>
-                                                    {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                      <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          <h3 className="resume-project-title">
-                                                            {proj.projectName || 'Project'}
-                                                            {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                          </h3>
-                                                        </div>
-                                                        {proj.description && (
-                                                          <div className="resume-item-content">
-                                                            <p>{proj.description}</p>
+                                                            {exp.jobDescription && (
+                                                              <div className="resume-item-content">
+                                                                <p>{exp.jobDescription}</p>
+                                                              </div>
+                                                            )}
                                                           </div>
-                                                        )}
+                                                        ))}
                                                       </div>
-                                                    ))}
-                                                  </div>
-                                                )}
+                                                    )
+                                                  )}
 
-                                                {profile._candidate?.personalInfo?.interest && profile._candidate.personalInfo.interest.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Interests</h2>
-                                                    <div className="resume-interests-tags">
-                                                      {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                        <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                          {interest}
-                                                        </span>
+                                                  {profile._candidate?.qualifications && profile._candidate.qualifications.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Education</h2>
+                                                      {profile._candidate.qualifications.map((edu, index) => (
+                                                        <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {edu.education && (
+                                                              <h3 className="resume-item-title">{edu.education}</h3>
+                                                            )}
+                                                            {edu.course && (
+                                                              <h3 className="resume-item-title">{edu.course}</h3>
+                                                            )}
+                                                            {edu.universityName && (
+                                                              <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                            )}
+                                                            {edu.schoolName && (
+                                                              <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                            )}
+                                                            {edu.collegeName && (
+                                                              <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                            )}
+                                                            {edu.passingYear && (
+                                                              <p className="resume-item-period">{edu.passingYear}</p>
+                                                            )}
+                                                          </div>
+                                                          <div className="resume-item-content">
+                                                            {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                            {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                          </div>
+                                                        </div>
                                                       ))}
                                                     </div>
-                                                  </div>
-                                                )}
+                                                  )}
+                                                </div>
+
+                                                <div className="resume-column resume-right-column">
+                                                  {profile._candidate?.personalInfo?.skills && profile._candidate.personalInfo.skills.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Skills</h2>
+                                                      <div className="resume-skills-list">
+                                                        {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                          <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                            <div className="resume-skill-name">{skill.skillName || skill}</div>
+                                                            {skill.skillPercent && (
+                                                              <div className="resume-skill-bar-container">
+                                                                <div
+                                                                  className="resume-skill-bar"
+                                                                  style={{ width: `${skill.skillPercent}%` }}
+                                                                ></div>
+                                                                <span className="resume-skill-percent">{skill.skillPercent}%</span>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                  {profile._candidate?.personalInfo?.languages && profile._candidate.personalInfo.languages.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Languages</h2>
+                                                      <div className="resume-languages-list">
+                                                        {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                          <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                            <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                            {lang.level && (
+                                                              <div className="resume-language-level">
+                                                                {[1, 2, 3, 4, 5].map(dot => (
+                                                                  <span
+                                                                    key={`resume-lang-dot-${index}-${dot}`}
+                                                                    className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                                  ></span>
+                                                                ))}
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+
+                                                  {profile._candidate?.personalInfo?.certifications && profile._candidate.personalInfo.certifications.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Certifications</h2>
+                                                      <ul className="resume-certifications-list">
+                                                        {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                          <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                            <strong>{cert.certificateName || cert.name}</strong>
+                                                            {cert.orgName && (
+                                                              <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                            )}
+                                                            {(cert.month || cert.year) && (
+                                                              <span className="resume-cert-date">
+                                                                {cert.month && cert.year ?
+                                                                  ` (${cert.month}/${cert.year})` :
+                                                                  cert.month ?
+                                                                    ` (${cert.month})` :
+                                                                    cert.year ?
+                                                                      ` (${cert.year})` :
+                                                                      ''}
+                                                              </span>
+                                                            )}
+                                                          </li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  )}
+
+                                                  {profile._candidate?.personalInfo?.projects && profile._candidate.personalInfo.projects.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Projects</h2>
+                                                      {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                        <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            <h3 className="resume-project-title">
+                                                              {proj.projectName || 'Project'}
+                                                              {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                            </h3>
+                                                          </div>
+                                                          {proj.description && (
+                                                            <div className="resume-item-content">
+                                                              <p>{proj.description}</p>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
+
+                                                  {profile._candidate?.personalInfo?.interest && profile._candidate.personalInfo.interest.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Interests</h2>
+                                                      <div className="resume-interests-tags">
+                                                        {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                          <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                            {interest}
+                                                          </span>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  )}
+                                                </div>
                                               </div>
+
+                                              {profile._candidate?.personalInfo?.declaration?.text && (
+                                                <div className="resume-declaration">
+                                                  <h2 className="resume-section-title">Declaration</h2>
+                                                  <p>{profile._candidate.personalInfo.declaration.text}</p>
+                                                </div>
+                                              )}
                                             </div>
-
-                                            {profile._candidate?.personalInfo?.declaration?.text && (
-                                              <div className="resume-declaration">
-                                                <h2 className="resume-section-title">Declaration</h2>
-                                                <p>{profile._candidate.personalInfo.declaration.text}</p>
-                                              </div>
-                                            )}
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    {/* Job History Tab */}
-                                    {(activeTab[profileIndex] || 0) === 2 && (
-                                      <div className="tab-pane active" id="job-history">
-                                        <div className="section-card">
-                                          <div className="table-responsive">
-                                            <table className="table table-hover table-bordered job-history-table">
-                                              <thead className="table-light">
-                                                <tr>
-                                                  <th>S.No</th>
-                                                  <th>Company Name</th>
-                                                  <th>Position</th>
-                                                  <th>Duration</th>
-                                                  <th>Location</th>
-                                                  <th>Status</th>
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-                                                {experiences.map((job, index) => (
-                                                  <tr key={index}>
-                                                    <td>{index + 1}</td>
-                                                    <td>{job.companyName}</td>
-                                                    <td>{job.jobTitle}</td>
-                                                    <td>
-                                                      {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                      {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                    </td>
-                                                    <td>Remote</td>
-                                                    <td><span className="text-success">Completed</span></td>
+                                      {/* Job History Tab */}
+                                      {(activeTab[profileIndex] || 0) === 2 && (
+                                        <div className="tab-pane active" id="job-history">
+                                          <div className="section-card">
+                                            <div className="table-responsive">
+                                              <table className="table table-hover table-bordered job-history-table">
+                                                <thead className="table-light">
+                                                  <tr>
+                                                    <th>S.No</th>
+                                                    <th>Company Name</th>
+                                                    <th>Position</th>
+                                                    <th>Duration</th>
+                                                    <th>Location</th>
+                                                    <th>Status</th>
                                                   </tr>
-                                                ))}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Course History Tab */}
-                                    {(activeTab[profileIndex] || 0) === 3 && (
-                                      <div className="tab-pane active" id="course-history">
-                                        <div className="section-card">
-                                          <div className="table-responsive">
-                                            <table className="table table-hover table-bordered course-history-table">
-                                              <thead className="table-light">
-                                                <tr>
-                                                  <th>S.No</th>
-                                                  <th>Applied Date</th>
-                                                  <th>Course Name</th>
-                                                  <th>Lead Added By</th>
-                                                  <th>Counsellor</th>
-                                                  <th>Status</th>
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-                                                {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                  profile._candidate._appliedCourses.map((course, index) => (
+                                                </thead>
+                                                <tbody>
+                                                  {experiences.map((job, index) => (
                                                     <tr key={index}>
                                                       <td>{index + 1}</td>
-                                                      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-                                                      <td>{course._course?.name || 'N/A'}</td>
-                                                      <td>{course.registeredBy?.name || 'Self Registered'}</td>
-                                                      <td>{course.month || ''} {course.year || ''}</td>
-                                                      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                      <td>{job.companyName}</td>
+                                                      <td>{job.jobTitle}</td>
+                                                      <td>
+                                                        {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                        {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                      </td>
+                                                      <td>Remote</td>
+                                                      <td><span className="text-success">Completed</span></td>
                                                     </tr>
-                                                  ))
-                                                ) : (
-                                                  <tr>
-                                                    <td colSpan={6} className="text-center">No course history available</td>
-                                                  </tr>
-                                                )}
-                                              </tbody>
-                                            </table>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
+
+                                      {/* Course History Tab */}
+                                      {(activeTab[profileIndex] || 0) === 3 && (
+                                        <div className="tab-pane active" id="course-history">
+                                          <div className="section-card">
+                                            <div className="table-responsive">
+                                              <table className="table table-hover table-bordered course-history-table">
+                                                <thead className="table-light">
+                                                  <tr>
+                                                    <th>S.No</th>
+                                                    <th>Applied Date</th>
+                                                    <th>Course Name</th>
+                                                    <th>Lead Added By</th>
+                                                    <th>Counsellor</th>
+                                                    <th>Status</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
+                                                    profile._candidate._appliedCourses.map((course, index) => (
+                                                      <tr key={index}>
+                                                        <td>{index + 1}</td>
+                                                        <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                        <td>{course._course?.name || 'N/A'}</td>
+                                                        <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                        <td>{course.month || ''} {course.year || ''}</td>
+                                                        <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                      </tr>
+                                                    ))
+                                                  ) : (
+                                                    <tr>
+                                                      <td colSpan={6} className="text-center">No course history available</td>
+                                                    </tr>
+                                                  )}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
 
 
-                                    {/* Documents Tab */}
-                                    {(activeTab[profileIndex] || 0) === 4 && (
-                                      <div className="tab-pane active" id='studentsDocuments'>
-                                        {(() => {
-                                          const documentsToDisplay = profile.uploadedDocs || profile._candidate?.documents || [];
-                                          const totalRequired = profile?.docCounts?.totalRequired || 0;
+                                      {/* Documents Tab */}
+                                      {(activeTab[profileIndex] || 0) === 4 && (
+                                        <div className="tab-pane active" id='studentsDocuments'>
+                                          {(() => {
+                                            const documentsToDisplay = profile.uploadedDocs || profile._candidate?.documents || [];
+                                            const totalRequired = profile?.docCounts?.totalRequired || 0;
 
-                                          // If no documents are required, show a message
-                                          if (totalRequired === 0) {
-                                            return (
-                                              <div className="col-12 text-center py-5">
-                                                <div className="text-muted">
-                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                  <h5 className="text-success">No Documents Required</h5>
-                                                  <p>This course does not require any document verification.</p>
-                                                </div>
-                                              </div>
-
-                                            );
-                                          }
-
-                                          // If documents are required, show the full interface
-                                          return (
-                                            <div className="enhanced-documents-panel">
-                                              {/* Enhanced Stats Grid */}
-                                              <div className="stats-grid">
-                                                {(() => {
-                                                  // Use backend counts only, remove static document fallback
-                                                  const backendCounts = profile?.docCounts || {};
-                                                  return (
-                                                    <>
-                                                      <div className="stat-card total-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-file-alt"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.totalRequired || 0}</h4>
-                                                          <p>Total Required</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-list"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card uploaded-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-cloud-upload-alt"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                          <p>Uploaded</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-arrow-up"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card pending-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-clock"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                          <p>Pending Review</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-exclamation-triangle"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card verified-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-check-circle"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                          <p>Approved</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-thumbs-up"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card rejected-docs">
-                                                        <div className="stat-icon">
-                                                          <i className="fas fa-times-circle"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                          <p>Rejected</p>
-                                                        </div>
-                                                        <div className="stat-trend">
-                                                          <i className="fas fa-arrow-down"></i>
-                                                        </div>
-                                                      </div>
-                                                    </>
-                                                  );
-                                                })()}
-                                              </div>
-
-                                              {/* Enhanced Filter Section */}
-                                              <div className="filter-section-enhanced">
-                                                <div className="filter-tabs-container">
-                                                  <h5 className="filter-title">
-                                                    <i className="fas fa-filter me-2"></i>
-                                                    Filter Documents
-                                                  </h5>
-                                                  <div className="filter-tabs">
-                                                    {(() => {
-                                                      const backendCounts = profile?.docCounts || {};
-                                                      return (
-                                                        <>
-                                                          <button
-                                                            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('all')}
-                                                          >
-                                                            <i className="fas fa-list-ul"></i>
-                                                            All Documents
-                                                            <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('pending')}
-                                                          >
-                                                            <i className="fas fa-clock"></i>
-                                                            Pending
-                                                            <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('verified')}
-                                                          >
-                                                            <i className="fas fa-check-circle"></i>
-                                                            Verified
-                                                            <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('rejected')}
-                                                          >
-                                                            <i className="fas fa-times-circle"></i>
-                                                            Rejected
-                                                            <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn`}
-                                                            >
-                                                            <i className="fas fa-download"></i>
-                                                            Download All 
-                                                           
-                                                          </button>
-                                                        </>
-                                                      );
-                                                    })()}
+                                            // If no documents are required, show a message
+                                            if (totalRequired === 0) {
+                                              return (
+                                                <div className="col-12 text-center py-5">
+                                                  <div className="text-muted">
+                                                    <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                    <h5 className="text-success">No Documents Required</h5>
+                                                    <p>This course does not require any document verification.</p>
                                                   </div>
                                                 </div>
-                                              </div>
 
-                                              {/* Enhanced Documents Grid */}
-                                              <div className="documents-grid-enhanced">
-                                                {(() => {
-                                                  // Filter documents based on status filter
-                                                  const filteredDocs = filterDocuments(documentsToDisplay);
+                                              );
+                                            }
 
-                                                  if (filteredDocs.length === 0) {
+                                            // If documents are required, show the full interface
+                                            return (
+                                              <div className="enhanced-documents-panel">
+                                                {/* Enhanced Stats Grid */}
+                                                <div className="stats-grid">
+                                                  {(() => {
+                                                    // Use backend counts only, remove static document fallback
+                                                    const backendCounts = profile?.docCounts || {};
                                                     return (
-                                                      <div className="col-12 text-center py-5">
-                                                        <div className="text-muted">
-                                                          <i className="fas fa-filter fa-3x mb-3"></i>
-                                                          <h5>No Documents Found</h5>
-                                                          <p>No documents match the current filter criteria.</p>
-                                                        </div>
-                                                      </div>
-                                                    );
-                                                  }
-
-                                                  return filteredDocs.map((doc, index) => {
-                                                    // Check if this is a document with upload data or just uploaded file info
-                                                    const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                      ? doc.uploads[doc.uploads.length - 1]
-                                                      : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                    return (
-                                                      <div key={doc._id || index} className="document-card-enhanced">
-                                                        <div className="document-image-container">
-                                                          {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                            <>
-                                                              {(() => {
-                                                                const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                                const fileType = getFileType(fileUrl);
-
-                                                                if (fileType === 'image') {
-                                                                  return (
-                                                                    <img
-                                                                      src={fileUrl}
-                                                                      alt="Document Preview"
-                                                                      className="document-image"
-                                                                    />
-                                                                  );
-                                                                } else if (fileType === 'pdf') {
-                                                                  return (
-                                                                    <div className="document-preview-icon">
-                                                                      <i className="fas fa-file-pdf" style={{ fontSize: '40px', color: '#dc3545' }}></i>
-                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                    </div>
-                                                                  );
-                                                                } else {
-                                                                  return (
-                                                                    <div className="document-preview-icon">
-                                                                      <i className={`fas ${fileType === 'document' ? 'fa-file-word' :
-                                                                        fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                        }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                        {fileType === 'document' ? 'Document' :
-                                                                          fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                      </p>
-                                                                    </div>
-                                                                  );
-                                                                }
-                                                              })()}
-                                                              <div className="image-overlay">
-                                                                <button
-                                                                  className="preview-btn"
-                                                                  onClick={() => openDocumentModal(doc)}
-                                                                >
-                                                                  <i className="fas fa-search-plus"></i>
-                                                                  Preview
-                                                                </button>
-                                                              </div>
-                                                            </>
-                                                          ) : (
-                                                            <div className="no-document-placeholder">
-                                                              <i className="fas fa-file-upload"></i>
-                                                              <p>No Document</p>
-                                                            </div>
-                                                          )}
-
-                                                          {/* Status Badge Overlay */}
-                                                          <div className="status-badge-overlay">
-                                                            {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                              <span className="status-badge-new pending">
-                                                                <i className="fas fa-clock"></i>
-                                                                Pending
-                                                              </span>
-                                                            )}
-                                                            {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                              <span className="status-badge-new verified">
-                                                                <i className="fas fa-check-circle"></i>
-                                                                Verified
-                                                              </span>
-                                                            )}
-                                                            {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                              <span className="status-badge-new rejected">
-                                                                <i className="fas fa-times-circle"></i>
-                                                                Rejected
-                                                              </span>
-                                                            )}
-                                                            {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                              <span className="status-badge-new not-uploaded">
-                                                                <i className="fas fa-upload"></i>
-                                                                Required
-                                                              </span>
-                                                            )}
+                                                      <>
+                                                        <div className="stat-card total-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-file-alt"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.totalRequired || 0}</h4>
+                                                            <p>Total Required</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-list"></i>
                                                           </div>
                                                         </div>
 
-                                                        <div className="document-info-section">
-                                                          <div className="document-header">
-                                                            <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
-                                                            <div className="document-actions">
-                                                              {(!latestUpload) ? (
-                                                                <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
-                                                                  setSelectedProfile(profile); // Set the current profile
-                                                                  openUploadModal(doc);        // Open the upload modal
-                                                                }}>
-                                                                  <i className="fas fa-cloud-upload-alt"></i>
-                                                                  Upload
-                                                                </button>
-                                                              )  : (
-                                                                <button
-                                                                  className="action-btn view-btn"
-                                                                  onClick={() => openDocumentModal(doc)}
-                                                                  title="View Document"
-                                                                >
-                                                                  <i className="fas fa-eye"></i>
-                                                                  View
-                                                                </button>
+                                                        <div className="stat-card uploaded-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-cloud-upload-alt"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                            <p>Uploaded</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-arrow-up"></i>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="stat-card pending-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-clock"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                            <p>Pending Review</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-exclamation-triangle"></i>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="stat-card verified-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-check-circle"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                            <p>Approved</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-thumbs-up"></i>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="stat-card rejected-docs">
+                                                          <div className="stat-icon">
+                                                            <i className="fas fa-times-circle"></i>
+                                                          </div>
+                                                          <div className="stat-info">
+                                                            <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                            <p>Rejected</p>
+                                                          </div>
+                                                          <div className="stat-trend">
+                                                            <i className="fas fa-arrow-down"></i>
+                                                          </div>
+                                                        </div>
+                                                      </>
+                                                    );
+                                                  })()}
+                                                </div>
+
+                                                {/* Enhanced Filter Section */}
+                                                <div className="filter-section-enhanced">
+                                                  <div className="filter-tabs-container">
+                                                    <h5 className="filter-title">
+                                                      <i className="fas fa-filter me-2"></i>
+                                                      Filter Documents
+                                                    </h5>
+                                                    <div className="filter-tabs">
+                                                      {(() => {
+                                                        const backendCounts = profile?.docCounts || {};
+                                                        return (
+                                                          <>
+                                                            <button
+                                                              className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                              onClick={() => setStatusFilter('all')}
+                                                            >
+                                                              <i className="fas fa-list-ul"></i>
+                                                              All Documents
+                                                              <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                            </button>
+                                                            <button
+                                                              className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                              onClick={() => setStatusFilter('pending')}
+                                                            >
+                                                              <i className="fas fa-clock"></i>
+                                                              Pending
+                                                              <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                            </button>
+                                                            <button
+                                                              className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                              onClick={() => setStatusFilter('verified')}
+                                                            >
+                                                              <i className="fas fa-check-circle"></i>
+                                                              Verified
+                                                              <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                            </button>
+                                                            <button
+                                                              className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                              onClick={() => setStatusFilter('rejected')}
+                                                            >
+                                                              <i className="fas fa-times-circle"></i>
+                                                              Rejected
+                                                              <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                            </button>
+                                                            <button
+                                                              className={`filter-btn`}
+                                                            >
+                                                              <i className="fas fa-download"></i>
+                                                              Download All
+
+                                                            </button>
+                                                          </>
+                                                        );
+                                                      })()}
+                                                    </div>
+                                                  </div>
+                                                </div>
+
+                                                {/* Enhanced Documents Grid */}
+                                                <div className="documents-grid-enhanced">
+                                                  {(() => {
+                                                    // Filter documents based on status filter
+                                                    const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                    if (filteredDocs.length === 0) {
+                                                      return (
+                                                        <div className="col-12 text-center py-5">
+                                                          <div className="text-muted">
+                                                            <i className="fas fa-filter fa-3x mb-3"></i>
+                                                            <h5>No Documents Found</h5>
+                                                            <p>No documents match the current filter criteria.</p>
+                                                          </div>
+                                                        </div>
+                                                      );
+                                                    }
+
+                                                    return filteredDocs.map((doc, index) => {
+                                                      // Check if this is a document with upload data or just uploaded file info
+                                                      const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                        ? doc.uploads[doc.uploads.length - 1]
+                                                        : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                      return (
+                                                        <div key={doc._id || index} className="document-card-enhanced">
+                                                          <div className="document-image-container">
+                                                            {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                              <>
+                                                                {(() => {
+                                                                  const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                  const fileType = getFileType(fileUrl);
+
+                                                                  if (fileType === 'image') {
+                                                                    return (
+                                                                      <img
+                                                                        src={fileUrl}
+                                                                        alt="Document Preview"
+                                                                        className="document-image"
+                                                                      />
+                                                                    );
+                                                                  } else if (fileType === 'pdf') {
+                                                                    return (
+                                                                      <div className="document-preview-icon">
+                                                                        <i className="fas fa-file-pdf" style={{ fontSize: '40px', color: '#dc3545' }}></i>
+                                                                        <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                      </div>
+                                                                    );
+                                                                  } else {
+                                                                    return (
+                                                                      <div className="document-preview-icon">
+                                                                        <i className={`fas ${fileType === 'document' ? 'fa-file-word' :
+                                                                          fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                          }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                        <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                          {fileType === 'document' ? 'Document' :
+                                                                            fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                        </p>
+                                                                      </div>
+                                                                    );
+                                                                  }
+                                                                })()}
+                                                                <div className="image-overlay">
+                                                                  <button
+                                                                    className="preview-btn"
+                                                                    onClick={() => openDocumentModal(doc)}
+                                                                  >
+                                                                    <i className="fas fa-search-plus"></i>
+                                                                    Preview
+                                                                  </button>
+                                                                </div>
+                                                              </>
+                                                            ) : (
+                                                              <div className="no-document-placeholder">
+                                                                <i className="fas fa-file-upload"></i>
+                                                                <p>No Document</p>
+                                                              </div>
+                                                            )}
+
+                                                            {/* Status Badge Overlay */}
+                                                            <div className="status-badge-overlay">
+                                                              {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                                <span className="status-badge-new pending">
+                                                                  <i className="fas fa-clock"></i>
+                                                                  Pending
+                                                                </span>
+                                                              )}
+                                                              {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                                <span className="status-badge-new verified">
+                                                                  <i className="fas fa-check-circle"></i>
+                                                                  Verified
+                                                                </span>
+                                                              )}
+                                                              {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                                <span className="status-badge-new rejected">
+                                                                  <i className="fas fa-times-circle"></i>
+                                                                  Rejected
+                                                                </span>
+                                                              )}
+                                                              {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                                <span className="status-badge-new not-uploaded">
+                                                                  <i className="fas fa-upload"></i>
+                                                                  Required
+                                                                </span>
                                                               )}
                                                             </div>
                                                           </div>
 
-                                                          <div className="document-meta">
-                                                            <div className="meta-item">
-                                                              <i className="fas fa-calendar-alt text-muted"></i>
-                                                              <span className="meta-text">
-                                                                {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                  new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                    day: '2-digit',
-                                                                    month: 'short',
-                                                                    year: 'numeric'
-                                                                  }) :
-                                                                  'Not uploaded'
-                                                                }
-                                                              </span>
+                                                          <div className="document-info-section">
+                                                            <div className="document-header">
+                                                              <h4 className="document-title">{doc.Name || doc.name || `Document ${index + 1}`}</h4>
+                                                              <div className="document-actions">
+                                                                {(!latestUpload) ? (
+                                                                  <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
+                                                                    setSelectedProfile(profile); // Set the current profile
+                                                                    openUploadModal(doc);        // Open the upload modal
+                                                                  }}>
+                                                                    <i className="fas fa-cloud-upload-alt"></i>
+                                                                    Upload
+                                                                  </button>
+                                                                ) : (
+                                                                  <button
+                                                                    className="action-btn view-btn"
+                                                                    onClick={() => openDocumentModal(doc)}
+                                                                    title="View Document"
+                                                                  >
+                                                                    <i className="fas fa-eye"></i>
+                                                                    View
+                                                                  </button>
+                                                                )}
+                                                              </div>
                                                             </div>
 
-                                                            {latestUpload && (
+                                                            <div className="document-meta">
                                                               <div className="meta-item">
-                                                                <i className="fas fa-clock text-muted"></i>
+                                                                <i className="fas fa-calendar-alt text-muted"></i>
                                                                 <span className="meta-text">
-                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                  })}
+                                                                  {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                    new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                      day: '2-digit',
+                                                                      month: 'short',
+                                                                      year: 'numeric'
+                                                                    }) :
+                                                                    'Not uploaded'
+                                                                  }
                                                                 </span>
                                                               </div>
-                                                            )}
+
+                                                              {latestUpload && (
+                                                                <div className="meta-item">
+                                                                  <i className="fas fa-clock text-muted"></i>
+                                                                  <span className="meta-text">
+                                                                    {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                      hour: '2-digit',
+                                                                      minute: '2-digit'
+                                                                    })}
+                                                                  </span>
+                                                                </div>
+                                                              )}
+                                                            </div>
                                                           </div>
                                                         </div>
-                                                      </div>
-                                                    );
-                                                  });
-                                                })()}
-                                              </div>
+                                                      );
+                                                    });
+                                                  })()}
+                                                </div>
 
-                                              <DocumentModal />
-                                              <UploadModal />
-                                            </div>
-                                          );
-                                        })()}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+                                                <DocumentModal />
+                                                <UploadModal />
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="col-12 text-center py-5">
+                              <div className="text-muted">
+                                <i className="fas fa-users fa-3x mb-3"></i>
+                                <h5>No profiles found</h5>
+                                <p>Try adjusting your filters or search criteria</p>
                               </div>
                             </div>
-                          ))
-                        ) : (
-                          <div className="col-12 text-center py-5">
-                            <div className="text-muted">
-                              <i className="fas fa-users fa-3x mb-3"></i>
-                              <h5>No profiles found</h5>
-                              <p>Try adjusting your filters or search criteria</p>
-                            </div>
-                          </div>
-                        )}</>)}
+                          )}</>)}
                       </div>
                     </div>
                   </div>
@@ -4787,24 +4868,24 @@ const AdmissionList = () => {
 
 
         {openModalId === selectedProfile?._id && (
-                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                                <div className="modal-dialog modal-dialog-scrollable m-0 mt-2">
-                                  <div className="modal-content new-modal-content">
-                                    <div className="modal-header">
-                                      <h1 className="modal-title fs-5">Candidate Profile</h1>
-                                      <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
-                                    </div>
-                                    <div className="modal-body">
-                                      <CandidateProfile ref={candidateRef} />
-                                    </div>
-                                    <div className="modal-footer">
-                                      <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
-                                      <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+          <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-scrollable m-0 mt-2">
+              <div className="modal-content new-modal-content">
+                <div className="modal-header">
+                  <h1 className="modal-title fs-5">Candidate Profile</h1>
+                  <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
+                </div>
+                <div className="modal-body">
+                  <CandidateProfile ref={candidateRef} />
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
+                  <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
       <style>
@@ -7381,10 +7462,10 @@ background: #fd2b5a;
       </style>
 
 
-      <style> 
-          {
-            
-            `
+      <style>
+        {
+
+          `
           
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
@@ -7699,7 +7780,7 @@ height:min-content !important;
 
    
             `
-          }
+        }
 
       </style>
       <style>
@@ -9072,7 +9153,7 @@ max-width: 600px;
       
           `
         }
-        </style>
+      </style>
     </div>
   );
 };

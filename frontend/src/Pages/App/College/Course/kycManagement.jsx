@@ -1270,6 +1270,9 @@ const KYCManagement = () => {
 
   }, [currentPage, activeCrmFilter]);
 
+
+  
+
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
       console.log('filters', filters)
