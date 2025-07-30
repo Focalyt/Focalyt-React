@@ -132,7 +132,7 @@ const CandidateProfile = forwardRef((props, ref) => {
         return size <= 5 * 1024 * 1024; // 5MB
     };
 
-    
+
     // Audio recording state
     const [isRecording, setIsRecording] = useState(false);
     const [recordings, setRecordings] = useState([]);
@@ -233,8 +233,8 @@ const CandidateProfile = forwardRef((props, ref) => {
     };
 
     const uploadProfilePic = async (file, filename) => {
-        try {      
-            console.log('uploadProfilePic hitting',profileData.mobile)
+        try {
+            console.log('uploadProfilePic hitting', profileData.mobile)
             const formData = new FormData();
             formData.append('file', file);
             formData.append('mobile', profileData.mobile);
@@ -245,10 +245,19 @@ const CandidateProfile = forwardRef((props, ref) => {
                     'Content-Type': 'multipart/form-data'
                 }
             });
+            console.log('res for profile pic', res.data)
 
             if (res.data.status) {
                 alert('Profile picture updated successfully')
-                window.location.reload();
+                setProfileData(prev => ({
+                    ...prev,
+                    personalInfo: {
+                        ...(prev.personalInfo || {}),
+                        image: res.data.data.Location
+                    }
+                }));
+                // window.location.reload();
+
                 console.log('file uploaded on s3')
 
             }
@@ -1117,7 +1126,7 @@ const CandidateProfile = forwardRef((props, ref) => {
                         permanentAddress: profileData?.personalInfo?.permanentAddress || {},
                         fatherName: profileData?.personalInfo?.fatherName || '',
                         motherName: profileData?.personalInfo?.motherName || '',
-                        image: userData.image || user.image || '',
+                        image: profileData?.personalInfo?.image || '',
                         resume: userData.resume || user.resume || '',
                         voiceIntro: recordings.map(rec => ({
                             name: rec.name,
@@ -1221,17 +1230,22 @@ const CandidateProfile = forwardRef((props, ref) => {
 
                 if (res.data.status) {
                     alert('CV Saved Successfully!');
+                    let response = {
+                        isvalid: true,
+                        data: res.data.data
+                    }
 
-                    isValid = true;
+                    console.log('response', response)
+                    // isValid = true;
                     // window.location.reload();
-                    return isValid;
+                    return response;
 
                 } else {
                     alert('Failed to save CV!');
 
                     isValid = true;
                     // window.location.reload();
-                    
+
                     return isValid;
 
                 }
@@ -3051,74 +3065,7 @@ const CandidateProfile = forwardRef((props, ref) => {
                     <i className="bi bi-eye me-2"></i> Preview Resume
                 </button>
             </div> */}
-            {fileName && (
-                <div className="section-order">
-                    <div className="section fadeInUp resume">
-                        <div className="heading-container">
-                            <div className="text-emoji-container">
-                                <div className="text-container">
-                                    <h1 className="section-heading title-16-bold">Uploaded Resume</h1>
-                                    <h2 className="section-sub-heading title-14-medium">
-                                        Your resume is the first impression you make on potential employers. Craft it carefully to secure your desired job or internship.
-                                    </h2>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="uploaded-container">
-                            <div className="file-details">
-                                <div className="file-name title-14-bold">{fileName}</div>
-                                <div className="uploaded-date title-14-regular">Uploaded on {uploadDate}</div>
-                            </div>
-
-                            <div className="action-container">
-                                {/* View button */}
-                                <div className="border-box view"
-                                    onClick={viewResume}
-                                    style={{ cursor: 'pointer' }}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                        <path d="M7 2.625C3.5 2.625 1.1375 7 1.1375 7C1.1375 7 3.5 11.375 7 11.375C10.5 11.375 12.8625 7 12.8625 7C12.8625 7 10.5 2.625 7 2.625Z"
-                                            stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                                        <path d="M7 9.1875C8.2426 9.1875 9.25 8.18008 9.25 6.9375C9.25 5.69492 8.2426 4.6875 7 4.6875C5.75736 4.6875 4.75 5.69492 4.75 6.9375C4.75 8.18008 5.75736 9.1875 7 9.1875Z"
-                                            stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                </div>
-
-                                <div className="border-box delete"
-                                    onClick={() => {
-                                        setFileName("");
-                                        setUploadDate("");
-                                        localStorage.removeItem('resumeFileName');
-                                        localStorage.removeItem('resumeUploadDate');
-                                        localStorage.removeItem('resume');
-                                        alert('Resume deleted');
-                                        // You may want to call a function to delete from backend as well
-                                    }}
-                                    style={{ cursor: 'pointer' }}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                        <g clipPath="url(#clip0_2370_12506)">
-                                            <path d="M1.52734 3.35156H2.74333H12.4712"
-                                                stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                                            <path d="M4.56812 3.35189V2.1359C4.56812 1.81341 4.69623 1.50412 4.92427 1.27608C5.15231 1.04803 5.4616 0.919922 5.7841 0.919922H8.21606C8.53856 0.919922 8.84785 1.04803 9.07589 1.27608C9.30393 1.50412 9.43205 1.81341 9.43205 2.1359V3.35189"
-                                                stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                                            <path d="M11.256 3.35189V11.8638C11.256 12.1863 11.1279 12.4956 10.8999 12.7236C10.6718 12.9516 10.3625 13.0798 10.04 13.0798H3.96012C3.63762 13.0798 3.32833 12.9516 3.10029 12.7236C2.87225 12.4956 2.74414 12.1863 2.74414 11.8638V3.35189H11.256Z"
-                                                stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                                            <path d="M5.7832 6.39258V10.0405"
-                                                stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                                            <path d="M8.21484 6.39258V10.0405"
-                                                stroke="#275DF5" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                                        </g>
-                                        <defs>
-                                            <clipPath id="clip0_2370_12506">
-                                                <rect width="14" height="14" fill="white" />
-                                            </clipPath>
-                                        </defs>
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>)}
+           
             {showResumeViewer && (
                 <div className="resume-viewer-overlay">
                     <div className="resume-viewer-modal">

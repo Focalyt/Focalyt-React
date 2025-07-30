@@ -746,7 +746,7 @@ const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerti
                 <div className="modal d-block overflowY" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                     <div className="modal-dialog modal-dialog-centered modal-lg">
                         <div className="modal-content">
-                            <div className="modal-header text-success text-white">
+                            <div className="modal-header text-success text-white" style={{ backgroundColor: '#fc2b5a' }}>
                                 <h5 className="modal-title">
                                     {alignCenter
                                         ? 'Align Existing Center'

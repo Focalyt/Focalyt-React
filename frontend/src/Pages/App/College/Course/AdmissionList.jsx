@@ -301,6 +301,7 @@ const AdmissionList = () => {
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showFollowupPanel, setShowFollowupPanel] = useState(false);
   const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
+  const [showAssignBatchPanel, setShowAssignBatchPanel] = useState(false);
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -1380,6 +1381,10 @@ const AdmissionList = () => {
       setShowPopup(null)
       setShowFollowupPanel(true);
     }
+    else if(panel === 'AssignBatch') {
+      setShowPopup(null)
+      setShowAssignBatchPanel(true);
+    }
 
     if (!isMobile) {
       setMainContentClass('col-8');
@@ -1457,6 +1462,37 @@ const AdmissionList = () => {
       window.dispatchEvent(event);
     }, 300);
   };
+  const openAssignBatchPanel = async (profile = null) => {
+    if (profile) {
+      setSelectedProfile(profile);
+    }
+
+    setShowPopup(null)
+    setShowAssignBatchPanel(true)
+    setShowWhatsappPanel(false);
+    setShowEditPanel(false);
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+  };
+
+  const closeAssignBatchPanel = () => {
+    setShowAssignBatchPanel(false)
+    if (!isMobile) {
+      setMainContentClass(showEditPanel || showWhatsappPanel ? 'col-8' : 'col-12');
+    }
+    setTimeout(() => {
+      const event = new Event('resize');
+      window.dispatchEvent(event);
+    }, 300);
+  };
+
+  // const openAssignBatchPanel = (panel = null) => {
+  //   setShowAssignBatchPanel(true);
+  //   setShowPopup(null)
+  //   setSelectedProfile(panel)
+  //   setOpenModalId(panel._id);
+  // }
 
   const getPaginationPages = () => {
     const delta = 2;
@@ -2487,7 +2523,7 @@ const AdmissionList = () => {
           <div
             className="flex-grow-1 overflow-auto px-3 py-2"
             style={{
-              maxHeight: isMobile ? '30vh' : '65vh',
+              maxHeight: isMobile ? '30vh' : '34vh',
               minHeight: '200px'
             }}
           >
@@ -2603,6 +2639,113 @@ const AdmissionList = () => {
         {panelContent}
       </div>
     ) : null;
+  };
+
+  const renderAssignBatchPanel = () => {
+    if (!showAssignBatchPanel) return null;
+
+    const panelContent = (
+      <div className="card border-0 shadow-sm h-100">
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-users text-primary"></i>
+            </div>
+            <h6 className="mb-0 fw-medium">Assign Batch</h6>
+          </div>
+          <button className="btn-close" type="button" onClick={closeAssignBatchPanel}>
+          </button>
+        </div>
+
+        <div className="card-body p-0 d-flex flex-column h-100">
+          {/* Scrollable Content Area */}
+          <div
+            className="flex-grow-1 overflow-auto px-3 py-2"
+            style={{
+              maxHeight: isMobile ? '30vh' : '34vh',
+              minHeight: '200px'
+            }}
+          >
+            {selectedProfile ? (
+              <div className="p-3">
+               
+                <div className="mb-4">
+                  <div className="mb-3">
+                    <label className="form-label">Select Batch</label>
+                    <select className="form-select" defaultValue="">
+                      <option value="">Choose a Batch...</option>
+                      <option value="course1">Batch 1</option>
+                      <option value="course2">Batch 2</option>
+                      <option value="course3">Batch 3</option>
+                      <option value="course4">Batch 4</option>
+                    </select>
+                  </div>
+                
+                </div>
+              </div>
+            ) : (
+              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                <div className="mb-3">
+                  <i className="fas fa-users text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                </div>
+                <h6 className="text-muted mb-2">No Student Selected</h6>
+                <p className="text-muted small mb-0">Please select a student to assign batch.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Fixed Footer */}
+          <div className="border-top px-3 py-3 bg-light">
+            <div className="d-flex justify-content-end gap-2">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={closeAssignBatchPanel}
+              >
+                <i className="fas fa-times me-1"></i>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  // Handle batch assignment logic here
+                  console.log('Assigning batch to:', selectedProfile);
+                  closeAssignBatchPanel();
+                }}
+              >
+                <i className="fas fa-check me-1"></i>
+                Assign Batch
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (isMobile) {
+      return (
+        <div
+          className={`modal ${showAssignBatchPanel ? 'show d-block' : 'd-none'}`}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeAssignBatchPanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+            <div className="modal-content" style={{ height: '85vh' }}>
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="col-12 transition-col" id="assignBatchPanel" style={{ height: '80vh' }}>
+        {panelContent}
+      </div>
+    );
   };
 
   const handleRejectionReasonChange = (e) => {
@@ -3281,7 +3424,7 @@ const AdmissionList = () => {
                                               boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                               borderRadius: "4px",
                                               padding: "8px 0",
-                                              zIndex: 9,
+                                              zIndex: 8,
                                               transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                               transition: "transform 0.3s ease-in-out",
                                               pointerEvents: showPopup ? "auto" : "none",
@@ -3377,6 +3520,25 @@ const AdmissionList = () => {
                                             >
                                               Edit Profile
                                             </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                                 onClick={() => {
+                                                  openAssignBatchPanel(profile);
+                                                  console.log('selectedProfile', profile);
+                                                 }}
+                                            >
+                                              Assign Batch
+                                            </button>
                                           </div>
                                         </div>
 
@@ -3430,7 +3592,7 @@ const AdmissionList = () => {
                                               boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                               borderRadius: "4px",
                                               padding: "8px 0",
-                                              zIndex: 9,
+                                              zIndex: 8,
                                               transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                               transition: "transform 0.3s ease-in-out",
                                               pointerEvents: showPopup === profileIndex ? "auto" : "none",
@@ -3522,6 +3684,25 @@ const AdmissionList = () => {
                                                   }}
                                             >
                                               Edit Profile
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                                onClick={() => {
+                                                  openAssignBatchPanel(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                            >
+                                              Assign Batch
                                             </button>
                                           </div>
                                         </div>
@@ -4593,6 +4774,7 @@ const AdmissionList = () => {
               {renderEditPanel()}
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
+              {renderAssignBatchPanel()}
             </div>
           </div>
         )}
@@ -4601,7 +4783,7 @@ const AdmissionList = () => {
         {isMobile && renderEditPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
-
+        {isMobile && renderAssignBatchPanel()}
 
 
         {openModalId === selectedProfile?._id && (
@@ -4643,7 +4825,8 @@ const AdmissionList = () => {
         position: fixed !important;
         transition: 0.4s;
         background: white;
-       top:280px
+       top:280px;
+       z-index: 15;
         
     }
 

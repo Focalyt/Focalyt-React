@@ -1319,9 +1319,17 @@ router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 		console.log('url', url)
 
 
+
+
 		const updatedProfile = await Candidate.findOneAndUpdate({ mobile: mobile }, { $set: { personalInfo: { image: url.Location } } }, { new: true })
 		console.log('updatedProfile', updatedProfile)
-		return res.send({ status: true, message: 'Profile picture updated successfully', data: updatedProfile })
+
+		let newData = {
+			Location: url.Location,
+			updatedProfile: updatedProfile
+		}
+
+		return res.send({ status: true, message: 'Profile picture updated successfully', data: newData })
 
 	} catch (err) { return req.errFunc(err); }
 })
