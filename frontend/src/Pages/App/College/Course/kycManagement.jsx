@@ -317,6 +317,11 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   const fileInputRef = useRef(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
+  const [verifiedByUser, setVerifiedByUser] = useState(null);
+  const [rejectedByUser, setRejectedByUser] = useState(null);
+  const [uploadedByUser, setUploadedByUser] = useState(null);
+  const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
+  const [userDetailsError, setUserDetailsError] = useState(false);
 
   // Static document data for demonstration
   useEffect(() => {
@@ -651,6 +656,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     setShowDocumentModal(true);
     setDocumentZoom(1);
     setDocumentRotation(0);
+    fetchUserDetailsForDocument(document);
   };
 
   const closeDocumentModal = () => {
@@ -662,6 +668,12 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     // Only reset when actually closing modal
     setDocumentZoom(1);
     setDocumentRotation(0);
+    // document.body?.classList.remove('no-scroll');
+    setVerifiedByUser(null);
+    setRejectedByUser(null);
+    setUploadedByUser(null);
+    setIsLoadingUserDetails(false);
+    setUserDetailsError(false);
   };
 
 
@@ -1657,6 +1669,66 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     );
   });
 
+  // Function to fetch user details by ID
+  const fetchUserDetails = async (userId) => {
+    if (!userId) return null;
+    
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+      
+      const response = await axios.get(`${backendUrl}/college/users/users-details/${userId}`, {
+        headers: {
+          'x-auth': token
+        }
+      });
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      return null;
+    }
+  };
+
+  // Function to fetch user details when document modal opens
+  const fetchUserDetailsForDocument = async (document) => {
+    if (!document) return;
+    
+    setIsLoadingUserDetails(true);
+    
+    try {
+      const latestUpload = document.uploads && document.uploads.length > 0
+        ? document.uploads[document.uploads.length - 1]
+        : (document.fileUrl && document.status !== "Not Uploaded" ? document : null);
+      
+      if (latestUpload) {
+        // Fetch verifiedBy user details
+        if (latestUpload.verifiedBy) {
+          const verifiedByDetails = await fetchUserDetails(latestUpload.verifiedBy);
+          setVerifiedByUser(verifiedByDetails);
+        }
+        
+        // Fetch rejectedBy user details
+        if (latestUpload.rejectedBy) {
+          const rejectedByDetails = await fetchUserDetails(latestUpload.rejectedBy);
+          setRejectedByUser(rejectedByDetails);
+        }
+        
+        // Fetch uploadedBy user details
+        if (latestUpload.uploadedBy) {
+          const uploadedByDetails = await fetchUserDetails(latestUpload.uploadedBy);
+          setUploadedByUser(uploadedByDetails);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user details for document:', error);
+      setUserDetailsError(true);
+    } finally {
+      setIsLoadingUserDetails(false);
+    }
+  };
+
   // यह function DocumentModal के बाहर, component के अंदर कहीं भी define करें:
 
   // Auto Height Document Thumbnail Function - DocumentModal के बाहर define करें
@@ -1674,6 +1746,8 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
         ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
         : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
     }, [selectedDocument]);
+
+   
 
     const handleZoomIn = useCallback(() => {
       setDocumentZoom(prev => Math.min(prev + 0.1, 2));
@@ -2105,6 +2179,29 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                   <strong>Status:</strong>
                   <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
                     {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
+                  </span>
+                </div>
+                <div className="info-row">
+                  <strong>{latestUpload?.status === 'Verified' ? 'Verified By:' : latestUpload?.status === 'Rejected' ? 'Rejected By:' : ''}</strong>
+                  <span className="ms-2">
+                    {isLoadingUserDetails ? (
+                      <span className="text-muted">
+                        <i className="fas fa-spinner fa-spin me-1"></i>
+                        Loading...
+                      </span>
+                    ) : userDetailsError ? (
+                      <span className="text-danger">
+                        <i className="fas fa-exclamation-triangle me-1"></i>
+                        Error loading user details
+                      </span>
+                    ) : (
+                      latestUpload?.status === 'Verified' && verifiedByUser?.name ? 
+                        `${verifiedByUser.name}${verifiedByUser.designation ? ` (${verifiedByUser.designation})` : ''}` :
+                      latestUpload?.status === 'Rejected' && rejectedByUser?.name ? 
+                        `${rejectedByUser.name}${rejectedByUser.designation ? ` (${rejectedByUser.designation})` : ''}` :
+                      uploadedByUser?.name ? 
+                        `${uploadedByUser.name}${uploadedByUser.designation ? ` (${uploadedByUser.designation})` : ''}` : 'N/A'
+                    )}
                   </span>
                 </div>
               </div>

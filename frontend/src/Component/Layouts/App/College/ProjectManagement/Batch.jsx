@@ -443,6 +443,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   }, [batches, selectedCourse, selectedCenter, selectedProject, selectedVertical]);
 
   const handleBatchAssign = async (e) => {
+    if(!selectedBatch){
+      alert('Please select a batch');
+      return;
+    }
     e?.preventDefault(); // Prevent form submission
     e?.stopPropagation(); // Stop event bubbling
     
@@ -549,6 +553,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                     <select
                       className="form-select border-0  bgcolor"
                       id="counselor"
+                      required
                       style={{
                         height: '42px',
                         paddingTop: '8px',
@@ -1857,6 +1862,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                           >
                                             History List
                                           </button>
+                                          {!profile?.batch && (
                                           <button
                                             className="dropdown-item"
                                             onClick={() => {
@@ -1876,6 +1882,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                           >
                                             Assign Batch
                                           </button>
+                                          )}
 
 
 
@@ -1959,6 +1966,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                           >
                                             History List
                                           </button>
+                                          {!profile?.batch && (
                                           <button
                                             className="dropdown-item"
                                             style={{
@@ -1977,7 +1985,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                             }}
                                           >
                                             Assign Batch
-                                          </button>
+                                          </button>)}
 
 
 
