@@ -1329,6 +1329,9 @@ router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 router.post('/assign-batch', [isCollege], async (req, res) => {
 	try {
 		const { batchId, appliedCourseId } = req.body
+		if (!batchId || !appliedCourseId) {
+			return res.send({ status: false, message: `${batchId ? 'batchId' : 'appliedCourseId'} is required` })
+		}
 		const appliedCourse = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, { $set: { batch: batchId, isBatchAssigned: true } }, { new: true })
 		return res.send({ status: true, message: 'Batch assigned successfully', data: appliedCourse })
 	} catch (err) {
