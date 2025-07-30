@@ -81,6 +81,10 @@ const appliedCoursesSchema = new Schema(
 
     kycStage: { type: Boolean, default: false },
     kyc: { type: Boolean, default: false },
+
+    kycDoneAt: { type: Date },
+    kycDoneBy: { type: ObjectId, ref: "User" },
+    
     admissionDone: { type: Boolean, default: false },
     admissionDate: { type: Date },
     dropout: { type: Boolean, default: false },

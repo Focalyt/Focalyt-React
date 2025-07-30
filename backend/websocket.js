@@ -1,231 +1,295 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
-const { jwtSecret } = require('./config');
+const { College, WhatsAppMessage } = require('./controllers/models');
 
 class WebSocketServer {
   constructor(server) {
     this.wss = new WebSocket.Server({ server });
-    this.clients = new Map(); // Map to store connected clients
-    this.rooms = new Map(); // Map to store chat rooms
+    this.clients = new Map(); // Store connected clients
+    this.rooms = new Map(); // Store room subscriptions
     
-    this.init();
+    this.setupEventHandlers();
+    console.log('WebSocket server initialized');
   }
 
-  init() {
+  setupEventHandlers() {
     this.wss.on('connection', (ws, req) => {
-      console.log('New WebSocket connection established');
-      
-      // Extract token from query string or headers
+      this.handleConnection(ws, req);
+    });
+  }
+
+  async handleConnection(ws, req) {
+    try {
+      // Extract token from query parameters or headers
       const token = this.extractToken(req);
       
+      // For attendance system, allow connections without token
       if (!token) {
-        ws.close(1008, 'Authentication required');
+        // Allow anonymous connections for attendance system
+        this.handleAnonymousConnection(ws);
         return;
       }
 
-      // Verify JWT token
-      try {
-        const decoded = jwt.verify(token, jwtSecret);
-        ws.userId = decoded.id;
-        ws.userType = decoded.userType; // college, candidate, company, admin
-        ws.collegeId = decoded.collegeId;
-        
-        this.addClient(ws);
-        this.sendWelcomeMessage(ws);
-        
-      } catch (error) {
-        console.error('WebSocket authentication error:', error);
+      // Verify token and get user info
+      const userInfo = await this.verifyToken(token);
+      if (!userInfo) {
         ws.close(1008, 'Invalid token');
         return;
       }
 
-      // Handle incoming messages
-      ws.on('message', (data) => {
-        try {
-          const message = JSON.parse(data);
-          this.handleMessage(ws, message);
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-          this.sendError(ws, 'Invalid message format');
-        }
+      // Store client information
+      this.clients.set(ws, {
+        userId: userInfo.userId,
+        userType: userInfo.userType,
+        collegeId: userInfo.collegeId,
+        connectedAt: new Date()
       });
 
-      // Handle client disconnect
+      // Send welcome message
+      this.sendToClient(ws, {
+        type: 'welcome',
+        message: 'Connected to WebSocket server',
+        userId: userInfo.userId,
+        userType: userInfo.userType,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`Client connected: ${userInfo.userType} - ${userInfo.userId}`);
+
+      // Handle incoming messages
+      ws.on('message', (data) => {
+        this.handleMessage(ws, data);
+      });
+
+      // Handle disconnection
       ws.on('close', () => {
-        this.removeClient(ws);
-        console.log('WebSocket connection closed');
+        this.handleDisconnection(ws);
       });
 
       // Handle errors
       ws.on('error', (error) => {
         console.error('WebSocket error:', error);
-        this.removeClient(ws);
+        this.handleDisconnection(ws);
       });
+
+    } catch (error) {
+      console.error('Connection error:', error);
+      ws.close(1011, 'Internal server error');
+    }
+  }
+
+  handleAnonymousConnection(ws) {
+    // Store anonymous client for attendance system
+    this.clients.set(ws, {
+      userId: 'anonymous',
+      userType: 'attendance',
+      connectedAt: new Date()
+    });
+
+    console.log('Anonymous client connected for attendance system');
+
+    // Handle incoming messages
+    ws.on('message', (data) => {
+      this.handleMessage(ws, data);
+    });
+
+    // Handle disconnection
+    ws.on('close', () => {
+      this.handleDisconnection(ws);
+    });
+
+    // Handle errors
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      this.handleDisconnection(ws);
     });
   }
 
   extractToken(req) {
-    // Try to get token from query string
+    // Try to get token from query parameters
     const url = new URL(req.url, `http://${req.headers.host}`);
     let token = url.searchParams.get('token');
-    
-    // If not in query string, try headers
-    if (!token) {
-      token = req.headers['x-auth'] || req.headers['authorization'];
-      if (token && token.startsWith('Bearer ')) {
-        token = token.substring(7);
-      }
+
+    // If not in query, try Authorization header
+    if (!token && req.headers.authorization) {
+      token = req.headers.authorization.replace('Bearer ', '');
     }
-    
+
     return token;
   }
 
-  addClient(ws) {
-    this.clients.set(ws.userId, ws);
-    
-    // Add to college room if it's a college user
-    if (ws.userType === 'college' && ws.collegeId) {
-      if (!this.rooms.has(ws.collegeId)) {
-        this.rooms.set(ws.collegeId, new Set());
+  async verifyToken(token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      
+      // Get user details from database
+      if (decoded.userType === 'college') {
+        const college = await College.findById(decoded.userId);
+        if (!college) return null;
+        
+        return {
+          userId: college._id.toString(),
+          userType: 'college',
+          collegeId: college._id.toString()
+        };
       }
-      this.rooms.get(ws.collegeId).add(ws);
+      
+      return null;
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return null;
     }
-    
-    console.log(`Client ${ws.userId} (${ws.userType}) connected. Total clients: ${this.clients.size}`);
   }
 
-  removeClient(ws) {
-    this.clients.delete(ws.userId);
-    
-    // Remove from college room
-    if (ws.userType === 'college' && ws.collegeId && this.rooms.has(ws.collegeId)) {
-      this.rooms.get(ws.collegeId).delete(ws);
-      if (this.rooms.get(ws.collegeId).size === 0) {
-        this.rooms.delete(ws.collegeId);
+  handleMessage(ws, data) {
+    try {
+      const message = JSON.parse(data);
+      
+      switch (message.type) {
+        case 'whatsapp_message':
+          this.handleWhatsAppMessage(ws, message);
+          break;
+          
+        case 'location_update':
+          this.handleLocationUpdate(ws, message);
+          break;
+          
+        case 'join_room':
+          this.handleJoinRoom(ws, message);
+          break;
+          
+        case 'leave_room':
+          this.handleLeaveRoom(ws, message);
+          break;
+          
+        case 'ping':
+          this.sendToClient(ws, { type: 'pong', timestamp: new Date().toISOString() });
+          break;
+          
+        default:
+          console.log('Unknown message type:', message.type);
       }
-    }
-    
-    console.log(`Client ${ws.userId} disconnected. Total clients: ${this.clients.size}`);
-  }
-
-  sendWelcomeMessage(ws) {
-    const welcomeMessage = {
-      type: 'welcome',
-      message: 'Connected to WhatsApp WebSocket server',
-      userId: ws.userId,
-      userType: ws.userType,
-      timestamp: new Date().toISOString()
-    };
-    
-    this.sendToClient(ws, welcomeMessage);
-  }
-
-  handleMessage(ws, message) {
-    switch (message.type) {
-      case 'whatsapp_message':
-        this.handleWhatsAppMessage(ws, message);
-        break;
-      case 'join_room':
-        this.handleJoinRoom(ws, message);
-        break;
-      case 'leave_room':
-        this.handleLeaveRoom(ws, message);
-        break;
-      case 'ping':
-        this.sendToClient(ws, { type: 'pong', timestamp: new Date().toISOString() });
-        break;
-      default:
-        this.sendError(ws, 'Unknown message type');
+    } catch (error) {
+      console.error('Error handling message:', error);
+      this.sendToClient(ws, {
+        type: 'error',
+        message: 'Invalid message format',
+        timestamp: new Date().toISOString()
+      });
     }
   }
 
-  handleWhatsAppMessage(ws, message) {
-    const { recipientId, content, messageType = 'text', templateId, variables } = message;
-    
-    // Validate message
-    if (!recipientId || !content) {
-      this.sendError(ws, 'Missing required fields: recipientId, content');
+  async handleWhatsAppMessage(ws, message) {
+    const client = this.clients.get(ws);
+    if (!client || client.userType !== 'college') {
+      this.sendToClient(ws, {
+        type: 'error',
+        message: 'Unauthorized to send WhatsApp messages',
+        timestamp: new Date().toISOString()
+      });
       return;
     }
 
-    // Create message object
-    const whatsappMessage = {
-      type: 'whatsapp_message',
-      senderId: ws.userId,
-      senderType: ws.userType,
-      recipientId,
-      content,
-      messageType,
-      templateId,
-      variables,
-      timestamp: new Date().toISOString(),
-      status: 'pending'
-    };
+    try {
+      // Here you would integrate with WhatsApp Business API
+      // For now, we'll simulate the process
+      
+      // Send notification to client
+      this.sendToClient(ws, {
+        type: 'whatsapp_notification',
+        notification: {
+          type: 'message_sent',
+          messageId: `msg_${Date.now()}`,
+          recipientPhone: message.recipientId,
+          status: 'sent',
+          timestamp: new Date().toISOString()
+        },
+        timestamp: new Date().toISOString()
+      });
 
-    // Send to recipient if online
-    const recipientWs = this.clients.get(recipientId);
-    if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
-      this.sendToClient(recipientWs, {
-        ...whatsappMessage,
-        status: 'delivered'
+      // Broadcast to room if specified
+      if (message.roomId) {
+        this.broadcastToRoom(message.roomId, {
+          type: 'whatsapp_notification',
+          notification: {
+            type: 'message_sent',
+            messageId: `msg_${Date.now()}`,
+            recipientPhone: message.recipientId,
+            status: 'sent',
+            timestamp: new Date().toISOString()
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+
+    } catch (error) {
+      console.error('WhatsApp message error:', error);
+      this.sendToClient(ws, {
+        type: 'whatsapp_notification',
+        notification: {
+          type: 'message_error',
+          error: error.message,
+          timestamp: new Date().toISOString()
+        },
+        timestamp: new Date().toISOString()
       });
     }
+  }
 
-    // Send confirmation to sender
-    this.sendToClient(ws, {
-      type: 'message_sent',
-      messageId: Date.now().toString(),
-      timestamp: new Date().toISOString()
+  handleLocationUpdate(ws, message) {
+    const client = this.clients.get(ws);
+    console.log(
+      `Location update from ${message.employeeId}:`,
+      message.location
+    );
+
+    // Broadcast location update to all other clients
+    this.wss.clients.forEach((client) => {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
+        this.sendToClient(client, {
+          type: 'location_broadcast',
+          employeeId: message.employeeId,
+          location: message.location,
+          timestamp: new Date().toISOString()
+        });
+      }
     });
-
-    // Broadcast to college room if it's a college message
-    if (ws.userType === 'college' && ws.collegeId) {
-      this.broadcastToRoom(ws.collegeId, {
-        type: 'whatsapp_activity',
-        userId: ws.userId,
-        action: 'message_sent',
-        recipientId,
-        timestamp: new Date().toISOString()
-      }, ws); // Exclude sender
-    }
   }
 
   handleJoinRoom(ws, message) {
-    const { roomId } = message;
-    
-    if (!roomId) {
-      this.sendError(ws, 'Room ID required');
-      return;
-    }
+    const roomId = message.roomId;
+    if (!roomId) return;
 
-    // Add to room
     if (!this.rooms.has(roomId)) {
       this.rooms.set(roomId, new Set());
     }
-    this.rooms.get(roomId).add(ws);
     
-    this.sendToClient(ws, {
-      type: 'room_joined',
-      roomId,
-      timestamp: new Date().toISOString()
-    });
+    this.rooms.get(roomId).add(ws);
+    console.log(`Client joined room: ${roomId}`);
   }
 
   handleLeaveRoom(ws, message) {
-    const { roomId } = message;
-    
-    if (roomId && this.rooms.has(roomId)) {
-      this.rooms.get(roomId).delete(ws);
-      if (this.rooms.get(roomId).size === 0) {
-        this.rooms.delete(roomId);
-      }
+    const roomId = message.roomId;
+    if (!roomId || !this.rooms.has(roomId)) return;
+
+    this.rooms.get(roomId).delete(ws);
+    console.log(`Client left room: ${roomId}`);
+  }
+
+  handleDisconnection(ws) {
+    const client = this.clients.get(ws);
+    if (client) {
+      console.log(`Client disconnected: ${client.userType} - ${client.userId}`);
+      
+      // Remove from all rooms
+      this.rooms.forEach((clients, roomId) => {
+        if (clients.has(ws)) {
+          clients.delete(ws);
+        }
+      });
+      
+      this.clients.delete(ws);
     }
-    
-    this.sendToClient(ws, {
-      type: 'room_left',
-      roomId,
-      timestamp: new Date().toISOString()
-    });
   }
 
   sendToClient(ws, message) {
@@ -234,94 +298,47 @@ class WebSocketServer {
     }
   }
 
-  sendError(ws, error) {
-    this.sendToClient(ws, {
-      type: 'error',
-      message: error,
-      timestamp: new Date().toISOString()
+  broadcastToRoom(roomId, message) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    room.forEach(client => {
+      this.sendToClient(client, message);
     });
   }
 
-  broadcastToRoom(roomId, message, excludeWs = null) {
-    if (this.rooms.has(roomId)) {
-      this.rooms.get(roomId).forEach(client => {
-        if (client !== excludeWs && client.readyState === WebSocket.OPEN) {
-          this.sendToClient(client, message);
-        }
-      });
-    }
+  broadcastToAll(message) {
+    this.wss.clients.forEach(client => {
+      this.sendToClient(client, message);
+    });
   }
 
-  broadcastToAll(message, excludeWs = null) {
-    this.clients.forEach(client => {
-      if (client !== excludeWs && client.readyState === WebSocket.OPEN) {
-        this.sendToClient(client, message);
+  // Method to send WhatsApp notifications from API routes
+  sendWhatsAppNotification(userId, notification) {
+    this.wss.clients.forEach(client => {
+      const clientInfo = this.clients.get(client);
+      if (clientInfo && clientInfo.userId === userId) {
+        this.sendToClient(client, {
+          type: 'whatsapp_notification',
+          notification,
+          timestamp: new Date().toISOString()
+        });
       }
     });
   }
 
-  sendToUser(userId, message) {
-    const client = this.clients.get(userId);
-    if (client && client.readyState === WebSocket.OPEN) {
-      this.sendToClient(client, message);
-    }
-  }
-
-  // Method to send WhatsApp notification
-  sendWhatsAppNotification(userId, notification) {
-    const message = {
-      type: 'whatsapp_notification',
-      notification,
-      timestamp: new Date().toISOString()
+  // Get connection statistics
+  getStats() {
+    return {
+      totalClients: this.clients.size,
+      totalRooms: this.rooms.size,
+      connectedClients: Array.from(this.clients.values()).map(client => ({
+        userId: client.userId,
+        userType: client.userType,
+        connectedAt: client.connectedAt
+      }))
     };
-    
-    this.sendToUser(userId, message);
-  }
-
-  // Method to send message status update
-  sendMessageStatus(messageId, status, recipientId) {
-    const message = {
-      type: 'message_status',
-      messageId,
-      status,
-      timestamp: new Date().toISOString()
-    };
-    
-    this.sendToUser(recipientId, message);
-  }
-
-  // Get connected clients info
-  getConnectedClients() {
-    const clients = [];
-    this.clients.forEach((ws, userId) => {
-      clients.push({
-        userId,
-        userType: ws.userType,
-        collegeId: ws.collegeId,
-        connectedAt: ws.connectedAt
-      });
-    });
-    return clients;
-  }
-
-  // Get room info
-  getRoomInfo(roomId) {
-    if (this.rooms.has(roomId)) {
-      const clients = [];
-      this.rooms.get(roomId).forEach(ws => {
-        clients.push({
-          userId: ws.userId,
-          userType: ws.userType
-        });
-      });
-      return {
-        roomId,
-        clientCount: clients.length,
-        clients
-      };
-    }
-    return null;
   }
 }
 
-module.exports = WebSocketServer; 
+module.exports = WebSocketServer;

@@ -1620,7 +1620,7 @@ router.post('/batch-mark-attendance', [isCollege], async (req, res) => {
 router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, res) => {
 	try {
 		let { appliedCourseId } = req.params;
-		const { status } = req.body;
+		const { status, dropoutReason } = req.body;
 
 		const markedBy = req.user._id;
 		console.log('appliedCourseId', appliedCourseId)
@@ -1683,6 +1683,32 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 				message: 'Student moved to batch freeze successfully',
 
 			});
+
+
+
+		} else if (status === 'Dropout') {	
+			// Check if student is already in dropout
+			if (appliedCourse.dropout) {
+				return res.status(400).json({
+					status: false,
+					message: 'Student is already in dropout'
+				});
+			}
+
+			// Move student to dropout
+			appliedCourse.dropout = true;
+			appliedCourse.dropoutBy = markedBy;
+			appliedCourse.dropoutDate = new Date();
+			appliedCourse.dropoutReason = dropoutReason;
+
+			await appliedCourse.save();
+
+			return res.status(200).json({
+				status: true,
+				message: 'Student moved to dropout successfully',
+
+			});
+
 
 
 

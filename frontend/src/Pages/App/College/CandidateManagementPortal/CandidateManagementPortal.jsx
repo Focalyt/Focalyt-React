@@ -26,8 +26,6 @@ const CandidateManagementPortal = () => {
   const [showProjects, setShowProjects] = useState(false);
   const [selectedVerticalForProjects, setSelectedVerticalForProjects] = useState(null);
 
-  const [showProjectAddForm, setShowProjectAddForm] = useState(false);
-  const [showProjectEditForm, setShowProjectEditForm] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -40,15 +38,11 @@ const CandidateManagementPortal = () => {
 
   ]);
 
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   // URL-based state management only
   const getInitialState = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const stage = urlParams.get('stage') || 'vertical';
-    const verticalId = urlParams.get('verticalId');
-    
+    const verticalId = urlParams.get('verticalId');    
     return { stage, verticalId };
   };
 
@@ -57,7 +51,6 @@ const CandidateManagementPortal = () => {
     url.searchParams.set('stage', stage);
     if (vertical) {
       url.searchParams.set('verticalId', vertical.id);
-      // Removed verticalName from URL for security and cleaner URLs
     } else {
       url.searchParams.delete('verticalId');
     }
@@ -188,16 +181,10 @@ const CandidateManagementPortal = () => {
     setEditingVertical(null);
   };
 
-  const handleShare = (vertical) => {
-    setSelectedVertical(vertical);
-    setShowShareModal(true);
-  };
-
   useEffect(() => {
     // URL-based restoration logic - only run when verticals are loaded
     const { stage, verticalId } = getInitialState();
   
-    console.log('Restoring state from URL:', { stage, verticalId, verticalsLoaded: verticals.length > 0 });
   
     // Don't make any decisions until verticals are loaded
     if (verticals.length === 0) {
@@ -205,7 +192,7 @@ const CandidateManagementPortal = () => {
       return;
     }
   
-    if (stage === "project" && verticalId) {
+    if (stage === "project") {
       // We have verticalId in URL and verticals are loaded, find the vertical
       const foundVertical = verticals.find(v => v.id === verticalId);
       if (foundVertical) {
@@ -320,22 +307,8 @@ const CandidateManagementPortal = () => {
   if (showProjects && selectedVerticalForProjects) {
     return (
       <div>
-        {/* Breadcrumb Navigation */}
-        {/* <div className="d-flex justify-content-between align-items-center mb-3">
-          
-          <div>
-            <button className="btn btn-outline-secondary me-2" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
-              <i className={`bi ${viewMode === 'grid' ? 'bi-list' : 'bi-grid'}`}></i>
-            </button>
-            <button className="btn btn-danger" onClick={handleAdd}>Add Project</button>
-          </div>
-        </div> */}
-
-
         {/* Project Component with filtered data */}
-       <Project selectedVertical={selectedVerticalForProjects} onBackToVerticals={handleBackToVerticals} />
-
-      </div>
+       <Project selectedVertical={selectedVerticalForProjects} onBackToVerticals={handleBackToVerticals} /> </div>
     );
   }
 
