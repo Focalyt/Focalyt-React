@@ -277,12 +277,37 @@ const AdmissionList = () => {
   // };
 
 
+  // const handleSaveCV = async () => {
+  //   if (candidateRef.current) {
+  //     const result = await candidateRef.current.handleSaveCV();
+  //     console.log(result, 'result')
+  //     if (result === true) {
+  //       setOpenModalId(null); setSelectedProfile(null)
+  //     }
+  //   }
+  // };
+
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
+
       console.log(result, 'result')
-      if (result === true) {
-        setOpenModalId(null); setSelectedProfile(null)
+      if (result.isvalid === true) {
+        // Find and update the candidate in allProfiles
+        setAllProfiles(prevProfiles => 
+          prevProfiles.map(profile => {
+            if (profile._id === selectedProfile._id) {
+              // Update the _candidate data with the updated profile from result
+              return {
+                ...profile,
+                _candidate: result.data // result.data contains the updated candidate profile
+              };
+            }
+            return profile;
+          })
+        );
+        setOpenModalId(null); 
+        setSelectedProfile(null)
       }
     }
   };
@@ -553,6 +578,33 @@ const AdmissionList = () => {
 
   }, []);
 
+  // ========================================
+  // 🎯 Modal Scroll Management
+  // ========================================
+  useEffect(() => {
+    // Prevent background scrolling when any modal or panel is open
+    if (showDocumentModal || showUploadModal || showEditPanel || showWhatsappPanel || showAssignBatchPanel) {
+      // Store the current scroll position
+      const scrollY = window.scrollY;
+      
+      // Add styles to prevent scrolling
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+      
+      // Return function to restore scrolling when modal closes
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        // Restore scroll position
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [showDocumentModal, showUploadModal, showEditPanel, showWhatsappPanel, showAssignBatchPanel]);
+
   // Simulate file upload with progress
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
@@ -620,8 +672,6 @@ const AdmissionList = () => {
     } else {
       setIsNewModalOpen(false);
     }
-
-    document.body?.classList.add('no-scroll');
   };
 
   const closeDocumentModal = () => {
@@ -633,7 +683,6 @@ const AdmissionList = () => {
     // Only reset when actually closing modal
     setDocumentZoom(1);
     setDocumentRotation(0);
-    document.body?.classList.remove('no-scroll');
   };
 
   const zoomIn = () => {
@@ -1613,7 +1662,7 @@ const AdmissionList = () => {
           style={{ whiteSpace: 'nowrap' }}
           title="Zoom In"
         >
-          <i className="fas fa-search-plus"></i> Zoom In
+          <i className="fas fa-search-plus"></i> 
         </button>
 
         <button
@@ -1622,7 +1671,7 @@ const AdmissionList = () => {
           style={{ whiteSpace: 'nowrap' }}
           title="Zoom Out"
         >
-          <i className="fas fa-search-minus"></i> Zoom Out
+          <i className="fas fa-search-minus"></i>
         </button>
 
         {/* Show rotation button only for images */}
@@ -1633,7 +1682,7 @@ const AdmissionList = () => {
             style={{ whiteSpace: 'nowrap' }}
             title="Rotate 90°"
           >
-            <i className="fas fa-redo"></i> Rotate
+            <i className="fas fa-redo"></i> 
           </button>
         )}
 
@@ -1644,7 +1693,7 @@ const AdmissionList = () => {
           style={{ whiteSpace: 'nowrap' }}
           title="Reset View"
         >
-          <i className="fas fa-sync-alt"></i> Reset
+          <i className="fas fa-sync-alt"></i> 
         </button>
 
         {/* Download Button */}

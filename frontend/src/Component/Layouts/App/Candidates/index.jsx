@@ -259,6 +259,142 @@ function CandidateLayout({ children }) {
     }
   };
 
+  const handleSaveCV = async (profileData, skills, certificates, languages, projects, interests, experiences, isExperienced) => {
+    try {
+      const token = localStorage.getItem('token');
+      const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+      const monthNames = {
+        "01": "January",
+        "02": "February",
+        "03": "March",
+        "04": "April",
+        "05": "May",
+        "06": "June",
+        "07": "July",
+        "08": "August",
+        "09": "September",
+        "10": "October",
+        "11": "November",
+        "12": "December"
+      };
+
+      // Format the data to match what your API expects
+      const cvPayload = {
+        name: profileData.name || '',
+        email: profileData?.email || '',
+        mobile: profileData?.mobile || '',
+        sex: profileData?.sex || '',
+        dob: profileData?.dob || '',
+        whatsapp: profileData?.whatsapp || '',
+        showProfileForm: true,
+        personalInfo: {
+          professionalTitle: profileData?.personalInfo?.professionalTitle || '',
+          professionalSummary: profileData?.personalInfo?.professionalSummary || '',
+          currentAddress: profileData?.personalInfo?.currentAddress || {},
+          permanentAddress: profileData?.personalInfo?.permanentAddress || {},
+          image: userData.image || user.image || '',
+          resume: userData.resume || user.resume || '',
+          skills: skills.map(s => ({
+            skillName: s.skillName || '',
+            skillPercent: s.skillPercent || 0
+          })),
+          certifications: certificates.map(c => ({
+            certificateName: c.certificateName || '',
+            orgName: c.orgName || '',
+            month: c.month ? monthNames[c.month] || c.month : '',
+            year: c.year || '',
+            orgLocation: c.orgLocation || {
+              type: 'Point',
+              coordinates: [0, 0],
+              city: '',
+              state: '',
+              fullAddress: ''
+            }
+          })),
+          languages: languages.map(l => ({
+            name: l.name || '',
+            level: l.level || 0
+          })),
+          projects: projects.map(p => ({
+            projectName: p.projectName || '',
+            proyear: p.proyear || '',
+            proDescription: p.proDescription || ''
+          })),
+          interest: interests.filter(i => i.trim() !== ''),
+        },
+        experiences: experiences.map(e => ({
+          jobTitle: e.jobTitle || '',
+          companyName: e.companyName || '',
+          from: e.from ? new Date(e.from) : null,
+          to: e.to ? new Date(e.to) : null,
+          jobDescription: e.jobDescription || '',
+          currentlyWorking: e.currentlyWorking || false,
+          location: e.location || {
+            type: 'Point',
+            coordinates: [0, 0],
+            city: '',
+            state: '',
+            fullAddress: ''
+          }
+        })),
+        isExperienced: isExperienced,
+        qualifications: educations.map(edu => ({
+          education: edu.education,
+          boardName: edu.boardName,
+          schoolName: edu.schoolName,
+          collegeName: edu.collegeName,
+          universityName: edu.universityName,
+          passingYear: edu.passingYear,
+          marks: edu.marks,
+          course: edu.course,
+          specialization: edu.specialization,
+          universityLocation: edu.universityLocation || {
+            type: 'Point',
+            coordinates: [0, 0],
+            city: '',
+            state: '',
+            fullAddress: ''
+          },
+          collegeLocation: edu.collegeLocation || {
+            type: 'Point',
+            coordinates: [0, 0],
+            city: '',
+            state: '',
+            fullAddress: ''
+          },
+          schoolLocation: edu.schoolLocation || {
+            type: 'Point',
+            coordinates: [0, 0],
+            city: '',
+            state: '',
+            fullAddress: ''
+          }
+        }))
+      };
+
+      console.log("📤 CV Payload being sent to backend:", cvPayload);
+
+      const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
+        headers: {
+          'x-auth': token
+        }
+      });
+
+      if (res.data.status) {
+        alert('Profile saved successfully!');
+
+      } else {
+        alert('Failed to save CV!');
+      }
+    } catch (err) {
+      console.error("Error saving CV:", err);
+      alert("An error occurred while saving your CV");
+    }
+    finally{
+      setShowProfileForm(!showProfileForm)
+    }
+  };
+
   const handleContinue = () => {
     if (currentStep === 1) {
       setFormData({
@@ -988,7 +1124,7 @@ function CandidateLayout({ children }) {
                               <div className="modal-content">
                                 
                                 <div className="modal-body">
-                                  <User />
+                                  <User handleSaveCV={handleSaveCV} />
                                 </div>
                               </div>
                             </div>

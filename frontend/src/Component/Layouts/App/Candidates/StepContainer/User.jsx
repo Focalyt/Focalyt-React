@@ -3,7 +3,7 @@ import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 
 
-const User = () => {
+const User = ({handleSaveCV}) => {
   // Current step state
   const [currentStep, setCurrentStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
@@ -1004,140 +1004,7 @@ const User = () => {
   };
 
   // Handle form submission
-  const handleSaveCV = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
-      const monthNames = {
-        "01": "January",
-        "02": "February",
-        "03": "March",
-        "04": "April",
-        "05": "May",
-        "06": "June",
-        "07": "July",
-        "08": "August",
-        "09": "September",
-        "10": "October",
-        "11": "November",
-        "12": "December"
-      };
 
-      // Format the data to match what your API expects
-      const cvPayload = {
-        name: profileData.name || '',
-        email: profileData?.email || '',
-        mobile: profileData?.mobile || '',
-        sex: profileData?.sex || '',
-        dob: profileData?.dob || '',
-        whatsapp: profileData?.whatsapp || '',
-        showProfileForm: true,
-        personalInfo: {
-          professionalTitle: profileData?.personalInfo?.professionalTitle || '',
-          professionalSummary: profileData?.personalInfo?.professionalSummary || '',
-          currentAddress: profileData?.personalInfo?.currentAddress || {},
-          permanentAddress: profileData?.personalInfo?.permanentAddress || {},
-          image: userData.image || user.image || '',
-          resume: userData.resume || user.resume || '',
-          skills: skills.map(s => ({
-            skillName: s.skillName || '',
-            skillPercent: s.skillPercent || 0
-          })),
-          certifications: certificates.map(c => ({
-            certificateName: c.certificateName || '',
-            orgName: c.orgName || '',
-            month: c.month ? monthNames[c.month] || c.month : '',
-            year: c.year || '',
-            orgLocation: c.orgLocation || {
-              type: 'Point',
-              coordinates: [0, 0],
-              city: '',
-              state: '',
-              fullAddress: ''
-            }
-          })),
-          languages: languages.map(l => ({
-            name: l.name || '',
-            level: l.level || 0
-          })),
-          projects: projects.map(p => ({
-            projectName: p.projectName || '',
-            proyear: p.proyear || '',
-            proDescription: p.proDescription || ''
-          })),
-          interest: interests.filter(i => i.trim() !== ''),
-        },
-        experiences: experiences.map(e => ({
-          jobTitle: e.jobTitle || '',
-          companyName: e.companyName || '',
-          from: e.from ? new Date(e.from) : null,
-          to: e.to ? new Date(e.to) : null,
-          jobDescription: e.jobDescription || '',
-          currentlyWorking: e.currentlyWorking || false,
-          location: e.location || {
-            type: 'Point',
-            coordinates: [0, 0],
-            city: '',
-            state: '',
-            fullAddress: ''
-          }
-        })),
-        isExperienced: isExperienced,
-        qualifications: educations.map(edu => ({
-          education: edu.education,
-          boardName: edu.boardName,
-          schoolName: edu.schoolName,
-          collegeName: edu.collegeName,
-          universityName: edu.universityName,
-          passingYear: edu.passingYear,
-          marks: edu.marks,
-          course: edu.course,
-          specialization: edu.specialization,
-          universityLocation: edu.universityLocation || {
-            type: 'Point',
-            coordinates: [0, 0],
-            city: '',
-            state: '',
-            fullAddress: ''
-          },
-          collegeLocation: edu.collegeLocation || {
-            type: 'Point',
-            coordinates: [0, 0],
-            city: '',
-            state: '',
-            fullAddress: ''
-          },
-          schoolLocation: edu.schoolLocation || {
-            type: 'Point',
-            coordinates: [0, 0],
-            city: '',
-            state: '',
-            fullAddress: ''
-          }
-        }))
-      };
-
-      console.log("📤 CV Payload being sent to backend:", cvPayload);
-
-      const res = await axios.post(`${backendUrl}/candidate/saveProfile`, cvPayload, {
-        headers: {
-          'x-auth': token
-        }
-      });
-
-      if (res.data.status) {
-        alert('Profile saved successfully!');
-
-        // window.location.reload();
-
-      } else {
-        alert('Failed to save CV!');
-      }
-    } catch (err) {
-      console.error("Error saving CV:", err);
-      alert("An error occurred while saving your CV");
-    }
-  };
 
   // Navigation functions
   const handleContinue = () => {
@@ -1160,7 +1027,7 @@ const User = () => {
     } else if (currentStep === 4) {
       // Submit form
       setFormData(prev => ({ ...prev, additional: { completed: true } }));
-      handleSaveCV();
+      handleSaveCV(profileData, skills, certificates, languages, projects, interests, experiences, isExperienced);
     }
   };
 
@@ -1990,51 +1857,51 @@ const User = () => {
                 </button>
               </div>
 
-              <button className="submit-btn" onClick={async () => {
-                await handleContinue();
-                setShowPreview(true);
+              <button className="submit-btn" onClick={ () => {
+                 handleContinue();
+                // setShowPreview(true);
 
-                // Need to wait for the preview to render
-                setTimeout(async () => {
-                  try {
-                    // Now try to get the element
-                    const element = document.getElementById('resume-download');
+                // // Need to wait for the preview to render
+                // setTimeout(async () => {
+                //   try {
+                //     // Now try to get the element
+                //     const element = document.getElementById('resume-download');
 
-                    if (!element) {
-                      console.error("Resume element still not found after showing preview");
-                      alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
-                      return;
-                    }
+                //     if (!element) {
+                //       console.error("Resume element still not found after showing preview");
+                //       alert("Could not generate PDF. Please try using the Preview button and downloading from there.");
+                //       return;
+                //     }
 
-                    const opt = {
-                      margin: 0.5,
-                      filename: 'resume.pdf',
-                      image: { type: 'jpeg', quality: 0.98 },
-                      html2canvas: { scale: 2 },
-                      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-                    };
+                //     const opt = {
+                //       margin: 0.5,
+                //       filename: 'resume.pdf',
+                //       image: { type: 'jpeg', quality: 0.98 },
+                //       html2canvas: { scale: 2 },
+                //       jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                //     };
 
-                    // Generate blob
-                    const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+                //     // Generate blob
+                //     const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
 
-                    // Create a file object from the blob
-                    const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
-                      type: 'application/pdf'
-                    });
+                //     // Create a file object from the blob
+                //     const pdfFile = new File([pdfBlob], `focalyt-profile-${Date.now()}.pdf`, {
+                //       type: 'application/pdf'
+                //     });
 
-                    // Upload to focalytProfile
-                    await uploadCV(pdfFile, 'focalytProfile');
+                //     // Upload to focalytProfile
+                //     await uploadCV(pdfFile, 'focalytProfile');
 
-                    // Close the preview
-                    setShowPreview(false);
+                //     // Close the preview
+                //     setShowPreview(false);
 
-                    alert('Resume has been saved successfully, including the PDF for your profile!');
-                  } catch (err) {
-                    console.error("PDF generation error:", err);
-                    alert('Resume data saved, but there was an error generating the PDF profile.');
-                    setShowPreview(false); // Close preview on error
-                  }
-                }, 1000);
+                //     alert('Resume has been saved successfully, including the PDF for your profile!');
+                //   } catch (err) {
+                //     console.error("PDF generation error:", err);
+                //     alert('Resume data saved, but there was an error generating the PDF profile.');
+                //     setShowPreview(false); // Close preview on error
+                //   }
+                // }, 1000);
 
 
               }}>Save Profile</button>
