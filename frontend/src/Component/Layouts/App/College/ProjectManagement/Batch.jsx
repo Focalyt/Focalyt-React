@@ -402,11 +402,13 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     if (urlParams.stage === "student" && urlParams.batchId) {
       // Find batch from current batches list
       const batch = batches.find(b => b._id === urlParams.batchId);
+      
       if (batch) {
         setSelectedBatchForStudents(batch);
         setShowStudents(true);
         console.log('Restored to student view for batch:', batch.name);
-      } else {
+      } 
+      else {
         // Batch not found, reset to batch view
         console.warn('Batch not found in current list, resetting to batch view');
         updateURL({
