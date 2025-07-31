@@ -462,90 +462,8 @@ const CRMDashboard = () => {
         console.log('Function called');
 
         try {
-            if (showEditPanel) {
-                // Validation checks
-                if (!selectedProfile || !selectedProfile._id) {
-                    alert('No profile selected');
-                    return;
-                }
-
-                if (!seletectedStatus) {
-                    alert('Please select a status');
-                    return;
-                }
-
-                // Combine date and time into a single Date object (if both are set)
-                let followupDateTime = '';
-                if (followupDate && followupTime) {
-                    // Create proper datetime string
-                    const dateStr = followupDate instanceof Date
-                        ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-                        : followupDate;
-
-                    followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-                    // Validate the datetime
-                    if (isNaN(followupDateTime.getTime())) {
-                        alert('Invalid date/time combination');
-                        return;
-                    }
-                }
-
-                // Prepare the request body
-                const data = {
-                    _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-                    _leadSubStatus: seletectedSubStatus?._id || null,
-                    followup: followupDateTime ? followupDateTime.toISOString() : null,
-                    remarks: remarks || ''
-                };
-
-
-
-                // Check if backend URL and token exist
-                if (!backendUrl) {
-                    alert('Backend URL not configured');
-                    return;
-                }
-
-                if (!token) {
-                    alert('Authentication token missing');
-                    return;
-                }
-
-                // Send PUT request to backend API
-                const response = await axios.put(
-                    `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-                    data,
-                    {
-                        headers: {
-                            'x-auth': token,
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
-
-                console.log('API response:', response.data);
-
-                if (response.data.success) {
-                    alert('Status updated successfully!');
-
-                    // Reset form
-                    setSelectedStatus('');
-                    setSelectedSubStatus(null);
-                    setFollowupDate('');
-                    setFollowupTime('');
-                    setRemarks('');
-
-                    // Refresh data and close panel
-                    await fetchProfileData();
-                    closeEditPanel();
-                } else {
-                    console.error('API returned error:', response.data);
-                    alert(response.data.message || 'Failed to update status');
-                }
-
-            }
-            if (showFollowupPanel) {
+           
+            if (showPanel =='SetFollowup') {
 
 
                 // Combine date and time into a single Date object (if both are set)
@@ -606,11 +524,9 @@ const CRMDashboard = () => {
                     setSelectedSubStatus(null);
                     setFollowupDate('');
                     setFollowupTime('');
+                    
                     setRemarks('');
 
-                    // Refresh data and close panel
-                    await fetchProfileData();
-                    closeEditPanel();
                 } else {
                     console.error('API returned error:', response.data);
                     alert(response.data.message || 'Failed to update status');
@@ -636,6 +552,9 @@ const CRMDashboard = () => {
                 console.error('Error:', error.message);
                 alert(`Error: ${error.message}`);
             }
+        }
+        finally{
+           closePanel();
         }
     };
 
@@ -683,7 +602,7 @@ const CRMDashboard = () => {
             case 'kyc':
                 return <KYCManagement openPanel={openPanel} closePanel={closePanel}  isPanelOpen={isPanelOpen} />;
             case 'AllAdmission':
-                return <AdmissionList openPanel={openPanel} />;
+                return <AdmissionList openPanel={openPanel} closePanel={closePanel}  isPanelOpen={isPanelOpen}/>;
             default:
                 return null;
         }
@@ -759,7 +678,7 @@ const CRMDashboard = () => {
                     <div
                         className="flex-grow-1 overflow-auto px-3 py-2"
                         style={{
-                            maxHeight: isMobile ? '60vh' : '65vh',
+                            maxHeight: isMobile ? '50vh' : '55vh',
                             minHeight: '200px'
                         }}
                     >

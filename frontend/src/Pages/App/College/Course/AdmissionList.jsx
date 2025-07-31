@@ -260,7 +260,7 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
-const AdmissionList = () => {
+const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -495,7 +495,7 @@ const AdmissionList = () => {
     showFollowupPanel, 
     leadHistoryPanel, 
     showWhatsappPanel,
-    mainContentClass]);
+    mainContentClass , isPanelOpen]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -3524,9 +3524,13 @@ const AdmissionList = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
+                                              // onClick={() => {
+                                              //   openleadHistoryPanel(profile);
+                                              //   console.log('selectedProfile', profile);
+                                              // }}
                                               onClick={() => {
-                                                openleadHistoryPanel(profile);
-                                                console.log('selectedProfile', profile);
+                                                setShowPopup(null)
+                                                openPanel('leadHistory', profile)
                                               }}
                                             >
                                               History List
@@ -3543,9 +3547,13 @@ const AdmissionList = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
+                                              // onClick={() => {
+                                              //   openEditPanel(profile, 'SetFollowup');
+                                              //   console.log('selectedProfile', profile);
+                                              // }}
                                               onClick={() => {
-                                                openEditPanel(profile, 'SetFollowup');
-                                                console.log('selectedProfile', profile);
+                                                setShowPopup(null)
+                                                openPanel('SetFollowup', profile)
                                               }}
                                             >
                                               Set Followup
@@ -3692,7 +3700,11 @@ const AdmissionList = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
-                                              onClick={() => openleadHistoryPanel(profile)}
+                                              // onClick={() => openleadHistoryPanel(profile)}
+                                               onClick={() => {
+                                                    setShowPopup(null)
+                                                    openPanel('leadHistory', profile)
+                                                  }}
                                             >
                                               History List
                                             </button>
@@ -3708,9 +3720,13 @@ const AdmissionList = () => {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                               }}
+                                              // onClick={() => {
+                                              //   openEditPanel(profile, 'SetFollowup');
+                                              //   console.log('selectedProfile', profile);
+                                              // }}
                                               onClick={() => {
-                                                openEditPanel(profile, 'SetFollowup');
-                                                console.log('selectedProfile', profile);
+                                                setShowPopup(null)
+                                                openPanel('SetFollowup', profile)
                                               }}
                                             >
                                               Set Followup
@@ -8710,6 +8726,19 @@ max-width: 600px;
 
 
 }
+.site-header--sticky--admission--post--panel:not(.mobile-sticky-enable) {
+    z-index: 10;
+}
+@media (min-width: 992px) {
+.site-header--sticky--admission--post--panel:not(.mobile-sticky-enable){
+  position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+}
+
+
 /* Resume Preview Modal */
 .resume-preview-modal {
     position: fixed;
