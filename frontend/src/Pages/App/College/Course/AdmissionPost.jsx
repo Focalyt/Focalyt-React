@@ -214,6 +214,10 @@ const CRMDashboard = () => {
 
     ]);
 
+
+    const [showAssignBatchPanel, setShowAssignBatchPanel] = useState(false);
+    const [batches, setBatches] = useState([]);
+    const [error, setError] = useState('');
     //filte stats
 
     const [formData, setFormData] = useState({
@@ -319,6 +323,55 @@ const CRMDashboard = () => {
             setIsLoadingProfiles(false);
         }
     };
+
+    const fetchBatches = async (profile) => {
+        setError('');
+    
+        console.log(profile, 'profile');
+    
+        const courseId = profile?._course?._id;
+        const centerId = profile?._center?._id;
+        if (!courseId || !centerId) {
+          alert(`No ${courseId ? 'course' : 'center'} selected`);
+          return;
+        }
+    
+        try {
+          const response = await axios.get(`${backendUrl}/college/get_batches`, {
+            params: {
+              courseId: courseId,
+              centerId: centerId
+            },
+            headers: {
+              'x-auth': token  // Pass the token in the headers for authentication
+            }
+          });
+    
+          if (response.data.success) {
+            setBatches(response.data.data);
+          } else {
+            setError('Failed to fetch batches');
+          }
+        } catch (err) {
+          console.error('Error fetching batches:', err);
+          setError('Server error');
+        }
+      };
+
+    const openAssignBatchPanel = async (profile = null) => {
+        await fetchBatches(profile);
+        if (profile) {
+          setSelectedProfile(profile);
+        }   
+    
+        setShowPopup(null)
+        setShowAssignBatchPanel(true)
+        setShowWhatsappPanel(false);
+        setShowEditPanel(false);
+        if (!isMobile) {
+          setMainContentClass('col-8');
+        }
+      };
 
     const handleFilterChange = (e) => {
         try {
@@ -887,7 +940,7 @@ const CRMDashboard = () => {
                                 CLOSE
                             </button>
                             <button
-                                type="submit"
+                                type="button"
                                 className="btn text-white"
                                 onClick={handleUpdateStatus}
                                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
@@ -1069,6 +1122,112 @@ const CRMDashboard = () => {
         ) : null;
     };
 
+    const renderAssignBatchPanel = () => {
+        if (showPanel !== 'AssignBatch') return null;
+    
+        const panelContent = (
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+              <div className="d-flex align-items-center">
+                <div className="me-2">
+                  <i className="fas fa-users text-primary"></i>
+                </div>
+                <h6 className="mb-0 fw-medium">Assign Batch</h6>
+              </div>
+              <button className="btn-close" type="button" onClick={closePanel}>
+              </button>
+            </div>
+    
+            <div className="card-body p-0 d-flex flex-column h-100">
+              {/* Scrollable Content Area */}
+              <div
+                className="flex-grow-1 overflow-auto px-3 py-2"
+                style={{
+                  maxHeight: isMobile ? '30vh' : '34vh',
+                  minHeight: '200px'
+                }}
+              >
+                {selectedProfile ? (
+                  <div className="p-3">
+    
+                    <div className="mb-4">
+                      <div className="mb-3">
+                        <label className="form-label">Select Batch</label>
+                        <select className="form-select" defaultValue="">
+                          <option value="">Choose a Batch...</option>
+                          {batches.map((batch) => (
+                            <option key={batch._id} value={batch._id}>{batch.name}</option>
+                          ))}
+                        </select>
+                      </div>
+    
+                    </div>
+                  </div>
+                ) : (
+                  <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                    <div className="mb-3">
+                      <i className="fas fa-users text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                    </div>
+                    <h6 className="text-muted mb-2">No Student Selected</h6>
+                    <p className="text-muted small mb-0">Please select a student to assign batch.</p>
+                  </div>
+                )}
+              </div>
+    
+              {/* Fixed Footer */}
+              <div className="border-top px-3 py-3 bg-light">
+                <div className="d-flex justify-content-end gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={closePanel}
+                  >
+                    <i className="fas fa-times me-1"></i>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      // Handle batch assignment logic here
+                      console.log('Assigning batch to:', selectedProfile);
+                      openAssignBatchPanel()
+                    }}
+                  >
+                    <i className="fas fa-check me-1"></i>
+                    Assign Batch
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+    
+        if (isMobile) {
+          return (
+            <div
+              className={`modal ${showPanel === 'AssignBatch' ? 'show d-block' : 'd-none'}`}
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) closePanel();
+              }}
+            >
+              <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+                <div className="modal-content" style={{ height: '85vh' }}>
+                  {panelContent}
+                </div>
+              </div>
+            </div>
+          );
+        }
+    
+        return (
+          <div className="col-12 transition-col" id="assignBatchPanel" style={{ height: '80vh' }}>
+            {panelContent}
+          </div>
+        );
+      };
+    
 
     return (
         <div className="container-fluid admissionMobileResponsive">
@@ -1160,6 +1319,7 @@ const CRMDashboard = () => {
                             {renderEditPanel()}
                             {renderWhatsAppPanel()}
                             {renderLeadHistoryPanel()}
+                            {renderAssignBatchPanel()}
                         </div>
                     </div>
                 )}
@@ -1168,6 +1328,7 @@ const CRMDashboard = () => {
                 {isMobile && renderEditPanel()}
                 {isMobile && renderWhatsAppPanel()}
                 {isMobile && renderLeadHistoryPanel()}
+                {isMobile && renderAssignBatchPanel()}
 
                 {openModalId === selectedProfile?._id && (
                     <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

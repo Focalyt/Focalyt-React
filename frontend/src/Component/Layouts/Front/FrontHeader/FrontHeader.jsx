@@ -9,7 +9,8 @@ const FrontHeader = () => {
   const menuMainRef = useRef(null);
   const menuOverlayRef = useRef(null);
   const dropdownRef = useRef(null);
-  
+  const botContainerRef = useRef(null);
+
   const [isMenuActive, setIsMenuActive] = useState(false);
   const [isDropdownActive, setIsDropdownActive] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -56,7 +57,82 @@ const FrontHeader = () => {
     subMenu?.classList.toggle("active");
   };
 
+  // const dragElement = (element) => {
+  //   let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+  //   element.onmousedown = dragMouseDown;
+
+  //   function dragMouseDown(e) {
+  //     e = e || window.event;
+  //     e.preventDefault();
+
+  //     pos3 = e.clientX;
+  //     pos4 = e.clientY;
+
+  //     document.onmouseup = closeDragElement;
+  //     document.onmousemove = elementDrag;
+  //   }
+
+  //   function elementDrag(e) {
+  //     e = e || window.event;
+  //     e.preventDefault();
+
+  //     pos1 = pos3 - e.clientX;
+  //     pos2 = pos4 - e.clientY;
+  //     pos3 = e.clientX;
+  //     pos4 = e.clientY;
+
+  //     const parentWidth = window.innerWidth;
+  //     const parentHeight = window.innerHeight;
+  //     const elemWidth = element.offsetWidth;
+  //     const elemHeight = element.offsetHeight;
+
+  //     let newTop = element.offsetTop - pos2;
+  //     let newLeft = element.offsetLeft - pos1;
+
+  //     // Keep 50px padding from edges
+  //     newTop = Math.max(50, Math.min(parentHeight - elemHeight - 50, newTop));
+  //     newLeft = Math.max(50, Math.min(parentWidth - elemWidth - 50, newLeft));
+
+  //     element.style.top = newTop + "px";
+  //     element.style.left = newLeft + "px";
+  //   }
+
+  //   function closeDragElement() {
+  //     document.onmouseup = null;
+  //     document.onmousemove = null;
+  //   }
+  // };
+
   useEffect(() => {
+    // Add external CSS and script dynamically
+    const cssLink = document.createElement("link");
+    cssLink.rel = "stylesheet";
+    cssLink.href = "https://app.helloyubo.com/assets/focalyt_bot.bot.css";
+    document.head.appendChild(cssLink);
+
+    const script = document.createElement("script");
+    script.src = "https://app.helloyubo.com/assets/focalyt_bot.bot.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    // Drag functionality
+    // const botContainer = botContainerRef.current;
+    // if (botContainer) {
+    //   dragElement(botContainer); // Apply drag to the container div
+    // }
+
+    return () => {
+      // Cleanup CSS and script when component unmounts
+      document.head.removeChild(cssLink);
+      document.body.removeChild(script);
+    };
+  }, []);
+
+
+  useEffect(() => {
+
+    
     // Throttled scroll handler
     let ticking = false;
     const handleScroll = () => {
