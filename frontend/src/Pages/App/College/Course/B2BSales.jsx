@@ -7,7 +7,7 @@ import moment from 'moment';
 import axios from 'axios'
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
-import GoogleMapsLocationPicker from './GoogleMapsLocationPicker';
+// import GoogleMapsLocationPicker from './GoogleMapsLocationPicker';
 
 // Google Maps API styles
 const mapStyles = `
@@ -316,48 +316,13 @@ const B2BSales = () => {
 
   const candidateRef = useRef();
 
-  const fetchProfile = (id) => {
-    if (candidateRef.current) {
-      console.log('start fetching', id)
-      candidateRef.current.fetchProfile(id);
-    }
-  };
 
 
-  // const handleSaveCV = async () => {
-  //   if (candidateRef.current) {
-  //     const result = await candidateRef.current.handleSaveCV();
-  //     console.log(result, 'result')
-  //     if (result === true) {
-  //       setOpenModalId(null); setSelectedProfile(null)
-  //     }
-  //   }
-  // };
 
-  const handleSaveCV = async () => {
-    if (candidateRef.current) {
-      const result = await candidateRef.current.handleSaveCV();
 
-      console.log(result, 'result')
-      if (result.isvalid === true) {
-        // Find and update the candidate in allProfiles
-        setAllProfiles(prevProfiles => 
-          prevProfiles.map(profile => {
-            if (profile._id === selectedProfile._id) {
-              // Update the _candidate data with the updated profile from result
-              return {
-                ...profile,
-                _candidate: result.data // result.data contains the updated candidate profile
-              };
-            }
-            return profile;
-          })
-        );
-        setOpenModalId(null); 
-        setSelectedProfile(null)
-      }
-    }
-  };
+
+
+
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -415,11 +380,17 @@ const B2BSales = () => {
     businessName: '',
     businessAddress: '',
     concernPersonName: '',
+    address: '',
+    city: '',
+    state: '',
+    latitude: '',
+    longitude: '',
     designation: '',
     email: '',
     mobile: '',
     whatsapp: '',
-    leadOwner: ''
+    leadOwner: '',
+    remark: ''
   });
 
   // Form validation state
@@ -431,18 +402,13 @@ const B2BSales = () => {
   const [selectedConcernPerson, setSelectedConcernPerson] = useState(null);
 
   //filter stats
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterSubStatus, setFilterSubStatus] = useState('all');
-  const [filterLeadStatus, setFilterLeadStatus] = useState('all');
-  const [filterCourse, setFilterCourse] = useState('all');
-  const [filterCenter, setFilterCenter] = useState('all');
-  const [filterVertical, setFilterVertical] = useState('all');
-  const [filterProject, setFilterProject] = useState('all');
-  const [filterSector, setFilterSector] = useState('all');
-  const [filterCounselor, setFilterCounselor] = useState('all');
-  const [filterConcernPerson, setFilterConcernPerson] = useState('all');
-  const [filterDate, setFilterDate] = useState(new Date());
+
+
   const [selectedProfiles, setSelectedProfiles] = useState([]);
+
+  // Users state for Lead Owner dropdown
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
 
   //side pannel stats
@@ -451,17 +417,11 @@ const B2BSales = () => {
   // Loading state for fetchProfileData
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
 
-  // 1. State
-  const [verticalOptions, setVerticalOptions] = useState([]);
-  const [projectOptions, setProjectOptions] = useState([]);
-  const [courseOptions, setCourseOptions] = useState([]);
-  const [centerOptions, setCenterOptions] = useState([]);
-  const [counselorOptions, setCounselorOptions] = useState([]);
-  
+
   // B2B Dropdown Options
   const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
   const [typeOfB2BOptions, setTypeOfB2BOptions] = useState([]);
-  
+
   // Google Maps API
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -469,120 +429,192 @@ const B2BSales = () => {
   const [loading, setLoading] = useState(false);
 
   // Load Google Maps API
-  useEffect(() => {
-    const loadGoogleMapsAPI = () => {
-      if (window.google && window.google.maps) {
-        setMapLoaded(true);
-        initializeAutocomplete();
-        return;
-      }
+  // useEffect(() => {
+  //   const loadGoogleMapsAPI = () => {
+  //     if (window.google && window.google.maps) {
+  //       setMapLoaded(true);
+  //       initializeAutocomplete();
+  //       return;
+  //     }
 
-      // Check if script is already loading
-      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-        return;
-      }
+  //     // Check if script is already loading
+  //     if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+  //       return;
+  //     }
 
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places,geometry`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        setMapLoaded(true);
-        initializeAutocomplete();
-      };
-      script.onerror = () => {
-        console.error('Failed to load Google Maps API');
-        alert('Failed to load Google Maps. Please check your internet connection and try again.');
-      };
-      document.head.appendChild(script);
-    };
+  //     const script = document.createElement('script');
+  //     script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places,geometry`;
+  //     script.async = true;
+  //     script.defer = true;
+  //     script.onload = () => {
+  //       setMapLoaded(true);
+  //       initializeAutocomplete();
+  //     };
+  //     script.onerror = () => {
+  //       console.error('Failed to load Google Maps API');
+  //       alert('Failed to load Google Maps. Please check your internet connection and try again.');
+  //     };
+  //     document.head.appendChild(script);
+  //   };
 
-    loadGoogleMapsAPI();
-  }, []);
+  //   loadGoogleMapsAPI();
+  // }, []);
 
-  // Initialize Google Maps Autocomplete
-  const initializeAutocomplete = () => {
-    if (!window.google || !window.google.maps) {
-      console.log('Google Maps not loaded yet');
+  // // Initialize Google Maps Autocomplete
+  // const initializeAutocomplete = () => {
+  //   if (!window.google || !window.google.maps) {
+  //     console.log('Google Maps not loaded yet');
+  //     return;
+  //   }
+
+  //   // Wait for DOM to be ready
+  //   setTimeout(() => {
+  //   const addressInput = document.getElementById('businessAddress');
+  //   if (addressInput) {
+  //       // Remove existing autocomplete if any
+  //       if (addressInput.autocomplete) {
+  //         window.google.maps.event.clearInstanceListeners(addressInput);
+  //       }
+
+  //     const autocomplete = new window.google.maps.places.Autocomplete(addressInput, {
+  //         types: ['address', 'establishment'],
+  //         componentRestrictions: { country: 'IN' }, // Restrict to India
+  //         fields: ['formatted_address', 'geometry', 'place_id', 'name', 'address_components']
+  //     });
+
+  //     autocomplete.addListener('place_changed', () => {
+  //       const place = autocomplete.getPlace();
+  //       if (place.geometry) {
+  //         const location = {
+  //           address: place.formatted_address,
+  //           lat: place.geometry.location.lat(),
+  //           lng: place.geometry.location.lng(),
+  //             placeId: place.place_id,
+  //             name: place.name
+  //         };
+  //         setSelectedLocation(location);
+  //         setLeadFormData(prev => ({
+  //           ...prev,
+  //           businessAddress: place.formatted_address
+  //         }));
+
+  //           // Show success message
+  //           console.log('Location selected:', location);
+  //         } else {
+  //           console.log('No geometry found for selected place');
+  //         }
+  //       });
+
+  //       // Store reference to autocomplete
+  //       addressInput.autocomplete = autocomplete;
+  //     } else {
+  //       console.log('Address input not found, retrying...');
+  //       // Retry after a short delay
+  //       setTimeout(initializeAutocomplete, 500);
+  //     }
+  //   }, 100);
+  // };
+
+
+  // Function to initialize Google Places Autocomplete
+  // Ref for business name input
+  const businessNameInputRef = useRef(null);
+
+  const initializeBusinessNameAutocomplete = () => {
+    console.log('Initializing business name autocomplete...');
+
+    // Check if Google Maps is available
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      console.log('Google Maps not available yet');
       return;
     }
 
-    // Wait for DOM to be ready
-    setTimeout(() => {
-    const addressInput = document.getElementById('businessAddress');
-    if (addressInput) {
-        // Remove existing autocomplete if any
-        if (addressInput.autocomplete) {
-          window.google.maps.event.clearInstanceListeners(addressInput);
-        }
+    // Get input element using ref
+    const input = businessNameInputRef.current;
+    if (!input) {
+      console.log('Business name input not found');
+      return;
+    }
 
-      const autocomplete = new window.google.maps.places.Autocomplete(addressInput, {
-          types: ['address', 'establishment'],
-          componentRestrictions: { country: 'IN' }, // Restrict to India
-          fields: ['formatted_address', 'geometry', 'place_id', 'name', 'address_components']
+    console.log('Business name input found, initializing autocomplete...');
+
+    // Remove any existing autocomplete to prevent duplicates
+    if (input.autocomplete) {
+      window.google.maps.event.clearInstanceListeners(input);
+    }
+
+    const autocomplete = new window.google.maps.places.Autocomplete(input, {
+      types: ['establishment'],
+      componentRestrictions: { country: 'in' },
+    });
+
+    autocomplete.addListener('place_changed', () => {
+      console.log('Place selected from autocomplete');
+      const place = autocomplete.getPlace();
+      if (!place || !place.geometry || !place.geometry.location) return;
+
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+
+      const placeNameOnly = place.name || input.value;
+
+      setLeadFormData(prev => ({
+        ...prev,
+        businessName: placeNameOnly
+      }));
+
+      let city = '', state = '';
+      place.address_components?.forEach((component) => {
+        const types = component.types.join(',');
+        if (types.includes("locality")) city = component.long_name;
+        if (types.includes("administrative_area_level_1")) state = component.long_name;
+        if (!city && types.includes("sublocality_level_1")) city = component.long_name;
       });
 
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place.geometry) {
-          const location = {
-            address: place.formatted_address,
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-              placeId: place.place_id,
-              name: place.name
-          };
-          setSelectedLocation(location);
-          setLeadFormData(prev => ({
-            ...prev,
-            businessAddress: place.formatted_address
-          }));
-            
-            // Show success message
-            console.log('Location selected:', location);
-          } else {
-            console.log('No geometry found for selected place');
-          }
-        });
+      setLeadFormData(prev => ({
+        ...prev,
+        city: city,
+        state: state,
+        latitude: lat,
+        longitude: lng
+      }));
 
-        // Store reference to autocomplete
-        addressInput.autocomplete = autocomplete;
-      } else {
-        console.log('Address input not found, retrying...');
-        // Retry after a short delay
-        setTimeout(initializeAutocomplete, 500);
-      }
-    }, 100);
+      setLeadFormData(prev => ({
+        ...prev,
+        address: place.formatted_address || ''
+      }));
+    });
+
+    // Store reference to autocomplete
+    input.autocomplete = autocomplete;
+    console.log('Business name autocomplete initialized successfully');
   };
 
   // Fetch filter options from backend API on mount
-  useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-        const token = userData.token;
-        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-        
-        // Fetch main filter options
-        const res = await axios.get(`${backendUrl}/college/filters-data`, {
-          headers: { 'x-auth': token }
-        });
-        if (res.data.status) {
-          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
-          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
-          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
-        }
 
-        // Fetch B2B dropdown options
-        await fetchB2BDropdownOptions();
-      } catch (err) {
-        console.error('Failed to fetch filter options:', err);
-      }
-    };
-    fetchFilterOptions();
+  useEffect(() => {
+    fetchB2BDropdownOptions();
+    fetchUsers(); // Fetch users for Lead Owner dropdown
   }, []);
+
+  // Test Google Maps API availability on component mount
+  useEffect(() => {
+    console.log('B2BSales component mounted');
+    console.log('Google Maps API available:', !!(window.google && window.google.maps && window.google.maps.places));
+  }, []);
+
+  // Initialize autocomplete when modal is opened
+  useEffect(() => {
+    if (showAddLeadModal) {
+      console.log('Modal opened, initializing autocomplete...');
+      // Small delay to ensure modal is fully rendered and Google Maps is loaded
+      const timer = setTimeout(() => {
+        initializeBusinessNameAutocomplete();
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showAddLeadModal]);
 
   // Fetch B2B dropdown options
   const fetchB2BDropdownOptions = async () => {
@@ -596,9 +628,9 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
       if (leadCategoriesRes.data.status) {
-        setLeadCategoryOptions(leadCategoriesRes.data.data.map(cat => ({ 
-          value: cat._id, 
-          label: cat.name 
+        setLeadCategoryOptions(leadCategoriesRes.data.data.map(cat => ({
+          value: cat._id,
+          label: cat.name
         })));
       }
 
@@ -607,9 +639,9 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
       if (typeOfB2BRes.data.status) {
-        setTypeOfB2BOptions(typeOfB2BRes.data.data.map(type => ({ 
-          value: type._id, 
-          label: type.name 
+        setTypeOfB2BOptions(typeOfB2BRes.data.data.map(type => ({
+          value: type._id,
+          label: type.name
         })));
       }
     } catch (err) {
@@ -617,87 +649,62 @@ const B2BSales = () => {
     }
   };
 
-  // Handle location selection from map (for backward compatibility)
-  const handleMapLocationSelect = (location) => {
-    setSelectedLocation(location);
-    setLeadFormData(prev => ({
-      ...prev,
-      businessAddress: location.address
-    }));
+  // Fetch users for Lead Owner dropdown
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+      const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+      const response = await axios.get(`${backendUrl}/college/users`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        console.log('response.data.data.users', response.data.data)
+        // Update users state with detailed access summary
+        setUsers(response.data.data.users.map(user => ({
+          user_id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          designation: user.designation,
+          status: user.status ? 'active' : 'inactive',
+          reporting_managers: user.accessSummary?.reportingManagers || 0,
+          role: user.role,
+          roleId: user.roleId,
+          access_level: user.access_level,
+          permissions: user.permissions,
+          my_team: user.my_team,
+          // ✅ NEW: Add detailed access summary
+          accessSummary: user.accessSummary || {},
+          fullPermissions: user.fullPermissions || {},
+          college: user.college || {},
+          created_at: user.createdAt
+        })));
+      } else {
+        console.error('Failed to fetch users:', response.data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
   };
 
-  // Initialize map when shown
+  // Fetch users on component mount
   useEffect(() => {
-    if (showMap && mapLoaded && window.google) {
-      const mapElement = document.getElementById('map');
-      if (mapElement) {
-        const map = new window.google.maps.Map(mapElement, {
-          center: selectedLocation ? { lat: selectedLocation.lat, lng: selectedLocation.lng } : { lat: 20.5937, lng: 78.9629 }, // Default to India center
-          zoom: 12,
-          mapTypeControl: true,
-          streetViewControl: true,
-          fullscreenControl: true
-        });
+    fetchUsers();
+  }, []);
 
-        let marker = null;
 
-        // Add click listener to map
-        map.addListener('click', (event) => {
-          const lat = event.latLng.lat();
-          const lng = event.latLng.lng();
-          
-          // Remove existing marker
-          if (marker) {
-            marker.setMap(null);
-          }
 
-          // Add new marker
-          marker = new window.google.maps.Marker({
-            position: { lat, lng },
-            map: map,
-            draggable: true
-          });
-
-          // Geocode the clicked location
-          const geocoder = new window.google.maps.Geocoder();
-          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-            if (status === 'OK' && results[0]) {
-              const location = {
-                address: results[0].formatted_address,
-                lat: lat,
-                lng: lng,
-                placeId: results[0].place_id
-              };
-              handleMapLocationSelect(location);
-            }
-          });
-        });
-
-        // Add marker for selected location if exists
-        if (selectedLocation) {
-          marker = new window.google.maps.Marker({
-            position: { lat: selectedLocation.lat, lng: selectedLocation.lng },
-            map: map,
-            draggable: true
-          });
-          map.setCenter({ lat: selectedLocation.lat, lng: selectedLocation.lng });
-        }
-      }
-    }
-  }, [showMap, mapLoaded, selectedLocation]);
-
-  // Reinitialize autocomplete when map is loaded
-  useEffect(() => {
-    if (mapLoaded) {
-      initializeAutocomplete();
-    }
-  }, [mapLoaded]);
-
-  const handleCheckboxChange = (profile, checked) => {
+  const handleCheckboxChange = (lead, checked) => {
     if (checked) {
-      setSelectedProfiles(prev => [...prev, profile._id]);
+      setSelectedProfiles(prev => [...prev, lead._id]);
     } else {
-      setSelectedProfiles(prev => prev.filter(id => id !== profile._id));
+      setSelectedProfiles(prev => prev.filter(id => id !== lead._id));
     }
   };
 
@@ -768,6 +775,15 @@ const B2BSales = () => {
   const handleLeadMobileChange = (e) => {
     const { name, value } = e.target;
 
+    if (name === 'mobile') {
+      if (value.length > 10) {
+        setFormErrors(prev => ({
+          ...prev,
+          mobile: 'Mobile number should be 10 digits'
+        }));
+      }
+    }
+
     // Only allow digits, spaces, hyphens, and plus sign
     const cleanValue = value.replace(/[^\d\s\-+]/g, '');
 
@@ -822,6 +838,39 @@ const B2BSales = () => {
     return Object.keys(errors).length === 0;
   };
 
+  // Add state for leads data
+  const [leads, setLeads] = useState([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+
+  useEffect(() => {
+    fetchLeads();
+  }, []);
+
+  const fetchLeads = async () => {
+    try {
+      setLoadingLeads(true);
+      const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+        headers: { 'x-auth': token }
+      });
+
+      console.log('Leads response:', response.data.data);
+
+      if (response.data.status) {
+        setLeads(response.data.data.leads || []);
+      } else {
+        console.error('Failed to fetch leads:', response.data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log('leads', leads)
+  }, [leads])
+
   // Handle lead form submission
   const handleLeadSubmit = async () => {
     if (!validateLeadForm()) {
@@ -835,26 +884,33 @@ const B2BSales = () => {
         leadCategory: leadFormData.leadCategory,
         typeOfB2B: leadFormData.typeOfB2B,
         businessName: leadFormData.businessName,
-        businessAddress: leadFormData.businessAddress,
+        address: leadFormData.address,
         concernPersonName: leadFormData.concernPersonName,
         designation: leadFormData.designation,
         email: leadFormData.email,
         mobile: leadFormData.mobile,
         whatsapp: leadFormData.whatsapp,
-        leadOwner: leadFormData.leadOwner
+        leadOwner: leadFormData.leadOwner,
+        remark: leadFormData.remark
       };
 
       // Add coordinates if location is selected
       if (selectedLocation) {
         leadData.coordinates = {
+          type: "Point",
           coordinates: [selectedLocation.lng, selectedLocation.lat] // [longitude, latitude]
+        };
+      } else if (leadFormData.longitude && leadFormData.latitude) {
+        leadData.coordinates = {
+          type: "Point",
+          coordinates: [leadFormData.longitude, leadFormData.latitude] // [longitude, latitude]
         };
       }
 
       console.log('Submitting lead data:', leadData);
 
       // Send data to backend API
-      const response = await axios.post(`${backendUrl}/college/b2b/leads`, leadData, {
+      const response = await axios.post(`${backendUrl}/college/b2b/add-lead`, leadData, {
         headers: {
           'x-auth': token,
           'Content-Type': 'application/json',
@@ -864,10 +920,10 @@ const B2BSales = () => {
       if (response.data.status) {
         // Show success message
         alert('Lead added successfully!');
-        
+
         // Refresh the leads list
-        fetchProfileData();
-        
+        fetchLeads();
+
         // Reset form
         setLeadFormData({
           leadCategory: '',
@@ -925,6 +981,12 @@ const B2BSales = () => {
     setShowMap(false);
   };
 
+  // Open lead modal and initialize autocomplete
+  const handleOpenLeadModal = () => {
+    console.log('handleOpenLeadModal')
+    setShowAddLeadModal(true);
+  };
+
 
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
@@ -976,481 +1038,10 @@ const B2BSales = () => {
     }
   };
 
-  //  Simulate file upload with progress
-  const handleFileUpload = async () => {
-    if (!selectedFile || !selectedDocumentForUpload) return;
 
-    console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
+ 
 
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      // Simulate upload progress
-      for (let i = 0; i <= 100; i += 10) {
-        setUploadProgress(i);
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('doc', selectedDocumentForUpload._id);
-      console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
-
-      const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'multipart/form-data',
-        }
-      });
-
-      console.log('response', response)
-
-      if (response.data.status) {
-
-        alert('Document uploaded successfully! Status: Pending Review');
-
-        // Optionally refresh data here
-        const closeButton = document.querySelector('#staticBackdrop .btn-close');
-        if (closeButton) {
-          closeButton.click();
-        }
-        fetchProfileData()
-      } else {
-        alert('Failed to upload file');
-      }
-
-
-
-
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // Document functions
-  // Fixed openDocumentModal function
-  const openDocumentModal = (document) => {
-    // Check if this is the same document that was already open
-    const isSameDocument = selectedDocument && selectedDocument._id === document._id;
-
-    setSelectedDocument(document);
-    setShowDocumentModal(true);
-
-    // Only reset zoom and rotation if it's a NEW document or first time opening modal
-    if (!isSameDocument) {
-      setDocumentZoom(1);
-      setDocumentRotation(0);
-      setIsNewModalOpen(true);
-    } else {
-      setIsNewModalOpen(false);
-    }
-
-    document.body?.classList.add('no-scroll');
-  };
-
-  const closeDocumentModal = useCallback(() => {
-    setShowDocumentModal(false);
-    setSelectedDocument(null);
-    setDocumentZoom(1);
-    setDocumentRotation(0);
-  }, []);
-  // const closeDocumentModal = () => {
-  //   setShowDocumentModal(false);
-  //   setSelectedDocument(null);
-
-  //   setIsNewModalOpen(false);
-  //   // // Only reset when actually closing modal
-  //   setDocumentZoom(1);
-  //   setDocumentRotation(0);
-  // };
-
-  const zoomIn = () => {
-    setDocumentZoom(prev => Math.min(prev + 0.1, 3)); // Max zoom 3x
-  };
-
-  const zoomOut = () => {
-    setDocumentZoom(prev => Math.max(prev - 0.1, 0.5)); // Min zoom 0.5x
-  };
-
-  const rotateDocument = () => {
-    setDocumentRotation(prev => (prev + 90) % 360);
-  };
-
-  const resetView = () => {
-    setDocumentZoom(1);
-    setDocumentRotation(0);
-  };
-
-  const updateDocumentStatus = useCallback((uploadId, status, reason) => {
-    console.log(`Updating document ${uploadId} to ${status}`);
-    if (status === 'Rejected' && !reason?.trim()) {
-      alert('Please provide a rejection reason');
-      return;
-    }
-    alert(`Document ${status} successfully!`);
-    closeDocumentModal();
-  }, [closeDocumentModal]);
-
-  // const updateDocumentStatus = (uploadId, status) => {
-  //   // In real app, this would make an API call
-  //   console.log(`Updating document ${uploadId} to ${status}`);
-  //   if (status === 'Rejected' && !rejectionReason.trim()) {
-  //     alert('Please provide a rejection reason');
-  //     return;
-  //   }
-  //   alert(`Document ${status} successfully!`);
-  //   closeDocumentModal();
-  // };
-
-
-
-  const getFileType = (fileUrl) => {
-    if (!fileUrl) return 'unknown';
-    const extension = fileUrl.split('.').pop().toLowerCase();
-
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
-      return 'image';
-    } else if (extension === 'pdf') {
-      return 'pdf';
-    } else if (['doc', 'docx'].includes(extension)) {
-      return 'document';
-    } else if (['xls', 'xlsx'].includes(extension)) {
-      return 'spreadsheet';
-    }
-    return 'unknown';
-  };
-
-  const filterDocuments = (documents = []) => {
-    // Ensure documents is always an array
-    if (!Array.isArray(documents)) return [];
-    if (statusFilter === 'all') return documents;
-
-    return documents.filter(doc => {
-      if (!doc.uploads || doc.uploads.length === 0) return statusFilter === 'none';
-
-      const lastUpload = doc.uploads[doc.uploads.length - 1];
-      if (!lastUpload || !lastUpload.status) return false;
-
-      return lastUpload.status.toLowerCase() === statusFilter;
-    });
-  };
-
-
-  const getDocumentCounts = (documents = []) => {
-    // Ensure documents is always an array
-    if (!Array.isArray(documents)) return {
-      totalDocs: 0,
-      uploadedDocs: 0,
-      pendingDocs: 0,
-      verifiedDocs: 0,
-      rejectedDocs: 0
-    };
-
-    const totalDocs = documents.length;
-    const uploadedDocs = documents.filter(doc => doc.uploads && doc.uploads.length > 0).length;
-    const pendingDocs = documents.filter(doc =>
-      doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Pending'
-    ).length;
-    const verifiedDocs = documents.filter(doc =>
-      doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Verified'
-    ).length;
-    const rejectedDocs = documents.filter(doc =>
-      doc.uploads && doc.uploads.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Rejected'
-    ).length;
-
-    return { totalDocs, uploadedDocs, pendingDocs, verifiedDocs, rejectedDocs };
-  };
-  const DocumentControls = React.memo(({
-    onZoomIn,
-    onZoomOut,
-    onRotate,
-    onReset,
-    onDownload,
-    zoomLevel,
-    fileType
-  }) => {
-    return (
-      <div className="preview-controls">
-        <button
-          onClick={onZoomIn}
-          className="control-btn"
-          style={{ whiteSpace: 'nowrap' }}
-          title="Zoom In"
-        >
-          <i className="fas fa-search-plus"></i> Zoom In
-        </button>
-
-        <button
-          onClick={onZoomOut}
-          className="control-btn"
-          style={{ whiteSpace: 'nowrap' }}
-          title="Zoom Out"
-        >
-          <i className="fas fa-search-minus"></i> Zoom Out
-        </button>
-
-        {/* Show rotation button only for images */}
-        {fileType === 'image' && (
-          <button
-            onClick={onRotate}
-            className="control-btn"
-            style={{ whiteSpace: 'nowrap' }}
-            title="Rotate 90°"
-          >
-            <i className="fas fa-redo"></i> Rotate
-          </button>
-        )}
-
-        {/* Reset View Button */}
-        <button
-          onClick={onReset}
-          className="control-btn"
-          style={{ whiteSpace: 'nowrap' }}
-          title="Reset View"
-        >
-          <i className="fas fa-sync-alt"></i> Reset
-        </button>
-
-        {/* Download Button */}
-        <a
-          href={onDownload}
-          download
-          className="control-btn"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
-          title="Download Document"
-        >
-          <i className="fas fa-download"></i> Download
-        </a>
-
-        {/* Zoom Level Indicator */}
-        <div className="zoom-indicator" style={{
-          fontSize: '12px',
-          color: '#666',
-          marginLeft: '10px',
-          padding: '5px 10px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '4px'
-        }}>
-          {Math.round(zoomLevel * 100)}%
-        </div>
-      </div>
-    );
-  });
-
-
-
-  // Form data state
-  const [formData, setFormData] = useState({
-    projects: {
-      type: "includes",
-      values: []
-    },
-    verticals: {
-      type: "includes",
-      values: []
-    },
-    course: {
-      type: "includes",
-      values: []
-    },
-    center: {
-      type: "includes",
-      values: []
-    },
-    counselor: {
-      type: "includes",
-      values: []
-    },
-    sector: {
-      type: "includes",
-      values: []
-    }
-  });
-
-  // Dropdown open state
-  const [dropdownStates, setDropdownStates] = useState({
-    projects: false,
-    verticals: false,
-    course: false,
-    center: false,
-    counselor: false,
-    sector: false
-  });
-
-
-
-  const toggleDropdown = (filterName) => {
-    setDropdownStates(prev => {
-      // Close all other dropdowns and toggle the current one
-      const newState = Object.keys(prev).reduce((acc, key) => {
-        acc[key] = key === filterName ? !prev[key] : false;
-        return acc;
-      }, {});
-      return newState;
-    });
-  };
-
-  // Add this useEffect to handle clicking outside to close dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside any multi-select dropdown
-      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
-
-      if (!isMultiSelectClick) {
-        // Close all dropdowns
-        setDropdownStates(prev =>
-          Object.keys(prev).reduce((acc, key) => {
-            acc[key] = false;
-            return acc;
-          }, {})
-        );
-      }
-    };
-
-    // Add event listener
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Calculate total selected filters
-  const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
-
-  const UploadModal = () => {
-    if (!showUploadModal || !selectedDocumentForUpload) return null;
-
-    return (
-      <div className="upload-modal-overlay" onClick={closeUploadModal}>
-        <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="upload-modal-header">
-            <h3>
-              <i className="fas fa-cloud-upload-alt me-2"></i>
-              Upload {selectedDocumentForUpload.Name}
-            </h3>
-            <button className="close-btn" onClick={closeUploadModal}>&times;</button>
-          </div>
-
-          <div className="upload-modal-body">
-            <div className="upload-section">
-              {!selectedFile ? (
-                <div className="file-drop-zone">
-                  <div className="drop-zone-content">
-                    <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                    <h4>Choose a file to upload</h4>
-                    <p>Drag and drop a file here, or click to select</p>
-                    <div className="file-types">
-                      <span>Supported: JPG, PNG, GIF, PDF</span>
-                      <span>Max size: 10MB</span>
-                    </div>
-                    <input
-                      type="file"
-                      id="file-input"
-                      accept=".jpg,.jpeg,.png,.gif,.pdf"
-                      onChange={handleFileSelect}
-                      style={{ display: 'none' }}
-                    />
-                    <button
-                      className="btn btn-primary"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        fileInputRef.current?.click(); // Use ref instead of getElementById
-                      }}
-                    // onClick={() => document.getElementById('file-input').click()}
-                    >
-                      <i className="fas fa-folder-open me-2"></i>
-                      Choose File
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="file-preview-section">
-                  <div className="selected-file-info">
-                    <h4>Selected File:</h4>
-                    <div className="file-details">
-                      <div className="file-icon">
-                        <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
-                      </div>
-                      <div className="file-info">
-                        <p className="file-name">{selectedFile.name}</p>
-                        <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                      </div>
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        onClick={() => {
-                          setSelectedFile(null);
-                          setUploadPreview(null);
-                        }}
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-
-                  {uploadPreview && (
-                    <div className="upload-preview">
-                      <h5>Preview:</h5>
-                      <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                    </div>
-                  )}
-
-                  {isUploading && (
-                    <div className="upload-progress-section">
-                      <h5>Uploading...</h5>
-                      <div className="progress-bar-container">
-                        <div
-                          className="progress-bar"
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                      <p>{uploadProgress}% Complete</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="upload-modal-footer">
-            <button
-              className="btn btn-secondary"
-              onClick={closeUploadModal}
-              disabled={isUploading}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleFileUpload}
-              disabled={!selectedFile || isUploading}
-            >
-              {isUploading ? (
-                <>
-                  <i className="fas fa-spinner fa-spin me-2"></i>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-upload me-2"></i>
-                  Upload Document
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  //Pagination
+  
 
   const getPaginationPages = () => {
     const delta = 2;
@@ -1535,7 +1126,7 @@ const B2BSales = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
-  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters , mainContentClass]);
+  const { widthRef, width } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -1566,94 +1157,6 @@ const B2BSales = () => {
     }
   }, [seletectedStatus]);
 
-  useEffect(() => {
-    console.log('seletectedSubStatus', seletectedSubStatus)
-
-  }, [seletectedSubStatus]);
-
-
-  //Advance filter
-
-
-
-
-  // Date range handlers
-  const handleDateFilterChange = (date, fieldName) => {
-    const newFilterData = {
-      ...filterData,
-      [fieldName]: date
-    };
-    setFilterData(newFilterData);
-
-    // Apply filters immediately
-    setTimeout(() => fetchProfileData(newFilterData), 100);
-  };
-  const formatDate = (date) => {
-    // If the date is not a valid Date object, try to convert it
-    if (date && !(date instanceof Date)) {
-      date = new Date(date);
-    }
-
-    // Check if the date is valid
-    if (!date || isNaN(date)) return ''; // Return an empty string if invalid
-
-    // Now call toLocaleDateString
-    return date.toLocaleDateString('en-GB');
-  };
-
-
-
-  // 5. Clear functions
-  const clearDateFilter = (filterType) => {
-    let newFilterData = { ...filterData };
-
-    if (filterType === 'created') {
-      newFilterData.createdFromDate = null;
-      newFilterData.createdToDate = null;
-    } else if (filterType === 'modified') {
-      newFilterData.modifiedFromDate = null;
-      newFilterData.modifiedToDate = null;
-    } else if (filterType === 'nextAction') {
-      newFilterData.nextActionFromDate = null;
-      newFilterData.nextActionToDate = null;
-    }
-
-    setFilterData(newFilterData);
-    setTimeout(() => fetchProfileData(newFilterData), 100);
-  };
-
-
-
-  //
-  const clearAllFilters = () => {
-    const clearedFilters = {
-      name: '',
-      courseType: '',
-      status: 'true',
-      leadStatus: '',
-      sector: '',
-      createdFromDate: null,
-      createdToDate: null,
-      modifiedFromDate: null,
-      modifiedToDate: null,
-      nextActionFromDate: null,
-      nextActionToDate: null,
-    };
-
-    setFilterData(clearedFilters);
-    setFormData({
-      projects: { type: "includes", values: [] },
-      verticals: { type: "includes", values: [] },
-      course: { type: "includes", values: [] },
-      center: { type: "includes", values: [] },
-      counselor: { type: "includes", values: [] },
-      sector: { type: "includes", values: [] }
-    });
-
-    setCurrentPage(1);
-    // Explicitly call fetchProfileData with cleared filters to ensure data is fetched
-    fetchProfileData(clearedFilters, 1);
-  };
 
   const handleStatusChange = (e) => {
     setSelectedStatus(e.target.value);
@@ -1756,396 +1259,9 @@ const B2BSales = () => {
     }
   };
 
-  const handleUpdateStatus = async (e) => {
-    e.preventDefault();
+ 
 
-    try {
-      if (showPanel === 'bulkstatuschange') {
-        // Validation checks
-        if (!selectedProfiles) {
-          alert('No profile selected');
-          return;
-        }
 
-        if (!seletectedStatus) {
-          alert('Please select a status');
-          return;
-        }
-
-
-        // Prepare the request body
-        const data = {
-          selectedProfiles,
-          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-          _leadSubStatus: seletectedSubStatus?._id || null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/bulk_status_change`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closePanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
-      }
-      if (showPanel === 'editPanel') {
-        // Validation checks
-        if (!selectedProfile || !selectedProfile._id) {
-          alert('No profile selected');
-          return;
-        }
-
-        if (!seletectedStatus) {
-          alert('Please select a status');
-          return;
-        }
-
-        // Combine date and time into a single Date object (if both are set)
-        let followupDateTime = '';
-        if (followupDate && followupTime) {
-          // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
-
-          followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-          // Validate the datetime
-          if (isNaN(followupDateTime.getTime())) {
-            alert('Invalid date/time combination');
-            return;
-          }
-        }
-
-        // Prepare the request body
-        const data = {
-          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-          _leadSubStatus: seletectedSubStatus?._id || null,
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closePanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
-      }
-      if (showPanel === 'followUp') {
-
-
-        // Combine date and time into a single Date object (if both are set)
-        let followupDateTime = '';
-        if (followupDate && followupTime) {
-          // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
-
-          followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-          // Validate the datetime
-          if (isNaN(followupDateTime.getTime())) {
-            alert('Invalid date/time combination');
-            return;
-          }
-        }
-
-        // Prepare the request body
-        const data = {
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closePanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
-      }
-    }
-    catch (error) {
-      console.error('Error updating status:', error);
-
-      // More detailed error handling
-      if (error.response) {
-        // Server responded with error status
-        console.error('Error Response:', error.response.data);
-        console.error('Error Status:', error.response.status);
-        alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
-      } else if (error.request) {
-        // Request was made but no response received
-        console.error('No response received:', error.request);
-        alert('Network error: Unable to reach server');
-      } else {
-        // Something else happened
-        console.error('Error:', error.message);
-        alert(`Error: ${error.message}`);
-      }
-    }
-  };
-
-
-
-
-  // Inside CRMDashboard component:
-
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
-
-  useEffect(() => {
-    fetchProfileData(filterData, currentPage);
-  }, [currentPage]);
-
-  // Add this function in your component:
-  const updateCrmFiltersFromBackend = (backendCounts) => {
-    console.log('Backend counts received:', backendCounts);
-
-    setCrmFilters(prevFilters => {
-      return prevFilters.map(filter => {
-        if (filter._id === 'all') {
-          return { ...filter, count: backendCounts.all || 0 };
-        }
-
-        const backendFilter = backendCounts[filter._id];
-        if (backendFilter) {
-          return {
-            ...filter,
-            count: backendFilter.count || 0,
-            milestone: backendFilter.milestone
-          };
-        }
-
-        return { ...filter, count: 0 };
-      });
-    });
-  };
-
-  const fetchProfileData = async (filters = filterData, page = currentPage) => {
-    try {
-      setIsLoadingProfiles(true);
-
-      if (!token) {
-        console.warn('No token found in session storage.');
-        setIsLoadingProfiles(false);
-        return;
-      }
-
-      // Prepare query parameters
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        ...(filters.name && { name: filters.name }),
-        ...(filters.b2bType && { b2bType: filters.b2bType }),
-        ...(filters.leadCategory && { leadCategory: filters.leadCategory }),
-        ...(filters.leadOwner && { leadOwner: filters.leadOwner }),
-        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-      
-    
-      });
-      console.log('API counselor:', formData.counselor.values);
-
-      const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
-        headers: { 'x-auth': token }
-      });
-
-      if (response.data.success && response.data.data) {
-        const data = response.data;
-        console.log('data', data);
-
-        // Sirf ek state me data set karo - paginated data
-        setAllProfiles(data.data);
-        setTotalPages(data.totalPages);
-        setPageSize(data.limit);
-
-        // Update CRM filter counts from backend
-        if (data.crmFilterCounts) {
-          updateCrmFiltersFromBackend(data.crmFilterCounts);
-        }
-      } else {
-        console.error('Failed to fetch profile data', response.data.message);
-      }
-
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-    } finally {
-      setIsLoadingProfiles(false);
-    }
-  };
-
-
-  const handleTabClick = (profileIndex, tabIndex) => {
-    setActiveTab(prevTabs => ({
-      ...prevTabs,
-      [profileIndex]: tabIndex
-    }));
-  };
-
-  // const handleTabClick = (index) => {
-  //   setActiveTab(index);
-  //   console.log('Tab clicked:', index);
-  // };
-
-  const handleFilterChange = (e) => {
-    try {
-      const { name, value } = e.target;
-      const newFilterData = { ...filterData, [name]: value };
-      setFilterData(newFilterData);
-
-      // Reset to first page and fetch with new filters
-      setCurrentPage(1);
-      fetchProfileData(newFilterData, 1);
-    } catch (error) {
-      console.error('Filter change error:', error);
-    }
-  };
-
-  useEffect(() => {
-    // Always fetch data when formData changes, regardless of whether filters have values
-    setCurrentPage(1);
-    fetchProfileData(filterData, 1);
-  }, [formData]);
-
-
-
-  const handleCrmFilterClick = async (index) => {
-    setActiveCrmFilter(index);
-    setCurrentPage(1);
-
-    let newFilterData = { ...filterData };
-
-    if (index !== 0) {
-      newFilterData.leadStatus = crmFilters[index]._id;
-    } else {
-      // Remove leadStatus filter for "All"
-      delete newFilterData.leadStatus;
-    }
-
-    setFilterData(newFilterData);
-    fetchProfileData(newFilterData, 1);
-  };
 
 
 
@@ -2297,7 +1413,6 @@ const B2BSales = () => {
       } else {
         alert(response.data.message || 'Failed to refer lead');
       }
-      await fetchProfileData();
       closePanel();
 
 
@@ -2525,7 +1640,6 @@ const B2BSales = () => {
               <button
 
                 className="btn text-white"
-                onClick={handleUpdateStatus}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
@@ -2815,6 +1929,306 @@ const B2BSales = () => {
     <div className="container-fluid">
       {/* Inject Google Maps styles */}
       <style>{mapStyles}</style>
+      <style>{`
+  .modal .pac-container {
+    z-index: 99999 !important;
+    position: fixed !important;
+  }
+  
+  .modal .pac-item {
+    cursor: pointer;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .modal .pac-item:hover {
+    background-color: #f8f9fa;
+  }
+  
+  .modal .pac-item-selected {
+    background-color: #007bff;
+    color: white;
+  }
+
+  /* Modern Lead Card Styles */
+  .lead-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f0f0f0;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 1rem;
+  }
+
+  .lead-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Header Section */
+  .lead-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .lead-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(30px, -30px);
+  }
+
+  .lead-title-section {
+    position: relative;
+    z-index: 2;
+  }
+
+  .lead-business-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    color: white;
+    line-height: 1.3;
+  }
+
+  .lead-contact-person {
+    font-size: 0.9rem;
+    margin: 0;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+  }
+
+  .lead-badges {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 2;
+  }
+
+  .lead-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .lead-badge.category {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    backdrop-filter: blur(10px);
+  }
+
+  .lead-badge.type {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    backdrop-filter: blur(10px);
+  }
+
+  /* Content Section */
+  .lead-content {
+    padding: 1.5rem;
+  }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .contact-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .contact-item:hover {
+    background: #e9ecef;
+    transform: translateY(-2px);
+  }
+
+  .contact-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .contact-icon:not(.phone):not(.whatsapp):not(.address):not(.owner) {
+    background: linear-gradient(135deg, #6c757d, #495057);
+  }
+
+  .contact-icon.phone {
+    background: linear-gradient(135deg, #28a745, #20c997);
+  }
+
+  .contact-icon.whatsapp {
+    background: linear-gradient(135deg, #25d366, #128c7e);
+  }
+
+  .contact-icon.address {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+  }
+
+  .contact-icon.owner {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+  }
+
+  .contact-icon.added-by {
+    background: linear-gradient(135deg, #6f42c1, #5a32a3);
+  }
+
+  .contact-details {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .contact-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+  }
+
+  .contact-value {
+    display: block;
+    font-size: 0.9rem;
+    color: #212529;
+    font-weight: 500;
+    word-break: break-word;
+  }
+
+  .contact-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .contact-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+  }
+
+  .address-text {
+    line-height: 1.4;
+  }
+
+  .address-section,
+  .owner-section {
+    margin-top: 1rem;
+  }
+
+  /* Action Buttons */
+  .lead-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+  }
+
+  .action-group {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: white;
+  }
+
+  .action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .action-btn.view {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+  }
+
+  .action-btn.refer {
+    background: linear-gradient(135deg, #6c757d, #495057);
+  }
+
+  .action-btn.history {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+  }
+
+  .action-btn.status {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    padding: 0.5rem;
+    min-width: 40px;
+  }
+
+  .action-btn.followup {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    padding: 0.5rem;
+    min-width: 40px;
+  }
+
+  .action-btn span {
+    display: inline-block;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .contact-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .lead-actions {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .action-group {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .lead-badges {
+      position: static;
+      margin-top: 1rem;
+    }
+  }
+`}</style>
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           <div
@@ -2861,48 +2275,11 @@ const B2BSales = () => {
 
                   <div className="col-md-6">
                     <div className="d-flex justify-content-end align-items-center gap-2">
-                      <button className="btn btn-primary" onClick={() => setShowAddLeadModal(true)} style={{ whiteSpace: 'nowrap' }}>
+                      <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
-                      <div className="input-group" style={{ maxWidth: '300px' }}>
-                        <span className="input-group-text bg-white border-end-0 input-height">
-                          <i className="fas fa-search text-muted"></i>
-                        </span>
-                        <input
-                          type="text"
-                          name="name"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Quick search..."
-                          value={filterData.name}
-                          onChange={handleFilterChange}
-                        />
-                        {filterData.name && (
-                          <button
-                            className="btn btn-outline-secondary border-start-0"
-                            type="button"
-                            onClick={() => {
-                              setFilterData(prev => ({ ...prev, name: '' }));
-                              fetchProfileData();
-                            }}
-                          >
-                            <i className="fas fa-times"></i>
-                          </button>
-                        )}
-                      </div>
+                     
 
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
-                          </span>
-                        )}
-                      </button>
 
 
                     </div>
@@ -2916,7 +2293,6 @@ const B2BSales = () => {
                           <div className='d-flex position-relative'>
                             <button
                               className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
-                              onClick={() => handleCrmFilterClick(index)}
                             >
                               {filter.name}
                               <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
@@ -2948,382 +2324,7 @@ const B2BSales = () => {
             </nav>
           </div>
 
-          {/* Advanced Filters */}
-          {!isFilterCollapsed && (
-            <div
-              className="modal show fade d-block"
-              style={{
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                zIndex: 1050
-              }}
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setIsFilterCollapsed(true);
-              }}
-            >
-              <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
-                <div className="modal-content">
-                  {/* Modal Header - Fixed at top */}
-                  <div className="modal-header bg-white border-bottom">
-                    <div className="d-flex justify-content-between align-items-center w-100">
-                      <div className="d-flex align-items-center">
-                        <i className="fas fa-filter text-primary me-2"></i>
-                        <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                        {totalSelected > 0 && (
-                          <span className="badge bg-primary ms-2">
-                            {totalSelected} Active
-                          </span>
-                        )}
-                      </div>
-                      <div className="d-flex align-items-center gap-2">
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={clearAllFilters}
-                        >
-                          <i className="fas fa-times-circle me-1"></i>
-                          Clear All
-                        </button>
-                        <button
-                          className="btn-close"
-                          onClick={() => setIsFilterCollapsed(true)}
-                          aria-label="Close"
-                        ></button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Modal Body - Scrollable content */}
-                  <div className="modal-body p-4">
-                    <div className="row g-4">
-                      {/* Course Type Filter */}
-                      <div className="col-md-3">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-graduation-cap me-1 text-success"></i>
-                           Type of B2B
-                        </label>
-                        <div className="position-relative">
-                          <select
-                            className="form-select"
-                            name="b2bType"
-                            value={filterData.b2bType}
-                            onChange={handleFilterChange}
-                          >
-                            <option value="">All Types</option>
-                            <option value="Free">🆓 Free</option>
-                            <option value="Paid">💰 Paid</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div className="col-md-3">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-graduation-cap me-1 text-success"></i>
-                           Lead Category
-                        </label>
-                        <div className="position-relative">
-                          <select
-                            className="form-select"
-                            name="leadCategory"
-                            value={filterData.leadCategory}
-                            onChange={handleFilterChange}
-                          >
-                            <option value="">All Types</option>
-                            <option value="Free">🆓 Free</option>
-                            <option value="Paid">💰 Paid</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div className="col-md-3">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-graduation-cap me-1 text-success"></i>
-                           Lead Owner
-                        </label>
-                        <div className="position-relative">
-                          <select
-                            className="form-select"
-                            name="leadOwner"
-                            value={filterData.leadOwner}
-                            onChange={handleFilterChange}
-                          >
-                            <option value="">All Types</option>
-                            <option value="Free">🆓 Free</option>
-                            <option value="Paid">💰 Paid</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Date Filters Section */}
-                    <div className="row g-4 mt-3">
-                      <div className="col-12">
-                        <h6 className="text-dark fw-bold mb-3">
-                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
-                          Date Range Filters
-                        </h6>
-                      </div>
-
-                      {/* Created Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-plus me-1 text-success"></i>
-                          Lead Creation Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
-                                value={filterData.createdFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                maxDate={filterData.createdToDate || new Date()}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
-                                value={filterData.createdToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-success"></i>}
-                                minDate={filterData.createdFromDate}
-                                maxDate={new Date()}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.createdFromDate || filterData.createdToDate) && (
-                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
-                              <small className="text-success">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
-                                {filterData.createdToDate && ` To ${formatDate(filterData.createdToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('created')}
-                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Created Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Modified Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-edit me-1 text-warning"></i>
-                          Lead Modification Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
-                                value={filterData.modifiedFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                maxDate={filterData.modifiedToDate || new Date()}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
-                                value={filterData.modifiedToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-warning"></i>}
-                                minDate={filterData.modifiedFromDate}
-                                maxDate={new Date()}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
-                              <small className="text-warning">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
-                                {filterData.modifiedToDate && ` To ${formatDate(filterData.modifiedToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('modified')}
-                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Next Action Date Range */}
-                      <div className="col-md-4">
-                        <label className="form-label small fw-bold text-dark">
-                          <i className="fas fa-calendar-check me-1 text-info"></i>
-                          Next Action Date Range
-                        </label>
-                        <div className="card border-0 bg-light p-3">
-                          <div className="row g-2">
-                            <div className="col-6">
-                              <label className="form-label small">From Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
-                                value={filterData.nextActionFromDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                maxDate={filterData.nextActionToDate}
-                              />
-                            </div>
-                            <div className="col-6">
-                              <label className="form-label small">To Date</label>
-                              <DatePicker
-                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
-                                value={filterData.nextActionToDate}
-                                format="dd/MM/yyyy"
-                                className="form-control p-0"
-                                clearIcon={null}
-                                calendarIcon={<i className="fas fa-calendar text-info"></i>}
-                                minDate={filterData.nextActionFromDate}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Show selected dates */}
-                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
-                              <small className="text-info">
-                                <i className="fas fa-info-circle me-1"></i>
-                                <strong>Selected:</strong>
-                                {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
-                                {filterData.nextActionToDate && ` To ${formatDate(filterData.nextActionToDate)}`}
-                              </small>
-                            </div>
-                          )}
-
-                          {/* Clear button */}
-                          <div className="mt-2">
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => clearDateFilter('nextAction')}
-                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
-                            >
-                              <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Results Summary */}
-                    <div className="row mt-4">
-                      <div className="col-12">
-                        <div className="alert alert-info">
-                          <div className="d-flex align-items-center">
-                            <i className="fas fa-info-circle me-2"></i>
-                            <div>
-                              <strong>Results Summary:</strong> Showing {allProfiles.length} results on page {currentPage} of {totalPages}
-
-                              {/* Active filter indicators */}
-                              <div className="mt-2">
-                                {(filterData.createdFromDate || filterData.createdToDate) && (
-                                  <span className="badge bg-success me-2">
-                                    <i className="fas fa-calendar-plus me-1"></i>
-                                    Created Date Filter Active
-                                  </span>
-                                )}
-
-                                {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                                  <span className="badge bg-warning me-2">
-                                    <i className="fas fa-calendar-edit me-1"></i>
-                                    Modified Date Filter Active
-                                  </span>
-                                )}
-
-                                {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                                  <span className="badge bg-info me-2">
-                                    <i className="fas fa-calendar-check me-1"></i>
-                                    Next Action Date Filter Active
-                                  </span>
-                                )}
-
-                                {totalSelected > 0 && (
-                                  <span className="badge bg-primary me-2">
-                                    <i className="fas fa-filter me-1"></i>
-                                    {totalSelected} Multi-Select Filters Active
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Modal Footer - Fixed at bottom */}
-                  <div className="modal-footer bg-light border-top">
-                    <div className="d-flex justify-content-between align-items-center w-100">
-                      <div className="text-muted small">
-                        <i className="fas fa-filter me-1"></i>
-                        {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
-                      </div>
-                      <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-outline-secondary"
-                          onClick={() => setIsFilterCollapsed(true)}
-                        >
-                          <i className="fas fa-eye-slash me-1"></i>
-                          Hide Filters
-                        </button>
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => {
-                            fetchProfileData(filterData);
-                            setIsFilterCollapsed(true);
-                          }}
-                        >
-                          <i className="fas fa-search me-1"></i>
-                          Apply Filters
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+        
 
 
           {/* Main Content */}
@@ -3332,1098 +2333,577 @@ const B2BSales = () => {
             transition: 'margin-top 0.2s ease-in-out'
           }}>
             <section className="list-view">
-              <div className="row">
+              
+              {/* Loading State */}
+              {loadingLeads ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-3 text-muted">Loading B2B leads...</p>
+                </div>
+              ) : leads.length === 0 ? (
+                <div className="text-center py-5">
+                  <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                  <h5 className="mt-3 text-muted">No B2B Leads Found</h5>
+                  <p className="text-muted">Start by adding your first B2B lead using the "Add Lead" button.</p>
+                </div>
+              ) : (
+                <div className="row g-3">
+                  {leads.map((lead, leadIndex) => (
+                    <div key={lead._id || leadIndex} className="col-12">
+                      <div className="lead-card">
+                        {/* Card Header */}
+                        <div className="lead-header">
+                          <div className="lead-title-section">
+                            <h5 className="lead-business-name">
+                              {lead.businessName || 'Business Name Not Available'}
+                            </h5>
+                            <p className="lead-contact-person">
+                              <i className="fas fa-user me-2"></i>
+                              {lead.concernPersonName || 'Contact Person Not Available'}
+                            </p>
+                          </div>
+                          <div className="lead-badges">
+                            {lead.leadCategory?.name && (
+                              <span className="lead-badge category">
+                                {lead.leadCategory.name}
+                              </span>
+                            )}
+                            {lead.typeOfB2B?.name && (
+                              <span className="lead-badge type">
+                                {lead.typeOfB2B.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Content */}
+                        <div className="lead-content">
+                          {/* Contact Info Grid */}
+                          <div className="contact-grid">
+                            <div className="contact-item">
+                              <div className="contact-icon">
+                                <i className="fas fa-envelope"></i>
+                              </div>
+                              <div className="contact-details">
+                                <span className="contact-label">Email</span>
+                                <span className="contact-value">
+                                  {lead.email || 'Not provided'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="contact-item">
+                              <div className="contact-icon">
+                                <i className="fas fa-id-badge"></i>
+                              </div>
+                              <div className="contact-details">
+                                <span className="contact-label">Designation</span>
+                                <span className="contact-value">
+                                  {lead.designation || 'Not specified'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="contact-item">
+                              <div className="contact-icon phone">
+                                <i className="fas fa-phone"></i>
+                              </div>
+                              <div className="contact-details">
+                                <span className="contact-label">Mobile</span>
+                                <span className="contact-value">
+                                  {lead.mobile ? (
+                                    <a href={`tel:${lead.mobile}`} className="contact-link">
+                                      {lead.mobile}
+                                    </a>
+                                  ) : 'Not provided'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="contact-item">
+                              <div className="contact-icon whatsapp">
+                                <i className="fab fa-whatsapp"></i>
+                              </div>
+                              <div className="contact-details">
+                                <span className="contact-label">WhatsApp</span>
+                                <span className="contact-value">
+                                  {lead.whatsapp ? (
+                                    <a href={`https://wa.me/${lead.whatsapp}`} target="_blank" rel="noopener noreferrer" className="contact-link">
+                                      {lead.whatsapp}
+                                    </a>
+                                  ) : 'Not provided'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Address Section */}
+                          {lead.address && (
+                            <div className="address-section">
+                              <div className="contact-item">
+                                <div className="contact-icon address">
+                                  <i className="fas fa-map-marker-alt"></i>
+                                </div>
+                                <div className="contact-details">
+                                  <span className="contact-label">Address</span>
+                                  <span className="contact-value address-text">
+                                    {lead.address}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Lead Owner Section */}
+                          {lead.leadOwner?.name && (
+                            <div className="owner-section">
+                              <div className="contact-item">
+                                <div className="contact-icon owner">
+                                  <i className="fas fa-user-tie"></i>
+                                </div>
+                                <div className="contact-details">
+                                  <span className="contact-label">Lead Owner</span>
+                                  <span className="contact-value">
+                                    {lead.leadOwner.name}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Lead Added By Section */}
+                          {lead.addedBy?.name && (
+                            <div className="owner-section">
+                              <div className="contact-item">
+                                <div className="contact-icon added-by">
+                                  <i className="fas fa-user-plus"></i>
+                                </div>
+                                <div className="contact-details">
+                                  <span className="contact-label">Added By</span>
+                                  <span className="contact-value">
+                                    {lead.addedBy.name}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="lead-actions">
+                          <div className="action-group primary">
+                            <button
+                              className="action-btn view"
+                              onClick={() => togglePopup(leadIndex)}
+                              title="View Details"
+                            >
+                              <i className="fas fa-eye"></i>
+                              <span>View</span>
+                            </button>
+                            <button
+                              className="action-btn refer"
+                              onClick={() => openRefferPanel(lead, 'Reffer')}
+                              title="Refer Lead"
+                            >
+                              <i className="fas fa-share"></i>
+                              <span>Refer</span>
+                            </button>
+                            <button
+                              className="action-btn history"
+                              onClick={() => openleadHistoryPanel(lead)}
+                              title="Lead History"
+                            >
+                              <i className="fas fa-history"></i>
+                              <span>History</span>
+                            </button>
+                          </div>
+                          <div className="action-group secondary">
+                            <button
+                              className="action-btn status"
+                              onClick={() => openEditPanel(lead, 'StatusChange')}
+                              title="Change Status"
+                            >
+                              <i className="fas fa-edit"></i>
+                            </button>
+                            <button
+                              className="action-btn followup"
+                              onClick={() => openEditPanel(lead, 'SetFollowup')}
+                              title="Set Follow-up"
+                            >
+                              <i className="fas fa-calendar-plus"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Pagination */}
+              <nav aria-label="Page navigation" className="mt-4">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <small className="text-muted">
+              Page {currentPage} of {totalPages} ({leads.length} results)
+            </small>
+          </div>
+
+          <ul className="pagination justify-content-center">
+            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+              <button
+                className="page-link"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                &laquo;
+              </button>
+            </li>
+
+            {currentPage > 3 && (
+              <>
+                <li className="page-item">
+                  <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
+                </li>
+                {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+              </>
+            )}
+
+            {getPaginationPages().map((pageNumber) => (
+              <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
+                <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
+                  {pageNumber}
+                </button>
+              </li>
+            ))}
+
+            {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
+              <>
+                {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+                <li className="page-item">
+                  <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
+                </li>
+              </>
+            )}
+
+            <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+              <button
+                className="page-link"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                &raquo;
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </section>
+    </div>
+
+        </div >
+
+  {/* Right Sidebar for Desktop - Panels */ }
+{
+  !isMobile && (
+    <div className="col-4">
+      <div className="row " style={{
+        transition: 'margin-top 0.2s ease-in-out',
+        position: 'fixed'
+      }}>
+        {renderEditPanel()}
+        {renderRefferPanel()}
+        {renderLeadHistoryPanel()}
+      </div>
+    </div>
+  )
+}
+
+{/* Mobile Modals */ }
+{ isMobile && renderEditPanel() }
+{ isMobile && renderRefferPanel() }
+{ isMobile && renderLeadHistoryPanel() }
+
+      </div >
+{/* Lead Add modal Start*/ }
+{
+  showAddLeadModal && (
+    <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060, maxHeight: '100vh', overflowY: 'auto' }}>
+      <div className="modal-dialog modal-lg modal-dialog-centered">
+        <div className="modal-content">
+          {/* Modal Header */}
+          <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
+            <h5 className="modal-title d-flex align-items-center">
+              <i className="fas fa-user-plus me-2"></i>
+              Add New B2B Lead
+            </h5>
+            <button
+              type="button"
+              className="btn-close btn-close-white"
+              onClick={handleCloseLeadModal}
+            ></button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="modal-body p-4 " style={{ maxHeight: '100vh', overflowY: 'auto' }}>
+            <div className="row g-3">
+              {/* Lead Category */}
+              <div className="col-md-6">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-tag text-primary me-1"></i>
+                  Lead Category <span className="text-danger">*</span>
+                </label>
+                <select
+                  className={`form-select ${formErrors.leadCategory ? 'is-invalid' : ''}`}
+                  name="leadCategory"
+                  value={leadFormData.leadCategory}
+                  onChange={handleLeadInputChange}
+                >
+                  <option value="">Select Lead Category</option>
+                  {leadCategoryOptions.map(category => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.leadCategory && (
+                  <div className="invalid-feedback">
+                    {formErrors.leadCategory}
+                  </div>
+                )}
+              </div>
+
+              {/* Type of B2B */}
+              <div className="col-md-6">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-building text-primary me-1"></i>
+                  Type of B2B <span className="text-danger">*</span>
+                </label>
+                <select
+                  className={`form-select ${formErrors.typeOfB2B ? 'is-invalid' : ''}`}
+                  name="typeOfB2B"
+                  value={leadFormData.typeOfB2B}
+                  onChange={handleLeadInputChange}
+                >
+                  <option value="">Select B2B Type</option>
+                  {typeOfB2BOptions.map(type => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.typeOfB2B && (
+                  <div className="invalid-feedback">
+                    {formErrors.typeOfB2B}
+                  </div>
+                )}
+              </div>
+
+              {/* Business Name */}
+              <div className="col-12">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-briefcase text-primary me-1"></i>
+                  Business Name <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  ref={businessNameInputRef}
+                  className={`form-control ${formErrors.businessName ? 'is-invalid' : ''}`}
+                  name="businessName"
+                  value={leadFormData.businessName}
+                  onChange={handleLeadInputChange}
+                  placeholder="Enter business/company name"
+                />
+
+                {formErrors.businessName && (
+                  <div className="invalid-feedback">
+                    {formErrors.businessName}
+                  </div>
+                )}
+              </div>
+
+              {/* Business Address with Google Maps */}
+              <div className="col-12">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-map-marker-alt text-primary me-1"></i>
+                  Business Address
+                </label>
+                <input
+
+                  type="text"
+                  className={`form-control ${formErrors.businessAddress ? 'is-invalid' : ''}`}
+                  name="address"
+                  value={leadFormData.address}
+                  onChange={handleLeadInputChange}
+                  placeholder="Enter business address"
+                />
+
+                {formErrors.businessAddress && (
+                  <div className="invalid-feedback d-block">
+                    {formErrors.businessAddress}
+                  </div>
+                )}
+              </div>
+
+              {/* Concern Person Name */}
+              <div className="col-md-6">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-user text-primary me-1"></i>
+                  Concern Person Name <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className={`form-control ${formErrors.concernPersonName ? 'is-invalid' : ''}`}
+                  name="concernPersonName"
+                  value={leadFormData.concernPersonName}
+                  onChange={handleLeadInputChange}
+                  placeholder="Enter contact person name"
+                />
+                {formErrors.concernPersonName && (
+                  <div className="invalid-feedback">
+                    {formErrors.concernPersonName}
+                  </div>
+                )}
+              </div>
+
+              {/* Designation */}
+              <div className="col-md-6">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-id-badge text-primary me-1"></i>
+                  Designation
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  name="designation"
+                  value={leadFormData.designation}
+                  onChange={handleLeadInputChange}
+                  placeholder="e.g., HR Manager, CEO, Director"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="col-md-6">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-envelope text-primary me-1"></i>
+                  Email <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="email"
+                  className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
+                  name="email"
+                  value={leadFormData.email}
+                  onChange={handleLeadInputChange}
+                  placeholder="Enter email address"
+                />
+                {formErrors.email && (
+                  <div className="invalid-feedback">
+                    {formErrors.email}
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile */}
+              <div className="col-md-6">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-phone text-primary me-1"></i>
+                  Mobile <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  className={`form-control ${formErrors.mobile ? 'is-invalid' : ''}`}
+                  name="mobile"
+                  value={leadFormData.mobile}
+                  onChange={handleLeadMobileChange}
+                  placeholder="Enter mobile number"
+                />
+                {formErrors.mobile && (
+                  <div className="invalid-feedback">
+                    {formErrors.mobile}
+                  </div>
+                )}
+              </div>
+
+              {/* WhatsApp */}
+              <div className="col-md-6">
+                <label className="form-label fw-bold">
+                  <i className="fab fa-whatsapp text-success me-1"></i>
+                  WhatsApp
+                </label>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  className={`form-control ${formErrors.whatsapp ? 'is-invalid' : ''}`}
+                  name="whatsapp"
+                  value={leadFormData.whatsapp}
+                  onChange={handleLeadMobileChange}
+                  placeholder="WhatsApp number"
+                />
+                {formErrors.whatsapp && (
+                  <div className="invalid-feedback">
+                    {formErrors.whatsapp}
+                  </div>
+                )}
+              </div>
+
+              {/* Lead Owner */}
+              <div className="col-md-6">
+                <label className="form-label fw-bold">
+                  <i className="fas fa-user-tie text-primary me-1"></i>
+                  Lead Owner
+                </label>
+                <select
+                  className="form-select"
+                  name="leadOwner"
+                  value={leadFormData.leadOwner}
+                  onChange={handleLeadInputChange}
+                >
+                  <option value="">Select Lead Owner</option>
+                  {users?.map(user => (
+                    <option key={user?._id} value={user?._id}>
+                      {user?.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+
+            </div>
+
+            {/* Form Actions */}
+            <div className="row mt-4">
+              <div className="col-12">
                 <div className="d-flex justify-content-end gap-2">
                   <button
-                    className="btn btn-sm btn-outline-primary"
-                    disabled={isLoadingProfiles || allProfiles.length === 0}
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    onClick={() => {
-                      openRefferPanel(null, 'RefferAllLeads');
-                      console.log('selectedProfile', null);
-                    }}
+                    type="button"
+                    className="btn btn-outline-secondary px-4"
+                    onClick={handleCloseLeadModal}
                   >
-                    <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
-                    Refer All Leads
+                    <i className="fas fa-times me-1"></i>
+                    Cancel
                   </button>
                   <button
-                    className="btn btn-sm btn-outline-secondary"
-                    disabled={isLoadingProfiles || allProfiles.length === 0}
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
+                    type="button"
+                    className="btn px-4"
+                    style={{ backgroundColor: '#fc2b5a', color: 'white' }}
+                    onClick={handleLeadSubmit}
                   >
-                    <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
-                    Bulk Action
+                    <i className="fas fa-save me-1"></i>
+                    Add Lead
                   </button>
-
-
                 </div>
               </div>
-              <div className='row'>
-                <div>
-                  <div className="col-12 rounded equal-height-2 coloumn-2">
-                    <div className="card px-3">
-                      <div className="row" id="crm-main-row">
-
-                        {/* Loading State */}
-                        {isLoadingProfiles && (
-                          <div className="col-12 text-center py-5">
-                            <div className="d-flex flex-column align-items-center">
-                              <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
-                                <span className="visually-hidden">Loading...</span>
-                              </div>
-                              <h5 className="text-muted">Loading profiles...</h5>
-                              <p className="text-muted small">Please wait while we fetch the latest data</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Profiles List */}
-                        {!isLoadingProfiles && allProfiles.map((profile, profileIndex) => (
-                          <div className={`card-content transition-col mb-2`} key={profileIndex}>
-
-                            {/* Profile Header Card */}
-                            <div className="card border-0 shadow-sm mb-0 mt-2">
-                              <div className="card-body px-1 py-0 my-2">
-                                <div className="row align-items-center">
-                                  <div className="col-md-6">
-                                    <div className="d-flex align-items-center">
-                                      <div className="form-check me-3">
-                                        <input onChange={(e) => handleCheckboxChange(profile, e.target.checked)} className="form-check-input" type="checkbox" />
-                                      </div>
-                                      
-                                      <div>
-                                        <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
-                                        <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
-                                      </div>
-                                      <div style={{ marginLeft: '15px' }}>
-                                        <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                          <a href={`tel:${profile._candidate?.mobile}`} target="_blank" rel="noopener noreferrer">
-                                            <i className="fas fa-phone"></i>
-                                          </a>
-                                        </button>
-                                        {/* <button
-                                        className="btn btn-outline-success btn-sm border-0"
-                                        onClick={openWhatsappPanel}
-                                        style={{ fontSize: '20px' }}
-                                        title="WhatsApp"
-                                      >
-                                        <i className="fab fa-whatsapp"></i>
-                                      </button> */}
-                                        <a
-                                          className="btn btn-outline-success btn-sm border-0"
-                                          href={`https://wa.me/${profile._candidate?.mobile}`}
-                                          style={{ fontSize: '20px' }}
-                                          title="WhatsApp"
-                                          target="_blank"
-                                        >
-                                          <i className="fab fa-whatsapp"></i>
-                                        </a>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="col-md-4">
-                                    <div className="d-flex gap-2">
-                                      <div className="flex-grow-1">
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm m-0"
-                                          style={{
-                                            cursor: 'pointer',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '0px',
-                                            borderTopRightRadius: '5px',
-                                            borderTopLeftRadius: '5px',
-                                            width: '145px',
-                                            height: '20px',
-                                            fontSize: '10px'
-                                          }}
-                                          value={profile._leadStatus?.title}
-                                          readOnly
-                                          onClick={() => {
-                                            openEditPanel(profile, 'StatusChange');
-                                            console.log('selectedProfile', profile);
-                                          }}
-
-                                        />
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm m-0"
-                                          value={profile.selectedSubstatus?.title}
-                                          style={{
-                                            cursor: 'pointer',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '0px',
-                                            borderBottomRightRadius: '5px',
-                                            borderBottomLeftRadius: '5px',
-                                            width: '145px',
-                                            height: '20px',
-                                            fontSize: '10px'
-                                          }}
-                                          readOnly
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                    <div className="btn-group">
-
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => togglePopup(profileIndex)}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                        </button>
-
-                                        {/* Overlay for click outside */}
-                                        {showPopup === profileIndex && (
-                                          <div
-                                            onClick={() => setShowPopup(null)}
-                                            style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 8,
-                                            }}
-                                          ></div>
-                                        )}
-
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px", // button ke thoda niche
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 9,
-                                            transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                            transition: "transform 0.3s ease-in-out",
-                                            pointerEvents: showPopup ? "auto" : "none",
-                                            display: showPopup === profileIndex ? "block" : "none"
-                                          }}
-                                        >
-                                        
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openRefferPanel(profile, 'Reffer');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Reffer
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-
-                                            onClick={() => {
-                                              openleadHistoryPanel(profile);
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            History List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openRefferPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Set Followup
-                                          </button>
-
-                                         
-
-
-                                        </div>
-                                      </div>
-
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => setLeadDetailsVisible(profileIndex)}
-                                      >
-                                        {leadDetailsVisible === profileIndex ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <div className="col-md-2 text-end d-md-block d-sm-none d-none">
-                                    <div className="btn-group">
-
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => togglePopup(profileIndex)}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                        </button>
-
-                                        {/* Overlay for click outside */}
-                                        {showPopup === profileIndex && (
-                                          <div
-                                            onClick={() => setShowPopup(null)}
-                                            style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 8,
-                                            }}
-                                          ></div>
-                                        )}
-
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px", // button ke thoda niche
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 9,
-                                            transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                            transition: "transform 0.3s ease-in-out",
-                                            pointerEvents: showPopup === profileIndex ? "auto" : "none",
-                                            display: showPopup === profileIndex ? "block" : "none"
-                                          }}
-                                        >
-                                          
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              setShowPopup(null)
-                                              openRefferPanel(profile, 'Reffer');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Reffer
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => openleadHistoryPanel(profile)}
-                                          >
-                                            History List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openEditPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Set Followup
-                                          </button>
-
-
-                                        </div>
-                                      </div>
-
-
-
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => toggleLeadDetails(profileIndex)}
-                                      >
-                                        {leadDetailsVisible === profileIndex ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Tab Navigation and Content Card */}
-                            <div className="card border-0 shadow-sm mb-4">
-                              <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                <ul className="nav nav-pills nav-pills-sm">
-                                  {tabs.map((tab, tabIndex) => (
-                                    <li className="nav-item" key={tabIndex}>
-                                      <button
-                                        className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                        onClick={() => handleTabClick(profileIndex, tabIndex)}
-                                      >
-                                        {tab}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-
-                              {/* Tab Content - Only show if leadDetailsVisible is true */}
-                              {leadDetailsVisible === profileIndex && (
-                                <div className="tab-content">
-
-                                  {/* Lead Details Tab */}
-                                  {/* {activeTab === 0 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 0 && (
-                                    <div className="tab-pane active" id="lead-details">
-                                      {/* Your lead details content here */}
-                                      <div className="scrollable-container">
-                                        <div className="scrollable-content">
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD AGE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                : 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Lead Category</div>
-                                              <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Type of B2B</div>
-                                              <div className="info-value">{profile._course?.name}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Business Name</div>
-                                              <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                            </div>
-                                          </div>
-
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">Concern Person Name</div>
-                                              <div className="info-value">{profile._course?.typeOfProject}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Designation</div>
-                                              <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Email</div>
-                                              <div className="info-value">{profile.sector}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Mobile Number</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">WhatsApp Number</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                          </div>
-
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">STATE</div>
-                                              <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">City</div>
-                                              <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Lead Owner</div>
-                                              <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                            </div>
-
-                                          </div>
-                                        </div>
-                                      </div>
-
-
-                                      <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                      <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
-
-
-                                      <div className="desktop-view">
-                                        <div className="row g-4">
-
-                                          <div className="col-12">
-                                            <div className="scrollable-container">
-                                              <div className="scrollable-content">
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Category</div>
-                                                    <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Type of B2B</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Business Name</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Concern Person Name</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Designation</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Email</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Mobile Number</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">WhatsApp Number</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">City</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Owner</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                  </div>
-                                                 
-                                                  <div className="info-group">
-                                                    <div className="info-label">Remarks</div>
-                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                  </div>
-                                                 
-
-                                                </div>
-                                              </div>
-                                            </div>
-                                            <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                            <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
-
-                                            <div className="desktop-view">
-                                              <div className="row">
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">CITY</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Concern Person Name</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Designation</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Email</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Mobile Number</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">WhatsApp Number</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                </div>
-
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Type Of B2B</div>
-                                                    <div className="info-value">
-                                                      {profile.followups?.length > 0
-                                                        ?
-                                                        (() => {
-                                                          const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric',
-                                                          }).replace(/ /g, '-');
-                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                            hour12: true,
-                                                          });
-                                                          return `${datePart}, ${timePart}`;
-                                                        })()
-                                                        : 'N/A'}
-                                                    </div>
-
-                                                  </div>
-                                                </div>
-
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Category</div>
-                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Owner</div>
-                                                    <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-
-                                                          </div>
-                                                          )}
-                                                        </div>
-                            {/* Lead Add modal Start*/}
-                            {showAddLeadModal && (
-                            <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
-                              <div className="modal-dialog modal-lg modal-dialog-centered">
-                                <div className="modal-content">
-                                  {/* Modal Header */}
-                                  <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
-                                    <h5 className="modal-title d-flex align-items-center">
-                                      <i className="fas fa-user-plus me-2"></i>
-                                      Add New B2B Lead
-                                    </h5>
-                                    <button
-                                      type="button"
-                                      className="btn-close btn-close-white"
-                                    onClick={handleCloseLeadModal}
-                                    ></button>
-                                  </div>
-
-                                  {/* Modal Body */}
-                                  <div className="modal-body p-4">
-                                    <div className="row g-3">
-                                      {/* Lead Category */}
-                                      <div className="col-md-6">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-tag text-primary me-1"></i>
-                                          Lead Category <span className="text-danger">*</span>
-                                        </label>
-                                        <select
-                                          className={`form-select ${formErrors.leadCategory ? 'is-invalid' : ''}`}
-                                          name="leadCategory"
-                                          value={leadFormData.leadCategory}
-                                          onChange={handleLeadInputChange}
-                                        >
-                                          <option value="">Select Lead Category</option>
-                                          {leadCategoryOptions.map(category => (
-                                              <option key={category.value} value={category.value}>
-                                                {category.label}
-                                              </option>
-                                            ))}
-                                        </select>
-                                        {formErrors.leadCategory && (
-                                          <div className="invalid-feedback">
-                                            {formErrors.leadCategory}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Type of B2B */}
-                                      <div className="col-md-6">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-building text-primary me-1"></i>
-                                          Type of B2B <span className="text-danger">*</span>
-                                        </label>
-                                        <select
-                                          className={`form-select ${formErrors.typeOfB2B ? 'is-invalid' : ''}`}
-                                          name="typeOfB2B"
-                                          value={leadFormData.typeOfB2B}
-                                          onChange={handleLeadInputChange}
-                                        >
-                                          <option value="">Select B2B Type</option>
-                                          {typeOfB2BOptions.map(type => (
-                                            <option key={type.value} value={type.value}>
-                                              {type.label}
-                                            </option>
-                                          ))}
-                                        </select>
-                                        {formErrors.typeOfB2B && (
-                                          <div className="invalid-feedback">
-                                            {formErrors.typeOfB2B}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Business Name */}
-                                      <div className="col-12">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-briefcase text-primary me-1"></i>
-                                          Business Name <span className="text-danger">*</span>
-                                        </label>
-                                        <input
-                                          type="text"
-                                          className={`form-control ${formErrors.businessName ? 'is-invalid' : ''}`}
-                                          name="businessName"
-                                          value={leadFormData.businessName}
-                                          onChange={handleLeadInputChange}
-                                          placeholder="Enter business/company name"
-                                        />
-                                        {formErrors.businessName && (
-                                          <div className="invalid-feedback">
-                                            {formErrors.businessName}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Business Address with Google Maps */}
-                                      <div className="col-12">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-map-marker-alt text-primary me-1"></i>
-                                          Business Address
-                                        </label>
-                                        <GoogleMapsLocationPicker
-                                          onLocationSelect={(location) => {
-                                            setSelectedLocation(location);
-                                            setLeadFormData(prev => ({
-                                              ...prev,
-                                              businessAddress: location.address
-                                            }));
-                                          }}
-                                          selectedLocation={selectedLocation}
-                                            placeholder="Enter business address or use map to select"
-                                            disabled={loading}
-                                          />
-                                        {formErrors.businessAddress && (
-                                          <div className="invalid-feedback d-block">
-                                            {formErrors.businessAddress}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Concern Person Name */}
-                                      <div className="col-md-6">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-user text-primary me-1"></i>
-                                          Concern Person Name <span className="text-danger">*</span>
-                                        </label>
-                                        <input
-                                          type="text"
-                                          className={`form-control ${formErrors.concernPersonName ? 'is-invalid' : ''}`}
-                                          name="concernPersonName"
-                                          value={leadFormData.concernPersonName}
-                                          onChange={handleLeadInputChange}
-                                          placeholder="Enter contact person name"
-                                        />
-                                        {formErrors.concernPersonName && (
-                                          <div className="invalid-feedback">
-                                            {formErrors.concernPersonName}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Designation */}
-                                      <div className="col-md-6">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-id-badge text-primary me-1"></i>
-                                          Designation
-                                        </label>
-                                        <input
-                                          type="text"
-                                          className="form-control"
-                                          name="designation"
-                                          value={leadFormData.designation}
-                                          onChange={handleLeadInputChange}
-                                          placeholder="e.g., HR Manager, CEO, Director"
-                                        />
-                                      </div>
-
-                                      {/* Email */}
-                                      <div className="col-md-6">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-envelope text-primary me-1"></i>
-                                          Email <span className="text-danger">*</span>
-                                        </label>
-                                        <input
-                                          type="email"
-                                          className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
-                                          name="email"
-                                          value={leadFormData.email}
-                                          onChange={handleLeadInputChange}
-                                          placeholder="Enter email address"
-                                        />
-                                        {formErrors.email && (
-                                          <div className="invalid-feedback">
-                                            {formErrors.email}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Mobile */}
-                                      <div className="col-md-6">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-phone text-primary me-1"></i>
-                                          Mobile <span className="text-danger">*</span>
-                                        </label>
-                                        <input
-                                          type="tel"
-                                          className={`form-control ${formErrors.mobile ? 'is-invalid' : ''}`}
-                                          name="mobile"
-                                          value={leadFormData.mobile}
-                                          onChange={handleLeadMobileChange}
-                                          placeholder="Enter mobile number"
-                                        />
-                                        {formErrors.mobile && (
-                                          <div className="invalid-feedback">
-                                            {formErrors.mobile}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* WhatsApp */}
-                                      <div className="col-md-6">
-                                        <label className="form-label fw-bold">
-                                          <i className="fab fa-whatsapp text-success me-1"></i>
-                                          WhatsApp
-                                        </label>
-                                        <input
-                                          type="tel"
-                                          className={`form-control ${formErrors.whatsapp ? 'is-invalid' : ''}`}
-                                          name="whatsapp"
-                                          value={leadFormData.whatsapp}
-                                          onChange={handleLeadMobileChange}
-                                          placeholder="WhatsApp number"
-                                        />
-                                        {formErrors.whatsapp && (
-                                          <div className="invalid-feedback">
-                                            {formErrors.whatsapp}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Lead Owner */}
-                                      <div className="col-md-6">
-                                        <label className="form-label fw-bold">
-                                          <i className="fas fa-user-tie text-primary me-1"></i>
-                                          Lead Owner
-                                        </label>
-                                        <select
-                                          className="form-select"
-                                          name="leadOwner"
-                                          value={leadFormData.leadOwner}
-                                          onChange={handleLeadInputChange}
-                                        >
-                                          <option value="">Select Lead Owner</option>
-                                          {/* {leadOwners.map(owner => (
-                                            <option key={owner.value} value={owner.value}>
-                                              {owner.label}
-                                            </option>
-                                          ))} */}
-                                        </select>
-                                      </div>
-
-                                      {/* Extracted Numbers Display */}
-                                      {extractedNumbers.length > 0 && (
-                                        <div className="col-12">
-                                          <div className="alert alert-info">
-                                            <div className="d-flex align-items-center mb-2">
-                                              <i className="fas fa-phone text-primary me-2"></i>
-                                              <strong>Extracted Mobile/WhatsApp Numbers ({extractedNumbers.length}):</strong>
-                                            </div>
-                                            <div className="row g-2">
-                                              {extractedNumbers.map((number, index) => (
-                                                <div key={index} className="col-md-3 col-sm-6">
-                                                  <span className="badge bg-success me-1">
-                                                    <i className="fas fa-check me-1"></i>
-                                                    {number}
-                                                  </span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Form Actions */}
-                                    <div className="row mt-4">
-                                      <div className="col-12">
-                                        <div className="d-flex justify-content-end gap-2">
-                                          <button
-                                            type="button"
-                                            className="btn btn-outline-secondary px-4"
-                                            onClick={handleCloseLeadModal}
-                                          >
-                                            <i className="fas fa-times me-1"></i>
-                                            Cancel
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="btn px-4"
-                                            style={{ backgroundColor: '#fc2b5a', color: 'white' }}
-                                            onClick={handleLeadSubmit}
-                                          >
-                                            <i className="fas fa-save me-1"></i>
-                                            Add Lead
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            )}
-                            {/* Lead Add modal End */}
-
-
-                            <style>
-                              {
-                                `.new-modal-content{
-                                 width:1000px!important;
-                                 transform: translateX(25%);
-                                 }
-
-                                 @media(max-width:768px){
-                                 .new-modal-content{
-                                 width:100%!important;
-                                 transform: translateX(0%)
-                                 }
-                                 }
-                                  `
-                              }
-                            </style>
-                          </div>
-
-
-                        ))}
-
-
-
-
-                      </div>
-
-
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              <nav aria-label="Page navigation" className="mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <small className="text-muted">
-                    Page {currentPage} of {totalPages} ({allProfiles.length} results)
-                  </small>
-                </div>
-
-                <ul className="pagination justify-content-center">
-                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                    <button
-                      className="page-link"
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                    >
-                      &laquo;
-                    </button>
-                  </li>
-
-                  {currentPage > 3 && (
-                    <>
-                      <li className="page-item">
-                        <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
-                      </li>
-                      {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-                    </>
-                  )}
-
-                  {getPaginationPages().map((pageNumber) => (
-                    <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-                      <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
-                        {pageNumber}
-                      </button>
-                    </li>
-                  ))}
-
-                  {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
-                    <>
-                      {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-                      <li className="page-item">
-                        <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
-                      </li>
-                    </>
-                  )}
-
-                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                    <button
-                      className="page-link"
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                    >
-                      &raquo;
-                    </button>
-                  </li>
-                </ul>
-              </nav>
-            </section>
-          </div>
-
-        </div>
-
-        {/* Right Sidebar for Desktop - Panels */}
-        {!isMobile && (
-          <div className="col-4">
-            <div className="row " style={{
-              transition: 'margin-top 0.2s ease-in-out',
-              position: 'fixed'
-            }}>
-              {renderEditPanel()}
-              {renderRefferPanel()}
-              {renderLeadHistoryPanel()}
             </div>
           </div>
-        )}
-
-        {/* Mobile Modals */}
-        {isMobile && renderEditPanel()}
-        {isMobile && renderRefferPanel()}
-        {isMobile && renderLeadHistoryPanel()}
-
+        </div>
       </div>
-      <UploadModal />
-
-     
-      
     </div>
+  )
+}
+
+
+    </div >
   );
 };
 

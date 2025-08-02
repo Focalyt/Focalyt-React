@@ -25,15 +25,26 @@ function CollegeLayout({ children }) {
   const [user, setUser] = useState();
   const location = useLocation();
 
-  // useEffect(() => {
-  //   const token = localStorage.getItem('token');
-  //   const collegeData = localStorage.getItem('collegeName');
-  //   if (token && collegeData) {
-  //     setUser({ token, collegeName: collegeData });
-  //   } else {
-  //     navigate('/institute/login');
-  //   }
-  // }, []);
+  useEffect(() => {
+    const userFromStorage = sessionStorage.getItem('user');
+    console.log(userFromStorage, 'userFromStorage');
+    if (!userFromStorage) {
+      navigate('/institute/login');
+      return;
+    }
+    try {
+      const parsedUser = JSON.parse(userFromStorage);
+      if (!parsedUser || parsedUser.role !== 2) {
+        navigate('/institute/login');
+        return;
+      }
+      setUser(parsedUser);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      navigate('/institute/login');
+      return;
+    }
+  }, []);
 
 
 

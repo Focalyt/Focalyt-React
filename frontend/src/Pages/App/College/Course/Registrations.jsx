@@ -804,6 +804,7 @@ const CRMDashboard = () => {
 
   // Loading state for fetchProfileData
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
+  const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
 
   // 1. State
   const [verticalOptions, setVerticalOptions] = useState([]);
@@ -1997,8 +1998,9 @@ const CRMDashboard = () => {
   };
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
-    try {
-      setIsLoadingProfiles(true);
+    setIsLoadingProfiles(true);
+    setLeadDetailsVisible(null);
+    fetchRegistrationCrmFilterCounts();
 
       if (!token) {
         console.warn('No token found in session storage.');
@@ -2027,6 +2029,9 @@ const CRMDashboard = () => {
         ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
         ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
+    
+    try {
+      
       console.log('API counselor:', formData.counselor.values);
 
       const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
@@ -2043,9 +2048,9 @@ const CRMDashboard = () => {
         setPageSize(data.limit);
 
         // Update CRM filter counts from backend
-        if (data.crmFilterCounts) {
-          updateCrmFiltersFromBackend(data.crmFilterCounts);
-        }
+        // if (data.crmFilterCounts) {
+        //   updateCrmFiltersFromBackend(data.crmFilterCounts);
+        // }
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -2054,8 +2059,97 @@ const CRMDashboard = () => {
       console.error('Error fetching profile data:', error);
     } finally {
       setIsLoadingProfiles(false);
+      
+
     }
   };
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage) => {
+
+      if (!token) {
+        console.warn('No token found in session storage.');
+        setIsLoadingProfiles(false);
+        return;
+      }
+
+      // Prepare query parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        ...(filters.name && { name: filters.name }),
+        ...(filters.courseType && { courseType: filters.courseType }),
+        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters.sector && { sector: filters.sector }),
+        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        // Multi-select filters
+        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+      });
+    
+    try {
+      
+      console.log('API counselor:', formData.counselor.values);
+
+      const response = await axios.get(`${backendUrl}/college/registrationCrmFilterCounts?${queryParams}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success && response.data) {
+        const data = response.data;
+        console.log('crm filter count', data);
+        updateCrmFiltersFromBackend(data.crmFilterCount)
+
+      } else {
+        console.error('Failed to fetch crm filter counts', response.data.message);
+      }
+
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchLeadDetails = async () => {
+      if(leadDetailsVisible === null || leadDetailsVisible === undefined){
+        return;
+      }
+      try{
+        setIsLoadingProfilesData(true);
+        const leadId = allProfiles[leadDetailsVisible]._id;
+        console.log('leadId', leadId)
+        const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
+          headers: { 'x-auth': token }
+        });
+
+        if (response.data.success && response.data.data) {
+
+          const data = response.data;
+          // Sirf ek state me data set karo - paginated data
+          if(!isLoadingProfiles){
+            allProfiles[leadDetailsVisible] = data.data;
+          }
+  
+          
+        } else {
+          console.error('Failed to fetch profile data', response.data.message);
+        }
+      }
+      catch (error) {
+        console.error('Error fetching profile data:', error);
+      }
+      finally {
+        setIsLoadingProfilesData(false);
+      }
+    }
+    fetchLeadDetails();
+  }, [leadDetailsVisible]);
 
 
   const [experiences, setExperiences] = useState([{
@@ -4101,13 +4195,13 @@ const CRMDashboard = () => {
                         )}
 
                         {/* Profiles List */}
-                        {!isLoadingProfiles && allProfiles.map((profile, profileIndex) => (
+                        {!isLoadingProfiles && allProfiles && allProfiles.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
                             {/* Profile Header Card */}
                             <div className="card border-0 shadow-sm mb-0 mt-2">
                               <div className="card-body px-1 py-0 my-2">
-                                <div className="row align-items-center">
+                                <div className="row align-items-center justify-content-around">
                                   <div className="col-md-7">
                                     <div className="d-flex align-items-center">
                                       <div className="form-check me-3">
@@ -4602,6 +4696,13 @@ const CRMDashboard = () => {
 
                               {/* Tab Content - Only show if leadDetailsVisible is true */}
                               {leadDetailsVisible === profileIndex && (
+                                isLoadingProfilesData ? (
+                                  <div className="text-center">
+                                    <div className="spinner-border" role="status">
+                                      <span className="visually-hidden">Loading...</span>
+                                    </div>
+                                  </div>
+                                ) : (
                                 <div className="tab-content">
 
                                   {/* Lead Details Tab */}
@@ -4758,7 +4859,7 @@ const CRMDashboard = () => {
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                    <div className="info-value">{profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
                                                   </div>
                                                 </div>
                                               </div>
@@ -4899,10 +5000,10 @@ const CRMDashboard = () => {
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
-                                                  </div>
+                                                                                                  <div className="info-group">
+                                                  <div className="info-label">Counsellor Name</div>
+                                                  <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
@@ -5755,7 +5856,7 @@ const CRMDashboard = () => {
                                     </div>
                                   )}
 
-                                </div>
+                                </div>)
                               )}
                             </div>
 

@@ -283,6 +283,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   const [mainTab, setMainTab] = useState('Ekyc'); // 'Ekyc' or 'AllAdmission'
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
+  const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
 
   const [activeTab, setActiveTab] = useState({});
   const [showPopup, setShowPopup] = useState(null);
@@ -1452,39 +1453,6 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     }
   };
 
-  const openEditPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
-
-    if (profile) {
-      setSelectedProfile(profile);
-    }
-
-    setShowEditPanel(false);
-    setShowFollowupPanel(false);
-    setShowWhatsappPanel(false);
-
-    if (panel === 'StatusChange') {
-      if (profile) {
-        const newStatus = profile?._leadStatus?._id || '';
-        setSelectedStatus(newStatus);
-
-        if (newStatus) {
-          await fetchSubStatus(newStatus);
-        }
-
-        setSelectedSubStatus(profile?.selectedSubstatus || '');
-      }
-      setShowEditPanel(true);
-    }
-    else if (panel === 'SetFollowup') {
-      setShowPopup(null)
-      setShowFollowupPanel(true);
-    }
-
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
 
   const closeEditPanel = () => {
     setShowEditPanel(false);
@@ -1510,53 +1478,9 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     }
   }, [selectedProfile]);
 
-  const openWhatsappPanel = () => {
-    setShowWhatsappPanel(true);
-    setShowEditPanel(false);
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
 
-  const closeWhatsappPanel = () => {
-    setShowWhatsappPanel(false);
-    if (!isMobile) {
-      // setMainContentClass(showEditPanel ? 'col-8' : 'col-12');
-      const hasOtherPanelsOpen = showEditPanel || showFollowupPanel || showWhatsappPanel;
-    setMainContentClass(hasOtherPanelsOpen ? 'col-8' : 'col-12');
-    }
-  };
 
-  const openChangeCenterPanel = async (profile = null) => {
-    if (profile) {
-      setSelectedProfile(profile);
-    }
 
-    setShowPopup(null)
-    setLeadHistoryPanel(true)
-    setShowWhatsappPanel(false);
-    setShowEditPanel(false);
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
-
-  const openleadHistoryPanel = async (profile = null) => {
-    if (profile) {
-      // Set selected profile
-      setSelectedProfile(profile);
-
-    }
-
-    setShowPopup(null);
-    setShowPanel('leadHistory');
-    setShowPanel('SetFollowup')
-    // setSelectedConcernPerson(null);
-    // setSelectedProfiles(null);
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
 
   const toggleLeadDetails = (profileIndex) => {
     setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
@@ -3406,6 +3330,13 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
                                     {/* Tab Content - Only show if leadDetailsVisible is true */}
                                     {leadDetailsVisible === profileIndex && (
+                                      isLoadingProfilesData ? (
+                                        <div className="text-center">
+                                          <div className="spinner-border" role="status">
+                                            <span className="visually-hidden">Loading...</span>
+                                          </div>
+                                        </div>
+                                      ) : (
                                       <div className="tab-content">
                                         {/* Lead Details Tab */}
                                         {(activeTab[profileIndex] || 0) === 0 && (
@@ -3549,7 +3480,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                         <div className="col-xl- col-3">
                                                           <div className="info-group">
                                                             <div className="info-label">Counsellor Name</div>
-                                                            <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                            <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
                                                           </div>
                                                         </div>
                                                       </div>
@@ -3835,7 +3766,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                         <div className="resume-skills-list">
                                                           {profile._candidate.personalInfo.skills.map((skill, index) => (
                                                             <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                              <div className="resume-skill-name">{skill.skillName || skill}</div>
+                                                              <div className="resume-skill-name">{skill.skillName || (typeof skill === 'string' ? skill : 'Skill')}</div>
                                                               {skill.skillPercent && (
                                                                 <div className="resume-skill-bar-container">
                                                                   <div
@@ -3857,7 +3788,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                         <div className="resume-languages-list">
                                                           {profile._candidate.personalInfo.languages.map((lang, index) => (
                                                             <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                              <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                              <div className="resume-language-name">{lang.name || lang.lname || (typeof lang === 'string' ? lang : 'Language')}</div>
                                                               {lang.level && (
                                                                 <div className="resume-language-level">
                                                                   {[1, 2, 3, 4, 5].map(dot => (
@@ -3880,7 +3811,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                         <ul className="resume-certifications-list">
                                                           {profile._candidate.personalInfo.certifications.map((cert, index) => (
                                                             <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                              <strong>{cert.certificateName || cert.name}</strong>
+                                                              <strong>{cert.certificateName || cert.name || 'Certification'}</strong>
                                                               {cert.orgName && (
                                                                 <span className="resume-cert-org"> - {cert.orgName}</span>
                                                               )}
@@ -4364,7 +4295,7 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                             })()}
                                           </div>
                                         )}
-                                      </div>
+                                      </div>)
                                     )}
                                   </div>
                                 </div>

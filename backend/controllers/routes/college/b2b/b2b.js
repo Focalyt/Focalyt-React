@@ -3,7 +3,7 @@ const axios = require("axios");
 const moment = require("moment");
 let fs = require("fs");
 let path = require("path");
-const { isCollege } = require("../../../../helpers");
+const { isCollege,getAllTeamMembers } = require("../../../../helpers");
 const fileupload = require("express-fileupload");
 const readXlsxFile = require("read-excel-file/node");
 const mongoose = require("mongoose");
@@ -12,7 +12,6 @@ const csv = require("fast-csv");
 const uuid = require('uuid/v1');
 const multer = require('multer');
 const AWS = require('aws-sdk');
-
 const {
 	accessKeyId,
 
@@ -440,76 +439,97 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 // Get all leads with filtering and pagination
 router.get('/leads', isCollege, async (req, res) => {
 	try {
-		const {
-			page = 1,
-			limit = 10,
-			status,
-			leadCategory,
-			typeOfB2B,
-			search,
-			sortBy = 'createdAt',
-			sortOrder = 'desc'
-		} = req.query;
+	  const {
+		page = 1,
+		limit = 10,
+		status,
+		leadCategory,
+		typeOfB2B,
+		search,
+		sortBy = 'createdAt',
+		sortOrder = 'desc'
+	  } = req.query;
+  
+	  let teamMembers = await getAllTeamMembers(req.user._id);
+	  const query = {};
+  
+	  // Ownership Conditions for team members
+	  const ownershipConditions = teamMembers.map(member => ({
+		$or: [{ leadAddedBy: member }, { leadOwner: member }]
+	  }));
+  
+	  // Search functionality conditions
+	  const searchConditions = search
+		? [{
+			$or: [
+			  { concernPersonName: { $regex: search, $options: 'i' } },
+			  { businessName: { $regex: search, $options: 'i' } },
+			  { email: { $regex: search, $options: 'i' } },
+			  { mobile: { $regex: search, $options: 'i' } }
+			]
+		  }]
+		: [];
+  
+	  // Combine Ownership and Search conditions
+	  const combinedConditions = [...ownershipConditions, ...searchConditions];
+  
+	  // Final Query Object
+	  const finalQuery = {
+		$and: [
+		  ...(combinedConditions.length > 0 ? [{ $or: combinedConditions.flatMap(c => c.$or || [c]) }] : []),
+		  ...(status ? [{ status }] : []),
+		  ...(leadCategory ? [{ leadCategory }] : []),
+		  ...(typeOfB2B ? [{ typeOfB2B }] : [])
+		]
+	  };
+  
+	  // Sorting options
+	  const sortOptions = {};
+	  sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+  
+	  // Pagination logic
+	  const skip = (page - 1) * limit;
+  
+	  // Get total lead count for pagination
+	  const totalLeads = await Lead.countDocuments(finalQuery);
+	  const totalPages = Math.ceil(totalLeads / limit);
+  
+	  // Fetch leads based on the query, sorted and paginated
+	  const leads = await Lead.find(finalQuery)
+		.populate('leadCategory', 'name')
+		.populate('typeOfB2B', 'name')
+		.populate('status', 'name')
+		.populate('followUp', 'scheduledDate status')
+		.populate('leadAddedBy', 'name email')
+		.sort(sortOptions)
+		.skip(skip)
+		.limit(Number(limit));
 
-		const query = { leadAddedBy: req.user._id };
-
-		// Apply filters
-		if (status) query.status = status;
-		if (leadCategory) query.leadCategory = leadCategory;
-		if (typeOfB2B) query.typeOfB2B = typeOfB2B;
-
-		// Search functionality
-		if (search) {
-			query.$or = [
-				{ concernPersonName: { $regex: search, $options: 'i' } },
-				{ businessName: { $regex: search, $options: 'i' } },
-				{ email: { $regex: search, $options: 'i' } },
-				{ mobile: { $regex: search, $options: 'i' } }
-			];
-		}
-
-		// Sorting
-		const sortOptions = {};
-		sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-		const skip = (page - 1) * limit;
-
-		const leads = await Lead.find(query)
-			.populate('leadCategory', 'name')
-			.populate('typeOfB2B', 'name')
-			.populate('status', 'name')
-			.populate('followUp', 'scheduledDate status')
-			.populate('leadAddedBy', 'name email')
-			.sort(sortOptions)
-			.skip(skip)
-			.limit(parseInt(limit));
-
-		const totalLeads = await Lead.countDocuments(query);
-		const totalPages = Math.ceil(totalLeads / limit);
-
-		res.json({
-			status: true,
-			data: {
-				leads,
-				pagination: {
-					currentPage: parseInt(page),
-					totalPages,
-					totalLeads,
-					hasNextPage: page < totalPages,
-					hasPrevPage: page > 1
-				}
-			},
-			message: 'Leads retrieved successfully'
-		});
+		console.log(leads, 'leads')
+  
+	  res.json({
+		status: true,
+		data: {
+		  leads,
+		  pagination: {
+			currentPage: parseInt(page),
+			totalPages,
+			totalLeads,
+			hasNextPage: page < totalPages,
+			hasPrevPage: page > 1
+		  }
+		},
+		message: 'Leads retrieved successfully'
+	  });
 	} catch (error) {
-		console.error('Error getting leads:', error);
-		res.status(500).json({
-			status: false,
-			message: 'Failed to retrieve leads',
-			error: error.message
-		});
+	  console.error('Error getting leads:', error);
+	  res.status(500).json({
+		status: false,
+		message: 'Failed to retrieve leads',
+		error: error.message
+	  });
 	}
-});
+  });
 
 // Get lead by ID
 router.get('/leads/:id', isCollege, async (req, res) => {
@@ -548,13 +568,13 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 });
 
 // Create new lead
-router.post('/leads', isCollege, async (req, res) => {
+router.post('/add-lead', isCollege, async (req, res) => {
 	try {
 		const {
 			leadCategory,
 			typeOfB2B,
 			businessName,
-			businessAddress,
+			address,
 			coordinates,
 			concernPersonName,
 			designation,
@@ -590,7 +610,7 @@ router.post('/leads', isCollege, async (req, res) => {
 			leadCategory,
 			typeOfB2B,
 			businessName,
-			businessAddress,
+			address,
 			coordinates,
 			concernPersonName,
 			designation,
@@ -630,7 +650,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			leadCategory,
 			typeOfB2B,
 			businessName,
-			businessAddress,
+			address,
 			coordinates,
 			concernPersonName,
 			designation,
@@ -639,6 +659,8 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			whatsapp,
 			leadOwner
 		} = req.body;
+
+		const user = req.user;
 
 		// Check if lead exists and belongs to the user
 		const existingLead = await Lead.findOne({
@@ -676,14 +698,15 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 				leadCategory,
 				typeOfB2B,
 				businessName,
-				businessAddress,
+				address,
 				coordinates,
 				concernPersonName,
 				designation,
 				email,
 				mobile,
 				whatsapp,
-				leadOwner
+				leadOwner,
+				leadAddedBy: user._id
 			},
 			{ new: true, runValidators: true }
 		).populate([
