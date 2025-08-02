@@ -37,6 +37,7 @@
     "react-dom": "^18.2.0",
     "react-feather": "^2.0.10",
     "react-google-autocomplete": "^2.7.4",
+    "react-google-login": "^5.2.2",
     "react-google-recaptcha": "^3.1.0",
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.1.5",
@@ -77,5 +78,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1"
   }
 }

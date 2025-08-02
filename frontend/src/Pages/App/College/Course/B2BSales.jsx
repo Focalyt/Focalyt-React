@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
-
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
+import { AUTH_CONFIG } from '../../../../config/auth';
 // import GoogleMapsLocationPicker from './GoogleMapsLocationPicker';
 
 // Google Maps API styles
@@ -173,7 +173,6 @@ const useNavHeight = (dependencies = []) => {
     if (navRef.current) {
       const height = navRef.current.offsetHeight;
       setNavHeight(height);
-      console.log('Nav height updated:', height + 'px');
     }
   }, []);
 
@@ -182,7 +181,6 @@ const useNavHeight = (dependencies = []) => {
     if (widthRef.current) {
       const width = widthRef.current.offsetWidth;
       setWidth(width);
-      console.log('Width updated:', width + 'px');
     }
   }, []);
 
@@ -236,7 +234,6 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     if (widthRef.current) {
       const width = widthRef.current.offsetWidth;
       setWidth(width);
-      console.log('Width updated:', width + 'px');
     }
   }, []);
 
@@ -315,15 +312,6 @@ const useScrollBlur = (navbarHeight = 140) => {
 const B2BSales = () => {
 
   const candidateRef = useRef();
-
-
-
-
-
-
-
-
-
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
@@ -428,97 +416,335 @@ const B2BSales = () => {
   const [showMap, setShowMap] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Load Google Maps API
-  // useEffect(() => {
-  //   const loadGoogleMapsAPI = () => {
-  //     if (window.google && window.google.maps) {
-  //       setMapLoaded(true);
-  //       initializeAutocomplete();
-  //       return;
-  //     }
-
-  //     // Check if script is already loading
-  //     if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-  //       return;
-  //     }
-
-  //     const script = document.createElement('script');
-  //     script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places,geometry`;
-  //     script.async = true;
-  //     script.defer = true;
-  //     script.onload = () => {
-  //       setMapLoaded(true);
-  //       initializeAutocomplete();
-  //     };
-  //     script.onerror = () => {
-  //       console.error('Failed to load Google Maps API');
-  //       alert('Failed to load Google Maps. Please check your internet connection and try again.');
-  //     };
-  //     document.head.appendChild(script);
-  //   };
-
-  //   loadGoogleMapsAPI();
-  // }, []);
-
-  // // Initialize Google Maps Autocomplete
-  // const initializeAutocomplete = () => {
-  //   if (!window.google || !window.google.maps) {
-  //     console.log('Google Maps not loaded yet');
-  //     return;
-  //   }
-
-  //   // Wait for DOM to be ready
-  //   setTimeout(() => {
-  //   const addressInput = document.getElementById('businessAddress');
-  //   if (addressInput) {
-  //       // Remove existing autocomplete if any
-  //       if (addressInput.autocomplete) {
-  //         window.google.maps.event.clearInstanceListeners(addressInput);
-  //       }
-
-  //     const autocomplete = new window.google.maps.places.Autocomplete(addressInput, {
-  //         types: ['address', 'establishment'],
-  //         componentRestrictions: { country: 'IN' }, // Restrict to India
-  //         fields: ['formatted_address', 'geometry', 'place_id', 'name', 'address_components']
-  //     });
-
-  //     autocomplete.addListener('place_changed', () => {
-  //       const place = autocomplete.getPlace();
-  //       if (place.geometry) {
-  //         const location = {
-  //           address: place.formatted_address,
-  //           lat: place.geometry.location.lat(),
-  //           lng: place.geometry.location.lng(),
-  //             placeId: place.place_id,
-  //             name: place.name
-  //         };
-  //         setSelectedLocation(location);
-  //         setLeadFormData(prev => ({
-  //           ...prev,
-  //           businessAddress: place.formatted_address
-  //         }));
-
-  //           // Show success message
-  //           console.log('Location selected:', location);
-  //         } else {
-  //           console.log('No geometry found for selected place');
-  //         }
-  //       });
-
-  //       // Store reference to autocomplete
-  //       addressInput.autocomplete = autocomplete;
-  //     } else {
-  //       console.log('Address input not found, retrying...');
-  //       // Retry after a short delay
-  //       setTimeout(initializeAutocomplete, 500);
-  //     }
-  //   }, 100);
-  // };
-
-
-  // Function to initialize Google Places Autocomplete
-  // Ref for business name input
   const businessNameInputRef = useRef(null);
+
+
+  // Modern Google Authentication Implementation (Frontend Only)
+  const [googleAuthLoaded, setGoogleAuthLoaded] = useState(false);
+  const [googleUser, setGoogleUser] = useState(null);
+  const [googleAuthError, setGoogleAuthError] = useState(null);
+  const [isGoogleAuthLoading, setIsGoogleAuthLoading] = useState(false);
+  const [googleAuthRetryCount, setGoogleAuthRetryCount] = useState(0);
+
+  // Load Google Identity Services
+  useEffect(() => {
+    const loadGoogleAuth = () => {
+      // Check if script already exists
+      const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+      if (existingScript) {
+        console.log('✅ Google Identity Services script already exists');
+        if (window.google && window.google.accounts) {
+          setGoogleAuthLoaded(true);
+          initializeGoogleAuth();
+        } else {
+          // Wait a bit for the script to load
+          setTimeout(() => {
+            if (window.google && window.google.accounts) {
+              setGoogleAuthLoaded(true);
+              initializeGoogleAuth();
+            } else {
+              console.error('❌ Google Identity Services not available after script load');
+              setGoogleAuthError('Google authentication not available');
+            }
+          }, 1000);
+        }
+        return;
+      }
+
+      console.log('🔄 Loading Google Identity Services...');
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.id = 'google-identity-services';
+      
+      script.onload = () => {
+        console.log('✅ Google Identity Services script loaded successfully');
+        // Wait a moment for the script to initialize
+        setTimeout(() => {
+          if (window.google && window.google.accounts) {
+            console.log('✅ Google Identity Services API available');
+            setGoogleAuthLoaded(true);
+            initializeGoogleAuth();
+          } else {
+            console.error('❌ Google Identity Services API not available after script load');
+            setGoogleAuthError('Google authentication not available');
+          }
+        }, 500);
+      };
+      
+      script.onerror = (error) => {
+        console.error('❌ Failed to load Google Identity Services script:', error);
+        if (googleAuthRetryCount < 3) {
+          console.log(`🔄 Retrying Google Identity Services load (attempt ${googleAuthRetryCount + 1}/3)...`);
+          setGoogleAuthRetryCount(prev => prev + 1);
+          setTimeout(() => {
+            loadGoogleAuth();
+          }, 2000);
+        } else {
+          console.error('❌ Failed to load Google Identity Services after 3 attempts');
+          setGoogleAuthError('Failed to load Google authentication. Please check your internet connection.');
+        }
+      };
+      
+      document.head.appendChild(script);
+    };
+
+    // Check if Google is already available
+    if (window.google && window.google.accounts) {
+      console.log('✅ Google Identity Services already available');
+      setGoogleAuthLoaded(true);
+      initializeGoogleAuth();
+    } else {
+      console.log('🔄 Google Identity Services not available, loading...');
+      loadGoogleAuth();
+    }
+  }, []);
+
+  const initializeGoogleAuth = () => {
+    console.log('🔧 Attempting to initialize Google Auth...');
+    console.log('🔍 Checking Google Identity Services availability...');
+    console.log('window.google:', !!window.google);
+    console.log('window.google.accounts:', !!(window.google && window.google.accounts));
+    console.log('window.google.accounts.id:', !!(window.google && window.google.accounts && window.google.accounts.id));
+    
+    if (!window.google) {
+      console.error('❌ Google object not available');
+      setGoogleAuthError('Google authentication not available');
+      return;
+    }
+    
+    if (!window.google.accounts) {
+      console.error('❌ Google accounts not available');
+      setGoogleAuthError('Google authentication not available');
+      return;
+    }
+    
+    if (!window.google.accounts.id) {
+      console.error('❌ Google Identity Services not available');
+      setGoogleAuthError('Google authentication not available');
+      return;
+    }
+
+    try {
+      console.log('🔧 Initializing Google Auth with client ID:', AUTH_CONFIG.GOOGLE_CLIENT_ID);
+      window.google.accounts.id.initialize({
+        client_id: AUTH_CONFIG.GOOGLE_CLIENT_ID,
+        callback: handleGoogleAuthResponse,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      console.log('✅ Google Auth initialized successfully');
+      setGoogleAuthError(null); // Clear any previous errors
+    } catch (error) {
+      console.error('❌ Error initializing Google Auth:', error);
+      setGoogleAuthError('Failed to initialize Google authentication');
+    }
+  };
+
+  const handleGoogleAuthResponse = async (response) => {
+    try {
+      setIsGoogleAuthLoading(true);
+      setGoogleAuthError(null);
+      
+      console.log('🎉 === GOOGLE AUTHENTICATION RESPONSE ===');
+      console.log('📦 Full Response Object:', response);
+      console.log('🔑 Credential (ID Token):', response.credential);
+      console.log('🔓 Access Token:', response.access_token);
+      console.log('🆔 Client ID:', response.clientId);
+      console.log('👆 Select By:', response.select_by);
+      console.log('📅 Response Time:', new Date().toISOString());
+      console.log('=====================================');
+      
+      // Decode the ID token to get user info (frontend only)
+      try {
+        const tokenParts = response.credential.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          console.log('🔍 === DECODED USER INFO ===');
+          console.log('👤 User ID:', payload.sub);
+          console.log('📧 Email:', payload.email);
+          console.log('👨‍💼 Name:', payload.name);
+          console.log('🖼️ Picture:', payload.picture);
+          console.log('✅ Email Verified:', payload.email_verified);
+          console.log('🏢 Issuer:', payload.iss);
+          console.log('🎯 Audience:', payload.aud);
+          console.log('⏰ Issued At:', new Date(payload.iat * 1000));
+          console.log('⏰ Expires At:', new Date(payload.exp * 1000));
+          console.log('📊 Token Expires In:', Math.round((payload.exp - payload.iat) / 60), 'minutes');
+          console.log('========================');
+          
+          // Create user object for frontend
+          const userData = {
+            _id: payload.sub,
+            name: payload.name,
+            email: payload.email,
+            profilePicture: payload.picture,
+            emailVerified: payload.email_verified,
+            googleId: payload.sub,
+            token: response.credential,
+            loginTime: new Date().toISOString(),
+            issuer: payload.iss,
+            audience: payload.aud,
+            issuedAt: new Date(payload.iat * 1000).toISOString(),
+            expiresAt: new Date(payload.exp * 1000).toISOString()
+          };
+          
+          setGoogleUser(userData);
+          sessionStorage.setItem('googleUser', JSON.stringify(userData));
+          
+          console.log('🎊 === FRONTEND AUTHENTICATION SUCCESS ===');
+          console.log('✅ User logged in successfully:', userData);
+          console.log('💾 User stored in session storage');
+          console.log('🔐 Token stored for future use');
+          console.log('=====================================');
+          
+        } else {
+          throw new Error('Invalid token format - expected 3 parts');
+        }
+      } catch (decodeError) {
+        console.error('❌ Error decoding ID token:', decodeError);
+        setGoogleAuthError('Invalid authentication response');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error handling Google auth response:', error);
+      setGoogleAuthError('Authentication failed. Please try again.');
+    } finally {
+      setIsGoogleAuthLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    console.log('🚀 Attempting to trigger Google Sign-In...');
+    console.log('🔍 Checking Google Identity Services availability...');
+    console.log('window.google:', !!window.google);
+    console.log('window.google.accounts:', !!(window.google && window.google.accounts));
+    console.log('window.google.accounts.id:', !!(window.google && window.google.accounts && window.google.accounts.id));
+    
+    if (!window.google) {
+      console.error('❌ Google object not available');
+      setGoogleAuthError('Google authentication not available');
+      return;
+    }
+    
+    if (!window.google.accounts) {
+      console.error('❌ Google accounts not available');
+      setGoogleAuthError('Google authentication not available');
+      return;
+    }
+    
+    if (!window.google.accounts.id) {
+      console.error('❌ Google Identity Services not available');
+      setGoogleAuthError('Google authentication not available');
+      return;
+    }
+
+    try {
+      console.log('🚀 Triggering Google Sign-In prompt...');
+      window.google.accounts.id.prompt((notification) => {
+        console.log('📱 Google Sign-In notification received:', notification);
+        if (notification.isNotDisplayed()) {
+          console.log('❌ Google Sign-In prompt not displayed');
+          setGoogleAuthError('Sign-In prompt not available');
+        } else if (notification.isSkippedMoment()) {
+          console.log('⏭️ Google Sign-In prompt skipped');
+          // Don't show error for skipped - user can try again
+          console.log('ℹ️ User can try signing in again');
+        } else if (notification.isDismissedMoment()) {
+          console.log('❌ Google Sign-In prompt dismissed');
+          setGoogleAuthError('Sign-In was cancelled');
+        } else {
+          console.log('✅ Google Sign-In prompt displayed successfully');
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error prompting Google Sign-In:', error);
+      setGoogleAuthError('Failed to start authentication');
+    }
+  };
+
+  const handleGoogleLogout = () => {
+    if (window.google && window.google.accounts) {
+      console.log('🚪 Logging out Google user...');
+      window.google.accounts.id.disableAutoSelect();
+      setGoogleUser(null);
+      sessionStorage.removeItem('googleUser');
+      setGoogleAuthError(null);
+      console.log('✅ Google user logged out successfully');
+    }
+  };
+
+  // Load Google user from session storage on component mount
+  useEffect(() => {
+    const savedGoogleUser = sessionStorage.getItem('googleUser');
+    if (savedGoogleUser) {
+      try {
+        const user = JSON.parse(savedGoogleUser);
+        setGoogleUser(user);
+        console.log('🔄 Restored Google user from session:', user.name);
+      } catch (error) {
+        console.error('❌ Error parsing saved Google user:', error);
+        sessionStorage.removeItem('googleUser');
+      }
+    }
+  }, []);
+
+  const responseGoogle = (response) => {
+    console.log('Legacy Google response:', response);
+  }
+
+  const reloadGoogleAuth = () => {
+    console.log('🔄 Manually reloading Google Identity Services...');
+    setGoogleAuthError(null);
+    setGoogleAuthRetryCount(0);
+    setGoogleAuthLoaded(false);
+    
+    // Remove existing script
+    const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existingScript) {
+      existingScript.remove();
+    }
+    
+    // Clear any existing Google objects
+    if (window.google) {
+      delete window.google;
+    }
+    
+    // Reload after a short delay
+    setTimeout(() => {
+      const loadGoogleAuth = () => {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.id = 'google-identity-services';
+        
+        script.onload = () => {
+          console.log('✅ Google Identity Services script loaded on manual reload');
+          setTimeout(() => {
+            if (window.google && window.google.accounts) {
+              console.log('✅ Google Identity Services API available after manual reload');
+              setGoogleAuthLoaded(true);
+              initializeGoogleAuth();
+            } else {
+              console.error('❌ Google Identity Services API not available after manual reload');
+              setGoogleAuthError('Google authentication not available');
+            }
+          }, 500);
+        };
+        
+        script.onerror = (error) => {
+          console.error('❌ Failed to load Google Identity Services script on manual reload:', error);
+          setGoogleAuthError('Failed to load Google authentication');
+        };
+        
+        document.head.appendChild(script);
+      };
+      loadGoogleAuth();
+    }, 100);
+  };
+
 
   const initializeBusinessNameAutocomplete = () => {
     console.log('Initializing business name autocomplete...');
@@ -665,23 +891,9 @@ const B2BSales = () => {
         console.log('response.data.data.users', response.data.data)
         // Update users state with detailed access summary
         setUsers(response.data.data.users.map(user => ({
-          user_id: user._id,
+          _id: user._id,
           name: user.name,
-          email: user.email,
-          mobile: user.mobile,
-          designation: user.designation,
-          status: user.status ? 'active' : 'inactive',
-          reporting_managers: user.accessSummary?.reportingManagers || 0,
-          role: user.role,
-          roleId: user.roleId,
-          access_level: user.access_level,
-          permissions: user.permissions,
-          my_team: user.my_team,
-          // ✅ NEW: Add detailed access summary
-          accessSummary: user.accessSummary || {},
-          fullPermissions: user.fullPermissions || {},
-          college: user.college || {},
-          created_at: user.createdAt
+
         })));
       } else {
         console.error('Failed to fetch users:', response.data.message);
@@ -751,6 +963,8 @@ const B2BSales = () => {
   // Handle lead form input changes
   const handleLeadInputChange = (e) => {
     const { name, value } = e.target;
+
+    console.log(name, value, 'name, value')
     setLeadFormData(prev => ({
       ...prev,
       [name]: value
@@ -893,7 +1107,6 @@ const B2BSales = () => {
         leadOwner: leadFormData.leadOwner,
         remark: leadFormData.remark
       };
-
       // Add coordinates if location is selected
       if (selectedLocation) {
         leadData.coordinates = {
@@ -1039,9 +1252,9 @@ const B2BSales = () => {
   };
 
 
- 
 
-  
+
+
 
   const getPaginationPages = () => {
     const delta = 2;
@@ -1259,7 +1472,7 @@ const B2BSales = () => {
     }
   };
 
- 
+
 
 
 
@@ -1590,6 +1803,7 @@ const B2BSales = () => {
                       minDate={today}   // Isse past dates disable ho jayengi
 
                     />
+
                   </div>
                 </div>
 
@@ -1609,6 +1823,17 @@ const B2BSales = () => {
                       style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                     />
                   </div>
+                </div>
+
+                {/* remark */}
+                <div className="col-12">
+                  <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
+                  <textarea
+                    className="form-control border-0 bgcolor bg-light"
+                    id="comment"
+                    rows="4"
+                    onChange={(e) => setRemarks(e.target.value)}
+                  />
                 </div>
               </div>)}
 
@@ -2278,12 +2503,87 @@ const B2BSales = () => {
                       <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
-                     
-
-
-
+                      
+                      {/* Modern Google Authentication (Frontend Only) */}
+                      {googleAuthLoaded ? (
+                        <div className="d-flex align-items-center gap-2">
+                          {!googleUser ? (
+                            <div className="d-flex flex-column align-items-end">
+                              <button 
+                                className="btn btn-outline-primary" 
+                                onClick={handleGoogleLogin}
+                                disabled={isGoogleAuthLoading}
+                                style={{ whiteSpace: 'nowrap' }}
+                                title="Click to sign in with your Google account"
+                              >
+                                {isGoogleAuthLoading ? (
+                                  <>
+                                    <div className="spinner-border spinner-border-sm me-1" role="status">
+                                      <span className="visually-hidden">Loading...</span>
+                                    </div>
+                                    Signing in...
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="fab fa-google me-1"></i>
+                                    Sign in with Google
+                                  </>
+                                )}
+                              </button>
+                              {googleAuthError && (
+                                <small className="text-danger mt-1">
+                                  {googleAuthError}
+                                </small>
+                              )}
+                              {!googleAuthError && !googleUser && (
+                                <small className="text-muted mt-1">
+                                  Click the button above to sign in
+                                </small>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="d-flex align-items-center gap-2">
+                              <span className="text-muted small">
+                                <i className="fas fa-user-circle me-1"></i>
+                                {googleUser.name}
+                              </span>
+                              <button 
+                                className="btn btn-outline-secondary btn-sm" 
+                                onClick={handleGoogleLogout}
+                                title="Sign out"
+                              >
+                                <i className="fas fa-sign-out-alt"></i>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="d-flex flex-column align-items-end">
+                          <div className="d-flex align-items-center gap-2">
+                            <div className="spinner-border spinner-border-sm text-primary" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                            <small className="text-muted">Loading Google Auth...</small>
+                          </div>
+                          {googleAuthError && (
+                            <div className="d-flex flex-column align-items-end mt-1">
+                              <small className="text-danger">
+                                {googleAuthError}
+                              </small>
+                              <button 
+                                className="btn btn-outline-warning btn-sm mt-1"
+                                onClick={reloadGoogleAuth}
+                              >
+                                <i className="fas fa-redo me-1"></i>
+                                Retry
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
+
 
                   {/* Filter Buttons Row */}
                   <div className="col-12 mt-2">
@@ -2324,7 +2624,7 @@ const B2BSales = () => {
             </nav>
           </div>
 
-        
+
 
 
           {/* Main Content */}
@@ -2333,7 +2633,7 @@ const B2BSales = () => {
             transition: 'margin-top 0.2s ease-in-out'
           }}>
             <section className="list-view">
-              
+
               {/* Loading State */}
               {loadingLeads ? (
                 <div className="text-center py-5">
@@ -2473,35 +2773,54 @@ const B2BSales = () => {
                             </div>
                           )}
 
-                          {/* Lead Added By Section */}
-                          {lead.addedBy?.name && (
-                            <div className="owner-section">
-                              <div className="contact-item">
-                                <div className="contact-icon added-by">
-                                  <i className="fas fa-user-plus"></i>
-                                </div>
-                                <div className="contact-details">
-                                  <span className="contact-label">Added By</span>
-                                  <span className="contact-value">
-                                    {lead.addedBy.name}
-                                  </span>
+                          <div className='d-flex gap-4'>
+
+                            {/* Lead Added By Section */}
+                            {lead.leadAddedBy?.name && (
+                              <div className="owner-section">
+                                <div className="contact-item">
+                                  <div className="contact-icon added-by">
+                                    <i className="fas fa-user-plus"></i>
+                                  </div>
+                                  <div className="contact-details">
+                                    <span className="contact-label">Added By</span>
+                                    <span className="contact-value">
+                                      {lead.leadAddedBy.name}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
+
+                            {lead.remark && (
+                              <div className="owner-section">
+                                <div className="contact-item">
+                                  <div className="contact-icon added-by">
+                                    <i className="fas fa-comment"></i>
+                                  </div>
+                                  <div className="contact-details">
+                                    <span className="contact-label">Remarks</span>
+                                    <span className="contact-value">
+                                      {lead.remark}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {/* Action Buttons */}
                         <div className="lead-actions">
                           <div className="action-group primary">
-                            <button
+                            {/* <button
                               className="action-btn view"
                               onClick={() => togglePopup(leadIndex)}
                               title="View Details"
                             >
                               <i className="fas fa-eye"></i>
                               <span>View</span>
-                            </button>
+                            </button> */}
                             <button
                               className="action-btn refer"
                               onClick={() => openRefferPanel(lead, 'Reffer')}
@@ -2544,363 +2863,380 @@ const B2BSales = () => {
 
               {/* Pagination */}
               <nav aria-label="Page navigation" className="mt-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <small className="text-muted">
-              Page {currentPage} of {totalPages} ({leads.length} results)
-            </small>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <small className="text-muted">
+                    Page {currentPage} of {totalPages} ({leads.length} results)
+                  </small>
+                </div>
+
+                <ul className="pagination justify-content-center">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      &laquo;
+                    </button>
+                  </li>
+
+                  {currentPage > 3 && (
+                    <>
+                      <li className="page-item">
+                        <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
+                      </li>
+                      {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+                    </>
+                  )}
+
+                  {getPaginationPages().map((pageNumber) => (
+                    <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
+                      <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
+                        {pageNumber}
+                      </button>
+                    </li>
+                  ))}
+
+                  {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
+                    <>
+                      {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+                      <li className="page-item">
+                        <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
+                      </li>
+                    </>
+                  )}
+
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      &raquo;
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            </section>
           </div>
-
-          <ul className="pagination justify-content-center">
-            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-              <button
-                className="page-link"
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                &laquo;
-              </button>
-            </li>
-
-            {currentPage > 3 && (
-              <>
-                <li className="page-item">
-                  <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
-                </li>
-                {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-              </>
-            )}
-
-            {getPaginationPages().map((pageNumber) => (
-              <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-                <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
-                  {pageNumber}
-                </button>
-              </li>
-            ))}
-
-            {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
-              <>
-                {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-                <li className="page-item">
-                  <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
-                </li>
-              </>
-            )}
-
-            <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-              <button
-                className="page-link"
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-              >
-                &raquo;
-              </button>
-            </li>
-          </ul>
-        </nav>
-      </section>
-    </div>
 
         </div >
 
-  {/* Right Sidebar for Desktop - Panels */ }
-{
-  !isMobile && (
-    <div className="col-4">
-      <div className="row " style={{
-        transition: 'margin-top 0.2s ease-in-out',
-        position: 'fixed'
-      }}>
-        {renderEditPanel()}
-        {renderRefferPanel()}
-        {renderLeadHistoryPanel()}
-      </div>
-    </div>
-  )
-}
+        {/* Right Sidebar for Desktop - Panels */}
+        {
+          !isMobile && (
+            <div className="col-4">
+              <div className="row " style={{
+                transition: 'margin-top 0.2s ease-in-out',
+                position: 'fixed'
+              }}>
+                {renderEditPanel()}
+                {renderRefferPanel()}
+                {renderLeadHistoryPanel()}
+              </div>
+            </div>
+          )
+        }
 
-{/* Mobile Modals */ }
-{ isMobile && renderEditPanel() }
-{ isMobile && renderRefferPanel() }
-{ isMobile && renderLeadHistoryPanel() }
+        {/* Mobile Modals */}
+        {isMobile && renderEditPanel()}
+        {isMobile && renderRefferPanel()}
+        {isMobile && renderLeadHistoryPanel()}
 
       </div >
-{/* Lead Add modal Start*/ }
-{
-  showAddLeadModal && (
-    <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060, maxHeight: '100vh', overflowY: 'auto' }}>
-      <div className="modal-dialog modal-lg modal-dialog-centered">
-        <div className="modal-content">
-          {/* Modal Header */}
-          <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
-            <h5 className="modal-title d-flex align-items-center">
-              <i className="fas fa-user-plus me-2"></i>
-              Add New B2B Lead
-            </h5>
-            <button
-              type="button"
-              className="btn-close btn-close-white"
-              onClick={handleCloseLeadModal}
-            ></button>
-          </div>
-
-          {/* Modal Body */}
-          <div className="modal-body p-4 " style={{ maxHeight: '100vh', overflowY: 'auto' }}>
-            <div className="row g-3">
-              {/* Lead Category */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-tag text-primary me-1"></i>
-                  Lead Category <span className="text-danger">*</span>
-                </label>
-                <select
-                  className={`form-select ${formErrors.leadCategory ? 'is-invalid' : ''}`}
-                  name="leadCategory"
-                  value={leadFormData.leadCategory}
-                  onChange={handleLeadInputChange}
-                >
-                  <option value="">Select Lead Category</option>
-                  {leadCategoryOptions.map(category => (
-                    <option key={category.value} value={category.value}>
-                      {category.label}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.leadCategory && (
-                  <div className="invalid-feedback">
-                    {formErrors.leadCategory}
-                  </div>
-                )}
-              </div>
-
-              {/* Type of B2B */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-building text-primary me-1"></i>
-                  Type of B2B <span className="text-danger">*</span>
-                </label>
-                <select
-                  className={`form-select ${formErrors.typeOfB2B ? 'is-invalid' : ''}`}
-                  name="typeOfB2B"
-                  value={leadFormData.typeOfB2B}
-                  onChange={handleLeadInputChange}
-                >
-                  <option value="">Select B2B Type</option>
-                  {typeOfB2BOptions.map(type => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.typeOfB2B && (
-                  <div className="invalid-feedback">
-                    {formErrors.typeOfB2B}
-                  </div>
-                )}
-              </div>
-
-              {/* Business Name */}
-              <div className="col-12">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-briefcase text-primary me-1"></i>
-                  Business Name <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  ref={businessNameInputRef}
-                  className={`form-control ${formErrors.businessName ? 'is-invalid' : ''}`}
-                  name="businessName"
-                  value={leadFormData.businessName}
-                  onChange={handleLeadInputChange}
-                  placeholder="Enter business/company name"
-                />
-
-                {formErrors.businessName && (
-                  <div className="invalid-feedback">
-                    {formErrors.businessName}
-                  </div>
-                )}
-              </div>
-
-              {/* Business Address with Google Maps */}
-              <div className="col-12">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-map-marker-alt text-primary me-1"></i>
-                  Business Address
-                </label>
-                <input
-
-                  type="text"
-                  className={`form-control ${formErrors.businessAddress ? 'is-invalid' : ''}`}
-                  name="address"
-                  value={leadFormData.address}
-                  onChange={handleLeadInputChange}
-                  placeholder="Enter business address"
-                />
-
-                {formErrors.businessAddress && (
-                  <div className="invalid-feedback d-block">
-                    {formErrors.businessAddress}
-                  </div>
-                )}
-              </div>
-
-              {/* Concern Person Name */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-user text-primary me-1"></i>
-                  Concern Person Name <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className={`form-control ${formErrors.concernPersonName ? 'is-invalid' : ''}`}
-                  name="concernPersonName"
-                  value={leadFormData.concernPersonName}
-                  onChange={handleLeadInputChange}
-                  placeholder="Enter contact person name"
-                />
-                {formErrors.concernPersonName && (
-                  <div className="invalid-feedback">
-                    {formErrors.concernPersonName}
-                  </div>
-                )}
-              </div>
-
-              {/* Designation */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-id-badge text-primary me-1"></i>
-                  Designation
-                </label>
-                <input
-                  type="text"
-                  className="form-control"
-                  name="designation"
-                  value={leadFormData.designation}
-                  onChange={handleLeadInputChange}
-                  placeholder="e.g., HR Manager, CEO, Director"
-                />
-              </div>
-
-              {/* Email */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-envelope text-primary me-1"></i>
-                  Email <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="email"
-                  className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
-                  name="email"
-                  value={leadFormData.email}
-                  onChange={handleLeadInputChange}
-                  placeholder="Enter email address"
-                />
-                {formErrors.email && (
-                  <div className="invalid-feedback">
-                    {formErrors.email}
-                  </div>
-                )}
-              </div>
-
-              {/* Mobile */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-phone text-primary me-1"></i>
-                  Mobile <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="tel"
-                  maxLength={10}
-                  className={`form-control ${formErrors.mobile ? 'is-invalid' : ''}`}
-                  name="mobile"
-                  value={leadFormData.mobile}
-                  onChange={handleLeadMobileChange}
-                  placeholder="Enter mobile number"
-                />
-                {formErrors.mobile && (
-                  <div className="invalid-feedback">
-                    {formErrors.mobile}
-                  </div>
-                )}
-              </div>
-
-              {/* WhatsApp */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  <i className="fab fa-whatsapp text-success me-1"></i>
-                  WhatsApp
-                </label>
-                <input
-                  type="tel"
-                  maxLength={10}
-                  className={`form-control ${formErrors.whatsapp ? 'is-invalid' : ''}`}
-                  name="whatsapp"
-                  value={leadFormData.whatsapp}
-                  onChange={handleLeadMobileChange}
-                  placeholder="WhatsApp number"
-                />
-                {formErrors.whatsapp && (
-                  <div className="invalid-feedback">
-                    {formErrors.whatsapp}
-                  </div>
-                )}
-              </div>
-
-              {/* Lead Owner */}
-              <div className="col-md-6">
-                <label className="form-label fw-bold">
-                  <i className="fas fa-user-tie text-primary me-1"></i>
-                  Lead Owner
-                </label>
-                <select
-                  className="form-select"
-                  name="leadOwner"
-                  value={leadFormData.leadOwner}
-                  onChange={handleLeadInputChange}
-                >
-                  <option value="">Select Lead Owner</option>
-                  {users?.map(user => (
-                    <option key={user?._id} value={user?._id}>
-                      {user?.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-
-            </div>
-
-            {/* Form Actions */}
-            <div className="row mt-4">
-              <div className="col-12">
-                <div className="d-flex justify-content-end gap-2">
+      {/* Lead Add modal Start*/}
+      {
+        showAddLeadModal && (
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060, maxHeight: '100vh', overflowY: 'auto' }}>
+            <div className="modal-dialog modal-lg modal-dialog-centered">
+              <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+                {/* Modal Header */}
+                <div className="modal-header" style={{ backgroundColor: '#fc2b5a', color: 'white' }}>
+                  <h5 className="modal-title d-flex align-items-center">
+                    <i className="fas fa-user-plus me-2"></i>
+                    Add New B2B Lead
+                  </h5>
                   <button
                     type="button"
-                    className="btn btn-outline-secondary px-4"
+                    className="btn-close btn-close-white"
                     onClick={handleCloseLeadModal}
-                  >
-                    <i className="fas fa-times me-1"></i>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn px-4"
-                    style={{ backgroundColor: '#fc2b5a', color: 'white' }}
-                    onClick={handleLeadSubmit}
-                  >
-                    <i className="fas fa-save me-1"></i>
-                    Add Lead
-                  </button>
+                  ></button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="modal-body p-4 " style={{ maxHeight: '100vh', overflowY: 'auto' }}>
+                  <div className="row g-3">
+                    {/* Lead Category */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-tag text-primary me-1"></i>
+                        Lead Category <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        className={`form-select ${formErrors.leadCategory ? 'is-invalid' : ''}`}
+                        name="leadCategory"
+                        value={leadFormData.leadCategory}
+                        onChange={handleLeadInputChange}
+                      >
+                        <option value="">Select Lead Category</option>
+                        {leadCategoryOptions.map(category => (
+                          <option key={category.value} value={category.value}>
+                            {category.label}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.leadCategory && (
+                        <div className="invalid-feedback">
+                          {formErrors.leadCategory}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Type of B2B */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-building text-primary me-1"></i>
+                        Type of B2B <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        className={`form-select ${formErrors.typeOfB2B ? 'is-invalid' : ''}`}
+                        name="typeOfB2B"
+                        value={leadFormData.typeOfB2B}
+                        onChange={handleLeadInputChange}
+                      >
+                        <option value="">Select B2B Type</option>
+                        {typeOfB2BOptions.map(type => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.typeOfB2B && (
+                        <div className="invalid-feedback">
+                          {formErrors.typeOfB2B}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Business Name */}
+                    <div className="col-12">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-briefcase text-primary me-1"></i>
+                        Business Name <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        ref={businessNameInputRef}
+                        className={`form-control ${formErrors.businessName ? 'is-invalid' : ''}`}
+                        name="businessName"
+                        value={leadFormData.businessName}
+                        onChange={handleLeadInputChange}
+                        placeholder="Enter business/company name"
+                      />
+
+                      {formErrors.businessName && (
+                        <div className="invalid-feedback">
+                          {formErrors.businessName}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Business Address with Google Maps */}
+                    <div className="col-12">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-map-marker-alt text-primary me-1"></i>
+                        Business Address
+                      </label>
+                      <input
+
+                        type="text"
+                        className={`form-control ${formErrors.businessAddress ? 'is-invalid' : ''}`}
+                        name="address"
+                        value={leadFormData.address}
+                        onChange={handleLeadInputChange}
+                        placeholder="Enter business address"
+                      />
+
+                      {formErrors.businessAddress && (
+                        <div className="invalid-feedback d-block">
+                          {formErrors.businessAddress}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Concern Person Name */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-user text-primary me-1"></i>
+                        Concern Person Name <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className={`form-control ${formErrors.concernPersonName ? 'is-invalid' : ''}`}
+                        name="concernPersonName"
+                        value={leadFormData.concernPersonName}
+                        onChange={handleLeadInputChange}
+                        placeholder="Enter contact person name"
+                      />
+                      {formErrors.concernPersonName && (
+                        <div className="invalid-feedback">
+                          {formErrors.concernPersonName}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Designation */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-id-badge text-primary me-1"></i>
+                        Designation
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="designation"
+                        value={leadFormData.designation}
+                        onChange={handleLeadInputChange}
+                        placeholder="e.g., HR Manager, CEO, Director"
+                      />
+                    </div>
+
+                    {/* Email */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-envelope text-primary me-1"></i>
+                        Email <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
+                        name="email"
+                        value={leadFormData.email}
+                        onChange={handleLeadInputChange}
+                        placeholder="Enter email address"
+                      />
+                      {formErrors.email && (
+                        <div className="invalid-feedback">
+                          {formErrors.email}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Mobile */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-phone text-primary me-1"></i>
+                        Mobile <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        className={`form-control ${formErrors.mobile ? 'is-invalid' : ''}`}
+                        name="mobile"
+                        value={leadFormData.mobile}
+                        onChange={handleLeadMobileChange}
+                        placeholder="Enter mobile number"
+                      />
+                      {formErrors.mobile && (
+                        <div className="invalid-feedback">
+                          {formErrors.mobile}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* WhatsApp */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fab fa-whatsapp text-success me-1"></i>
+                        WhatsApp
+                      </label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        className={`form-control ${formErrors.whatsapp ? 'is-invalid' : ''}`}
+                        name="whatsapp"
+                        value={leadFormData.whatsapp}
+                        onChange={handleLeadMobileChange}
+                        placeholder="WhatsApp number"
+                      />
+                      {formErrors.whatsapp && (
+                        <div className="invalid-feedback">
+                          {formErrors.whatsapp}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Lead Owner */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-user-tie text-primary me-1"></i>
+                        Lead Owner
+                      </label>
+                      <select
+                        className="form-select"
+                        name="leadOwner"
+                        value={leadFormData.leadOwner}
+                        onChange={handleLeadInputChange}
+                      >
+                        <option value="">Select Lead Owner</option>
+                        {users?.map(user => (
+                          <option key={user?._id} value={user?._id}>
+                            {user?.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Remark */}
+                    <div className="col-12">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-comment text-primary me-1"></i>
+                        Remark
+                      </label>
+                      <textarea
+                        className="form-control"
+                        name="remark"
+                        value={leadFormData.remark}
+                        onChange={handleLeadInputChange}
+                        placeholder="Enter remark"
+                      />
+                    </div>
+
+
+
+
+                  </div>
+
+                  {/* Form Actions */}
+                  <div className="row mt-4">
+                    <div className="col-12">
+                      <div className="d-flex justify-content-end gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary px-4"
+                          onClick={handleCloseLeadModal}
+                        >
+                          <i className="fas fa-times me-1"></i>
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn px-4"
+                          style={{ backgroundColor: '#fc2b5a', color: 'white' }}
+                          onClick={handleLeadSubmit}
+                        >
+                          <i className="fas fa-save me-1"></i>
+                          Add Lead
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+        )
+      }
 
 
     </div >

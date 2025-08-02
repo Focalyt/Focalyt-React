@@ -98,7 +98,6 @@ router.get('/', isCollege, async (req, res) => {
    totalCount = users.length
   
   // Fetch user details
-  console.log('users', users)
  
 
     res.json({

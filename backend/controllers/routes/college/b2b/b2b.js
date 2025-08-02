@@ -3,7 +3,7 @@ const axios = require("axios");
 const moment = require("moment");
 let fs = require("fs");
 let path = require("path");
-const { isCollege,getAllTeamMembers } = require("../../../../helpers");
+const { isCollege, getAllTeamMembers } = require("../../../../helpers");
 const fileupload = require("express-fileupload");
 const readXlsxFile = require("read-excel-file/node");
 const mongoose = require("mongoose");
@@ -58,7 +58,7 @@ const {
 	SubQualification,
 	Courses,
 	AppliedCourses
-	
+
 } = require("../../../models");
 const TypeOfB2B = require("../../../models/b2b/typeOfB2B");
 const LeadCategory = require("../../../models/b2b/leadCategory");
@@ -81,24 +81,24 @@ router.get('/type-of-b2b', isCollege, async (req, res) => {
 
 		const status = req.query.status;
 		const query = {};
-		if(status){
+		if (status) {
 			query.isActive = status;
 		}
 		const types = await TypeOfB2B.find(query)
 			.populate('addedBy', 'name email')
 			.sort({ createdAt: -1 });
-		
-		res.json({ 
-			status: true, 
+
+		res.json({
+			status: true,
 			data: types,
-			message: 'Types of B2B retrieved successfully' 
+			message: 'Types of B2B retrieved successfully'
 		});
 	} catch (error) {
 		console.error('Error getting types of B2B:', error);
-		res.status(500).json({ 
-			status: false, 
+		res.status(500).json({
+			status: false,
 			message: 'Failed to retrieve types of B2B',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -108,25 +108,25 @@ router.get('/type-of-b2b/:id', isCollege, async (req, res) => {
 	try {
 		const type = await TypeOfB2B.findById(req.params.id)
 			.populate('addedBy', 'name email');
-		
+
 		if (!type) {
-			return res.status(404).json({ 
-				status: false, 
-				message: 'Type of B2B not found' 
+			return res.status(404).json({
+				status: false,
+				message: 'Type of B2B not found'
 			});
 		}
-		
-		res.json({ 
-			status: true, 
+
+		res.json({
+			status: true,
 			data: type,
-			message: 'Type of B2B retrieved successfully' 
+			message: 'Type of B2B retrieved successfully'
 		});
 	} catch (error) {
 		console.error('Error getting type of B2B:', error);
-		res.status(500).json({ 
-			status: false, 
+		res.status(500).json({
+			status: false,
 			message: 'Failed to retrieve type of B2B',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -135,44 +135,44 @@ router.get('/type-of-b2b/:id', isCollege, async (req, res) => {
 router.post('/type-of-b2b', isCollege, async (req, res) => {
 	try {
 		const { name, description } = req.body;
-		
+
 		// Validate required fields
 		if (!name) {
-			return res.status(400).json({ 
-				status: false, 
-				message: 'Name is required' 
+			return res.status(400).json({
+				status: false,
+				message: 'Name is required'
 			});
 		}
-		
+
 		// Check if name already exists
 		const existingType = await TypeOfB2B.findOne({ name });
 		if (existingType) {
-			return res.status(400).json({ 
-				status: false, 
-				message: 'Type of B2B with this name already exists' 
+			return res.status(400).json({
+				status: false,
+				message: 'Type of B2B with this name already exists'
 			});
 		}
 
 		const newType = new TypeOfB2B({
-				name,
+			name,
 			description,
 			addedBy: req.user._id
 		});
 
 		const savedType = await newType.save();
 		await savedType.populate('addedBy', 'name email');
-		
-		res.status(201).json({ 
+
+		res.status(201).json({
 			status: true,
-			data: savedType, 
-			message: 'Type of B2B created successfully' 
+			data: savedType,
+			message: 'Type of B2B created successfully'
 		});
 	} catch (error) {
 		console.error('Error creating type of B2B:', error);
-		res.status(500).json({ 
-			status: false, 
+		res.status(500).json({
+			status: false,
 			message: 'Failed to create type of B2B',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -181,17 +181,17 @@ router.post('/type-of-b2b', isCollege, async (req, res) => {
 router.put('/type-of-b2b/:id', isCollege, async (req, res) => {
 	try {
 		const { name, description, isActive } = req.body;
-		
+
 		// Check if name already exists (excluding current record)
 		if (name) {
-			const existingType = await TypeOfB2B.findOne({ 
-			name,
-				_id: { $ne: req.params.id } 
+			const existingType = await TypeOfB2B.findOne({
+				name,
+				_id: { $ne: req.params.id }
 			});
 			if (existingType) {
-			return res.status(400).json({
-				status: false,
-					message: 'Type of B2B with this name already exists' 
+				return res.status(400).json({
+					status: false,
+					message: 'Type of B2B with this name already exists'
 				});
 			}
 		}
@@ -203,23 +203,23 @@ router.put('/type-of-b2b/:id', isCollege, async (req, res) => {
 		).populate('addedBy', 'name email');
 
 		if (!updatedType) {
-			return res.status(404).json({ 
-				status: false, 
-				message: 'Type of B2B not found' 
+			return res.status(404).json({
+				status: false,
+				message: 'Type of B2B not found'
 			});
 		}
 
-		res.json({ 
+		res.json({
 			status: true,
-			data: updatedType, 
-			message: 'Type of B2B updated successfully' 
+			data: updatedType,
+			message: 'Type of B2B updated successfully'
 		});
 	} catch (error) {
 		console.error('Error updating type of B2B:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
 			message: 'Failed to update type of B2B',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -236,20 +236,20 @@ router.delete('/type-of-b2b/:id', isCollege, async (req, res) => {
 		if (!deletedType) {
 			return res.status(404).json({
 				status: false,
-				message: 'Type of B2B not found' 
+				message: 'Type of B2B not found'
 			});
 		}
 
-		res.json({ 
+		res.json({
 			status: true,
-			message: 'Type of B2B deleted successfully' 
+			message: 'Type of B2B deleted successfully'
 		});
 	} catch (error) {
 		console.error('Error deleting type of B2B:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
 			message: 'Failed to delete type of B2B',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -259,26 +259,26 @@ router.delete('/type-of-b2b/:id', isCollege, async (req, res) => {
 // Get all Lead Categories
 router.get('/lead-categories', isCollege, async (req, res) => {
 	try {
-		const status = req.query.status;	
+		const status = req.query.status;
 		const query = {};
-		if(status){
+		if (status) {
 			query.isActive = status;
 		}
 		const categories = await LeadCategory.find(query)
 			.populate('addedBy', 'name email')
 			.sort({ createdAt: -1 });
-		
-		res.json({ 
+
+		res.json({
 			status: true,
 			data: categories,
-			message: 'Lead categories retrieved successfully' 
+			message: 'Lead categories retrieved successfully'
 		});
 	} catch (error) {
 		console.error('Error getting lead categories:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
 			message: 'Failed to retrieve lead categories',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -288,25 +288,25 @@ router.get('/lead-categories/:id', isCollege, async (req, res) => {
 	try {
 		const category = await LeadCategory.findById(req.params.id)
 			.populate('addedBy', 'name email');
-		
+
 		if (!category) {
 			return res.status(404).json({
 				status: false,
-				message: 'Lead category not found' 
+				message: 'Lead category not found'
 			});
 		}
 
-		res.json({ 
+		res.json({
 			status: true,
 			data: category,
-			message: 'Lead category retrieved successfully' 
+			message: 'Lead category retrieved successfully'
 		});
 	} catch (error) {
 		console.error('Error getting lead category:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
 			message: 'Failed to retrieve lead category',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -320,16 +320,16 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 		if (!name) {
 			return res.status(400).json({
 				status: false,
-				message: 'Name is required' 
+				message: 'Name is required'
 			});
 		}
-		
+
 		// Check if name already exists
 		const existingCategory = await LeadCategory.findOne({ name });
 		if (existingCategory) {
-			return res.status(400).json({ 
+			return res.status(400).json({
 				status: false,
-				message: 'Lead category with this name already exists' 
+				message: 'Lead category with this name already exists'
 			});
 		}
 
@@ -341,18 +341,18 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 
 		const savedCategory = await newCategory.save();
 		await savedCategory.populate('addedBy', 'name email');
-		
-		res.status(201).json({ 
+
+		res.status(201).json({
 			status: true,
-			data: savedCategory, 
-			message: 'Lead category created successfully' 
+			data: savedCategory,
+			message: 'Lead category created successfully'
 		});
 	} catch (error) {
 		console.error('Error creating lead category:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
 			message: 'Failed to create lead category',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -361,17 +361,17 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 router.put('/lead-categories/:id', isCollege, async (req, res) => {
 	try {
 		const { name, description, isActive } = req.body;
-		
+
 		// Check if name already exists (excluding current record)
 		if (name) {
-			const existingCategory = await LeadCategory.findOne({ 
-				name, 
-				_id: { $ne: req.params.id } 
+			const existingCategory = await LeadCategory.findOne({
+				name,
+				_id: { $ne: req.params.id }
 			});
 			if (existingCategory) {
 				return res.status(400).json({
 					status: false,
-					message: 'Lead category with this name already exists' 
+					message: 'Lead category with this name already exists'
 				});
 			}
 		}
@@ -383,23 +383,23 @@ router.put('/lead-categories/:id', isCollege, async (req, res) => {
 		).populate('addedBy', 'name email');
 
 		if (!updatedCategory) {
-			return res.status(404).json({ 
-					status: false,
-				message: 'Lead category not found' 
+			return res.status(404).json({
+				status: false,
+				message: 'Lead category not found'
 			});
 		}
 
-		res.json({ 
-				status: true,
-			data: updatedCategory, 
-			message: 'Lead category updated successfully' 
-			});
+		res.json({
+			status: true,
+			data: updatedCategory,
+			message: 'Lead category updated successfully'
+		});
 	} catch (error) {
 		console.error('Error updating lead category:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
 			message: 'Failed to update lead category',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -416,20 +416,20 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 		if (!deletedCategory) {
 			return res.status(404).json({
 				status: false,
-				message: 'Lead category not found' 
+				message: 'Lead category not found'
 			});
 		}
 
-		res.json({ 
+		res.json({
 			status: true,
-			message: 'Lead category deleted successfully' 
+			message: 'Lead category deleted successfully'
 		});
 	} catch (error) {
 		console.error('Error deleting lead category:', error);
-		res.status(500).json({ 
+		res.status(500).json({
 			status: false,
 			message: 'Failed to delete lead category',
-			error: error.message 
+			error: error.message
 		});
 	}
 });
@@ -439,97 +439,98 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 // Get all leads with filtering and pagination
 router.get('/leads', isCollege, async (req, res) => {
 	try {
-	  const {
-		page = 1,
-		limit = 10,
-		status,
-		leadCategory,
-		typeOfB2B,
-		search,
-		sortBy = 'createdAt',
-		sortOrder = 'desc'
-	  } = req.query;
-  
-	  let teamMembers = await getAllTeamMembers(req.user._id);
-	  const query = {};
-  
-	  // Ownership Conditions for team members
-	  const ownershipConditions = teamMembers.map(member => ({
-		$or: [{ leadAddedBy: member }, { leadOwner: member }]
-	  }));
-  
-	  // Search functionality conditions
-	  const searchConditions = search
-		? [{
-			$or: [
-			  { concernPersonName: { $regex: search, $options: 'i' } },
-			  { businessName: { $regex: search, $options: 'i' } },
-			  { email: { $regex: search, $options: 'i' } },
-			  { mobile: { $regex: search, $options: 'i' } }
+		const {
+			page = 1,
+			limit = 10,
+			status,
+			leadCategory,
+			typeOfB2B,
+			search,
+			sortBy = 'createdAt',
+			sortOrder = 'desc'
+		} = req.query;
+
+		let teamMembers = await getAllTeamMembers(req.user._id);
+		const query = {};
+
+		// Ownership Conditions for team members
+		const ownershipConditions = teamMembers.map(member => ({
+			$or: [{ leadAddedBy: member }, { leadOwner: member }]
+		}));
+
+		// Search functionality conditions
+		const searchConditions = search
+			? [{
+				$or: [
+					{ concernPersonName: { $regex: search, $options: 'i' } },
+					{ businessName: { $regex: search, $options: 'i' } },
+					{ email: { $regex: search, $options: 'i' } },
+					{ mobile: { $regex: search, $options: 'i' } }
+				]
+			}]
+			: [];
+
+		// Combine Ownership and Search conditions
+		const combinedConditions = [...ownershipConditions, ...searchConditions];
+
+		// Final Query Object
+		const finalQuery = {
+			$and: [
+				...(combinedConditions.length > 0 ? [{ $or: combinedConditions.flatMap(c => c.$or || [c]) }] : []),
+				...(status ? [{ status }] : []),
+				...(leadCategory ? [{ leadCategory }] : []),
+				...(typeOfB2B ? [{ typeOfB2B }] : [])
 			]
-		  }]
-		: [];
-  
-	  // Combine Ownership and Search conditions
-	  const combinedConditions = [...ownershipConditions, ...searchConditions];
-  
-	  // Final Query Object
-	  const finalQuery = {
-		$and: [
-		  ...(combinedConditions.length > 0 ? [{ $or: combinedConditions.flatMap(c => c.$or || [c]) }] : []),
-		  ...(status ? [{ status }] : []),
-		  ...(leadCategory ? [{ leadCategory }] : []),
-		  ...(typeOfB2B ? [{ typeOfB2B }] : [])
-		]
-	  };
-  
-	  // Sorting options
-	  const sortOptions = {};
-	  sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-  
-	  // Pagination logic
-	  const skip = (page - 1) * limit;
-  
-	  // Get total lead count for pagination
-	  const totalLeads = await Lead.countDocuments(finalQuery);
-	  const totalPages = Math.ceil(totalLeads / limit);
-  
-	  // Fetch leads based on the query, sorted and paginated
-	  const leads = await Lead.find(finalQuery)
-		.populate('leadCategory', 'name')
-		.populate('typeOfB2B', 'name')
-		.populate('status', 'name')
-		.populate('followUp', 'scheduledDate status')
-		.populate('leadAddedBy', 'name email')
-		.sort(sortOptions)
-		.skip(skip)
-		.limit(Number(limit));
+		};
+
+		// Sorting options
+		const sortOptions = {};
+		sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+		// Pagination logic
+		const skip = (page - 1) * limit;
+
+		// Get total lead count for pagination
+		const totalLeads = await Lead.countDocuments(finalQuery);
+		const totalPages = Math.ceil(totalLeads / limit);
+
+		// Fetch leads based on the query, sorted and paginated
+		const leads = await Lead.find(finalQuery)
+			.populate('leadCategory', 'name')
+			.populate('typeOfB2B', 'name')
+			.populate('status', 'name')
+			.populate('followUp', 'scheduledDate status')
+			.populate('leadAddedBy', 'name email')
+			.populate('leadOwner', 'name email')
+			.sort(sortOptions)
+			.skip(skip)
+			.limit(Number(limit));
 
 		console.log(leads, 'leads')
-  
-	  res.json({
-		status: true,
-		data: {
-		  leads,
-		  pagination: {
-			currentPage: parseInt(page),
-			totalPages,
-			totalLeads,
-			hasNextPage: page < totalPages,
-			hasPrevPage: page > 1
-		  }
-		},
-		message: 'Leads retrieved successfully'
-	  });
+
+		res.json({
+			status: true,
+			data: {
+				leads,
+				pagination: {
+					currentPage: parseInt(page),
+					totalPages,
+					totalLeads,
+					hasNextPage: page < totalPages,
+					hasPrevPage: page > 1
+				}
+			},
+			message: 'Leads retrieved successfully'
+		});
 	} catch (error) {
-	  console.error('Error getting leads:', error);
-	  res.status(500).json({
-		status: false,
-		message: 'Failed to retrieve leads',
-		error: error.message
-	  });
+		console.error('Error getting leads:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve leads',
+			error: error.message
+		});
 	}
-  });
+});
 
 // Get lead by ID
 router.get('/leads/:id', isCollege, async (req, res) => {
@@ -581,8 +582,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			email,
 			mobile,
 			whatsapp,
-			leadOwner
+			leadOwner,
+			remark
 		} = req.body;
+
 
 		// Validate required fields
 		if (!leadCategory || !typeOfB2B || !businessName || !concernPersonName || !email || !mobile) {
@@ -618,15 +621,32 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			mobile,
 			whatsapp,
 			leadOwner,
-			leadAddedBy: req.user._id
+			leadAddedBy: req.user._id,
+			remark,
 		});
 
-		const savedLead = await newLead.save();
-		await savedLead.populate([
-			{ path: 'leadCategory', select: 'name' },
-			{ path: 'typeOfB2B', select: 'name' },
-			{ path: 'leadAddedBy', select: 'name email' }
-		]);
+
+
+		let savedLead = await newLead.save();
+
+		if (savedLead) {
+			savedLead.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: 'Lead added',
+				remarks: remark
+			});
+
+			await savedLead.save();
+		}
+		else {
+			return res.status(400).json({
+				status: false,
+				message: 'Failed to create lead'
+			});
+		}
+
+
 
 		res.status(201).json({
 			status: true,
