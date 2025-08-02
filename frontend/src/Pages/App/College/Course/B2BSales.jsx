@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
-import { GoogleLogin } from 'react-google-login'
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -420,9 +419,9 @@ const B2BSales = () => {
   const businessNameInputRef = useRef(null);
 
 
-  const responseGoogle = (response) => {
-    console.log(response);
-  }
+  // const responseGoogle = (response) => {
+  //   console.log(response);
+  // }
 
 
   const initializeBusinessNameAutocomplete = () => {
@@ -2184,7 +2183,7 @@ const B2BSales = () => {
                       </button>
                      
                     </div>
-                    <GoogleLogin
+                    {/* <GoogleLogin
                         clientId="449914901350-ibgtfl0tbog7vb91u7d5s9cmo92ba1kg.apps.googleusercontent.com"
                         buttonText="Login"
                         onSuccess={responseGoogle}
@@ -2193,7 +2192,7 @@ const B2BSales = () => {
                         responseType='code'
                         accessType='offline'
                         scope='openid profile email https://www.googleapis.com/auth/calendar'
-                      />
+                      /> */}
                   </div>
 
 
