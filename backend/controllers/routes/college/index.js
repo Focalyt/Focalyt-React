@@ -6744,14 +6744,8 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 					doc.verifiedDate = new Date();
 				}
 			}
-		}
+		};
 
-		// If this is the last required doc being verified, set KYC true
-		if (status === 'Verified' && verifiedCount === requiredCount) {
-			profile.kyc = true;
-			profile.kycDoneAt = new Date();
-			profile.kycDoneBy = req.user._id;
-		}
 
 		await profile.save();
 
