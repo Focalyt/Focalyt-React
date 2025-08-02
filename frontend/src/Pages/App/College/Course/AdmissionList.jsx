@@ -58,27 +58,27 @@ const useNavHeight = (dependencies = []) => {
   const [navWidth, setNavWidth] = useState('100%');
 
   const calculateHeightAndWidth = useCallback(() => {
-    console.log('🔍 Calculating nav height and width...');
+    // console.log('🔍 Calculating nav height and width...');
 
     if (navRef.current) {
       // Calculate Height
       const height = navRef.current.offsetHeight;
-      console.log('📏 Found height:', height);
+      // console.log('📏 Found height:', height);
 
       if (height > 0) {
         setNavHeight(height);
-        console.log('✅ Height set to:', height + 'px');
+        // console.log('✅ Height set to:', height + 'px');
       }
 
       // Calculate Width from parent (position-relative container)
       const parentContainer = navRef.current.closest('.position-relative');
       if (parentContainer) {
         const parentWidth = parentContainer.offsetWidth;
-        console.log('📐 Parent width:', parentWidth);
+        // console.log('📐 Parent width:', parentWidth);
 
         if (parentWidth > 0) {
           setNavWidth(parentWidth + 'px');
-          console.log('✅ Width set to:', parentWidth + 'px');
+          // console.log('✅ Width set to:', parentWidth + 'px');
         }
       }
     } else {
@@ -260,7 +260,7 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
-const AdmissionList = () => {
+const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -502,7 +502,7 @@ const AdmissionList = () => {
     showFollowupPanel,
     leadHistoryPanel,
     showWhatsappPanel,
-    mainContentClass]);
+    mainContentClass , isPanelOpen]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
@@ -515,6 +515,7 @@ const AdmissionList = () => {
   const [uploadPreview, setUploadPreview] = useState(null);
 
   const openUploadModal = (document) => {
+    console.log('openUploadModal called with document....');
     setSelectedDocumentForUpload(document);
     setShowUploadModal(true);
     setSelectedFile(null);
@@ -1081,6 +1082,17 @@ const AdmissionList = () => {
     }
   };
 
+
+
+  const [user, setUser] = useState({
+    image: '',
+    name: 'John Doe'
+  });
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [activeCrmFilter]);
+
   const handleUpdateStatus = async () => {
     console.log('Function called');
 
@@ -1262,14 +1274,6 @@ const AdmissionList = () => {
     }
   };
 
-  const [user, setUser] = useState({
-    image: '',
-    name: 'John Doe'
-  });
-
-  useEffect(() => {
-    fetchProfileData();
-  }, [activeCrmFilter]);
 
   const fetchBatches = async (profile) => {
     setError('');
@@ -2175,7 +2179,7 @@ const AdmissionList = () => {
 
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
-
+console.log("upload modal render....")
     return (
       <div className="upload-modal-overlay" onClick={closeUploadModal}>
         <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -2188,6 +2192,7 @@ const AdmissionList = () => {
           </div>
 
           <div className="upload-modal-body">
+            console.log("upload-modal-body render....")
             <div className="upload-section">
               {!selectedFile ? (
                 <div className="file-drop-zone">
@@ -2310,571 +2315,8 @@ const AdmissionList = () => {
     }
   };
 
-  // Render Edit Panel
-  const renderEditPanel = () => {
-    const panelContent = (
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-user-edit text-secondary"></i>
-            </div>
-            <h6 className="mb-0 followUp fw-medium">
-              {showEditPanel && 'Edit Status for '}
-              {showFollowupPanel && 'Set Followup for '}
-              {selectedProfile?._candidate?.name || 'Unknown'}
-            </h6>
-          </div>
-          <div>
-            <button className="btn-close" type="button" onClick={closeEditPanel}></button>
-          </div>
-        </div>
+;
 
-        <div className="card-body">
-          <form>
-            {!showFollowupPanel && (
-              <>
-                <div className="mb-1">
-                  <label htmlFor="status" className="form-label small fw-medium text-dark">
-                    Status<span className="text-danger">*</span>
-                  </label>
-                  <div className="d-flex">
-                    <div className="form-floating flex-grow-1">
-                      <select
-                        className="form-select border-0 bgcolor"
-                        id="status"
-                        value={seletectedStatus}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          paddingInline: '10px',
-                          width: '100%',
-                          backgroundColor: '#f1f2f6'
-                        }}
-                        onChange={handleStatusChange}
-                      >
-                        <option value="">Select Status</option>
-                        {statuses.map((filter, index) => (
-                          <option key={filter._id} value={filter._id}>{filter.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-1">
-                  <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                    Sub-Status<span className="text-danger">*</span>
-                  </label>
-                  <div className="d-flex">
-                    <div className="form-floating flex-grow-1">
-                      <select
-                        className="form-select border-0 bgcolor"
-                        id="subStatus"
-                        value={seletectedSubStatus?._id || ''}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          backgroundColor: '#f1f2f6',
-                          paddingInline: '10px',
-                          width: '100%'
-                        }}
-                        onChange={handleSubStatusChange}
-                      >
-                        <option value="">Select Sub-Status</option>
-                        {subStatuses.map((filter, index) => (
-                          <option key={filter._id} value={filter._id}>{filter.title}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {((seletectedSubStatus && seletectedSubStatus.hasFollowup) || showFollowupPanel) && (
-              <div className="row mb-1">
-                <div className="col-6">
-                  <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                    Next Action Date <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    <DatePicker
-                      className="form-control border-0 bgcolor"
-                      onChange={setFollowupDate}
-                      value={followupDate}
-                      format="dd/MM/yyyy"
-                      minDate={today}
-                    />
-                  </div>
-                </div>
-
-                <div className="col-6">
-                  <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                    Time <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    <input
-                      type="time"
-                      className="form-control border-0 bgcolor"
-                      id="actionTime"
-                      onChange={handleTimeChange}
-                      value={followupTime}
-                      style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || showFollowupPanel) && (
-              <div className="mb-1">
-                <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
-                <textarea
-                  className="form-control border-0 bgcolor"
-                  id="comment"
-                  rows="4"
-                  onChange={(e) => setRemarks(e.target.value)}
-                  style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-                ></textarea>
-              </div>
-            )}
-
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <button
-                type="button"
-                className="btn"
-                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closeEditPanel}
-              >
-                CLOSE
-              </button>
-              <button
-                type="submit"
-                className="btn text-white"
-                onClick={handleUpdateStatus}
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
-              >
-                SET FOLLOWUP
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-
-    if (isMobile) {
-      return (
-        <div
-          className={`modal ${showEditPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeEditPanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return showEditPanel || showFollowupPanel ? (
-      <div className="col-12 transition-col" id="editFollowupPanel">
-        {panelContent}
-      </div>
-    ) : null;
-  };
-
-  // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
-  const renderWhatsAppPanel = () => {
-    const panelContent = (
-      <div className="whatsapp-chat right-side-panel">
-        <section className="topbar-container">
-          <div className="left-topbar">
-            <div className="img-container">
-              <div className="small-avatar" title="Ram Ruhela">RR</div>
-            </div>
-            <div className="flex-column">
-              <span title="Ram Ruhela" className="lead-name">Ram Ruhela</span><br />
-              <span className="selected-number">Primary: 918875426236</span>
-            </div>
-          </div>
-          <div className="right-topbar">
-            <a className="margin-horizontal-4" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="whatsAppAccount" title="whatsAppChatList.title.whatsAppAccount" />
-            </a>
-            <a className="margin-horizontal-5" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
-            </a>
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={closeWhatsappPanel}
-              title="Close WhatsApp"
-            >
-              <i className="fas fa-times"></i>
-            </button>
-          </div>
-        </section>
-
-        <section className="chat-view">
-          <ul className="chat-container" id="messageList">
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>03/26/2025</span></div>
-              <div className="counselor-msg-0 counselor-msg macro">
-                <div className="text text-r">
-                  <div>
-                    <span className="message-header-name student-messages">Anjali</span><br />
-                    <div className="d-flex">
-                      <pre className="text-message">
-                        <br /><span><span style={{ fontSize: '16px' }}>🎯</span>&nbsp;फ्री&nbsp;होटल&nbsp;मैनेजमेंट&nbsp;कोर्स&nbsp;-&nbsp;सुनहरा&nbsp;मौका&nbsp;<span style={{ fontSize: '16px' }}>🎯</span><br /><br />अब&nbsp;बने&nbsp;Guest&nbsp;Service&nbsp;Executive&nbsp;(Front&nbsp;Office)&nbsp;और&nbsp;होटल&nbsp;इंडस्ट्री&nbsp;में&nbsp;पाएं&nbsp;शानदार&nbsp;करियर&nbsp;की&nbsp;शुरुआत।<br /><br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;आयु&nbsp;सीमा:&nbsp;18&nbsp;से&nbsp;29&nbsp;वर्ष<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;योग्यता:&nbsp;12वीं&nbsp;पास<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;कोर्स&nbsp;अवधि:&nbsp;3&nbsp;से&nbsp;4&nbsp;महीने<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;100%&nbsp;जॉब&nbsp;प्लेसमेंट&nbsp;गारंटी</span>
-                        <span className="messageTime text-message-time" id="time_0" style={{ marginTop: '12px' }}>
-                          12:31 PM
-                          <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
-                        </span>
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>04/07/2025</span></div>
-              <div className="counselor-msg-1 counselor-msg macro">
-                <div className="text text-r">
-                  <div className="d-flex">
-                    <pre className="text-message">
-                      <span className="message-header-name student-messages">Mr. Parveen Bansal</span><br />
-                      <span><h6>Hello</h6></span>
-                      <span className="messageTime text-message-time" id="time_1" style={{ marginTop: '7px' }}>
-                        04:28 PM
-                        <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
-                      </span>
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="sessionExpiredMsg">
-              <span>Your session has come to end. It will start once you receive a WhatsApp from the lead.<br />Meanwhile, you can send a Business Initiated Messages (BIM).</span>
-            </div>
-          </ul>
-        </section>
-
-        <section className="footer-container">
-          <div className="footer-box">
-            <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
-              <textarea
-                placeholder="Choose a template"
-                className="disabled-style message-input"
-                disabled
-                rows="1"
-                id="message-input"
-                style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
-              ></textarea>
-            </div>
-            <hr className="divider" />
-            <div className="message-container-input">
-              <div className="left-footer">
-                <span className="disabled-style margin-bottom-5">
-                  <a className="margin-right-10" href="#" title="Emoji">
-                    <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="Emoji" />
-                  </a>
-                </span>
-                <span className="disabled-style">
-                  <input name="fileUpload" type="file" title="Attach File" className="fileUploadIcon" />
-                </span>
-                <span className="input-template">
-                  <a title="Whatsapp Template">
-                    <img src="/Assets/public_assets/images/whatapp/orange-template-whatsapp.svg" alt="Whatsapp Template" />
-                  </a>
-                </span>
-              </div>
-              <div className="right-footer">
-                <span className="disabled-style">
-                  <a className="send-button" href="#" title="Send">
-                    <img className="send-img" src="/Assets/public_assets/images/whatapp/paper-plane.svg" alt="Send" />
-                  </a>
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
-
-    if (isMobile) {
-      return (
-        <div
-          className={`modal ${showWhatsappPanel ? 'show d-block' : 'd-none'}`}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeWhatsappPanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content" style={{ height: '80vh' }}>
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return showWhatsappPanel ? (
-      <div className="col-12 transition-col" id="whatsappPanel">
-        {panelContent}
-      </div>
-    ) : null;
-  };
-
-  // Render Edit Panel (Desktop Sidebar or Mobile Modal)
-  const renderLeadHistoryPanel = () => {
-    const panelContent = (
-      <div className="card border-0 shadow-sm h-100">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-history text-primary"></i>
-            </div>
-            <h6 className="mb-0 fw-medium">Lead History</h6>
-          </div>
-          <button className="btn-close" type="button" onClick={closeleadHistoryPanel}>
-          </button>
-        </div>
-
-        <div className="card-body p-0 d-flex flex-column h-100">
-          {/* Scrollable Content Area */}
-          <div
-            className="flex-grow-1 overflow-auto px-3 py-2"
-            style={{
-              maxHeight: isMobile ? '30vh' : '34vh',
-              minHeight: '200px'
-            }}
-          >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
-              <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
-                  <div key={index} className="timeline-item mb-4">
-                    <div className="timeline-marker">
-                      <div className="timeline-marker-icon">
-                        <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
-                      </div>
-                      {index !== selectedProfile.logs.length - 1 && (
-                        <div className="timeline-line"></div>
-                      )}
-                    </div>
-
-                    <div className="timeline-content">
-                      <div className="card border-0 shadow-sm">
-                        <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
-                            <span className="bg-light text-dark border">
-                              {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : 'Unknown Date'}
-                            </span>
-                            <small className="text-muted">
-                              <i className="fas fa-user me-1"></i>
-                              Modified By: {log.user?.name || 'Unknown User'}
-                            </small>
-                          </div>
-
-                          <div className="mb-2">
-                            <strong className="text-dark d-block mb-1">Action:</strong>
-                            <div className="text-muted small" style={{ lineHeight: '1.6' }}>
-                              {log.action ? (
-                                log.action.split(';').map((actionPart, actionIndex) => (
-                                  <div key={actionIndex} className="mb-1">
-                                    • {actionPart.trim()}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-muted">No action specified</div>
-                              )}
-                            </div>
-                          </div>
-
-                          {log.remarks && (
-                            <div>
-                              <strong className="text-dark d-block mb-1">Remarks:</strong>
-                              <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
-                                {log.remarks}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                <div className="mb-3">
-                  <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                </div>
-                <h6 className="text-muted mb-2">No History Available</h6>
-                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Fixed Footer */}
-          <div className="border-top px-3 py-3 bg-light">
-            <div className="d-flex justify-content-end">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={closeleadHistoryPanel}
-              >
-                <i className="fas fa-times me-1"></i>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-
-    if (isMobile) {
-      return (
-        <div
-          className={`modal ${leadHistoryPanel ? 'show d-block' : 'd-none'}`}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeleadHistoryPanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content" style={{ height: '85vh' }}>
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return leadHistoryPanel ? (
-      <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
-        {panelContent}
-      </div>
-    ) : null;
-  };
-
-  const renderAssignBatchPanel = () => {
-    if (!showAssignBatchPanel) return null;
-
-    const panelContent = (
-      <div className="card border-0 shadow-sm h-100">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-users text-primary"></i>
-            </div>
-            <h6 className="mb-0 fw-medium">Assign Batch</h6>
-          </div>
-          <button className="btn-close" type="button" onClick={closeAssignBatchPanel}>
-          </button>
-        </div>
-
-        <div className="card-body p-0 d-flex flex-column h-100">
-          {/* Scrollable Content Area */}
-          <div
-            className="flex-grow-1 overflow-auto px-3 py-2"
-            style={{
-              maxHeight: isMobile ? '30vh' : '34vh',
-              minHeight: '200px'
-            }}
-          >
-            {selectedProfile ? (
-              <div className="p-3">
-
-                <div className="mb-4">
-                  <div className="mb-3">
-                    <label className="form-label">Select Batch</label>
-                    <select className="form-select" defaultValue="">
-                      <option value="">Choose a Batch...</option>
-                      {batches.map((batch) => (
-                        <option key={batch._id} value={batch._id}>{batch.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                </div>
-              </div>
-            ) : (
-              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                <div className="mb-3">
-                  <i className="fas fa-users text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                </div>
-                <h6 className="text-muted mb-2">No Student Selected</h6>
-                <p className="text-muted small mb-0">Please select a student to assign batch.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Fixed Footer */}
-          <div className="border-top px-3 py-3 bg-light">
-            <div className="d-flex justify-content-end gap-2">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={closeAssignBatchPanel}
-              >
-                <i className="fas fa-times me-1"></i>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  // Handle batch assignment logic here
-                  console.log('Assigning batch to:', selectedProfile);
-                  closeAssignBatchPanel();
-                }}
-              >
-                <i className="fas fa-check me-1"></i>
-                Assign Batch
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-
-    if (isMobile) {
-      return (
-        <div
-          className={`modal ${showAssignBatchPanel ? 'show d-block' : 'd-none'}`}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeAssignBatchPanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content" style={{ height: '85vh' }}>
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="col-12 transition-col" id="assignBatchPanel" style={{ height: '80vh' }}>
-        {panelContent}
-      </div>
-    );
-  };
 
   const handleRejectionReasonChange = (e) => {
     rejectionReasonRef.current = e.target.value;
@@ -3519,7 +2961,7 @@ const AdmissionList = () => {
 
                                       <div className="col-md-2 text-end d-md-none d-sm-block d-block">
                                         <div className="btn-group">
-                                          <div style={{ position: "relative", display: "inline-block" }}>
+                                           <div style={{ position: "relative", display: "inline-block" }}>
                                             <button
                                               className="btn btn-sm btn-outline-secondary border-0"
                                               onClick={() => togglePopup(profileIndex)}
@@ -3541,130 +2983,319 @@ const AdmissionList = () => {
                                                   zIndex: 8,
                                                 }}
                                               ></div>
-                                            )}
+                                                                                      )}
 
-                                            <div
+                                          <div
+                                            style={{
+                                              position: "absolute",
+                                              top: "28px",
+                                              right: "-100px",
+                                              width: "170px",
+                                              backgroundColor: "white",
+                                              border: "1px solid #ddd",
+                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                              borderRadius: "4px",
+                                              padding: "8px 0",
+                                              zIndex: 8,
+                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                              transition: "transform 0.3s ease-in-out",
+                                              pointerEvents: showPopup ? "auto" : "none",
+                                              display: showPopup === profileIndex ? "block" : "none"
+                                            }}
+                                          >
+                                            <button
+                                              className="dropdown-item"
                                               style={{
-                                                position: "absolute",
-                                                top: "28px",
-                                                right: "-100px",
-                                                width: "170px",
-                                                backgroundColor: "white",
-                                                border: "1px solid #ddd",
-                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                                borderRadius: "4px",
-                                                padding: "8px 0",
-                                                zIndex: 8,
-                                                transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                                transition: "transform 0.3s ease-in-out",
-                                                pointerEvents: showPopup ? "auto" : "none",
-                                                display: showPopup === profileIndex ? "block" : "none"
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => handleDownloadAdmissionForm(profile)}
+                                            >
+                                              Download Admission Form
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => handleMarkDropout(profile)}
+                                            >
+                                              Mark Dropout
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              // onClick={() => {
+                                              //   openleadHistoryPanel(profile);
+                                              //   console.log('selectedProfile', profile);
+                                              // }}
+                                              onClick={() => {
+                                                setShowPopup(null)
+                                                openPanel('leadHistory', profile)
                                               }}
                                             >
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => handleDownloadAdmissionForm(profile)}
-                                              >
-                                                Download Admission Form
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => handleMarkDropout(profile)}
-                                              >
-                                                Mark Dropout
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
+                                              History List
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              // onClick={() => {
+                                              //   openEditPanel(profile, 'SetFollowup');
+                                              //   console.log('selectedProfile', profile);
+                                              // }}
+                                              onClick={() => {
+                                                setShowPopup(null)
+                                                openPanel('SetFollowup', profile)
+                                              }}
+                                            >
+                                              Set Followup
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                                  onClick={() => {
+                                                    handleFetchCandidate(profile);
+                                                    console.log('selectedProfile', profile);
+                                                  }}
+                                            >
+                                              Edit Profile
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                                //  onClick={() => {
+                                                //   openAssignBatchPanel(profile);
+                                                //   console.log('selectedProfile', profile);
+                                                //  }}
                                                 onClick={() => {
-                                                  openleadHistoryPanel(profile);
-                                                  console.log('selectedProfile', profile);
+                                                  setShowPopup(null)
+                                                  openPanel('SetFollowup', profile)
                                                 }}
-                                              >
-                                                History List
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
+                                            >
+                                              Assign Batch
+                                            </button>
+                                          </div>
+                                        </div> 
+
+                                        <button
+                                          className="btn btn-sm btn-outline-secondary border-0"
+                                          onClick={() => setLeadDetailsVisible(profileIndex)}
+                                        >
+                                          {leadDetailsVisible === profileIndex ? (
+                                            <i className="fas fa-chevron-up"></i>
+                                          ) : (
+                                            <i className="fas fa-chevron-down"></i>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                     <div className="col-md-2 text-end d-md-block d-sm-none d-none">
+                                      <div className="btn-group">
+                                        <div style={{ position: "relative", display: "inline-block" }}>
+                                          <button
+                                            className="btn btn-sm btn-outline-secondary border-0"
+                                            onClick={() => togglePopup(profileIndex)}
+                                            aria-label="Options"
+                                          >
+                                            <i className="fas fa-ellipsis-v"></i>
+                                          </button>
+
+                                          {showPopup === profileIndex && (
+                                            <div
+                                              onClick={() => setShowPopup(null)}
+                                              style={{
+                                                position: "fixed",
+                                                top: 0,
+                                                left: 0,
+                                                width: "100vw",
+                                                height: "100vh",
+                                                backgroundColor: "transparent",
+                                                zIndex: 8,
+                                              }}
+                                            ></div>
+                                          )}
+
+                                          <div
+                                            style={{
+                                              position: "absolute",
+                                              top: "28px",
+                                              right: "-100px",
+                                              width: "170px",
+                                              backgroundColor: "white",
+                                              border: "1px solid #ddd",
+                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                              borderRadius: "4px",
+                                              padding: "8px 0",
+                                              zIndex: 8,
+                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                              transition: "transform 0.3s ease-in-out",
+                                              pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                              display: showPopup === profileIndex ? "block" : "none"
+                                            }}
+                                          >
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => handleDownloadAdmissionForm(profile)}
+                                            >
+                                              Download Admission Form
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => handleMarkDropout(profile)}
+                                            >
+                                              Mark Dropout
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              // onClick={() => openleadHistoryPanel(profile)}
+                                               onClick={() => {
+                                                    setShowPopup(null)
+                                                    openPanel('leadHistory', profile)
+                                                  }}
+                                            >
+                                              History List
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              // onClick={() => {
+                                              //   openEditPanel(profile, 'SetFollowup');
+                                              //   console.log('selectedProfile', profile);
+                                              // }}
+                                              onClick={() => {
+                                                setShowPopup(null)
+                                                openPanel('SetFollowup', profile)
+                                              }}
+                                            >
+                                              Set Followup
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                                  onClick={() => {
+                                                    handleFetchCandidate(profile);
+                                                    console.log('selectedProfile', profile);
+                                                  }}
+                                            >
+                                              Edit Profile
+                                            </button>
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                                // onClick={() => {
+                                                //   openAssignBatchPanel(profile);
+                                                //   console.log('selectedProfile', profile);
+                                                // }}
                                                 onClick={() => {
-                                                  openEditPanel(profile, 'SetFollowup');
-                                                  console.log('selectedProfile', profile);
-                                                }}
-                                              >
-                                                Set Followup
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  handleFetchCandidate(profile);
-                                                  console.log('selectedProfile', profile);
-                                                }}
-                                              >
-                                                Edit Profile
-                                              </button>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  openAssignBatchPanel(profile);
-                                                  console.log('selectedProfile', profile);
+                                                  setShowPopup(null)
+                                                  openPanel('AssignBatch', profile)
                                                 }}
                                               >
                                                 Assign Batch
@@ -3683,9 +3314,9 @@ const AdmissionList = () => {
                                             )}
                                           </button>
                                         </div>
-                                      </div>
+                                      </div> 
 
-                                      <div className="col-md-2 text-end d-md-block d-sm-none d-none">
+                                      {/* <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                         <div className="btn-group">
                                           <div style={{ position: "relative", display: "inline-block" }}>
                                             <button
@@ -3848,7 +3479,7 @@ const AdmissionList = () => {
                                             )}
                                           </button>
                                         </div>
-                                      </div>
+                                      </div> */}
                                     </div>
                                   </div>
                                 </div>
@@ -4757,7 +4388,8 @@ const AdmissionList = () => {
                                                                 {(!latestUpload) ? (
                                                                   <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
                                                                     setSelectedProfile(profile); // Set the current profile
-                                                                    openUploadModal(doc);        // Open the upload modal
+                                                                    openUploadModal(doc);   
+                                                                    console.log("opening modal")     // Open the upload modal
                                                                   }}>
                                                                     <i className="fas fa-cloud-upload-alt"></i>
                                                                     Upload
@@ -4898,7 +4530,7 @@ const AdmissionList = () => {
         </div>
 
         {/* Right Sidebar for Desktop - Panels */}
-        {!isMobile && (
+        {/* {!isMobile && (
           <div className="col-4">
             <div className="row site-header--sticky--list--panels ">
               {renderEditPanel()}
@@ -4907,13 +4539,13 @@ const AdmissionList = () => {
               {renderAssignBatchPanel()}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Mobile Modals */}
-        {isMobile && renderEditPanel()}
+        {/* {isMobile && renderEditPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
-        {isMobile && renderAssignBatchPanel()}
+        {isMobile && renderAssignBatchPanel()} */}
 
 
         {openModalId === selectedProfile?._id && (
@@ -8791,6 +8423,19 @@ max-width: 600px;
 
 
 }
+.site-header--sticky--admission--post--panel:not(.mobile-sticky-enable) {
+    z-index: 10;
+}
+@media (min-width: 992px) {
+.site-header--sticky--admission--post--panel:not(.mobile-sticky-enable){
+  position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+}
+
+
 /* Resume Preview Modal */
 .resume-preview-modal {
     position: fixed;

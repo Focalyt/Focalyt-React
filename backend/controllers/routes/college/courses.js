@@ -793,6 +793,42 @@ router.route('/leadStatus')
 	});
 
 
+	router.route('/get-branches')
+	.get(async (req, res) => {
+		try {
+			const { courseId } = req.query;
+			const branches = await Courses.findById(courseId).populate('center').select('center');
+			res.status(200).json({ status: true, data: branches.center });
+		} catch (err) {
+			console.log("Error rendering addleads page:", err);
+			res.redirect('back');
+		}
+	});
+
+
+	router.put('/update-branch/:profileId', async (req, res) => {
+		console.log("api hitting....")
+		try {
+			const { profileId } = req.params;
+			const { centerId } = req.body;
+			console.log("profileId" , profileId)
+			console.log(req.body, 'req.body')
+			// Find the course
+			const appliedCourse = await AppliedCourses.findById(profileId);
+			if(!appliedCourse){
+				return res.status(404).json({ success: false, message: 'Applied course not found' });
+			}
+			appliedCourse._center = centerId;
+		const updatedAppliedCourse =	await appliedCourse.save();
+			
+	console.log("updatedAppliedCourse" , updatedAppliedCourse)
+			
+			res.json({ success: true, data: updatedAppliedCourse});
+		} catch (error) {
+			console.error('Error updating center:', error);
+			res.status(500).json({ success: false, message: 'Server error' });
+		}
+	});
 
 
 

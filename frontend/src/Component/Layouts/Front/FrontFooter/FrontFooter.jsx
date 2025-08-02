@@ -431,17 +431,17 @@ function Footer() {
                   </div>
                 </div>
               </div>
-              {/* <!-- <div className="col-xl-auto col-lg-auto col-md-6 col-auto">
+               {/* <div className="col-xl-auto col-lg-auto col-md-6 col-auto">
           <h4 className="color-pink fw-bold pb-xxl-4 pb-xp-4 pb-lg-3 pb-md-2 sm-1 pb-1">Download Now</h4>
           <div className="footer-store-buttons">
             <a href="#">
-              <img src="/public_assets/images/newpage/common/app-store.png" alt="image alt"/>
+              <img src="/Assets/public_assets/images/newpage/common/app-store.png" alt="image alt"/>
             </a>
             <a href="#">
-              <img src="/public_assets/images/newpage/common/play-store.png" alt="image alt"/>
+              <img src="/Assets/public_assets/images/newpage/common/play-store.png" alt="image alt"/>
             </a>
           </div>
-        </div> --> */}
+        </div>  */}
               <div className="copyright-block">
                 <div className="container">
                   <div className="copyright-inner text-center  copyright-border">

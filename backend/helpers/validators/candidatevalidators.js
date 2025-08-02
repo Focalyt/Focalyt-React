@@ -3,6 +3,8 @@ module.exports = {
     register: (data) => {
         return Joi.object({
             name: Joi.string().trim().max(30).required(),
+            fatherName: Joi.string().trim().max(30).required(),
+            motherName: Joi.string().trim().max(30).required(),
             mobile: Joi.string().trim().length(10).pattern(/^[0-9]+$/).required(),
             sex: Joi.string().trim().required(),
             email: Joi.string().trim().required(),

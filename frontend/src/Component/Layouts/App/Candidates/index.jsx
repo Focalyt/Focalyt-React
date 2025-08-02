@@ -28,6 +28,41 @@ function CandidateLayout({ children }) {
   // Backend URL
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
+  // Chatbot functionality
+  useEffect(() => {
+    // Add external CSS and script dynamically
+    const cssLink = document.createElement("link");
+    cssLink.rel = "stylesheet";
+    cssLink.href = "https://app.helloyubo.com/assets/focalyt_bot.bot.css";
+    document.head.appendChild(cssLink);
+
+    const script = document.createElement("script");
+    script.src = "https://app.helloyubo.com/assets/focalyt_bot.bot.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    // Wait for the script to load and then apply drag functionality
+    script.onload = () => {
+      // Wait a bit for the chatbot element to be created
+      setTimeout(() => {
+        const botContainer = document.getElementsByClassName("chat-start")[0];
+        if (botContainer && window.dragElement) {
+          window.dragElement(botContainer); // Apply drag to the container div
+        }
+      }, 1000); // Give time for the chatbot to initialize
+    };
+
+    return () => {
+      // Cleanup CSS and script when component unmounts
+      if (cssLink.parentNode) {
+        document.head.removeChild(cssLink);
+      }
+      if (script.parentNode) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -1562,4 +1597,5 @@ span#notification {
 }
 
 export default CandidateLayout
+
 

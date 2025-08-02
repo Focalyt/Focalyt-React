@@ -10,6 +10,8 @@ const { boolean } = require("joi");
 const candidateProfileSchema = new Schema(
   {
     name: { type: String, trim: true },
+    fatherName: { type: String, trim: true },
+    motherName: { type: String, trim: true },
     mobile: {
       type: Number,
       lowercase: true,

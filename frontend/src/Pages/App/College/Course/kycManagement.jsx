@@ -1353,9 +1353,6 @@ const KYCManagement = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
   }, [currentPage, activeCrmFilter]);
 
-
-  
-
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
       console.log('filters', filters)
