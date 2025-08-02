@@ -486,7 +486,7 @@ router
         return res.send({ status: "failure", error: value });
       }
       let formData = value;
-      const { name, mobile, sex, personalInfo ,highestQualification , email, dob, isExperienced} = formData;
+      const { name, mobile, sex, personalInfo ,highestQualification , email, dob, isExperienced, fatherName, motherName} = formData;
 
       if (formData?.refCode && formData?.refCode !== '') {
         let referredBy = await CandidateProfile.findOne({ _id: formData.refCode, status: true, isDeleted: false })
@@ -541,6 +541,8 @@ router
         dob,
         sex,
         mobile,
+        fatherName,
+        motherName,
         verified: true,
         availableCredit: coins?.candidateCoins,
         creditLeft: coins?.candidateCoins,

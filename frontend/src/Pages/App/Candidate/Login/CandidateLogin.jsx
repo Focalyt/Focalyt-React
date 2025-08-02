@@ -32,6 +32,8 @@ const CandidateLogin = () => {
     const [pincode, setPC] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
+    const [fatherName, setFatherName] = useState('');
+    const [motherName, setMotherName] = useState('');
 
     const [location, setLocation] = useState({ place: '', lat: '', lng: '' });
     const [isNewUser, setIsNewUser] = useState(false);
@@ -264,6 +266,8 @@ const CandidateLogin = () => {
                         name: fullName,
                         mobile: mobileNumber,
                         sex: gender,
+                        fatherName: fatherName,
+                        motherName: motherName,
                         personalInfo: {
                             currentAddress: {
                                 type: "Point",
@@ -315,7 +319,7 @@ const CandidateLogin = () => {
                     if (refCode) {
                         body.refCode = refCode;
                     }
-
+                    console.log("body...", body);
                     // Register the new user
                     const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
                     console.log("Register API response:", registerRes.data);
@@ -540,6 +544,25 @@ const CandidateLogin = () => {
                                                 onChange={(e) => setFullName(e.target.value)}
                                             />
                                         </div>
+                                        <div className="mb-3">
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                placeholder="Father Name / पिता का नाम"
+                                                value={fatherName}
+                                                onChange={(e) => setFatherName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="mb-3">
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                placeholder="Mother Name / माँ का नाम"
+                                                value={motherName}
+                                                onChange={(e) => setMotherName(e.target.value)}
+                                            />
+                                        </div>
+
                                         <div className="mb-3 datepicker-wrapper">
 
                                         <DatePicker

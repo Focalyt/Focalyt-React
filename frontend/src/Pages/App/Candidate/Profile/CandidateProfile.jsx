@@ -1538,7 +1538,7 @@ const CandidateProfile = () => {
                       }
                     }));
                   })} */}
-                  <label className="form-label fw-bold">Father Name:</label>
+                  <label className="form-label fw-bold">Father Name: {profileData?.fatherName || 'N/A'}</label>
                   <div>{profileData?.personalInfo?.professionalSummary || 'N/A'}</div>
                 </div>
 

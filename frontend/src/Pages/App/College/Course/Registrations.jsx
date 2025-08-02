@@ -737,7 +737,7 @@ const CRMDashboard = () => {
   const token = userData.token;
 
   const [openModalId, setOpenModalId] = useState(null);
-
+  const [showBranchModal, setShowBranchModal] = useState(false);
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -801,7 +801,8 @@ const CRMDashboard = () => {
 
   //side pannel stats
   const [showPanel, setShowPanel] = useState('')
-
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
   // Loading state for fetchProfileData
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
 
@@ -1956,6 +1957,75 @@ const CRMDashboard = () => {
     }
   };
 
+  const getBranches = async (profile) => {
+    const courseId = profile._course._id;
+    const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+      headers: {
+        'x-auth': token,
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    console.log('res..', response)
+    if (response.data.status) {
+      setBranches(response.data);
+      setSelectedBranch('');
+    } else {
+      alert('Failed to fetch branches');
+    }
+  }
+
+  const updateBranch = async (profile, selectedBranchId) => {
+    console.log("updateBranch")
+    if (!selectedBranchId) {
+      alert('Please select a branch first');
+      return;
+    }
+
+    const profileId = profile._id;
+    console.log("profile" , profileId)
+    console.log("profileId" , profileId)
+    console.log("selectedBranchId" , selectedBranchId)
+    
+    try {
+      const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+        centerId: selectedBranchId
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+      console.log('response', response)
+      if (response.data.success) {
+        alert('Branch updated successfully!');
+        // Optionally refresh the data or close modal
+        setShowBranchModal(false);
+        
+        // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+        // setAllProfiles(prevProfiles => 
+        //   prevProfiles.map(p => 
+        //     p._id === profile._id 
+        //       ? {
+        //           ...p,
+        //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+        //         }
+        //       : p
+        //   )
+        // );
+      
+      setSelectedBranch('');
+
+
+        
+      await fetchProfileData();
+      } else {
+        alert('Failed to update branch');
+      }
+    } catch (error) {
+      console.error('Error updating branch:', error);
+      alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+    }
+  }
 
 
 
@@ -3426,7 +3496,7 @@ const CRMDashboard = () => {
                 <h6 className="text-muted mb-2">No Center Available</h6>
                 <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
 
-               
+
 
               </div>
             )}
@@ -4371,6 +4441,27 @@ const CRMDashboard = () => {
                                             Change Center
                                           </button>
 
+                                          <button
+                                            className="btn btn-primary border-0 text-black"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              getBranches(profile);
+                                              setShowBranchModal(true);
+                                              console.log('change Branch')
+
+                                            }}
+                                          >
+                                            Change Branch
+                                          </button>
 
                                         </div>
                                       </div>
@@ -4561,6 +4652,26 @@ const CRMDashboard = () => {
                                           >
                                             Change Center
                                           </button>
+                                          <button
+                                            className="btn btn-primary border-0 text-black"
+                                            style={{
+                                              width: "100%",
+                                              padding: "8px 16px",
+                                              border: "none",
+                                              background: "none",
+                                              textAlign: "left",
+                                              cursor: "pointer",
+                                              fontSize: "12px",
+                                              fontWeight: "600"
+                                            }}
+                                            onClick={() => {
+                                              getBranches(profile);
+                                              console.log('change Branch')
+                                              setShowBranchModal(true);
+                                            }}
+                                          >
+                                            Change Branch
+                                          </button>
 
                                         </div>
                                       </div>
@@ -4664,7 +4775,7 @@ const CRMDashboard = () => {
                                             <div className="info-group">
                                               <div className="info-label">BRANCH NAME</div>
                                               <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                            </div>
+                                            </div>                               
                                             <div className="info-group">
                                               <div className="info-label">LEAD MODIFICATION DATE</div>
                                               <div className="info-value">{profile.updatedAt ?
@@ -5798,6 +5909,55 @@ const CRMDashboard = () => {
                               </div>
                             )}
 
+                            {showBranchModal && (
+                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+                                  <div className="modal-content">
+                                    <div className="modal-header">
+                                      <h1 className="modal-title fs-5">Select Branch</h1>
+                                      <button type="button" className="btn-close" onClick={() => setShowBranchModal(false)}></button>
+                                    </div>
+                                    <div className="modal-body">
+                                      <div className="position-relative">
+                                        <select
+                                          className="form-select border-0 shadow-sm"
+                                          id="course"
+                                          value={selectedBranch}
+                                          onChange={(e) => setSelectedBranch(e.target.value)}
+                                          style={{
+                                            height: '48px',
+                                            padding: '12px 16px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            transition: 'all 0.3s ease',
+                                            border: '1px solid #e9ecef',
+
+                                          }}
+
+                                        >
+                                          <option value="">Select Branch</option>
+                                          {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                                            <option key={branch._id || index} value={branch._id}>
+                                              {branch.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+
+
+                                    </div>
+                                    <div className="modal-footer">
+                                      <button type="button" className="btn btn-secondary" onClick={() => {
+                                        setShowBranchModal(false);
+                                        setSelectedBranch('');
+                                      }}>Close</button>
+                                      <button type="button" className="btn btn-primary" onClick={() => updateBranch(profile, selectedBranch)}>Save Branch</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
                             <style>
                               {

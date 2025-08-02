@@ -58,27 +58,27 @@ const useNavHeight = (dependencies = []) => {
   const [navWidth, setNavWidth] = useState('100%');
 
   const calculateHeightAndWidth = useCallback(() => {
-    console.log('🔍 Calculating nav height and width...');
+    // console.log('🔍 Calculating nav height and width...');
 
     if (navRef.current) {
       // Calculate Height
       const height = navRef.current.offsetHeight;
-      console.log('📏 Found height:', height);
+      // console.log('📏 Found height:', height);
 
       if (height > 0) {
         setNavHeight(height);
-        console.log('✅ Height set to:', height + 'px');
+        // console.log('✅ Height set to:', height + 'px');
       }
 
       // Calculate Width from parent (position-relative container)
       const parentContainer = navRef.current.closest('.position-relative');
       if (parentContainer) {
         const parentWidth = parentContainer.offsetWidth;
-        console.log('📐 Parent width:', parentWidth);
+        // console.log('📐 Parent width:', parentWidth);
 
         if (parentWidth > 0) {
           setNavWidth(parentWidth + 'px');
-          console.log('✅ Width set to:', parentWidth + 'px');
+          // console.log('✅ Width set to:', parentWidth + 'px');
         }
       }
     } else {
@@ -515,6 +515,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   const [uploadPreview, setUploadPreview] = useState(null);
 
   const openUploadModal = (document) => {
+    console.log('openUploadModal called with document....');
     setSelectedDocumentForUpload(document);
     setShowUploadModal(true);
     setSelectedFile(null);
@@ -2178,7 +2179,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
-
+console.log("upload modal render....")
     return (
       <div className="upload-modal-overlay" onClick={closeUploadModal}>
         <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -2191,6 +2192,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           </div>
 
           <div className="upload-modal-body">
+            console.log("upload-modal-body render....")
             <div className="upload-section">
               {!selectedFile ? (
                 <div className="file-drop-zone">
@@ -2981,23 +2983,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                   zIndex: 8,
                                                 }}
                                               ></div>
-                                            )}
-
-                                            <div
-                                              style={{
-                                                position: "absolute",
-                                                top: "28px",
-                                                right: "-100px",
-                                                width: "170px",
-                                                backgroundColor: "white",
-                                                border: "1px solid #ddd",
-                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                                borderRadius: "4px",
-                                                padding: "8px 0",
-                                                zIndex: 8,
-                                              }}
-                                            ></div>
-                                          )}
+                                                                                      )}
 
                                           <div
                                             style={{
@@ -4402,7 +4388,8 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                                 {(!latestUpload) ? (
                                                                   <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
                                                                     setSelectedProfile(profile); // Set the current profile
-                                                                    openUploadModal(doc);        // Open the upload modal
+                                                                    openUploadModal(doc);   
+                                                                    console.log("opening modal")     // Open the upload modal
                                                                   }}>
                                                                     <i className="fas fa-cloud-upload-alt"></i>
                                                                     Upload
