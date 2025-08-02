@@ -369,399 +369,1052 @@ router.route("/register")
 
 
 
-// router.route("/appliedCandidatesdata").get(isCollege, async (req, res) => {
+	router.route("/appliedCandidates").get(isCollege, async (req, res) => {
+		try {
+			const user = req.user;
+			let teamMembers = await getAllTeamMembers(user._id);
+	
+			const college = await College.findOne({
+				'_concernPerson._id': user._id
+			});
+	
+			const page = parseInt(req.query.page) || 1;
+			const limit = parseInt(req.query.limit) || 50;
+			const skip = (page - 1) * limit;
+	
+			// Extract ALL filter parameters from query
+			const {
+				name,
+				courseType,
+				status,
+				leadStatus,
+				sector,
+				createdFromDate,
+				createdToDate,
+				modifiedFromDate,
+				modifiedToDate,
+				nextActionFromDate,
+				nextActionToDate,
+				// Multi-select filters (these come as JSON strings)
+				projects,
+				verticals,
+				course,
+				center,
+				counselor
+			} = req.query;
+	
+			// Parse multi-select filter values
+			let projectsArray = [];
+			let verticalsArray = [];
+			let courseArray = [];
+			let centerArray = [];
+			let counselorArray = [];
+	
+			try {
+				if (projects) projectsArray = JSON.parse(projects);
+				if (verticals) verticalsArray = JSON.parse(verticals);
+				if (course) courseArray = JSON.parse(course);
+				if (center) centerArray = JSON.parse(center);
+				if (counselor) counselorArray = JSON.parse(counselor);
+			} catch (parseError) {
+				console.error('Error parsing filter arrays:', parseError);
+			}
+	
+			if (counselorArray.length > 0) {
+				teamMembers = counselorArray
+			}
+	
+	
+	
+	
+			let allFilteredResults = [];
+	
+			for (let member of teamMembers) {
+				// Build aggregation pipeline
+				let aggregationPipeline = [];
+	
+				if (typeof member === 'string') {
+					member = new mongoose.Types.ObjectId(member)
+	
+				}
+	
+	
+				// Base match stage
+				let baseMatchStage = {
+					kycStage: { $nin: [true] },
+					kyc: { $nin: [true] },
+					admissionDone: { $nin: [true] },
+					$or: [
+						{ registeredBy: member },
+						{
+							$expr: {
+								$eq: [
+									{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
+									member
+								]
+							}
+						}
+					]
+				};
+	
+				// Add date filters to base match
+				if (createdFromDate || createdToDate) {
+					baseMatchStage.createdAt = {};
+					if (createdFromDate) {
+						baseMatchStage.createdAt.$gte = new Date(createdFromDate);
+					}
+					if (createdToDate) {
+						const toDate = new Date(createdToDate);
+						toDate.setHours(23, 59, 59, 999);
+						baseMatchStage.createdAt.$lte = toDate;
+					}
+				}
+	
+				if (modifiedFromDate || modifiedToDate) {
+					baseMatchStage.updatedAt = {};
+					if (modifiedFromDate) {
+						baseMatchStage.updatedAt.$gte = new Date(modifiedFromDate);
+					}
+					if (modifiedToDate) {
+						const toDate = new Date(modifiedToDate);
+						toDate.setHours(23, 59, 59, 999);
+						baseMatchStage.updatedAt.$lte = toDate;
+					}
+				}
+	
+				if (nextActionFromDate || nextActionToDate) {
+					baseMatchStage.followupDate = {};
+					if (nextActionFromDate) {
+						baseMatchStage.followupDate.$gte = new Date(nextActionFromDate);
+					}
+					if (nextActionToDate) {
+						const toDate = new Date(nextActionToDate);
+						toDate.setHours(23, 59, 59, 999);
+						baseMatchStage.followupDate.$lte = toDate;
+					}
+				}
+	
+				// Status filters
+				if (status && status !== 'true') {
+					baseMatchStage._leadStatus = new mongoose.Types.ObjectId(status);
+				}
+				if (leadStatus) {
+					baseMatchStage._leadStatus = new mongoose.Types.ObjectId(leadStatus);
+				}
+	
+				// Add base match stage
+				aggregationPipeline.push({ $match: baseMatchStage });
+	
+				// Lookup stages for all related collections
+				aggregationPipeline.push(
+					// Course lookup with sectors, vertical, project population
+					{
+						$lookup: {
+							from: 'courses',
+							localField: '_course',
+							foreignField: '_id',
+							as: '_course',
+							pipeline: [
+								{
+									$lookup: {
+										from: 'sectors',
+										localField: 'sectors',
+										foreignField: '_id',
+										as: 'sectors'
+									}
+								},
+								{
+									$lookup: {
+										from: 'verticals',
+										localField: 'vertical',
+										foreignField: '_id',
+										as: 'verticalData'
+									}
+								},
+								{
+									$lookup: {
+										from: 'projects',
+										localField: 'project',
+										foreignField: '_id',
+										as: 'projectData'  // ← Different name
+									}
+								},
+								{
+									$addFields: {
+										projectInfo: { $arrayElemAt: ['$projectData', 0] },  // ← Single object
+										// Keep original 'project' field as ObjectId
+										verticalInfo: { $arrayElemAt: ['$verticalData', 0] },
+									}
+								}
+							]
+						}
+					},
+					{ $unwind: '$_course' },
+	
+					// Lead Status lookup
+					{
+						$lookup: {
+							from: 'status',
+							localField: '_leadStatus',
+							foreignField: '_id',
+							as: '_leadStatus'
+						}
+					},
+					{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
+	
+					// Center lookup
+					{
+						$lookup: {
+							from: 'centers',
+							localField: '_center',
+							foreignField: '_id',
+							as: '_center'
+						}
+					},
+					{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+	
+					// Registered By lookup
+					{
+						$lookup: {
+							from: 'users',
+							localField: 'registeredBy',
+							foreignField: '_id',
+							as: 'registeredBy'
+						}
+					},
+					{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+	
+					// Candidate lookup with applied courses
+					{
+						$lookup: {
+							from: 'candidateprofiles',
+							localField: '_candidate',
+							foreignField: '_id',
+							as: '_candidate',
+							pipeline: [
+								{
+									$lookup: {
+										from: 'appliedcourses',
+										localField: '_appliedCourses',
+										foreignField: '_id',
+										as: '_appliedCourses',
+										pipeline: [
+											{
+												$lookup: {
+													from: 'courses',
+													localField: '_course',
+													foreignField: '_id',
+													as: '_course'
+												}
+											},
+											{
+												$lookup: {
+													from: 'users',
+													localField: 'registeredBy',
+													foreignField: '_id',
+													as: 'registeredBy'
+												}
+											},
+											{
+												$lookup: {
+													from: 'centers',
+													localField: '_center',
+													foreignField: '_id',
+													as: '_center'
+												}
+											},
+											{
+												$lookup: {
+													from: 'status',
+													localField: '_leadStatus',
+													foreignField: '_id',
+													as: '_leadStatus'
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+	
+					// Logs lookup
+	
+					{
+						$lookup: {
+							from: 'users',
+							localField: 'logs.user',
+							foreignField: '_id',
+							as: 'logUsers'
+						}
+					},
+					{
+						$addFields: {
+							logs: {
+								$map: {
+									input: "$logs",
+									as: "log",
+									in: {
+										$mergeObjects: [
+											"$$log",
+											{
+												user: {
+													$arrayElemAt: [
+														{
+															$filter: {
+																input: "$logUsers",
+																cond: { $eq: ["$$this._id", "$$log.user"] }
+															}
+														},
+														0
+													]
+												}
+											}
+										]
+									}
+								}
+							}
+						}
+					}
+	
+				);
+	
+				// Filter by college
+				aggregationPipeline.push({
+					$match: {
+						'_course.college': college._id
+					}
+				});
+	
+				// Apply additional filters based on populated data
+				let additionalMatches = {};
+	
+				// Course type filter
+				if (courseType) {
+					additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(courseType, 'i') };
+				}
+	
+				// Sector filter (multi-select)
+				if (projectsArray.length > 0) {
+					additionalMatches['_course.project'] = {
+						$in: projectsArray.map(id => new mongoose.Types.ObjectId(id))
+					};
+				}
+	
+				// Verticals filter (multi-select)
+				if (verticalsArray.length > 0) {
+					additionalMatches['_course.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+				}
+	
+				// Course filter (multi-select)
+				if (courseArray.length > 0) {
+					additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+				}
+	
+				// Center filter (multi-select)
+				if (centerArray.length > 0) {
+					additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+				}
+	
+	
+				// Name search filter
+				if (name && name.trim()) {
+					const searchTerm = name.trim();
+					const searchRegex = new RegExp(searchTerm, 'i');
+	
+	
+	
+					additionalMatches.$or = additionalMatches.$or ? [
+						...additionalMatches.$or,
+						{ '_candidate.name': searchRegex },
+						{ '_candidate.mobile': searchRegex },
+						{ '_candidate.mobile': parseInt(searchTerm) || searchTerm }, // Try both number and string
+						{ '_candidate.email': searchRegex }
+					] : [
+						{ '_candidate.name': searchRegex },
+						{ '_candidate.mobile': searchRegex },
+						{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
+						{ '_candidate.email': searchRegex }
+					];
+				}
+	
+				// Add additional match stage if any filters are applied
+				if (Object.keys(additionalMatches).length > 0) {
+					aggregationPipeline.push({ $match: additionalMatches });
+				}
+	
+				// Sort by creation date
+				aggregationPipeline.push({
+					$sort: { updatedAt: -1 }
+				});
+	
+				// Execute aggregation
+				const response = await AppliedCourses.aggregate(aggregationPipeline);
+	
+				// Add unique results to the main array
+				response.forEach(doc => {
+					if (!allFilteredResults.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
+						allFilteredResults.push(doc);
+					}
+				});
+			}
+	
+			// Process results for document counts and other formatting
+			const results = allFilteredResults.map(doc => {
+				let selectedSubstatus = null;
+	
+				if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+					selectedSubstatus = doc._leadStatus.substatuses.find(
+						sub => sub._id.toString() === doc._leadSubStatus.toString()
+					);
+				}
+	
+				// Process sectors to show first sector name
+				const firstSectorName = doc._course?.sectors?.[0]?.name || 'N/A';
+				if (doc._course) {
+					doc._course.sectors = firstSectorName;
+				}
+	
+				const requiredDocs = doc._course?.docsRequired || [];
+				const uploadedDocs = doc.uploadedDocs || [];
+	
+				// Map uploaded docs by docsId for quick lookup
+				const uploadedDocsMap = {};
+				uploadedDocs.forEach(d => {
+					if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
+				});
+	
+				let combinedDocs = [];
+	
+				if (requiredDocs) {
+					// Create a merged array with both required docs and uploaded docs info
+					combinedDocs = requiredDocs.map(reqDoc => {
+						// Convert Mongoose document to plain object
+						const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
+	
+						// Find matching uploaded docs for this required doc
+						const matchingUploads = uploadedDocs.filter(
+							uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
+						);
+	
+						return {
+							_id: docObj._id,
+							Name: docObj.Name || 'Document',
+							mandatory: docObj.mandatory,
+							description: docObj.description || '',
+							uploads: matchingUploads || []
+						};
+					});
+				}
+	
+				// Prepare combined docs array for legacy compatibility
+				const allDocs = requiredDocs.map(reqDoc => {
+					const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
+					if (uploadedDoc) {
+						return {
+							...uploadedDoc,
+							Name: reqDoc.Name,
+							mandatory: reqDoc.mandatory,
+							_id: reqDoc._id
+						};
+					} else {
+						return {
+							docsId: reqDoc._id,
+							Name: reqDoc.Name,
+							mandatory: reqDoc.mandatory,
+							status: "Not Uploaded",
+							fileUrl: null,
+							reason: null,
+							verifiedBy: null,
+							verifiedDate: null,
+							uploadedAt: null
+						};
+					}
+				});
+	
+				// Count calculations
+				let verifiedCount = 0;
+				let RejectedCount = 0;
+				let pendingVerificationCount = 0;
+				let notUploadedCount = 0;
+	
+				allDocs.forEach(doc => {
+					if (doc.status === "Verified") verifiedCount++;
+					else if (doc.status === "Rejected") RejectedCount++;
+					else if (doc.status === "Pending") pendingVerificationCount++;
+					else if (doc.status === "Not Uploaded") notUploadedCount++;
+				});
+	
+				const totalRequired = allDocs.length;
+				const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
+				const uploadPercentage = totalRequired > 0
+					? Math.round((uploadedCount / totalRequired) * 100)
+					: 0;
+	
+				return {
+					...doc,
+					selectedSubstatus,
+					uploadedDocs: combinedDocs,
+					docCounts: {
+						totalRequired,
+						RejectedCount,
+						uploadedCount,
+						verifiedCount,
+						pendingVerificationCount,
+						notUploadedCount,
+						uploadPercentage
+					}
+				};
+			});
+	
+			// Calculate CRM filter counts
+			const crmFilterCounts = await calculateCrmFilterCounts(teamMembers, college._id, {
+				name,
+				courseType,
+				sector,
+				createdFromDate,
+				createdToDate,
+				modifiedFromDate,
+				modifiedToDate,
+				nextActionFromDate,
+				nextActionToDate,
+				projectsArray,
+				verticalsArray,
+				courseArray,
+				centerArray,
+				counselorArray
+			});
+	
+			// Apply pagination
+			const totalCount = results.length;
+			const paginatedResult = results.slice(skip, skip + limit);
+	
+	
+			res.status(200).json({
+				success: true,
+				count: paginatedResult.length,
+				page,
+				limit,
+				totalCount,
+				totalPages: Math.ceil(totalCount / limit),
+				data: paginatedResult,
+				allData: results,
+				crmFilterCounts
+			});
+	
+		} catch (err) {
+			console.error(err);
+			res.status(500).json({
+				success: false,
+				message: "Server Error"
+			});
+		}
+	});
+	
+	// Helper function to calculate CRM filter counts with applied filters
+	async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters = {}) {
+		const counts = { all: 0 };
+	
+		try {
+			const allStatuses = await Status.find({}).select('_id title milestone');
+	
+			// Initialize counts for each status
+			allStatuses.forEach(status => {
+				counts[status._id.toString()] = {
+					_id: status._id,
+					name: status.title,
+					milestone: status.milestone,
+					count: 0
+				};
+			});
+	
+			for (let member of teamMembers) {
+				// Build base aggregation pipeline
+				let basePipeline = [];
+	
+				if (typeof member === 'string') {
+					member = new mongoose.Types.ObjectId(member)
+				}
+	
+				// Base match stage
+				let baseMatchStage = {
+					kycStage: { $nin: [true] },
+					kyc: { $nin: [true] },
+					admissionDone: { $nin: [true] },
+					$or: [
+						{ registeredBy: member },
+						{
+							$expr: {
+								$eq: [
+									{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
+									member
+								]
+							}
+						}
+					]
+				};
+	
+				// Add date filters
+				if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
+					baseMatchStage.createdAt = {};
+					if (appliedFilters.createdFromDate) {
+						baseMatchStage.createdAt.$gte = new Date(appliedFilters.createdFromDate);
+					}
+					if (appliedFilters.createdToDate) {
+						const toDate = new Date(appliedFilters.createdToDate);
+						toDate.setHours(23, 59, 59, 999);
+						baseMatchStage.createdAt.$lte = toDate;
+					}
+				}
+	
+				if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
+					baseMatchStage.updatedAt = {};
+					if (appliedFilters.modifiedFromDate) {
+						baseMatchStage.updatedAt.$gte = new Date(appliedFilters.modifiedFromDate);
+					}
+					if (appliedFilters.modifiedToDate) {
+						const toDate = new Date(appliedFilters.modifiedToDate);
+						toDate.setHours(23, 59, 59, 999);
+						baseMatchStage.updatedAt.$lte = toDate;
+					}
+				}
+	
+				if (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate) {
+					baseMatchStage.followupDate = {};
+					if (appliedFilters.nextActionFromDate) {
+						baseMatchStage.followupDate.$gte = new Date(appliedFilters.nextActionFromDate);
+					}
+					if (appliedFilters.nextActionToDate) {
+						const toDate = new Date(appliedFilters.nextActionToDate);
+						toDate.setHours(23, 59, 59, 999);
+						baseMatchStage.followupDate.$lte = toDate;
+					}
+				}
+	
+				basePipeline.push({ $match: baseMatchStage });
+	
+				// Add lookups
+				basePipeline.push(
+					{
+						$lookup: {
+							from: 'courses',
+							localField: '_course',
+							foreignField: '_id',
+							as: '_course',
+							pipeline: [
+								{
+									$lookup: {
+										from: 'sectors',
+										localField: 'sectors',
+										foreignField: '_id',
+										as: 'sectors'
+									}
+								},
+								{
+									$lookup: {
+										from: 'verticals',
+										localField: 'vertical',
+										foreignField: '_id',
+										as: 'verticalData'
+									}
+								},
+								{
+									$lookup: {
+										from: 'projects',
+										localField: 'project',
+										foreignField: '_id',
+										as: 'projectData'  // ← Changed from 'project' to 'projectData'
+									}
+								},
+								{
+									$addFields: {
+										projectInfo: { $arrayElemAt: ['$projectData', 0] },  // ← Single object
+										// Keep original 'project' field as ObjectId
+										verticalInfo: { $arrayElemAt: ['$verticalData', 0] },
+									}
+								}
+							]
+						}
+					},
+					{ $unwind: '$_course' },
+					{
+						$lookup: {
+							from: 'centers',
+							localField: '_center',
+							foreignField: '_id',
+							as: '_center'
+						}
+					},
+					{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+	
+					{
+						$lookup: {
+							from: 'users',
+							localField: 'registeredBy',
+							foreignField: '_id',
+							as: 'registeredBy'
+						}
+					},
+					{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
+					{
+						$lookup: {
+							from: 'candidateprofiles',
+							localField: '_candidate',
+							foreignField: '_id',
+							as: '_candidate'
+						}
+					},
+					{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+	
+				);
+	
+				// Filter by college FIRST
+				basePipeline.push({
+					$match: {
+						'_course.college': collegeId
+					}
+				});
+	
+				// Apply additional filters
+				let additionalMatches = {};
+	
+				if (appliedFilters.courseType) {
+					additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(appliedFilters.courseType, 'i') };
+				}
+	
+				if (appliedFilters.projectsArray.length > 0) {
+					additionalMatches['_course.project'] = {
+						$in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id))
+					};
+				}
+	
+				if (appliedFilters.verticalsArray && appliedFilters.verticalsArray.length > 0) {
+					additionalMatches['_course.vertical'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+				}
+	
+				if (appliedFilters.courseArray && appliedFilters.courseArray.length > 0) {
+					additionalMatches['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+				}
+	
+				if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
+					additionalMatches['_center._id'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+				}
+	
+	
+	
+				if (appliedFilters.name && appliedFilters.name.trim()) {
+					const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
+					additionalMatches.$or = additionalMatches.$or ? [
+						...additionalMatches.$or,
+						{ '_candidate.name': searchRegex },
+						{ '_candidate.mobile': searchRegex },
+						{ '_candidate.email': searchRegex }
+					] : [
+						{ '_candidate.name': searchRegex },
+						{ '_candidate.mobile': searchRegex },
+						{ '_candidate.email': searchRegex }
+					];
+				}
+	
+				if (Object.keys(additionalMatches).length > 0) {
+					basePipeline.push({ $match: additionalMatches });
+				}
+	
+				// Get all leads count (without status filter)
+				const allLeadsAggregation = await AppliedCourses.aggregate([
+					...basePipeline,
+					{ $count: "total" }
+				]);
+	
+				const allLeadsCount = allLeadsAggregation[0]?.total || 0;
+				counts.all += allLeadsCount;
+	
+				// Get status-wise counts with proper grouping
+				const statusCountsAggregation = await AppliedCourses.aggregate([
+					...basePipeline,
+					// Add a stage to handle null leadStatus
+					{
+						$addFields: {
+							leadStatusId: {
+								$ifNull: ["$_leadStatus", null]
+							}
+						}
+					},
+					// Group by leadStatusId
+					{
+						$group: {
+							_id: "$leadStatusId",
+							count: { $sum: 1 }
+						}
+					}
+				]);
+	
+	
+				// Update counts
+				statusCountsAggregation.forEach(statusGroup => {
+					const statusId = statusGroup._id;
+					const count = statusGroup.count;
+	
+					if (statusId) {
+						const statusKey = statusId.toString();
+						if (counts[statusKey]) {
+							counts[statusKey].count += count;
+						}
+					} else {
+						// Handle null status
+						if (!counts['null']) {
+							counts['null'] = {
+								_id: null,
+								name: 'No Status',
+								milestone: null,
+								count: 0
+							};
+						}
+						counts['null'].count += count;
+					}
+				});
+			}
+	
+			// Remove statuses with 0 count (optional)
+			const finalCounts = {};
+			Object.keys(counts).forEach(key => {
+				if (key === 'all' || (counts[key].count && counts[key].count > 0)) {
+					finalCounts[key] = counts[key];
+				}
+			});
+	
+			return finalCounts;
+	
+		} catch (error) {
+			console.error('Error calculating CRM filter counts:', error);
+			return { all: 0 };
+		}
+	}
+
+// router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 // 	try {
 // 		const user = req.user;
-// 		let teamMembers = await getAllTeamMembers(user._id);
+		
+// 		// Get the specific lead ID from request body
+// 		let { leadId } = req.query;
+// 		console.log('leadId', leadId)
+		
+// 		if (!leadId) {
+// 			return res.status(400).json({
+// 				success: false,
+// 				message: "Lead ID is required in request body"
+// 			});
+// 		}
+
+// 		if(typeof leadId === 'string'){
+// 			leadId = new mongoose.Types.ObjectId(leadId);
+// 		}
 
 // 		const college = await College.findOne({
 // 			'_concernPerson._id': user._id
 // 		});
 
-// 		const page = parseInt(req.query.page) || 1;
-// 		const limit = parseInt(req.query.limit) || 20;
-// 		const skip = (page - 1) * limit;
+// 		// Build aggregation pipeline
+// 		let aggregationPipeline = [];
 
-// 		// Extract ALL filter parameters from query
-// 		const {
-// 			name,
-// 			courseType,
-// 			status,
-// 			leadStatus,
-// 			sector,
-// 			createdFromDate,
-// 			createdToDate,
-// 			modifiedFromDate,
-// 			modifiedToDate,
-// 			nextActionFromDate,
-// 			nextActionToDate,
-// 			// Multi-select filters (these come as JSON strings)
-// 			projects,
-// 			verticals,
-// 			course,
-// 			center,
-// 			counselor
-// 		} = req.query;
+// 		// Base match stage - ONLY filter by specific leadId
+// 		let baseMatchStage = {
+// 			_id: new mongoose.Types.ObjectId(leadId)
+// 		};
 
-// 		// Parse multi-select filter values
-// 		let projectsArray = [];
-// 		let verticalsArray = [];
-// 		let courseArray = [];
-// 		let centerArray = [];
-// 		let counselorArray = [];
+// 		// Add base match stage
+// 		aggregationPipeline.push({ $match: baseMatchStage });
 
-// 		try {
-// 			if (projects) projectsArray = JSON.parse(projects);
-// 			if (verticals) verticalsArray = JSON.parse(verticals);
-// 			if (course) courseArray = JSON.parse(course);
-// 			if (center) centerArray = JSON.parse(center);
-// 			if (counselor) counselorArray = JSON.parse(counselor);
-// 		} catch (parseError) {
-// 			console.error('Error parsing filter arrays:', parseError);
-// 		}
-
-// 		if (counselorArray.length > 0) {
-// 			teamMembers = counselorArray
-// 		}
-
-
-
-
-// 		let allFilteredResults = [];
-
-// 		for (let member of teamMembers) {
-// 			// Build aggregation pipeline
-// 			let aggregationPipeline = [];
-
-// 			if (typeof member === 'string') {
-// 				member = new mongoose.Types.ObjectId(member)
-
-// 			}
-
-
-// 			// Base match stage
-// 			let baseMatchStage = {
-// 				kycStage: { $nin: [true] },
-// 				kyc: { $nin: [true] },
-// 				admissionDone: { $nin: [true] },
-// 				$or: [
-// 					{ registeredBy: member },
-// 					{
-// 						$expr: {
-// 							$eq: [
-// 								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
-// 								member
-// 							]
+// 		// Lookup stages for all related collections
+// 		aggregationPipeline.push(
+// 			// Course lookup with sectors, vertical, project population
+// 			{
+// 				$lookup: {
+// 					from: 'courses',
+// 					localField: '_course',
+// 					foreignField: '_id',
+// 					as: '_course',
+// 					pipeline: [
+// 						{
+// 							$lookup: {
+// 								from: 'sectors',
+// 								localField: 'sectors',
+// 								foreignField: '_id',
+// 								as: 'sectors'
+// 							}
+// 						},
+// 						{
+// 							$lookup: {
+// 								from: 'verticals',
+// 								localField: 'vertical',
+// 								foreignField: '_id',
+// 								as: 'verticalData'
+// 							}
+// 						},
+// 						{
+// 							$lookup: {
+// 								from: 'projects',
+// 								localField: 'project',
+// 								foreignField: '_id',
+// 								as: 'projectData'
+// 							}
+// 						},
+// 						{
+// 							$addFields: {
+// 								projectInfo: { $arrayElemAt: ['$projectData', 0] },
+// 								verticalInfo: { $arrayElemAt: ['$verticalData', 0] },
+// 							}
 // 						}
-// 					}
-// 				]
-// 			};
-
-// 			// Add date filters to base match
-// 			if (createdFromDate || createdToDate) {
-// 				baseMatchStage.createdAt = {};
-// 				if (createdFromDate) {
-// 					baseMatchStage.createdAt.$gte = new Date(createdFromDate);
+// 					]
 // 				}
-// 				if (createdToDate) {
-// 					const toDate = new Date(createdToDate);
-// 					toDate.setHours(23, 59, 59, 999);
-// 					baseMatchStage.createdAt.$lte = toDate;
+// 			},
+// 			{ $unwind: '$_course' },
+
+// 			// Lead Status lookup
+// 			{
+// 				$lookup: {
+// 					from: 'status',
+// 					localField: '_leadStatus',
+// 					foreignField: '_id',
+// 					as: '_leadStatus'
 // 				}
-// 			}
+// 			},
+// 			{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
 
-// 			if (modifiedFromDate || modifiedToDate) {
-// 				baseMatchStage.updatedAt = {};
-// 				if (modifiedFromDate) {
-// 					baseMatchStage.updatedAt.$gte = new Date(modifiedFromDate);
+// 			// Center lookup
+// 			{
+// 				$lookup: {
+// 					from: 'centers',
+// 					localField: '_center',
+// 					foreignField: '_id',
+// 					as: '_center'
 // 				}
-// 				if (modifiedToDate) {
-// 					const toDate = new Date(modifiedToDate);
-// 					toDate.setHours(23, 59, 59, 999);
-// 					baseMatchStage.updatedAt.$lte = toDate;
+// 			},
+// 			{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+
+// 			// Registered By lookup
+// 			{
+// 				$lookup: {
+// 					from: 'users',
+// 					localField: 'registeredBy',
+// 					foreignField: '_id',
+// 					as: 'registeredBy'
 // 				}
-// 			}
+// 			},
+// 			{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
 
-// 			if (nextActionFromDate || nextActionToDate) {
-// 				baseMatchStage.followupDate = {};
-// 				if (nextActionFromDate) {
-// 					baseMatchStage.followupDate.$gte = new Date(nextActionFromDate);
-// 				}
-// 				if (nextActionToDate) {
-// 					const toDate = new Date(nextActionToDate);
-// 					toDate.setHours(23, 59, 59, 999);
-// 					baseMatchStage.followupDate.$lte = toDate;
-// 				}
-// 			}
-
-// 			// Status filters
-// 			if (status && status !== 'true') {
-// 				baseMatchStage._leadStatus = new mongoose.Types.ObjectId(status);
-// 			}
-// 			if (leadStatus) {
-// 				baseMatchStage._leadStatus = new mongoose.Types.ObjectId(leadStatus);
-// 			}
-
-// 			// Add base match stage
-// 			aggregationPipeline.push({ $match: baseMatchStage });
-
-// 			// Lookup stages for all related collections
-// 			aggregationPipeline.push(
-// 				// Course lookup with sectors, vertical, project population
-// 				{
-// 					$lookup: {
-// 						from: 'courses',
-// 						localField: '_course',
-// 						foreignField: '_id',
-// 						as: '_course',
-// 						pipeline: [
-// 							{
-// 								$lookup: {
-// 									from: 'sectors',
-// 									localField: 'sectors',
-// 									foreignField: '_id',
-// 									as: 'sectors'
-// 								}
-// 							},
-// 							{
-// 								$lookup: {
-// 									from: 'verticals',
-// 									localField: 'vertical',
-// 									foreignField: '_id',
-// 									as: 'verticalData'
-// 								}
-// 							},
-// 							{
-// 								$lookup: {
-// 									from: 'projects',
-// 									localField: 'project',
-// 									foreignField: '_id',
-// 									as: 'projectData'  // ← Different name
-// 								}
-// 							},
-// 							{
-// 								$addFields: {
-// 									projectInfo: { $arrayElemAt: ['$projectData', 0] },  // ← Single object
-// 									// Keep original 'project' field as ObjectId
-// 									verticalInfo: { $arrayElemAt: ['$verticalData', 0] },
-// 								}
-// 							}
-// 						]
-// 					}
-// 				},
-// 				{ $unwind: '$_course' },
-
-// 				// Lead Status lookup
-// 				{
-// 					$lookup: {
-// 						from: 'status',
-// 						localField: '_leadStatus',
-// 						foreignField: '_id',
-// 						as: '_leadStatus'
-// 					}
-// 				},
-// 				{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
-
-// 				// Center lookup
-// 				{
-// 					$lookup: {
-// 						from: 'centers',
-// 						localField: '_center',
-// 						foreignField: '_id',
-// 						as: '_center'
-// 					}
-// 				},
-// 				{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
-
-// 				// Registered By lookup
-// 				{
-// 					$lookup: {
-// 						from: 'users',
-// 						localField: 'registeredBy',
-// 						foreignField: '_id',
-// 						as: 'registeredBy'
-// 					}
-// 				},
-// 				{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
-
-// 				// Candidate lookup with applied courses
-// 				{
-// 					$lookup: {
-// 						from: 'candidateprofiles',
-// 						localField: '_candidate',
-// 						foreignField: '_id',
-// 						as: '_candidate',
-// 						pipeline: [
-// 							{
-// 								$lookup: {
-// 									from: 'appliedcourses',
-// 									localField: '_appliedCourses',
-// 									foreignField: '_id',
-// 									as: '_appliedCourses',
-// 									pipeline: [
-// 										{
-// 											$lookup: {
-// 												from: 'courses',
-// 												localField: '_course',
-// 												foreignField: '_id',
-// 												as: '_course'
-// 											}
-// 										},
-// 										{
-// 											$lookup: {
-// 												from: 'users',
-// 												localField: 'registeredBy',
-// 												foreignField: '_id',
-// 												as: 'registeredBy'
-// 											}
-// 										},
-// 										{
-// 											$lookup: {
-// 												from: 'centers',
-// 												localField: '_center',
-// 												foreignField: '_id',
-// 												as: '_center'
-// 											}
-// 										},
-// 										{
-// 											$lookup: {
-// 												from: 'status',
-// 												localField: '_leadStatus',
-// 												foreignField: '_id',
-// 												as: '_leadStatus'
-// 											}
+// 			// Candidate lookup with applied courses
+// 			{
+// 				$lookup: {
+// 					from: 'candidateprofiles',
+// 					localField: '_candidate',
+// 					foreignField: '_id',
+// 					as: '_candidate',
+// 					pipeline: [
+// 						{
+// 							$lookup: {
+// 								from: 'appliedcourses',
+// 								localField: '_appliedCourses',
+// 								foreignField: '_id',
+// 								as: '_appliedCourses',
+// 								pipeline: [
+// 									{
+// 										$lookup: {
+// 											from: 'courses',
+// 											localField: '_course',
+// 											foreignField: '_id',
+// 											as: '_course'
 // 										}
-// 									]
-// 								}
-// 							}
-// 						]
-// 					}
-// 				},
-// 				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
-
-// 				// Logs lookup
-
-// 				{
-// 					$lookup: {
-// 						from: 'users',
-// 						localField: 'logs.user',
-// 						foreignField: '_id',
-// 						as: 'logUsers'
-// 					}
-// 				},
-// 				{
-// 					$addFields: {
-// 						logs: {
-// 							$map: {
-// 								input: "$logs",
-// 								as: "log",
-// 								in: {
-// 									$mergeObjects: [
-// 										"$$log",
-// 										{
-// 											user: {
-// 												$arrayElemAt: [
-// 													{
-// 														$filter: {
-// 															input: "$logUsers",
-// 															cond: { $eq: ["$$this._id", "$$log.user"] }
-// 														}
-// 													},
-// 													0
-// 												]
-// 											}
+// 									},
+// 									{
+// 										$lookup: {
+// 											from: 'users',
+// 											localField: 'registeredBy',
+// 											foreignField: '_id',
+// 											as: 'registeredBy'
 // 										}
-// 									]
-// 								}
+// 									},
+// 									{
+// 										$lookup: {
+// 											from: 'centers',
+// 											localField: '_center',
+// 											foreignField: '_id',
+// 											as: '_center'
+// 										}
+// 									},
+// 									{
+// 										$lookup: {
+// 											from: 'status',
+// 											localField: '_leadStatus',
+// 											foreignField: '_id',
+// 											as: '_leadStatus'
+// 										}
+// 									}
+// 								]
+// 							}
+// 						}
+// 					]
+// 				}
+// 			},
+// 			{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+
+// 			// Logs lookup
+// 			{
+// 				$lookup: {
+// 					from: 'users',
+// 					localField: 'logs.user',
+// 					foreignField: '_id',
+// 					as: 'logUsers'
+// 				}
+// 			},
+// 			{
+// 				$addFields: {
+// 					logs: {
+// 						$map: {
+// 							input: "$logs",
+// 							as: "log",
+// 							in: {
+// 								$mergeObjects: [
+// 									"$$log",
+// 									{
+// 										user: {
+// 											$arrayElemAt: [
+// 												{
+// 													$filter: {
+// 														input: "$logUsers",
+// 														cond: { $eq: ["$$this._id", "$$log.user"] }
+// 													}
+// 												},
+// 												0
+// 											]
+// 										}
+// 									}
+// 								]
 // 							}
 // 						}
 // 					}
 // 				}
-
-// 			);
-
-// 			// Filter by college
-// 			aggregationPipeline.push({
-// 				$match: {
-// 					'_course.college': college._id
-// 				}
-// 			});
-
-// 			// Apply additional filters based on populated data
-// 			let additionalMatches = {};
-
-// 			// Course type filter
-// 			if (courseType) {
-// 				additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(courseType, 'i') };
 // 			}
+// 		);
 
-// 			// Sector filter (multi-select)
-// 			if (projectsArray.length > 0) {
-// 				additionalMatches['_course.project'] = {
-// 					$in: projectsArray.map(id => new mongoose.Types.ObjectId(id))
-// 				};
+// 		// Filter by college
+// 		aggregationPipeline.push({
+// 			$match: {
+// 				'_course.college': college._id
 // 			}
+// 		});
 
-// 			// Verticals filter (multi-select)
-// 			if (verticalsArray.length > 0) {
-// 				additionalMatches['_course.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
-// 			}
+// 		// Sort by creation date
+// 		aggregationPipeline.push({
+// 			$sort: { updatedAt: -1 }
+// 		});
 
-// 			// Course filter (multi-select)
-// 			if (courseArray.length > 0) {
-// 				additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-// 			}
-
-// 			// Center filter (multi-select)
-// 			if (centerArray.length > 0) {
-// 				additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
-// 			}
-
-
-// 			// Name search filter
-// 			if (name && name.trim()) {
-// 				const searchTerm = name.trim();
-// 				const searchRegex = new RegExp(searchTerm, 'i');
-
-
-
-// 				additionalMatches.$or = additionalMatches.$or ? [
-// 					...additionalMatches.$or,
-// 					{ '_candidate.name': searchRegex },
-// 					{ '_candidate.mobile': searchRegex },
-// 					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm }, // Try both number and string
-// 					{ '_candidate.email': searchRegex }
-// 				] : [
-// 					{ '_candidate.name': searchRegex },
-// 					{ '_candidate.mobile': searchRegex },
-// 					{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-// 					{ '_candidate.email': searchRegex }
-// 				];
-// 			}
-
-// 			// Add additional match stage if any filters are applied
-// 			if (Object.keys(additionalMatches).length > 0) {
-// 				aggregationPipeline.push({ $match: additionalMatches });
-// 			}
-
-// 			// Sort by creation date
-// 			aggregationPipeline.push({
-// 				$sort: { updatedAt: -1 }
-// 			});
-
-// 			// Execute aggregation
-// 			const response = await AppliedCourses.aggregate(aggregationPipeline);
-
-// 			// Add unique results to the main array
-// 			response.forEach(doc => {
-// 				if (!allFilteredResults.some(existingDoc => existingDoc._id.toString() === doc._id.toString())) {
-// 					allFilteredResults.push(doc);
-// 				}
-// 			});
-// 		}
+// 		// Execute aggregation
+// 		const response = await AppliedCourses.aggregate(aggregationPipeline);
 
 // 		// Process results for document counts and other formatting
-// 		const results = allFilteredResults.map(doc => {
+// 		const results = response.map(doc => {
 // 			let selectedSubstatus = null;
 
 // 			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
@@ -868,39 +1521,12 @@ router.route("/register")
 // 			};
 // 		});
 
-// 		// Calculate CRM filter counts
-// 		// const crmFilterCounts = await calculateCrmFilterCounts(teamMembers, college._id, {
-// 		// 	name,
-// 		// 	courseType,
-// 		// 	sector,
-// 		// 	createdFromDate,
-// 		// 	createdToDate,
-// 		// 	modifiedFromDate,
-// 		// 	modifiedToDate,
-// 		// 	nextActionFromDate,
-// 		// 	nextActionToDate,
-// 		// 	projectsArray,
-// 		// 	verticalsArray,
-// 		// 	courseArray,
-// 		// 	centerArray,
-// 		// 	counselorArray
-// 		// });
-
-// 		// Apply pagination
-// 		const totalCount = results.length;
-// 		const paginatedResult = results.slice(skip, skip + limit);
-
+// 		console.log('lead details', results[0])
 
 // 		res.status(200).json({
 // 			success: true,
-// 			count: paginatedResult.length,
-// 			page,
-// 			limit,
-// 			totalCount,
-// 			totalPages: Math.ceil(totalCount / limit),
-// 			data: paginatedResult,
-// 			allData: results,
-// 			// crmFilterCounts
+// 			count: results.length,
+// 			data: results.length > 0 ? results[0] : null, // Single object instead of array
 // 		});
 
 // 	} catch (err) {
@@ -912,1008 +1538,383 @@ router.route("/register")
 // 	}
 // });
 
-// Helper function to calculate CRM filter counts with applied filters
+// router.route("/appliedCandidates").get(isCollege, async (req, res) => {
+//     try {
+//         const user = req.user;
+//         const college = await College.findOne({
+//             '_concernPerson._id': user._id
+//         });
 
+//         const page = parseInt(req.query.page) || 1;
+//         const limit = parseInt(req.query.limit) || 20;
+//         const skip = (page - 1) * limit;
 
+//         // Extract filter parameters
+//         const {
+//             name, courseType, status, leadStatus,
+//             createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
+//             nextActionFromDate, nextActionToDate,
+//             projects, verticals, course, center, counselor
+//         } = req.query;
 
-// async function calculateCrmFilterCounts(teamMembers, collegeId, appliedFilters = {}) {
-// 	const counts = { all: 0 };
+//         // Parse multi-select filters
+//         let projectsArray = [];
+//         let verticalsArray = [];
+//         let courseArray = [];
+//         let centerArray = [];
+//         let counselorArray = [];
 
-// 	try {
-// 		const allStatuses = await Status.find({}).select('_id title milestone');
+//         try {
+//             if (projects) projectsArray = JSON.parse(projects);
+//             if (verticals) verticalsArray = JSON.parse(verticals);
+//             if (course) courseArray = JSON.parse(course);
+//             if (center) centerArray = JSON.parse(center);
+//             if (counselor) counselorArray = JSON.parse(counselor);
+//         } catch (parseError) {
+//             console.error('Error parsing filter arrays:', parseError);
+//         }
 
-// 		// Initialize counts for each status
-// 		allStatuses.forEach(status => {
-// 			counts[status._id.toString()] = {
-// 				_id: status._id,
-// 				name: status.title,
-// 				milestone: status.milestone,
-// 				count: 0
-// 			};
-// 		});
+//         // Get team members
+//         let teamMembers = await getAllTeamMembers(user._id);
 
-// 		for (let member of teamMembers) {
-// 			// Build base aggregation pipeline
-// 			let basePipeline = [];
+// 		console.log('teamMembers', teamMembers)
+//         if (counselorArray.length > 0) {
+//             teamMembers = counselorArray;
+//         }
 
-// 			if (typeof member === 'string') {
-// 				member = new mongoose.Types.ObjectId(member)
-// 			}
+//         const teamMemberIds = teamMembers.map(member => 
+//             typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
+//         );
 
-// 			// Base match stage
-// 			let baseMatchStage = {
-// 				kycStage: { $nin: [true] },
-// 				kyc: { $nin: [true] },
-// 				admissionDone: { $nin: [true] },
-// 				$or: [
-// 					{ registeredBy: member },
-// 					{
-// 						$expr: {
-// 							$eq: [
-// 								{ $arrayElemAt: ["$leadAssignment._counsellor", -1] },
-// 								member
-// 							]
-// 						}
-// 					}
-// 				]
-// 			};
+//         // Build optimized pipeline with only essential fields
+//         const pipeline = buildSimplifiedPipeline({
+//             teamMemberIds,
+//             college,
+//             filters: {
+//                 name, courseType, status, leadStatus,
+//                 createdFromDate, createdToDate,
+//                 modifiedFromDate, modifiedToDate,
+//                 nextActionFromDate, nextActionToDate,
+//                 projectsArray, verticalsArray, courseArray, centerArray
+//             },
+//             pagination: { skip, limit }
+//         });
 
-// 			// Add date filters
-// 			if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
-// 				baseMatchStage.createdAt = {};
-// 				if (appliedFilters.createdFromDate) {
-// 					baseMatchStage.createdAt.$gte = new Date(appliedFilters.createdFromDate);
-// 				}
-// 				if (appliedFilters.createdToDate) {
-// 					const toDate = new Date(appliedFilters.createdToDate);
-// 					toDate.setHours(23, 59, 59, 999);
-// 					baseMatchStage.createdAt.$lte = toDate;
-// 				}
-// 			}
+// 		console.log('pipeline', pipeline)
 
-// 			if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
-// 				baseMatchStage.updatedAt = {};
-// 				if (appliedFilters.modifiedFromDate) {
-// 					baseMatchStage.updatedAt.$gte = new Date(appliedFilters.modifiedFromDate);
-// 				}
-// 				if (appliedFilters.modifiedToDate) {
-// 					const toDate = new Date(appliedFilters.modifiedToDate);
-// 					toDate.setHours(23, 59, 59, 999);
-// 					baseMatchStage.updatedAt.$lte = toDate;
-// 				}
-// 			}
+//         // Execute queries in parallel
+//         const [results, totalCountResult] = await Promise.all([
+//             AppliedCourses.aggregate(pipeline),
+//             AppliedCourses.aggregate([
+//                 ...pipeline.slice(0, -2), // Remove sort and pagination
+//                 { $count: "total" }
+//             ])
+//             // Calculate filter counts in parallel
+//             // calculateOptimizedFilterCounts(teamMemberIds, college._id, {
+//             //     name, courseType, 
+//             //     createdFromDate, createdToDate,
+//             //     modifiedFromDate, modifiedToDate,
+//             //     nextActionFromDate, nextActionToDate,
+//             //     projectsArray, verticalsArray, courseArray, centerArray
+//             // })
+//         ]);
 
-// 			if (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate) {
-// 				baseMatchStage.followupDate = {};
-// 				if (appliedFilters.nextActionFromDate) {
-// 					baseMatchStage.followupDate.$gte = new Date(appliedFilters.nextActionFromDate);
-// 				}
-// 				if (appliedFilters.nextActionToDate) {
-// 					const toDate = new Date(appliedFilters.nextActionToDate);
-// 					toDate.setHours(23, 59, 59, 999);
-// 					baseMatchStage.followupDate.$lte = toDate;
-// 				}
-// 			}
+//         const totalCount = totalCountResult[0]?.total || 0;
 
-// 			basePipeline.push({ $match: baseMatchStage });
+//         // Process results - sirf essential fields return karenge
+//         const processedResults = results.map(doc => {
+//             // Calculate doc counts
+//             const docCounts = calculateSimpleDocCounts(
+//                 doc._course?.docsRequired || [], 
+//                 doc.uploadedDocs || []
+//             );
 
-// 			// Add lookups
-// 			basePipeline.push(
-// 				{
-// 					$lookup: {
-// 						from: 'courses',
-// 						localField: '_course',
-// 						foreignField: '_id',
-// 						as: '_course',
-// 						pipeline: [
-// 							{
-// 								$lookup: {
-// 									from: 'sectors',
-// 									localField: 'sectors',
-// 									foreignField: '_id',
-// 									as: 'sectors'
-// 								}
-// 							},
-// 							{
-// 								$lookup: {
-// 									from: 'verticals',
-// 									localField: 'vertical',
-// 									foreignField: '_id',
-// 									as: 'verticalData'
-// 								}
-// 							},
-// 							{
-// 								$lookup: {
-// 									from: 'projects',
-// 									localField: 'project',
-// 									foreignField: '_id',
-// 									as: 'projectData'  // ← Changed from 'project' to 'projectData'
-// 								}
-// 							},
-// 							{
-// 								$addFields: {
-// 									projectInfo: { $arrayElemAt: ['$projectData', 0] },  // ← Single object
-// 									// Keep original 'project' field as ObjectId
-// 									verticalInfo: { $arrayElemAt: ['$verticalData', 0] },
-// 								}
-// 							}
-// 						]
-// 					}
+//             // Get substatus
+//             let selectedSubstatus = null;
+//             if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
+//                 selectedSubstatus = doc._leadStatus.substatuses.find(
+//                     sub => sub._id.toString() === doc._leadSubStatus.toString()
+//                 );
+//             }
+
+//             return {
+//                 _id: doc._id,
+//                 _candidate: {
+//                     _id: (doc._candidate && doc._candidate._id) ? doc._candidate._id : null,
+//                     mobile: (doc._candidate && doc._candidate.mobile) ? doc._candidate.mobile : 'N/A',
+//                     name: (doc._candidate && doc._candidate.name) ? doc._candidate.name : 'N/A', 
+//                     email: (doc._candidate && doc._candidate.email) ? doc._candidate.email : 'N/A'
+//                 },
+//                 _leadStatus: {
+//                     _id: doc._leadStatus?._id || null,
+//                     title: doc._leadStatus?.title || 'No Status'
+//                 },
+//                 _leadSubStatus: selectedSubstatus ? selectedSubstatus._id : null,
+// 				selectedSubstatus:{
+// 					_id: selectedSubstatus ? selectedSubstatus._id : null,
+// 					title: selectedSubstatus ? selectedSubstatus.title : 'No Sub Status',
+// 					hasAttachment: selectedSubstatus ? selectedSubstatus.hasAttachment : false,
+// 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
+// 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 // 				},
-// 				{ $unwind: '$_course' },
-// 				{
-// 					$lookup: {
-// 						from: 'centers',
-// 						localField: '_center',
-// 						foreignField: '_id',
-// 						as: '_center'
-// 					}
-// 				},
-// 				{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+//                 docCounts
+//             };
+//         });
 
-// 				{
-// 					$lookup: {
-// 						from: 'users',
-// 						localField: 'registeredBy',
-// 						foreignField: '_id',
-// 						as: 'registeredBy'
-// 					}
-// 				},
-// 				{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
-// 				{
-// 					$lookup: {
-// 						from: 'candidateprofiles',
-// 						localField: '_candidate',
-// 						foreignField: '_id',
-// 						as: '_candidate'
-// 					}
-// 				},
-// 				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+//         res.status(200).json({
+//             success: true,
+//             count: processedResults.length,
+//             totalCount,
+//             page,
+//             limit, 
+//             totalPages: Math.ceil(totalCount / limit),
+//             data: processedResults,
+//             // crmFilterCounts
+//         });
 
-// 			);
+//     } catch (err) {
+//         console.error('API Error:', err);
+//         res.status(500).json({
+//             success: false,
+//             message: "Server Error"
+//         });
+//     }
+// });
 
-// 			// Filter by college FIRST
-// 			basePipeline.push({
-// 				$match: {
-// 					'_course.college': collegeId
-// 				}
-// 			});
+// function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
+//     const pipeline = [];
 
-// 			// Apply additional filters
-// 			let additionalMatches = {};
+//     // Base match with essential filters
+//     const baseMatch = {
+//         kycStage: { $ne: true },
+//         kyc: { $ne: true },
+//         admissionDone: { $ne: true },
+//         $or: [
+//             { registeredBy: { $in: teamMemberIds } },
+//             { 'leadAssignment._counsellor': { $in: teamMemberIds } }
+//         ]
+//     };
 
-// 			if (appliedFilters.courseType) {
-// 				additionalMatches['_course.courseFeeType'] = { $regex: new RegExp(appliedFilters.courseType, 'i') };
-// 			}
+//     // Add date filters
+//     if (filters.createdFromDate || filters.createdToDate) {
+//         baseMatch.createdAt = {};
+//         if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
+//         if (filters.createdToDate) {
+//             const toDate = new Date(filters.createdToDate);
+//             toDate.setHours(23, 59, 59, 999);
+//             baseMatch.createdAt.$lte = toDate;
+//         }
+//     }
 
-// 			if (appliedFilters.projectsArray.length > 0) {
-// 				additionalMatches['_course.project'] = {
-// 					$in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id))
-// 				};
-// 			}
+//     if (filters.modifiedFromDate || filters.modifiedToDate) {
+//         baseMatch.updatedAt = {};
+//         if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
+//         if (filters.modifiedToDate) {
+//             const toDate = new Date(filters.modifiedToDate);
+//             toDate.setHours(23, 59, 59, 999);
+//             baseMatch.updatedAt.$lte = toDate;
+//         }
+//     }
 
-// 			if (appliedFilters.verticalsArray && appliedFilters.verticalsArray.length > 0) {
-// 				additionalMatches['_course.vertical'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
-// 			}
+//     if (filters.nextActionFromDate || filters.nextActionToDate) {
+//         baseMatch.followupDate = {};
+//         if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
+//         if (filters.nextActionToDate) {
+//             const toDate = new Date(filters.nextActionToDate);
+//             toDate.setHours(23, 59, 59, 999);
+//             baseMatch.followupDate.$lte = toDate;
+//         }
+//     }
 
-// 			if (appliedFilters.courseArray && appliedFilters.courseArray.length > 0) {
-// 				additionalMatches['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-// 			}
+//     // Status filters
+//     if (filters.status && filters.status !== 'true') {
+//         baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.status);
+//     }
+//     if (filters.leadStatus) {
+//         baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.leadStatus);
+//     }
 
-// 			if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
-// 				additionalMatches['_center._id'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
-// 			}
+//     pipeline.push({ $match: baseMatch });
 
+//     // Essential lookups only - get minimal required data
+//     pipeline.push(
+//         // Course lookup with college filter
+//         {
+//             $lookup: {
+//                 from: 'courses',
+//                 localField: '_course',
+//                 foreignField: '_id',
+//                 as: '_course',
+//                 pipeline: [
+//                     { $match: { college: college._id } },
+//                     {
+//                         $project: {
+//                             courseFeeType: 1,
+//                             college: 1,
+//                             project: 1,
+//                             vertical: 1,
+//                             docsRequired: 1 // Only for doc counts
+//                         }
+//                     }
+//                 ]
+//             }
+//         },
+//         { $unwind: '$_course' },
 
+//         // Candidate lookup - only essential fields
+//         {
+//             $lookup: {
+//                 from: 'candidateprofiles',
+//                 localField: '_candidate',
+//                 foreignField: '_id',
+//                 as: '_candidate',
+//                 pipeline: [
+//                     {
+//                         $project: {
+//                             _id: 1,
+//                             name: 1,
+//                             email: 1,
+//                             mobile: 1
+//                         }
+//                     }
+//                 ]
+//             }
+//         },
+//         { $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
 
-// 			if (appliedFilters.name && appliedFilters.name.trim()) {
-// 				const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
-// 				additionalMatches.$or = additionalMatches.$or ? [
-// 					...additionalMatches.$or,
-// 					{ '_candidate.name': searchRegex },
-// 					{ '_candidate.mobile': searchRegex },
-// 					{ '_candidate.email': searchRegex }
-// 				] : [
-// 					{ '_candidate.name': searchRegex },
-// 					{ '_candidate.mobile': searchRegex },
-// 					{ '_candidate.email': searchRegex }
-// 				];
-// 			}
+//         // Status lookup - only title and milestone
+//         {
+//             $lookup: {
+//                 from: 'status',
+//                 localField: '_leadStatus',
+//                 foreignField: '_id',
+//                 as: '_leadStatus',
+//                 pipeline: [
+//                     {
+//                         $project: {
+//                             title: 1,
+//                             milestone: 1,
+//                             substatuses: 1
+//                         }
+//                     }
+//                 ]
+//             }
+//         },
+//         { $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } }
+//     );
 
-// 			if (Object.keys(additionalMatches).length > 0) {
-// 				basePipeline.push({ $match: additionalMatches });
-// 			}
+//     // Apply additional filters
+//     const additionalFilters = {};
 
-// 			// Get all leads count (without status filter)
-// 			const allLeadsAggregation = await AppliedCourses.aggregate([
-// 				...basePipeline,
-// 				{ $count: "total" }
-// 			]);
+//     if (filters.courseType) {
+//         additionalFilters['_course.courseFeeType'] = { $regex: new RegExp(filters.courseType, 'i') };
+//     }
+//     if (filters.projectsArray.length > 0) {
+//         additionalFilters['_course.project'] = { $in: filters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+//     }
+//     if (filters.verticalsArray.length > 0) {
+//         additionalFilters['_course.vertical'] = { $in: filters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+//     }
+//     if (filters.courseArray.length > 0) {
+//         additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+//     }
 
-// 			const allLeadsCount = allLeadsAggregation[0]?.total || 0;
-// 			counts.all += allLeadsCount;
+//     // Name search
+//     if (filters.name && filters.name.trim()) {
+//         const searchRegex = new RegExp(filters.name.trim(), 'i');
+//         additionalFilters.$or = [
+//             { '_candidate.name': searchRegex },
+//             { '_candidate.mobile': searchRegex },
+//             { '_candidate.email': searchRegex }
+//         ];
+//     }
 
-// 			// Get status-wise counts with proper grouping
-// 			const statusCountsAggregation = await AppliedCourses.aggregate([
-// 				...basePipeline,
-// 				// Add a stage to handle null leadStatus
-// 				{
-// 					$addFields: {
-// 						leadStatusId: {
-// 							$ifNull: ["$_leadStatus", null]
-// 						}
-// 					}
-// 				},
-// 				// Group by leadStatusId
-// 				{
-// 					$group: {
-// 						_id: "$leadStatusId",
-// 						count: { $sum: 1 }
-// 					}
-// 				}
-// 			]);
+//     if (Object.keys(additionalFilters).length > 0) {
+//         pipeline.push({ $match: additionalFilters });
+//     }
 
+//     // Project only essential fields
+//     pipeline.push({
+//         $project: {
+//             _id: 1,
+//             _candidate: 1,
+//             _leadStatus: 1,
+//             _leadSubStatus: 1,
+//             '_course.docsRequired': 1,
+//             uploadedDocs: 1,
+//             createdAt: 1,
+//             updatedAt: 1
+//         }
+//     });
 
-// 			// Update counts
-// 			statusCountsAggregation.forEach(statusGroup => {
-// 				const statusId = statusGroup._id;
-// 				const count = statusGroup.count;
+//     // Sort and pagination
+//     pipeline.push(
+//         { $sort: { updatedAt: -1 } },
+//         { $skip: pagination.skip },
+//         { $limit: pagination.limit }
+//     );
 
-// 				if (statusId) {
-// 					const statusKey = statusId.toString();
-// 					if (counts[statusKey]) {
-// 						counts[statusKey].count += count;
-// 					}
-// 				} else {
-// 					// Handle null status
-// 					if (!counts['null']) {
-// 						counts['null'] = {
-// 							_id: null,
-// 							name: 'No Status',
-// 							milestone: null,
-// 							count: 0
-// 						};
-// 					}
-// 					counts['null'].count += count;
-// 				}
-// 			});
-// 		}
-
-// 		// Remove statuses with 0 count (optional)
-// 		const finalCounts = {};
-// 		Object.keys(counts).forEach(key => {
-// 			if (key === 'all' || (counts[key].count && counts[key].count > 0)) {
-// 				finalCounts[key] = counts[key];
-// 			}
-// 		});
-
-// 		return finalCounts;
-
-// 	} catch (error) {
-// 		console.error('Error calculating CRM filter counts:', error);
-// 		return { all: 0 };
-// 	}
+//     return pipeline;
 // }
 
-router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
-	try {
-		const user = req.user;
-		
-		// Get the specific lead ID from request body
-		let { leadId } = req.query;
-		console.log('leadId', leadId)
-		
-		if (!leadId) {
-			return res.status(400).json({
-				success: false,
-				message: "Lead ID is required in request body"
-			});
-		}
-
-		if(typeof leadId === 'string'){
-			leadId = new mongoose.Types.ObjectId(leadId);
-		}
-
-		const college = await College.findOne({
-			'_concernPerson._id': user._id
-		});
-
-		// Build aggregation pipeline
-		let aggregationPipeline = [];
-
-		// Base match stage - ONLY filter by specific leadId
-		let baseMatchStage = {
-			_id: new mongoose.Types.ObjectId(leadId)
-		};
-
-		// Add base match stage
-		aggregationPipeline.push({ $match: baseMatchStage });
-
-		// Lookup stages for all related collections
-		aggregationPipeline.push(
-			// Course lookup with sectors, vertical, project population
-			{
-				$lookup: {
-					from: 'courses',
-					localField: '_course',
-					foreignField: '_id',
-					as: '_course',
-					pipeline: [
-						{
-							$lookup: {
-								from: 'sectors',
-								localField: 'sectors',
-								foreignField: '_id',
-								as: 'sectors'
-							}
-						},
-						{
-							$lookup: {
-								from: 'verticals',
-								localField: 'vertical',
-								foreignField: '_id',
-								as: 'verticalData'
-							}
-						},
-						{
-							$lookup: {
-								from: 'projects',
-								localField: 'project',
-								foreignField: '_id',
-								as: 'projectData'
-							}
-						},
-						{
-							$addFields: {
-								projectInfo: { $arrayElemAt: ['$projectData', 0] },
-								verticalInfo: { $arrayElemAt: ['$verticalData', 0] },
-							}
-						}
-					]
-				}
-			},
-			{ $unwind: '$_course' },
-
-			// Lead Status lookup
-			{
-				$lookup: {
-					from: 'status',
-					localField: '_leadStatus',
-					foreignField: '_id',
-					as: '_leadStatus'
-				}
-			},
-			{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
-
-			// Center lookup
-			{
-				$lookup: {
-					from: 'centers',
-					localField: '_center',
-					foreignField: '_id',
-					as: '_center'
-				}
-			},
-			{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
-
-			// Registered By lookup
-			{
-				$lookup: {
-					from: 'users',
-					localField: 'registeredBy',
-					foreignField: '_id',
-					as: 'registeredBy'
-				}
-			},
-			{ $unwind: { path: '$registeredBy', preserveNullAndEmptyArrays: true } },
-
-			// Candidate lookup with applied courses
-			{
-				$lookup: {
-					from: 'candidateprofiles',
-					localField: '_candidate',
-					foreignField: '_id',
-					as: '_candidate',
-					pipeline: [
-						{
-							$lookup: {
-								from: 'appliedcourses',
-								localField: '_appliedCourses',
-								foreignField: '_id',
-								as: '_appliedCourses',
-								pipeline: [
-									{
-										$lookup: {
-											from: 'courses',
-											localField: '_course',
-											foreignField: '_id',
-											as: '_course'
-										}
-									},
-									{
-										$lookup: {
-											from: 'users',
-											localField: 'registeredBy',
-											foreignField: '_id',
-											as: 'registeredBy'
-										}
-									},
-									{
-										$lookup: {
-											from: 'centers',
-											localField: '_center',
-											foreignField: '_id',
-											as: '_center'
-										}
-									},
-									{
-										$lookup: {
-											from: 'status',
-											localField: '_leadStatus',
-											foreignField: '_id',
-											as: '_leadStatus'
-										}
-									}
-								]
-							}
-						}
-					]
-				}
-			},
-			{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
-
-			// Logs lookup
-			{
-				$lookup: {
-					from: 'users',
-					localField: 'logs.user',
-					foreignField: '_id',
-					as: 'logUsers'
-				}
-			},
-			{
-				$addFields: {
-					logs: {
-						$map: {
-							input: "$logs",
-							as: "log",
-							in: {
-								$mergeObjects: [
-									"$$log",
-									{
-										user: {
-											$arrayElemAt: [
-												{
-													$filter: {
-														input: "$logUsers",
-														cond: { $eq: ["$$this._id", "$$log.user"] }
-													}
-												},
-												0
-											]
-										}
-									}
-								]
-							}
-						}
-					}
-				}
-			}
-		);
-
-		// Filter by college
-		aggregationPipeline.push({
-			$match: {
-				'_course.college': college._id
-			}
-		});
-
-		// Sort by creation date
-		aggregationPipeline.push({
-			$sort: { updatedAt: -1 }
-		});
-
-		// Execute aggregation
-		const response = await AppliedCourses.aggregate(aggregationPipeline);
-
-		// Process results for document counts and other formatting
-		const results = response.map(doc => {
-			let selectedSubstatus = null;
-
-			if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
-				selectedSubstatus = doc._leadStatus.substatuses.find(
-					sub => sub._id.toString() === doc._leadSubStatus.toString()
-				);
-			}
-
-			// Process sectors to show first sector name
-			const firstSectorName = doc._course?.sectors?.[0]?.name || 'N/A';
-			if (doc._course) {
-				doc._course.sectors = firstSectorName;
-			}
-
-			const requiredDocs = doc._course?.docsRequired || [];
-			const uploadedDocs = doc.uploadedDocs || [];
-
-			// Map uploaded docs by docsId for quick lookup
-			const uploadedDocsMap = {};
-			uploadedDocs.forEach(d => {
-				if (d.docsId) uploadedDocsMap[d.docsId.toString()] = d;
-			});
-
-			let combinedDocs = [];
-
-			if (requiredDocs) {
-				// Create a merged array with both required docs and uploaded docs info
-				combinedDocs = requiredDocs.map(reqDoc => {
-					// Convert Mongoose document to plain object
-					const docObj = reqDoc.toObject ? reqDoc.toObject() : reqDoc;
-
-					// Find matching uploaded docs for this required doc
-					const matchingUploads = uploadedDocs.filter(
-						uploadDoc => uploadDoc.docsId.toString() === docObj._id.toString()
-					);
-
-					return {
-						_id: docObj._id,
-						Name: docObj.Name || 'Document',
-						mandatory: docObj.mandatory,
-						description: docObj.description || '',
-						uploads: matchingUploads || []
-					};
-				});
-			}
-
-			// Prepare combined docs array for legacy compatibility
-			const allDocs = requiredDocs.map(reqDoc => {
-				const uploadedDoc = uploadedDocsMap[reqDoc._id.toString()];
-				if (uploadedDoc) {
-					return {
-						...uploadedDoc,
-						Name: reqDoc.Name,
-						mandatory: reqDoc.mandatory,
-						_id: reqDoc._id
-					};
-				} else {
-					return {
-						docsId: reqDoc._id,
-						Name: reqDoc.Name,
-						mandatory: reqDoc.mandatory,
-						status: "Not Uploaded",
-						fileUrl: null,
-						reason: null,
-						verifiedBy: null,
-						verifiedDate: null,
-						uploadedAt: null
-					};
-				}
-			});
-
-			// Count calculations
-			let verifiedCount = 0;
-			let RejectedCount = 0;
-			let pendingVerificationCount = 0;
-			let notUploadedCount = 0;
-
-			allDocs.forEach(doc => {
-				if (doc.status === "Verified") verifiedCount++;
-				else if (doc.status === "Rejected") RejectedCount++;
-				else if (doc.status === "Pending") pendingVerificationCount++;
-				else if (doc.status === "Not Uploaded") notUploadedCount++;
-			});
-
-			const totalRequired = allDocs.length;
-			const uploadedCount = allDocs.filter(doc => doc.status !== "Not Uploaded").length;
-			const uploadPercentage = totalRequired > 0
-				? Math.round((uploadedCount / totalRequired) * 100)
-				: 0;
-
-			return {
-				...doc,
-				selectedSubstatus,
-				uploadedDocs: combinedDocs,
-				docCounts: {
-					totalRequired,
-					RejectedCount,
-					uploadedCount,
-					verifiedCount,
-					pendingVerificationCount,
-					notUploadedCount,
-					uploadPercentage
-				}
-			};
-		});
-
-		console.log('lead details', results[0])
-
-		res.status(200).json({
-			success: true,
-			count: results.length,
-			data: results.length > 0 ? results[0] : null, // Single object instead of array
-		});
-
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({
-			success: false,
-			message: "Server Error"
-		});
-	}
-});
-
-router.route("/appliedCandidates").get(isCollege, async (req, res) => {
-    try {
-        const user = req.user;
-        const college = await College.findOne({
-            '_concernPerson._id': user._id
-        });
-
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
-        const skip = (page - 1) * limit;
-
-        // Extract filter parameters
-        const {
-            name, courseType, status, leadStatus,
-            createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
-            nextActionFromDate, nextActionToDate,
-            projects, verticals, course, center, counselor
-        } = req.query;
-
-        // Parse multi-select filters
-        let projectsArray = [];
-        let verticalsArray = [];
-        let courseArray = [];
-        let centerArray = [];
-        let counselorArray = [];
-
-        try {
-            if (projects) projectsArray = JSON.parse(projects);
-            if (verticals) verticalsArray = JSON.parse(verticals);
-            if (course) courseArray = JSON.parse(course);
-            if (center) centerArray = JSON.parse(center);
-            if (counselor) counselorArray = JSON.parse(counselor);
-        } catch (parseError) {
-            console.error('Error parsing filter arrays:', parseError);
-        }
-
-        // Get team members
-        let teamMembers = await getAllTeamMembers(user._id);
-        if (counselorArray.length > 0) {
-            teamMembers = counselorArray;
-        }
-
-        const teamMemberIds = teamMembers.map(member => 
-            typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
-        );
-
-        // Build optimized pipeline with only essential fields
-        const pipeline = buildSimplifiedPipeline({
-            teamMemberIds,
-            college,
-            filters: {
-                name, courseType, status, leadStatus,
-                createdFromDate, createdToDate,
-                modifiedFromDate, modifiedToDate,
-                nextActionFromDate, nextActionToDate,
-                projectsArray, verticalsArray, courseArray, centerArray
-            },
-            pagination: { skip, limit }
-        });
-
-        // Execute queries in parallel
-        const [results, totalCountResult] = await Promise.all([
-            AppliedCourses.aggregate(pipeline),
-            AppliedCourses.aggregate([
-                ...pipeline.slice(0, -2), // Remove sort and pagination
-                { $count: "total" }
-            ])
-            // Calculate filter counts in parallel
-            // calculateOptimizedFilterCounts(teamMemberIds, college._id, {
-            //     name, courseType, 
-            //     createdFromDate, createdToDate,
-            //     modifiedFromDate, modifiedToDate,
-            //     nextActionFromDate, nextActionToDate,
-            //     projectsArray, verticalsArray, courseArray, centerArray
-            // })
-        ]);
-
-        const totalCount = totalCountResult[0]?.total || 0;
-
-        // Process results - sirf essential fields return karenge
-        const processedResults = results.map(doc => {
-            // Calculate doc counts
-            const docCounts = calculateSimpleDocCounts(
-                doc._course?.docsRequired || [], 
-                doc.uploadedDocs || []
-            );
-
-            // Get substatus
-            let selectedSubstatus = null;
-            if (doc._leadStatus && doc._leadStatus.substatuses && doc._leadSubStatus) {
-                selectedSubstatus = doc._leadStatus.substatuses.find(
-                    sub => sub._id.toString() === doc._leadSubStatus.toString()
-                );
-            }
-
-            return {
-                _id: doc._id,
-                _candidate: {
-                    _id: (doc._candidate && doc._candidate._id) ? doc._candidate._id : null,
-                    mobile: (doc._candidate && doc._candidate.mobile) ? doc._candidate.mobile : 'N/A',
-                    name: (doc._candidate && doc._candidate.name) ? doc._candidate.name : 'N/A', 
-                    email: (doc._candidate && doc._candidate.email) ? doc._candidate.email : 'N/A'
-                },
-                _leadStatus: {
-                    _id: doc._leadStatus?._id || null,
-                    title: doc._leadStatus?.title || 'No Status'
-                },
-                _leadSubStatus: selectedSubstatus ? selectedSubstatus._id : null,
-				selectedSubstatus:{
-					_id: selectedSubstatus ? selectedSubstatus._id : null,
-					title: selectedSubstatus ? selectedSubstatus.title : 'No Sub Status',
-					hasAttachment: selectedSubstatus ? selectedSubstatus.hasAttachment : false,
-					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
-					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
-				},
-                docCounts
-            };
-        });
-
-        res.status(200).json({
-            success: true,
-            count: processedResults.length,
-            totalCount,
-            page,
-            limit, 
-            totalPages: Math.ceil(totalCount / limit),
-            data: processedResults,
-            // crmFilterCounts
-        });
-
-    } catch (err) {
-        console.error('API Error:', err);
-        res.status(500).json({
-            success: false,
-            message: "Server Error"
-        });
-    }
-});
-
-function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
-    const pipeline = [];
-
-    // Base match with essential filters
-    const baseMatch = {
-        kycStage: { $ne: true },
-        kyc: { $ne: true },
-        admissionDone: { $ne: true },
-        $or: [
-            { registeredBy: { $in: teamMemberIds } },
-            { 'leadAssignment._counsellor': { $in: teamMemberIds } }
-        ]
-    };
-
-    // Add date filters
-    if (filters.createdFromDate || filters.createdToDate) {
-        baseMatch.createdAt = {};
-        if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
-        if (filters.createdToDate) {
-            const toDate = new Date(filters.createdToDate);
-            toDate.setHours(23, 59, 59, 999);
-            baseMatch.createdAt.$lte = toDate;
-        }
-    }
-
-    if (filters.modifiedFromDate || filters.modifiedToDate) {
-        baseMatch.updatedAt = {};
-        if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
-        if (filters.modifiedToDate) {
-            const toDate = new Date(filters.modifiedToDate);
-            toDate.setHours(23, 59, 59, 999);
-            baseMatch.updatedAt.$lte = toDate;
-        }
-    }
-
-    if (filters.nextActionFromDate || filters.nextActionToDate) {
-        baseMatch.followupDate = {};
-        if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
-        if (filters.nextActionToDate) {
-            const toDate = new Date(filters.nextActionToDate);
-            toDate.setHours(23, 59, 59, 999);
-            baseMatch.followupDate.$lte = toDate;
-        }
-    }
-
-    // Status filters
-    if (filters.status && filters.status !== 'true') {
-        baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.status);
-    }
-    if (filters.leadStatus) {
-        baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.leadStatus);
-    }
-
-    pipeline.push({ $match: baseMatch });
-
-    // Essential lookups only - get minimal required data
-    pipeline.push(
-        // Course lookup with college filter
-        {
-            $lookup: {
-                from: 'courses',
-                localField: '_course',
-                foreignField: '_id',
-                as: '_course',
-                pipeline: [
-                    { $match: { college: college._id } },
-                    {
-                        $project: {
-                            courseFeeType: 1,
-                            college: 1,
-                            project: 1,
-                            vertical: 1,
-                            docsRequired: 1 // Only for doc counts
-                        }
-                    }
-                ]
-            }
-        },
-        { $unwind: '$_course' },
-
-        // Candidate lookup - only essential fields
-        {
-            $lookup: {
-                from: 'candidateprofiles',
-                localField: '_candidate',
-                foreignField: '_id',
-                as: '_candidate',
-                pipeline: [
-                    {
-                        $project: {
-                            _id: 1,
-                            name: 1,
-                            email: 1,
-                            mobile: 1
-                        }
-                    }
-                ]
-            }
-        },
-        { $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
-
-        // Status lookup - only title and milestone
-        {
-            $lookup: {
-                from: 'status',
-                localField: '_leadStatus',
-                foreignField: '_id',
-                as: '_leadStatus',
-                pipeline: [
-                    {
-                        $project: {
-                            title: 1,
-                            milestone: 1,
-                            substatuses: 1
-                        }
-                    }
-                ]
-            }
-        },
-        { $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } }
-    );
-
-    // Apply additional filters
-    const additionalFilters = {};
-
-    if (filters.courseType) {
-        additionalFilters['_course.courseFeeType'] = { $regex: new RegExp(filters.courseType, 'i') };
-    }
-    if (filters.projectsArray.length > 0) {
-        additionalFilters['_course.project'] = { $in: filters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
-    }
-    if (filters.verticalsArray.length > 0) {
-        additionalFilters['_course.vertical'] = { $in: filters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
-    }
-    if (filters.courseArray.length > 0) {
-        additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-    }
-
-    // Name search
-    if (filters.name && filters.name.trim()) {
-        const searchRegex = new RegExp(filters.name.trim(), 'i');
-        additionalFilters.$or = [
-            { '_candidate.name': searchRegex },
-            { '_candidate.mobile': searchRegex },
-            { '_candidate.email': searchRegex }
-        ];
-    }
-
-    if (Object.keys(additionalFilters).length > 0) {
-        pipeline.push({ $match: additionalFilters });
-    }
-
-    // Project only essential fields
-    pipeline.push({
-        $project: {
-            _id: 1,
-            _candidate: 1,
-            _leadStatus: 1,
-            _leadSubStatus: 1,
-            '_course.docsRequired': 1,
-            uploadedDocs: 1,
-            createdAt: 1,
-            updatedAt: 1
-        }
-    });
-
-    // Sort and pagination
-    pipeline.push(
-        { $sort: { updatedAt: -1 } },
-        { $skip: pagination.skip },
-        { $limit: pagination.limit }
-    );
-
-    return pipeline;
-}
-
-function calculateSimpleDocCounts(requiredDocs, uploadedDocs) {
-    if (!requiredDocs.length) {
-        return {
-            totalRequired: 0,
-            uploaded: 0,
-            verified: 0,
-            pending: 0,
-            rejected: 0,
-            notUploaded: 0,
-            uploadPercentage: 0
-        };
-    }
-
-    const uploadedDocsMap = new Map();
-    uploadedDocs.forEach(doc => {
-        if (doc.docsId) {
-            uploadedDocsMap.set(doc.docsId.toString(), doc.status);
-        }
-    });
-
-    let verified = 0;
-    let rejected = 0;  
-    let pending = 0;
-    let notUploaded = 0;
-
-    requiredDocs.forEach(reqDoc => {
-        const uploadStatus = uploadedDocsMap.get(reqDoc._id.toString());
+// function calculateSimpleDocCounts(requiredDocs, uploadedDocs) {
+//     if (!requiredDocs.length) {
+//         return {
+//             totalRequired: 0,
+//             uploaded: 0,
+//             verified: 0,
+//             pending: 0,
+//             rejected: 0,
+//             notUploaded: 0,
+//             uploadPercentage: 0
+//         };
+//     }
+
+//     const uploadedDocsMap = new Map();
+//     uploadedDocs.forEach(doc => {
+//         if (doc.docsId) {
+//             uploadedDocsMap.set(doc.docsId.toString(), doc.status);
+//         }
+//     });
+
+//     let verified = 0;
+//     let rejected = 0;  
+//     let pending = 0;
+//     let notUploaded = 0;
+
+//     requiredDocs.forEach(reqDoc => {
+//         const uploadStatus = uploadedDocsMap.get(reqDoc._id.toString());
         
-        switch (uploadStatus) {
-            case "Verified":
-                verified++;
-                break;
-            case "Rejected":
-                rejected++;
-                break;
-            case "Pending":
-                pending++;
-                break;
-            default:
-                notUploaded++;
-                break;
-        }
-    });
+//         switch (uploadStatus) {
+//             case "Verified":
+//                 verified++;
+//                 break;
+//             case "Rejected":
+//                 rejected++;
+//                 break;
+//             case "Pending":
+//                 pending++;
+//                 break;
+//             default:
+//                 notUploaded++;
+//                 break;
+//         }
+//     });
 
-    const totalRequired = requiredDocs.length;
-    const uploaded = totalRequired - notUploaded;
-    const uploadPercentage = totalRequired > 0 ? Math.round((uploaded / totalRequired) * 100) : 0;
+//     const totalRequired = requiredDocs.length;
+//     const uploaded = totalRequired - notUploaded;
+//     const uploadPercentage = totalRequired > 0 ? Math.round((uploaded / totalRequired) * 100) : 0;
 
-    return {
-        totalRequired,
-        uploaded,
-        verified,
-        pending,
-        rejected,
-        notUploaded,
-        uploadPercentage
-    };
-}
+//     return {
+//         totalRequired,
+//         uploaded,
+//         verified,
+//         pending,
+//         rejected,
+//         notUploaded,
+//         uploadPercentage
+//     };
+// }
 
 // async function calculateOptimizedFilterCounts(teamMemberIds, collegeId, appliedFilters) {
 //     try {
@@ -2089,194 +2090,194 @@ function calculateSimpleDocCounts(requiredDocs, uploadedDocs) {
 //     }
 // }
 
-router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => {
-    try {
+// router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => {
+//     try {
 
-		const user = req.user;
-		const teamMembers = await getAllTeamMembers(user._id);
-		const collegeId = user.college._id;
-		console.log('collegeId', collegeId)
-		const appliedFilters = req.query;
+// 		const user = req.user;
+// 		const teamMembers = await getAllTeamMembers(user._id);
+// 		const collegeId = user.college._id;
+// 		console.log('collegeId', collegeId)
+// 		const appliedFilters = req.query;
 
-		const teamMemberIds = teamMembers.map(member => 
-            typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
-        );
+// 		const teamMemberIds = teamMembers.map(member => 
+//             typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
+//         );
 
-		console.log('teamMemberIds', teamMemberIds)
+// 		console.log('teamMemberIds', teamMemberIds)
 
-        // Get all statuses once
-        const allStatuses = await Status.find({}).select('_id title milestone').lean();
+//         // Get all statuses once
+//         const allStatuses = await Status.find({}).select('_id title milestone').lean();
         
-        // Build base pipeline
-        const basePipeline = [
-            {
-                $match: {
-                    kycStage: { $ne: true },
-                    kyc: { $ne: true },
-                    admissionDone: { $ne: true },
-                    $or: [
-                        { registeredBy: { $in: teamMemberIds } },
-                        { 'leadAssignment._counsellor': { $in: teamMemberIds } }
-                    ]
-                }
-            },
-            {
-                $lookup: {
-                    from: 'courses',
-                    localField: '_course',
-                    foreignField: '_id',
-                    as: '_course',
-                    pipeline: [
-                        { $match: { college: collegeId } },
-                        { $project: { courseFeeType: 1, college: 1, project: 1, vertical: 1 } }
-                    ]
-                }
-            },
-            { $unwind: '$_course' }
-        ];
+//         // Build base pipeline
+//         const basePipeline = [
+//             {
+//                 $match: {
+//                     kycStage: { $ne: true },
+//                     kyc: { $ne: true },
+//                     admissionDone: { $ne: true },
+//                     $or: [
+//                         { registeredBy: { $in: teamMemberIds } },
+//                         { 'leadAssignment._counsellor': { $in: teamMemberIds } }
+//                     ]
+//                 }
+//             },
+//             {
+//                 $lookup: {
+//                     from: 'courses',
+//                     localField: '_course',
+//                     foreignField: '_id',
+//                     as: '_course',
+//                     pipeline: [
+//                         { $match: { college: collegeId } },
+//                         { $project: { courseFeeType: 1, college: 1, project: 1, vertical: 1 } }
+//                     ]
+//                 }
+//             },
+//             { $unwind: '$_course' }
+//         ];
 
-        // Add date filters to base pipeline
-        const dateFilters = {};
+//         // Add date filters to base pipeline
+//         const dateFilters = {};
         
-        if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
-            dateFilters.createdAt = {};
-            if (appliedFilters.createdFromDate) {
-                dateFilters.createdAt.$gte = new Date(appliedFilters.createdFromDate);
-            }
-            if (appliedFilters.createdToDate) {
-                const toDate = new Date(appliedFilters.createdToDate);
-                toDate.setHours(23, 59, 59, 999);
-                dateFilters.createdAt.$lte = toDate;
-            }
-        }
+//         if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
+//             dateFilters.createdAt = {};
+//             if (appliedFilters.createdFromDate) {
+//                 dateFilters.createdAt.$gte = new Date(appliedFilters.createdFromDate);
+//             }
+//             if (appliedFilters.createdToDate) {
+//                 const toDate = new Date(appliedFilters.createdToDate);
+//                 toDate.setHours(23, 59, 59, 999);
+//                 dateFilters.createdAt.$lte = toDate;
+//             }
+//         }
 
-        if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
-            dateFilters.updatedAt = {};
-            if (appliedFilters.modifiedFromDate) {
-                dateFilters.updatedAt.$gte = new Date(appliedFilters.modifiedFromDate);
-            }
-            if (appliedFilters.modifiedToDate) {
-                const toDate = new Date(appliedFilters.modifiedToDate);
-                toDate.setHours(23, 59, 59, 999);
-                dateFilters.updatedAt.$lte = toDate;
-            }
-        }
+//         if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
+//             dateFilters.updatedAt = {};
+//             if (appliedFilters.modifiedFromDate) {
+//                 dateFilters.updatedAt.$gte = new Date(appliedFilters.modifiedFromDate);
+//             }
+//             if (appliedFilters.modifiedToDate) {
+//                 const toDate = new Date(appliedFilters.modifiedToDate);
+//                 toDate.setHours(23, 59, 59, 999);
+//                 dateFilters.updatedAt.$lte = toDate;
+//             }
+//         }
 
-        if (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate) {
-            dateFilters.followupDate = {};
-            if (appliedFilters.nextActionFromDate) {
-                dateFilters.followupDate.$gte = new Date(appliedFilters.nextActionFromDate);
-            }
-            if (appliedFilters.nextActionToDate) {
-                const toDate = new Date(appliedFilters.nextActionToDate);
-                toDate.setHours(23, 59, 59, 999);
-                dateFilters.followupDate.$lte = toDate;
-            }
-        }
+//         if (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate) {
+//             dateFilters.followupDate = {};
+//             if (appliedFilters.nextActionFromDate) {
+//                 dateFilters.followupDate.$gte = new Date(appliedFilters.nextActionFromDate);
+//             }
+//             if (appliedFilters.nextActionToDate) {
+//                 const toDate = new Date(appliedFilters.nextActionToDate);
+//                 toDate.setHours(23, 59, 59, 999);
+//                 dateFilters.followupDate.$lte = toDate;
+//             }
+//         }
 
-        if (Object.keys(dateFilters).length > 0) {
-            basePipeline[0].$match = { ...basePipeline[0].$match, ...dateFilters };
-        }
+//         if (Object.keys(dateFilters).length > 0) {
+//             basePipeline[0].$match = { ...basePipeline[0].$match, ...dateFilters };
+//         }
 
-        // Apply other filters if needed
-        if (appliedFilters.courseType || appliedFilters.projectsArray?.length > 0 || 
-            appliedFilters.verticalsArray?.length > 0 || appliedFilters.courseArray?.length > 0) {
+//         // Apply other filters if needed
+//         if (appliedFilters.courseType || appliedFilters.projectsArray?.length > 0 || 
+//             appliedFilters.verticalsArray?.length > 0 || appliedFilters.courseArray?.length > 0) {
             
-            const filterMatch = {};
-            if (appliedFilters.courseType) {
-                filterMatch['_course.courseFeeType'] = { $regex: new RegExp(appliedFilters.courseType, 'i') };
-            }
-            if (appliedFilters.projectsArray?.length > 0) {
-                filterMatch['_course.project'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
-            }
-            if (appliedFilters.verticalsArray?.length > 0) {
-                filterMatch['_course.vertical'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
-            }
-            if (appliedFilters.courseArray?.length > 0) {
-                filterMatch['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-            }
+//             const filterMatch = {};
+//             if (appliedFilters.courseType) {
+//                 filterMatch['_course.courseFeeType'] = { $regex: new RegExp(appliedFilters.courseType, 'i') };
+//             }
+//             if (appliedFilters.projectsArray?.length > 0) {
+//                 filterMatch['_course.project'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+//             }
+//             if (appliedFilters.verticalsArray?.length > 0) {
+//                 filterMatch['_course.vertical'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+//             }
+//             if (appliedFilters.courseArray?.length > 0) {
+//                 filterMatch['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+//             }
             
-            basePipeline.push({ $match: filterMatch });
-        }
+//             basePipeline.push({ $match: filterMatch });
+//         }
 
-        // Add candidate lookup for name search
-        if (appliedFilters.name && appliedFilters.name.trim()) {
-            basePipeline.push(
-                {
-                    $lookup: {
-                        from: 'candidateprofiles',
-                        localField: '_candidate',
-                        foreignField: '_id',
-                        as: '_candidate',
-                        pipeline: [{ $project: { name: 1, email: 1, mobile: 1 } }]
-                    }
-                },
-                { $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
-            );
+//         // Add candidate lookup for name search
+//         if (appliedFilters.name && appliedFilters.name.trim()) {
+//             basePipeline.push(
+//                 {
+//                     $lookup: {
+//                         from: 'candidateprofiles',
+//                         localField: '_candidate',
+//                         foreignField: '_id',
+//                         as: '_candidate',
+//                         pipeline: [{ $project: { name: 1, email: 1, mobile: 1 } }]
+//                     }
+//                 },
+//                 { $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
+//             );
 
-            const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
-            basePipeline.push({
-                $match: {
-                    $or: [
-                        { '_candidate.name': searchRegex },
-                        { '_candidate.mobile': searchRegex },
-                        { '_candidate.email': searchRegex }
-                    ]
-                }
-            });
-        }
+//             const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
+//             basePipeline.push({
+//                 $match: {
+//                     $or: [
+//                         { '_candidate.name': searchRegex },
+//                         { '_candidate.mobile': searchRegex },
+//                         { '_candidate.email': searchRegex }
+//                     ]
+//                 }
+//             });
+//         }
 
-        // Single aggregation to get all counts
-        const [allCount, statusCounts] = await Promise.all([
-            AppliedCourses.aggregate([...basePipeline, { $count: "total" }]),
-            AppliedCourses.aggregate([
-                ...basePipeline,
-                {
-                    $group: {
-                        _id: "$_leadStatus",
-                        count: { $sum: 1 }
-                    }
-                }
-            ])
-        ]);
+//         // Single aggregation to get all counts
+//         const [allCount, statusCounts] = await Promise.all([
+//             AppliedCourses.aggregate([...basePipeline, { $count: "total" }]),
+//             AppliedCourses.aggregate([
+//                 ...basePipeline,
+//                 {
+//                     $group: {
+//                         _id: "$_leadStatus",
+//                         count: { $sum: 1 }
+//                     }
+//                 }
+//             ])
+//         ]);
 
-        // Process results
-        const counts = { all: allCount[0]?.total || 0 };
+//         // Process results
+//         const counts = { all: allCount[0]?.total || 0 };
         
-        allStatuses.forEach(status => {
-            counts[status._id.toString()] = {
-                _id: status._id,
-                name: status.title,
-                milestone: status.milestone,
-                count: 0
-            };
-        });
+//         allStatuses.forEach(status => {
+//             counts[status._id.toString()] = {
+//                 _id: status._id,
+//                 name: status.title,
+//                 milestone: status.milestone,
+//                 count: 0
+//             };
+//         });
 
-        statusCounts.forEach(({ _id, count }) => {
-            if (_id) {
-                const statusKey = _id.toString();
-                if (counts[statusKey]) {
-                    counts[statusKey].count = count;
-                }
-            } else {
-                counts['null'] = {
-                    _id: null,
-                    name: 'No Status',
-                    milestone: null,
-                    count
-                };
-            }
-        });
+//         statusCounts.forEach(({ _id, count }) => {
+//             if (_id) {
+//                 const statusKey = _id.toString();
+//                 if (counts[statusKey]) {
+//                     counts[statusKey].count = count;
+//                 }
+//             } else {
+//                 counts['null'] = {
+//                     _id: null,
+//                     name: 'No Status',
+//                     milestone: null,
+//                     count
+//                 };
+//             }
+//         });
 
-		console.log('counts', counts)
+// 		console.log('counts', counts)
 
-        res.status(200).json({ success: true, crmFilterCount:counts });
+//         res.status(200).json({ success: true, crmFilterCount:counts });
 
-    } catch (error) {
-        console.error('Error calculating filter counts:', error);
-        return { all: 0 };
-    }
-})
+//     } catch (error) {
+//         console.error('Error calculating filter counts:', error);
+//         return { all: 0 };
+//     }
+// })
 
 router.route('/dashboard').get(isCollege, async (req, res) => {
 	let college = await College.findOne({ _concernPerson: { $elemMatch: { _id: req.user._id } }, status: true })
