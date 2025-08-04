@@ -1554,6 +1554,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor
 		} = req.query;
 
+		console.log('req.query', req.query)
+
 		
 
 		// Parse multi-select filters
@@ -1842,10 +1844,11 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 
 	// Name search
 	if (filters.name && filters.name.trim()) {
+		const searchTerm = filters.name.trim();
 		const searchRegex = new RegExp(filters.name.trim(), 'i');
 		additionalFilters.$or = [
 			{ '_candidate.name': searchRegex },
-			{ '_candidate.mobile': searchRegex },
+			{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 			{ '_candidate.email': searchRegex }
 		];
 	}
@@ -1951,6 +1954,8 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			nextActionFromDate, nextActionToDate,
 			projects, verticals, course, center, counselor
 		} = req.query;
+
+		console.log('req.query', req.query)
 
 		// Parse multi-select filters
 		let projectsArray = [];
@@ -2118,12 +2123,13 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
 			);
 
+			const searchTerm = appliedFilters.name.trim();
 			const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
 			basePipeline.push({
 				$match: {
 					$or: [
 						{ '_candidate.name': searchRegex },
-						{ '_candidate.mobile': searchRegex },
+						{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
 						{ '_candidate.email': searchRegex }
 					]
 				}
