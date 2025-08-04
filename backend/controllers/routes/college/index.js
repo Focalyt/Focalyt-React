@@ -1577,6 +1577,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		// Get team members
 		let teamMembers = [req.user._id];
+		console.log('teamMembers', teamMembers)
 
 		if(projectsArray.length > 0) {
 			teamMembers = [];
@@ -1603,7 +1604,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			);
 		}
 
-		console.log('teamMemberIds', teamMemberIds)
 
 		// Build optimized pipeline with only essential fields
 		const pipeline = buildSimplifiedPipeline({
@@ -1619,7 +1619,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			pagination: { skip, limit }
 		});
 
-		console.log('pipeline', pipeline)
+		console.log('Final pipeline:', JSON.stringify(pipeline, null, 2)); 
 
 		// Execute queries in parallel
 		const [results, totalCountResult] = await Promise.all([
