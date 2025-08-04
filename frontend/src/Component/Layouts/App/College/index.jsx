@@ -27,7 +27,6 @@ function CollegeLayout({ children }) {
 
   useEffect(() => {
     const userFromStorage = sessionStorage.getItem('user');
-    console.log(userFromStorage, 'userFromStorage');
     if (!userFromStorage) {
       navigate('/institute/login');
       return;

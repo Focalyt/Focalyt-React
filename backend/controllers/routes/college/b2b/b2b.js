@@ -506,7 +506,6 @@ router.get('/leads', isCollege, async (req, res) => {
 			.skip(skip)
 			.limit(Number(limit));
 
-		console.log(leads, 'leads')
 
 		res.json({
 			status: true,
@@ -829,19 +828,22 @@ router.post('/leads/:id/remarks', isCollege, async (req, res) => {
 	}
 });
 
-// Set follow-up for lead
+// Set follow-up for lead with Google Calendar integration
 router.post('/leads/:id/followup', isCollege, async (req, res) => {
 	try {
 		const {
 			followUpType,
 			description,
-			scheduledDate
+			scheduledDate,
+			scheduledTime,
+			remarks,
+			googleCalendarEvent = false
 		} = req.body;
 
-		if (!followUpType || !description || !scheduledDate) {
+		if (!scheduledDate || !scheduledTime) {
 			return res.status(400).json({
 				status: false,
-				message: 'followUpType, description, and scheduledDate are required'
+				message: 'scheduledDate and scheduledTime are required'
 			});
 		}
 
@@ -858,27 +860,83 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 			});
 		}
 
+		// Combine date and time
+		const [hours, minutes] = scheduledTime.split(':');
+		const scheduledDateTime = new Date(scheduledDate);
+		scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
 		// Create new follow-up
 		const newFollowUp = new FollowUp({
 			leadId: req.params.id,
-			followUpType,
-			description,
-			scheduledDate,
+			followUpType: followUpType || 'Call',
+			description: description || 'Follow-up call',
+			scheduledDate: scheduledDateTime,
+			remarks: remarks,
 			addedBy: req.user._id
 		});
 
 		const savedFollowUp = await newFollowUp.save();
 
-		// Update lead with follow-up reference
+		// Update lead with follow-up reference and add to logs
 		lead.followUp = savedFollowUp._id;
+		lead.logs.push({
+			user: req.user._id,
+			timestamp: new Date(),
+			action: `Follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${scheduledTime}`,
+			remarks: remarks
+		});
 		await lead.save();
+
+		// Create Google Calendar event if requested (optional)
+		let googleEvent = null;
+		if (googleCalendarEvent && req.user.googleAuthToken?.accessToken) {
+			try {
+				const { createGoogleCalendarEvent } = require('../../services/googleservice');
+				
+				const event = {
+					summary: `B2B Follow-up: ${lead.businessName}`,
+					description: `Follow-up with ${lead.concernPersonName} (${lead.designation || 'N/A'})\n\nBusiness: ${lead.businessName}\nContact: ${lead.mobile}\nEmail: ${lead.email}\n\nRemarks: ${remarks || 'No remarks'}`,
+					start: {
+						dateTime: scheduledDateTime.toISOString(),
+						timeZone: 'Asia/Kolkata',
+					},
+					end: {
+						dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes duration
+						timeZone: 'Asia/Kolkata',
+					},
+					reminders: {
+						useDefault: false,
+						overrides: [
+							{ method: 'email', minutes: 24 * 60 }, // 1 day before
+							{ method: 'popup', minutes: 15 }, // 15 minutes before
+						],
+					},
+				};
+
+				googleEvent = await createGoogleCalendarEvent({
+					accessToken: req.user.googleAuthToken.accessToken,
+					event: event
+				});
+
+				// Update follow-up with Google Calendar event ID
+				savedFollowUp.googleCalendarEventId = googleEvent.data.id;
+				await savedFollowUp.save();
+
+			} catch (googleError) {
+				console.error('Google Calendar Error:', googleError);
+				// Don't fail the entire request if Google Calendar fails
+			}
+		}
 
 		await savedFollowUp.populate('addedBy', 'name email');
 
 		res.status(201).json({
 			status: true,
-			data: savedFollowUp,
-			message: 'Follow-up scheduled successfully'
+			data: {
+				followUp: savedFollowUp,
+				googleEvent: googleEvent?.data || null
+			},
+			message: 'Follow-up scheduled successfully' + (googleEvent ? ' and added to Google Calendar' : '')
 		});
 	} catch (error) {
 		console.error('Error setting follow-up:', error);
@@ -940,10 +998,17 @@ router.put('/leads/:id/followup/:followUpId', isCollege, async (req, res) => {
 	}
 });
 
-// Change lead status
+// Change lead status with optional follow-up
 router.put('/leads/:id/status', isCollege, async (req, res) => {
 	try {
-		const { status, subStatus } = req.body;
+		const { 
+			status, 
+			subStatus, 
+			followUpDate, 
+			followUpTime, 
+			remarks,
+			googleCalendarEvent = false 
+		} = req.body;
 
 		if (!status) {
 			return res.status(400).json({
@@ -965,13 +1030,36 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			});
 		}
 
-		// Update lead status
+		// Prepare update data
+		const updateData = {
+			status,
+			subStatus
+		};
+
+		// Add follow-up if provided
+		let followUp = null;
+		if (followUpDate && followUpTime) {
+			const [hours, minutes] = followUpTime.split(':');
+			const scheduledDateTime = new Date(followUpDate);
+			scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+			followUp = new FollowUp({
+				leadId: req.params.id,
+				followUpType: 'Status Change Follow-up',
+				description: `Status changed to ${status}`,
+				scheduledDate: scheduledDateTime,
+				remarks: remarks,
+				addedBy: req.user._id
+			});
+
+			await followUp.save();
+			updateData.followUp = followUp._id;
+		}
+
+		// Update lead status and add to logs
 		const updatedLead = await Lead.findByIdAndUpdate(
 			req.params.id,
-			{
-				status,
-				subStatus
-			},
+			updateData,
 			{ new: true }
 		).populate([
 			{ path: 'leadCategory', select: 'name' },
@@ -980,10 +1068,74 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			{ path: 'leadAddedBy', select: 'name email' }
 		]);
 
+		// Add to logs
+		updatedLead.logs.push({
+			user: req.user._id,
+			timestamp: new Date(),
+			action: `Status changed to ${status}`,
+			remarks: remarks
+		});
+
+		if (followUp) {
+			updatedLead.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: `Follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${followUpTime}`,
+				remarks: remarks
+			});
+		}
+
+		await updatedLead.save();
+
+		// Create Google Calendar event if requested (optional)
+		let googleEvent = null;
+		if (googleCalendarEvent && followUp && req.user.googleAuthToken?.accessToken) {
+			try {
+				const { createGoogleCalendarEvent } = require('../../services/googleservice');
+				
+				const event = {
+					summary: `B2B Follow-up: ${lead.businessName}`,
+					description: `Status Change Follow-up with ${lead.concernPersonName} (${lead.designation || 'N/A'})\n\nBusiness: ${lead.businessName}\nContact: ${lead.mobile}\nEmail: ${lead.email}\nStatus: ${status}\n\nRemarks: ${remarks || 'No remarks'}`,
+					start: {
+						dateTime: scheduledDateTime.toISOString(),
+						timeZone: 'Asia/Kolkata',
+					},
+					end: {
+						dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes duration
+						timeZone: 'Asia/Kolkata',
+					},
+					reminders: {
+						useDefault: false,
+						overrides: [
+							{ method: 'email', minutes: 24 * 60 }, // 1 day before
+							{ method: 'popup', minutes: 15 }, // 15 minutes before
+						],
+					},
+				};
+
+				googleEvent = await createGoogleCalendarEvent({
+					accessToken: req.user.googleAuthToken.accessToken,
+					event: event
+				});
+
+				// Update follow-up with Google Calendar event ID
+				followUp.googleCalendarEventId = googleEvent.data.id;
+				await followUp.save();
+
+			} catch (googleError) {
+				console.error('Google Calendar Error:', googleError);
+				// Don't fail the entire request if Google Calendar fails
+			}
+		}
+
 		res.json({
 			status: true,
-			data: updatedLead,
-			message: 'Lead status updated successfully'
+			data: {
+				lead: updatedLead,
+				followUp: followUp,
+				googleEvent: googleEvent?.data || null
+			},
+			message: 'Lead status updated successfully' + (followUp ? ' with follow-up scheduled' : '') + (googleEvent ? ' and added to Google Calendar' : '')
 		});
 	} catch (error) {
 		console.error('Error updating lead status:', error);

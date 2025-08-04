@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
-
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
-// import GoogleMapsLocationPicker from './GoogleMapsLocationPicker';
+
 
 // Google Maps API styles
 const mapStyles = `
+
   .map-container {
     position: relative;
     border-radius: 8px;
@@ -313,7 +314,7 @@ const B2BSales = () => {
 
   const candidateRef = useRef();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
 
   const [openModalId, setOpenModalId] = useState(null);
@@ -417,12 +418,132 @@ const B2BSales = () => {
   const [loading, setLoading] = useState(false);
 
   const businessNameInputRef = useRef(null);
+  const [isgoogleLoginLoading, setIsgoogleLoginLoading] = useState(false);
 
 
-  // const responseGoogle = (response) => {
-  //   console.log(response);
-  // }
+  const handleGoogleLogin = async() => {
+    try {
+      setIsgoogleLoginLoading(true);
+      console.log('🚀 Starting popup login...');
+      
+      const result = await getGoogleAuthCode({
+        scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar'],
+        user: userData
+      });
 
+      console.log('✅ Login successful:', result);
+
+      const refreshToken = await getGoogleRefreshToken({
+        code: result,
+        user: userData
+      });
+
+      console.log('✅ Refresh token successful:', refreshToken.data);
+      
+      const user = {
+        ...userData,
+        googleAuthToken: refreshToken.data
+      }
+      sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
+
+      setUserData(user);
+      
+
+    } catch (error) {
+      console.error('❌ Login failed:', error);
+      
+      // Handle specific popup errors
+      if (error.message.includes('Popup blocked')) {
+        console.error('Please allow popups for this site and try again.');
+      } else if (error.message.includes('closed by user')) {
+        console.error('Login cancelled by user.');
+      } else {
+        console.error('Login failed: ' + error.message);
+      }
+
+    }finally{
+      setIsgoogleLoginLoading(false);
+      setShowPanel('followUp');
+
+    }
+    // initiateGoogleAuth();
+  };
+
+  // Simple function to add follow-up to Google Calendar
+    // Function to clear all follow-up form data
+  const clearFollowupFormData = () => {
+    setFollowupFormData({
+      followupDate: '',
+      followupTime: '',
+      remarks: '',
+      selectedProfile: null,
+      selectedConcernPerson: null,
+      selectedProfiles: null,
+      selectedCounselor: null,
+      selectedDocument: null
+    });
+  };
+
+  const addFollowUpToGoogleCalendar = async (e) => {
+    e.preventDefault();
+    
+    try {
+      // Check if user has Google token
+      if (!userData.googleAuthToken?.accessToken) {
+        alert('Please login with Google first');
+        return;
+      }
+  
+      // Get data from followupFormData
+      const scheduledDateTime = new Date(followupFormData.followupDate);
+      const [hours, minutes] = followupFormData.followupTime.split(':');
+      scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+  
+      // Create calendar event data
+      const event = {
+        summary: `B2B Follow-up: ${followupFormData.selectedProfile?.businessName || 'Unknown'}`,
+        description: `Follow-up with ${followupFormData.selectedProfile?.concernPersonName || 'Unknown'} (${followupFormData.selectedProfile?.designation || 'N/A'})\n\nBusiness: ${followupFormData.selectedProfile?.businessName || 'Unknown'}\nContact: ${followupFormData.selectedProfile?.mobile || 'N/A'}\nEmail: ${followupFormData.selectedProfile?.email || 'N/A'}\n\nRemarks: ${followupFormData.remarks || 'No remarks'}`,
+        start: {
+          dateTime: scheduledDateTime.toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        end: {
+          dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes
+          timeZone: 'Asia/Kolkata',
+        },
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'email', minutes: 24 * 60 }, // 1 day before
+            { method: 'popup', minutes: 60 }, // 1 hour before
+          ],
+        },
+      };
+  
+      // Call backend API to create calendar event
+      const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
+        user: userData,
+        event: event
+      });
+  
+      if (response.data.success) {
+        alert('✅ Follow-up added to Google Calendar!');
+        console.log('✅ Follow-up added to Google Calendar:', response.data.data);
+      } else {
+        alert('❌ Failed to add to Google Calendar');
+        console.error('❌ Failed to add to Google Calendar:', response.data.message);
+      }
+  
+    } catch (error) {
+      console.error('❌ Error adding to Google Calendar:', error);
+      alert('❌ Error adding to Google Calendar');
+    }
+    finally{
+      closePanel();
+    }
+    
+  
+  };
 
   const initializeBusinessNameAutocomplete = () => {
     console.log('Initializing business name autocomplete...');
@@ -590,13 +711,6 @@ const B2BSales = () => {
 
 
 
-  const handleCheckboxChange = (lead, checked) => {
-    if (checked) {
-      setSelectedProfiles(prev => [...prev, lead._id]);
-    } else {
-      setSelectedProfiles(prev => prev.filter(id => id !== lead._id));
-    }
-  };
 
   // Email validation function
   const validateEmail = (email) => {
@@ -878,62 +992,6 @@ const B2BSales = () => {
     setShowAddLeadModal(true);
   };
 
-
-  const openUploadModal = (document) => {
-    setSelectedDocumentForUpload(document);
-    // setShowUploadModal(true);
-    setSelectedFile(null);
-    setUploadPreview(null);
-    setUploadProgress(0);
-    setIsUploading(false)
-  };
-
-  const closeUploadModal = () => {
-    setShowUploadModal(false);
-    setSelectedDocumentForUpload(null);
-    setSelectedFile(null);
-    setUploadPreview(null);
-    setUploadProgress(0);
-    setIsUploading(false);
-  };
-
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file type (images and PDFs)
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Please select a valid file (JPG, PNG, GIF, or PDF)');
-      return;
-    }
-
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      alert('File size should be less than 10MB');
-      return;
-    }
-
-    setSelectedFile(file);
-
-    // Create preview for images
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setUploadPreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setUploadPreview(null);
-    }
-  };
-
-
-
-
-
-
   const getPaginationPages = () => {
     const delta = 2;
     const range = [];
@@ -967,31 +1025,6 @@ const B2BSales = () => {
 
   // Toggle POPUP
 
-  const togglePopup = (profileIndex) => {
-    setShowPopup(prev => prev === profileIndex ? null : profileIndex);
-  };
-
-  // Filter state from Registration component
-  const [filterData, setFilterData] = useState({
-    name: '',
-    courseType: '',
-    status: 'true',
-    leadStatus: '',
-    sector: '',
-    // Date filter states
-    createdFromDate: null,
-    createdToDate: null,
-    modifiedFromDate: null,
-    modifiedToDate: null,
-    nextActionFromDate: null,
-    nextActionToDate: null,
-
-  });
-  // Add dropdown visibility states
-  const [showCreatedDatePicker, setShowCreatedDatePicker] = useState(false);
-  const [showModifiedDatePicker, setShowModifiedDatePicker] = useState(false);
-  const [showNextActionDatePicker, setShowNextActionDatePicker] = useState(false);
-
   const [crmFilters, setCrmFilters] = useState([
     { _id: '', name: '', count: 0, milestone: '' },
 
@@ -1004,9 +1037,17 @@ const B2BSales = () => {
   // edit status and set followup
   const [seletectedStatus, setSelectedStatus] = useState('');
   const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
-  const [followupDate, setFollowupDate] = useState('');
-  const [followupTime, setFollowupTime] = useState('');
-  const [remarks, setRemarks] = useState('');
+  // Single state for all follow-up form data
+  const [followupFormData, setFollowupFormData] = useState({
+    followupDate: '',
+    followupTime: '',
+    remarks: '',
+    selectedProfile: null,
+    selectedConcernPerson: null,
+    selectedProfiles: null,
+    selectedCounselor: null,
+    selectedDocument: null
+  });
 
 
   const [subStatuses, setSubStatuses] = useState([
@@ -1056,7 +1097,7 @@ const B2BSales = () => {
 
 
   const handleTimeChange = (e) => {
-    if (!followupDate) {
+    if (!followupFormData.followupDate) {
       alert('Select date first');
       return;  // Yahan return lagao
     }
@@ -1065,7 +1106,7 @@ const B2BSales = () => {
 
     const [hours, minutes] = time.split(':');
 
-    const selectedDateTime = new Date(followupDate);
+    const selectedDateTime = new Date(followupFormData.followupDate);
     selectedDateTime.setHours(parseInt(hours, 10));
     selectedDateTime.setMinutes(parseInt(minutes, 10));
     selectedDateTime.setSeconds(0);
@@ -1079,7 +1120,7 @@ const B2BSales = () => {
     }
 
     // Agar yaha aaya to time sahi hai
-    setFollowupTime(time);
+    setFollowupFormData(prev => ({ ...prev, followupTime: time }));
   };
 
 
@@ -1168,6 +1209,7 @@ const B2BSales = () => {
 
     if (profile) {
       setSelectedProfile(profile);
+      setFollowupFormData(prev => ({ ...prev, selectedProfile: profile }));
     }
 
     // Close all panels first
@@ -1215,10 +1257,9 @@ const B2BSales = () => {
 
   const closePanel = () => {
     setShowPanel('');
+    clearFollowupFormData();
     setShowPopup(null);
-    setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
-    setSelectedProfile(null);
+    clearFollowupFormData();
     setSelectedStatus(null)
     setSelectedSubStatus(null)
     if (!isMobile) {
@@ -1374,7 +1415,7 @@ const B2BSales = () => {
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
   const renderEditPanel = () => {
     const panelContent = (
-      <div className="card border-0 shadow-sm">
+      <div className="card border-0 shadow-sm " >
         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
           <div className="d-flex align-items-center">
             <div className="me-2">
@@ -1396,7 +1437,8 @@ const B2BSales = () => {
         </div>
 
         <div className="card-body">
-          <form>
+          {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading? (
+          <form onSubmit={addFollowUpToGoogleCalendar}>
 
             {(showPanel !== 'followUp') && (
               <>
@@ -1474,9 +1516,8 @@ const B2BSales = () => {
                   /> */}
                     <DatePicker
                       className="form-control border-0  bgcolor"
-                      onChange={setFollowupDate}
-
-                      value={followupDate}
+                      onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
+                      value={followupFormData.followupDate}
                       format="dd/MM/yyyy"
                       minDate={today}   // Isse past dates disable ho jayengi
 
@@ -1494,11 +1535,10 @@ const B2BSales = () => {
                       type="time"
                       className="form-control border-0  bgcolor"
                       id="actionTime"
-                      onChange={handleTimeChange}
-                      value={followupTime}
-
-
+                      onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
+                      value={followupFormData.followupTime}
                       style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
+
                     />
                   </div>
                 </div>
@@ -1510,7 +1550,9 @@ const B2BSales = () => {
                     className="form-control border-0 bgcolor bg-light"
                     id="comment"
                     rows="4"
-                    onChange={(e) => setRemarks(e.target.value)}
+                    onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                    value={followupFormData.remarks}
+                    placeholder="Enter any additional remarks..."
                   />
                 </div>
               </div>)}
@@ -1523,8 +1565,8 @@ const B2BSales = () => {
                   className="form-control border-0 bgcolor"
                   id="comment"
                   rows="4"
-                  onChange={(e) => setRemarks(e.target.value)}
-
+                  onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                  value={followupFormData.remarks}
                   style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
 
                 ></textarea>
@@ -1550,8 +1592,26 @@ const B2BSales = () => {
                 {(showPanel === 'followUp') && 'SET FOLLOWUP '}
                 {(showPanel === 'bulkstatuschange') && 'UPDATE BULK STATUS '}
               </button>
+              
+              {/* Simple Google Calendar Test Button */}
+            
             </div>
-          </form>
+            </form>
+          ):!isgoogleLoginLoading && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <button className="btn btn-primary" onClick={handleGoogleLogin}>Login with Google</button>
+              </div>
+            </div>
+          )}
+
+          {isgoogleLoginLoading && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <i className="fas fa-spinner fa-spin"></i>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2181,18 +2241,10 @@ const B2BSales = () => {
                       <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
-                     
+
                     </div>
-                    {/* <GoogleLogin
-                        clientId="449914901350-ibgtfl0tbog7vb91u7d5s9cmo92ba1kg.apps.googleusercontent.com"
-                        buttonText="Login"
-                        onSuccess={responseGoogle}
-                        onFailure={responseGoogle}
-                        cookiePolicy={'single_host_origin'}
-                        responseType='code'
-                        accessType='offline'
-                        scope='openid profile email https://www.googleapis.com/auth/calendar'
-                      /> */}
+
+
                   </div>
 
 
@@ -2537,14 +2589,11 @@ const B2BSales = () => {
         {
           !isMobile && (
             <div className="col-4">
-              <div className="row " style={{
-                transition: 'margin-top 0.2s ease-in-out',
-                position: 'fixed'
-              }}>
+             
                 {renderEditPanel()}
                 {renderRefferPanel()}
                 {renderLeadHistoryPanel()}
-              </div>
+          
             </div>
           )
         }
@@ -2855,4 +2904,3 @@ const B2BSales = () => {
 };
 
 export default B2BSales;
-
