@@ -1619,7 +1619,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			pagination: { skip, limit }
 		});
 
-		console.log('Final pipeline:', JSON.stringify(pipeline, null, 2)); 
 
 		// Execute queries in parallel
 		const [results, totalCountResult] = await Promise.all([
@@ -1724,7 +1723,12 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
 		if (filters.createdToDate) {
 			const toDate = new Date(filters.createdToDate);
-			toDate.setHours(23, 59, 59, 999);
+			console.log('toDate', toDate)
+			// Add 1 day (24 hours) to the date
+			toDate.setDate(toDate.getDate() + 1);	
+			console.log('toDate after updating date', toDate)
+			// Set time to 18:30:00.000 (6:30 PM)
+			// Use this modified 'toDate' as the upper limit in the filter
 			baseMatch.createdAt.$lte = toDate;
 		}
 	}
@@ -2054,7 +2058,11 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 			if (appliedFilters.createdToDate) {
 				const toDate = new Date(appliedFilters.createdToDate);
-				toDate.setHours(23, 59, 59, 999);
+				console.log('toDate in count', toDate)
+				toDate.setDate(toDate.getDate() + 1);	
+				console.log('toDate after updating date in count', toDate)
+				// Set time to 18:30:00.000 (6:30 PM)
+				// Use this modified 'toDate' as the upper limit in the filter
 				dateFilters.createdAt.$lte = toDate;
 			}
 		}
