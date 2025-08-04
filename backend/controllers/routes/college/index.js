@@ -1738,7 +1738,8 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
 		if (filters.modifiedToDate) {
 			const toDate = new Date(filters.modifiedToDate);
-			toDate.setHours(23, 59, 59, 999);
+			toDate.setDate(toDate.getDate() + 1);	
+
 			baseMatch.updatedAt.$lte = toDate;
 		}
 	}
@@ -1748,7 +1749,8 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
 		if (filters.nextActionToDate) {
 			const toDate = new Date(filters.nextActionToDate);
-			toDate.setHours(23, 59, 59, 999);
+			toDate.setDate(toDate.getDate() + 1);	
+
 			baseMatch.followupDate.$lte = toDate;
 		}
 	}
@@ -2074,7 +2076,8 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 			if (appliedFilters.modifiedToDate) {
 				const toDate = new Date(appliedFilters.modifiedToDate);
-				toDate.setHours(23, 59, 59, 999);
+				toDate.setDate(toDate.getDate() + 1);	
+
 				dateFilters.updatedAt.$lte = toDate;
 			}
 		}
@@ -2086,7 +2089,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 			if (appliedFilters.nextActionToDate) {
 				const toDate = new Date(appliedFilters.nextActionToDate);
-				toDate.setHours(23, 59, 59, 999);
+				toDate.setDate(toDate.getDate() + 1);
 				dateFilters.followupDate.$lte = toDate;
 			}
 		}
