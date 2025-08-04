@@ -2,6 +2,7 @@ const express = require("express");
 const multer  = require('multer')
 var multipleUpload = multer().array('file');
 const { authenti, authCollege, authCommon, isCandidate, isAdmin, authentiAdmin, auth1 } = require("../../helpers");
+const { User } = require("../models");
 const {
 	commonFunc,
 	educationlist,
@@ -20,6 +21,8 @@ const {
 	postFunc,
 	teamFunc
 } = require("./functions");
+
+const { getGoogleAuthToken, getNewGoogleAccessToken, getGoogleCalendarEvents, createGoogleCalendarEvent } = require("./services/googleservice");
 
 const apiRoutes = express.Router();
 const commonRoutes = express.Router();
@@ -91,6 +94,163 @@ commonRoutes.get(
 	authCommon,
 	commonFunc.getDashboardData
 );
+
+// Google OAuth Token Route
+commonRoutes.post("/getgoogleauth", async (req, res) => {
+  try {
+    const { code, redirectUri, user } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ 
+        error: 'Authorization code is required' 
+      });
+    }
+
+	console.log(req.body,'req.body');
+
+    const userData = await getGoogleAuthToken(req.body);
+	console.log(userData,'userData');
+
+	if (userData.error) {
+		return res.status(400).json({ 
+			error: userData.error 
+		});
+	}
+	
+
+	
+
+    res.json({ 
+      success: true, 
+      data: userData 
+    });
+    
+  } catch (error) {
+    console.error('Google OAuth Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to exchange authorization code',
+      message: error.message 
+    });
+  }
+});
+
+
+
+commonRoutes.post("/getgooglecalendarevents", async (req, res) => {
+	try {
+		const { accessToken } = req.body;
+
+		const events = await getGoogleCalendarEvents(accessToken);
+
+		res.json({ 
+			success: true, 
+			data: events 
+		});
+	} catch (error) {
+		console.error('Google Calendar Events Error:', error);
+		res.status(500).json({ 
+			error: 'Failed to get Google calendar events',
+			message: error.message 
+		});
+	}
+});
+
+commonRoutes.post("/creategooglecalendarevent", async (req, res) => {
+	try {
+		const { user, event } = req.body;
+
+		// Check if access token and event exist
+		if (!user || !event) {
+			return res.status(400).json({ 
+				success: false,
+				error: 'Access token and event are required' 
+			});
+		}
+
+				// Create data object for Google service
+				const calendarData = {
+					user: user,
+					event: event
+				};
+
+		const newEvent = await createGoogleCalendarEvent(calendarData);
+		console.log(newEvent, 'newEvent');
+
+		if (newEvent.error) {
+			return res.status(400).json({ 
+				success: false,
+				error: newEvent.error 
+			});
+		}
+
+		res.json({ 
+			success: true, 
+			data: newEvent 
+		});
+	} catch (error) {
+		console.error('Google Calendar Event Error:', error);
+		res.status(500).json({ 
+			success: false,
+			error: 'Failed to create Google calendar event',
+			message: error.message 
+		});
+	}
+});
+
+// Get B2B followup events from Google Calendar
+commonRoutes.post("/getb2bcalendarevents", async (req, res) => {
+	try {
+		const { accessToken, startDate, endDate } = req.body;
+
+		if (!accessToken) {
+			return res.status(400).json({ 
+				success: false,
+				error: 'Access token is required' 
+			});
+		}
+
+		// Set default date range if not provided
+		const timeMin = startDate ? new Date(startDate) : new Date();
+		const timeMax = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+		const events = await getGoogleCalendarEvents({
+			accessToken,
+			timeMin: timeMin.toISOString(),
+			timeMax: timeMax.toISOString()
+		});
+
+		// Filter events that are B2B related
+		const b2bEvents = events.data?.items?.filter(event => {
+			const summary = event.summary?.toLowerCase() || '';
+			const description = event.description?.toLowerCase() || '';
+			return summary.includes('b2b') || 
+				   summary.includes('follow-up') || 
+				   summary.includes('followup') ||
+				   description.includes('b2b') ||
+				   description.includes('follow-up') ||
+				   description.includes('followup');
+		}) || [];
+
+		res.json({ 
+			success: true, 
+			data: {
+				events: b2bEvents,
+				totalEvents: b2bEvents.length,
+				dateRange: {
+					start: timeMin,
+					end: timeMax
+				}
+			}
+		});
+	} catch (error) {
+		console.error('B2B Calendar Events Error:', error);
+		res.status(500).json({ 
+			success: false,
+			error: 'Failed to get B2B calendar events',
+			message: error.message 
+		});
+	}
+});
 
 imageRoutes.post("/uploadFile", authenti, imageFunc.uploadImageAndroid);
 

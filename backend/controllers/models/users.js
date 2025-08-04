@@ -102,7 +102,50 @@ const userSchema = new Schema(
 		source: {
 			type: String,
 			default: 'website'
-		}
+		},
+		googleAuthToken: {
+			// Access token (better naming)
+			accessToken: {
+			  type: String,
+			  default: ''
+			},
+			
+			// Token expiry time (better naming)
+			expiresAt: {
+			  type: Date,
+			  index: true // Index for efficient expiry checks
+			},
+			
+			// Refresh token
+			refreshToken: {
+			  type: String,
+			  default: ''
+			},
+			
+			// Scopes as array (more flexible)
+			scopes: {
+			  type: [String], // Array of strings
+			  default: []
+			},
+			
+			// Additional useful fields
+			tokenType: {
+			  type: String,
+			  default: 'Bearer'
+			},
+			
+			// When tokens were last updated
+			lastUpdated: {
+			  type: Date,
+			  default: Date.now
+			},
+			
+			// ID token (for user profile info)
+			idToken: {
+			  type: String,
+			  default: ''
+			}
+		  }
 		
 	},
 	{ timestamps: true }
