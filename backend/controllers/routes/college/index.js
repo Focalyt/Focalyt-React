@@ -1554,6 +1554,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor
 		} = req.query;
 
+		
+
 		// Parse multi-select filters
 		let projectsArray = [];
 		let verticalsArray = [];
@@ -1598,6 +1600,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
 			);
 		}
+
+		console.log('teamMemberIds', teamMemberIds)
 
 		// Build optimized pipeline with only essential fields
 		const pipeline = buildSimplifiedPipeline({
@@ -1707,9 +1711,10 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
-			{ 'leadAssignment._counsellor': { $in: teamMemberIds } }
+			{ counsellor: { $in: teamMemberIds } }
 		];
 	}
+	
 
 	// Add date filters
 	if (filters.createdFromDate || filters.createdToDate) {
@@ -1940,7 +1945,6 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		const user = req.user;
 		let teamMembers = [user._id];
 		const collegeId = user.college._id;
-		console.log('collegeId', collegeId)
 		const {
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
@@ -2031,7 +2035,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		if (teamMemberIds && teamMemberIds.length > 0) {
 			basePipeline[0].$match.$or = [
 				{ registeredBy: { $in: teamMemberIds } },
-				{ 'leadAssignment._counsellor': { $in: teamMemberIds } }
+				{ counsellor: { $in: teamMemberIds } }
 			];
 		}
 
@@ -2168,7 +2172,6 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 		});
 
-		console.log('counts', counts)
 
 		res.status(200).json({ success: true, crmFilterCount: counts });
 
@@ -8834,6 +8837,7 @@ router.route('/refer-leads')
 					assignedBy: new mongoose.Types.ObjectId(user._id)
 				}
 				appliedCourse.leadAssignment.push(updateData);
+				appliedCourse.counsellor = counselorId;
 				await appliedCourse.save();
 			}
 			res.status(200).json({
@@ -9530,6 +9534,52 @@ router.post('/lead-details-by-ids', [isCollege], async (req, res) => {
 	}
 });
 
+
+router.post('/updateAllCounsellors', async (req, res) => {
+	try {
+	  // Fetch all documents that have the leadAssignment array with data
+	  const appliedCourses = await AppliedCourses.find({ "leadAssignment.0": { $exists: true } });
+  
+	  if (!appliedCourses || appliedCourses.length === 0) {
+		return res.status(404).json({ error: 'No applied courses with leadAssignment found' });
+	  }
+  
+	  console.log(`Total documents found with leadAssignment: ${appliedCourses.length}`);
+  
+	  let updatedCount = 0; // To keep track of how many documents are updated
+  
+	  // Iterate over each applied course and update the counsellor
+	  for (const appliedCourse of appliedCourses) {
+		// Get the last counselor from the leadAssignment array
+		const lastCounselor = appliedCourse.leadAssignment[appliedCourse.leadAssignment.length - 1];
+  
+		if (lastCounselor && lastCounselor._counsellor) {
+		  // Check if the counsellor is already set
+		  if (appliedCourse.counsellor !== lastCounselor._counsellor) {
+			// Update the counsellor field in the root of the document
+			appliedCourse.counsellor = lastCounselor._counsellor;
+  
+			// Save the updated document
+			await appliedCourse.save();
+			updatedCount++;
+			console.log(`Document updated: ${appliedCourse._id}`);
+		  }
+		}
+	  }
+  
+	  // Log the result and send the response
+	  console.log(`Total documents processed: ${appliedCourses.length}`);
+	  console.log(`Total documents updated: ${updatedCount}`);
+  
+	  return res.status(200).json({
+		message: `Counsellors updated successfully for ${updatedCount} applied courses out of ${appliedCourses.length}`,
+	  });
+  
+	} catch (error) {
+	  console.error('Error updating counsellors:', error);
+	  return res.status(500).json({ error: 'Internal server error' });
+	}
+  });
 
 
 

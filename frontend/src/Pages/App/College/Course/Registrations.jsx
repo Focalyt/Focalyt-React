@@ -543,7 +543,7 @@ const useNavHeight = (dependencies = []) => {
     if (navRef.current) {
       const height = navRef.current.offsetHeight;
       setNavHeight(height);
-      console.log('Nav height updated:', height + 'px');
+      
     }
   }, []);
 
@@ -552,7 +552,7 @@ const useNavHeight = (dependencies = []) => {
     if (widthRef.current) {
       const width = widthRef.current.offsetWidth;
       setWidth(width);
-      console.log('Width updated:', width + 'px');
+      
     }
   }, []);
 
@@ -606,7 +606,6 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     if (widthRef.current) {
       const width = widthRef.current.offsetWidth;
       setWidth(width);
-      console.log('Width updated:', width + 'px');
     }
   }, []);
 
@@ -815,6 +814,7 @@ const CRMDashboard = () => {
   const [counselorOptions, setCounselorOptions] = useState([]);
 
   // Fetch filter options from backend API on mount
+ 
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
@@ -837,7 +837,7 @@ const CRMDashboard = () => {
     };
     fetchFilterOptions();
   }, []);
-
+  
   useEffect(() => {
     console.log(counselorOptions, 'counselorOptions')
   }, [counselorOptions])
