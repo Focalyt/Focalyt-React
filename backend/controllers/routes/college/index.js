@@ -4581,7 +4581,7 @@ router.put('/update/:id', isCollege, async (req, res) => {
 router.route("/kycCandidates").get(isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-		let teamMembers = [user._id];
+		let teamMembers = await getAllTeamMembers(user._id);
 
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
@@ -4628,25 +4628,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			if (counselor) counselorArray = JSON.parse(counselor);
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
-		}
-
-		if (projectsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (verticalsArray.length > 0) {
-			teamMembers = [];
-		}
-		if (courseArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
 		}
 
 		if (counselorArray.length > 0) {
@@ -6709,7 +6690,7 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 router.route("/admission-list").get(isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-		let teamMembers = [user._id];
+		let teamMembers = await getAllTeamMembers(user._id);
 		const college = await College.findOne({ '_concernPerson._id': user._id });
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 50;
@@ -6752,25 +6733,6 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
-
-		if (projectsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (verticalsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (courseArray.length > 0) {
-			teamMembers = [];
-		}
-
-		
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
-		}
-
 		if (counselorArray.length > 0) {
 			teamMembers = counselorArray;
 		}
