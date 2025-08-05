@@ -476,6 +476,7 @@ const B2BSales = () => {
       followupDate: '',
       followupTime: '',
       remarks: '',
+      additionalRemarks: '',
       selectedProfile: null,
       selectedConcernPerson: null,
       selectedProfiles: null,
@@ -493,56 +494,74 @@ const B2BSales = () => {
         alert('Please login with Google first');
         return;
       }
-  
-      // Get data from followupFormData
-      const scheduledDateTime = new Date(followupFormData.followupDate);
-      const [hours, minutes] = followupFormData.followupTime.split(':');
-      scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-  
-      // Create calendar event data
-      const event = {
-        summary: `B2B Follow-up: ${followupFormData.selectedProfile?.businessName || 'Unknown'}`,
-        description: `Follow-up with ${followupFormData.selectedProfile?.concernPersonName || 'Unknown'} (${followupFormData.selectedProfile?.designation || 'N/A'})\n\nBusiness: ${followupFormData.selectedProfile?.businessName || 'Unknown'}\nContact: ${followupFormData.selectedProfile?.mobile || 'N/A'}\nEmail: ${followupFormData.selectedProfile?.email || 'N/A'}\n\nRemarks: ${followupFormData.remarks || 'No remarks'}`,
-        start: {
-          dateTime: scheduledDateTime.toISOString(),
-          timeZone: 'Asia/Kolkata',
-        },
-        end: {
-          dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes
-          timeZone: 'Asia/Kolkata',
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 24 * 60 }, // 1 day before
-            { method: 'popup', minutes: 60 }, // 1 hour before
-          ],
-        },
-      };
-  
-      // Call backend API to create calendar event
-      const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
-        user: userData,
-        event: event
-      });
-  
-      if (response.data.success) {
-        alert('✅ Follow-up added to Google Calendar!');
-        console.log('✅ Follow-up added to Google Calendar:', response.data.data);
-      } else {
-        alert('❌ Failed to add to Google Calendar');
-        console.error('❌ Failed to add to Google Calendar:', response.data.message);
+
+      // Handle status change first
+      if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
+        const statusData = {
+          status: seletectedStatus,
+          subStatus: seletectedSubStatus?._id || null,
+          remarks: followupFormData.remarks || 'Status updated via B2B panel'
+        };
+        console.log('Status data to send:', statusData);
+        await updateLeadStatus(selectedProfile._id, statusData);
       }
-  
+
+      // Check if followup is required (either from followup panel or status change with followup)
+      const hasFollowup = (showPanel === 'followUp') || 
+                         (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
+      
+      if (hasFollowup && followupFormData.followupDate && followupFormData.followupTime) {
+        // Get data from followupFormData
+        const scheduledDateTime = new Date(followupFormData.followupDate);
+        const [hours, minutes] = followupFormData.followupTime.split(':');
+        scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+        // Create calendar event data
+        const event = {
+          summary: `B2B Follow-up: ${selectedProfile?.businessName || 'Unknown'}`,
+          description: `Follow-up with ${selectedProfile?.concernPersonName || 'Unknown'} (${selectedProfile?.designation || 'N/A'})\n\nBusiness: ${selectedProfile?.businessName || 'Unknown'}\nContact: ${selectedProfile?.mobile || 'N/A'}\nEmail: ${selectedProfile?.email || 'N/A'}\n\nRemarks: ${followupFormData.remarks || 'No remarks'}`,
+          start: {
+            dateTime: scheduledDateTime.toISOString(),
+            timeZone: 'Asia/Kolkata',
+          },
+          end: {
+            dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes
+            timeZone: 'Asia/Kolkata',
+          },
+          reminders: {
+            useDefault: false,
+            overrides: [
+              { method: 'email', minutes: 24 * 60 }, // 1 day before
+              { method: 'popup', minutes: 60 }, // 1 hour before
+            ],
+          },
+        };
+
+        // Call backend API to create calendar event
+        const response = await axios.post(`${backendUrl}/api/creategooglecalendarevent`, {
+          user: userData,
+          event: event
+        });
+
+        if (response.data.success) {
+          alert('✅ Follow-up added to Google Calendar!');
+          console.log('✅ Follow-up added to Google Calendar:', response.data.data);
+        } else {
+          alert('❌ Failed to add to Google Calendar');
+          console.error('❌ Failed to add to Google Calendar:', response.data.message);
+        }
+      } else if (showPanel === 'editPanel') {
+        // Status change without followup
+        alert('✅ Status updated successfully!');
+      }
+
     } catch (error) {
-      console.error('❌ Error adding to Google Calendar:', error);
-      alert('❌ Error adding to Google Calendar');
+      console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
+      alert('❌ Error processing request');
     }
     finally{
       closePanel();
     }
-    
-  
   };
 
   const initializeBusinessNameAutocomplete = () => {
@@ -620,6 +639,7 @@ const B2BSales = () => {
   useEffect(() => {
     fetchB2BDropdownOptions();
     fetchUsers(); // Fetch users for Lead Owner dropdown
+    fetchStatusCounts(); // Fetch status counts
   }, []);
 
   // Test Google Maps API availability on component mount
@@ -653,9 +673,10 @@ const B2BSales = () => {
         headers: { 'x-auth': token }
       });
       if (leadCategoriesRes.data.status) {
+        console.log('leadCategoriesRes.data.data', leadCategoriesRes.data.data)
         setLeadCategoryOptions(leadCategoriesRes.data.data.map(cat => ({
           value: cat._id,
-          label: cat.name
+          label: cat.name || cat.title
         })));
       }
 
@@ -673,6 +694,10 @@ const B2BSales = () => {
       console.error('Failed to fetch B2B dropdown options:', err);
     }
   };
+
+  useEffect(() => {
+    console.log('leadCategoryOptions', leadCategoryOptions)
+  }, [leadCategoryOptions]);
 
   // Fetch users for Lead Owner dropdown
   const fetchUsers = async () => {
@@ -847,16 +872,123 @@ const B2BSales = () => {
   // Add state for leads data
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
+  
+  // Add state for status counts
+  const [statusCounts, setStatusCounts] = useState([]);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [loadingStatusCounts, setLoadingStatusCounts] = useState(false);
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    search: '',
+    leadCategory: '',
+    typeOfB2B: '',
+    leadOwner: '',
+    dateRange: {
+      start: null,
+      end: null
+    }
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchLeads();
   }, []);
 
-  const fetchLeads = async () => {
+  // Handle status card click
+  const handleStatusCardClick = (statusId) => {
+    console.log('Status card clicked:', statusId);
+    console.log('Previous selectedStatusFilter:', selectedStatusFilter);
+    setSelectedStatusFilter(statusId);
+    console.log('New selectedStatusFilter will be:', statusId);
+    fetchLeads(statusId);
+  };
+
+  // Handle total card click (show all leads)
+  const handleTotalCardClick = () => {
+    console.log('Total card clicked');
+    console.log('Previous selectedStatusFilter:', selectedStatusFilter);
+    setSelectedStatusFilter(null);
+    console.log('New selectedStatusFilter will be: null');
+    fetchLeads();
+  };
+
+  // Filter handlers
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const handleDateRangeChange = (type, value) => {
+    setFilters(prev => ({
+      ...prev,
+      dateRange: {
+        ...prev.dateRange,
+        [type]: value
+      }
+    }));
+  };
+
+  const applyFilters = () => {
+    console.log('Applying filters:', filters);
+    console.log('Selected status filter:', selectedStatusFilter);
+    fetchLeads(selectedStatusFilter);
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      leadCategory: '',
+      typeOfB2B: '',
+      leadOwner: '',
+      dateRange: {
+        start: null,
+        end: null
+      }
+    });
+    fetchLeads(selectedStatusFilter);
+  };
+
+  const fetchLeads = async (statusFilter = null) => {
     try {
       setLoadingLeads(true);
+      
+      // Build query parameters
+      const params = {};
+      if (statusFilter) {
+        params.status = statusFilter;
+      }
+      
+      // Add filter parameters
+      if (filters.search) {
+        params.search = filters.search;
+      }
+      if (filters.leadCategory) {
+        params.leadCategory = filters.leadCategory;
+      }
+      if (filters.typeOfB2B) {
+        params.typeOfB2B = filters.typeOfB2B;
+      }
+      if (filters.leadOwner) {
+        params.leadOwner = filters.leadOwner;
+      }
+      if (filters.dateRange.start) {
+        params.startDate = filters.dateRange.start;
+      }
+      if (filters.dateRange.end) {
+        params.endDate = filters.dateRange.end;
+      }
+      
+      console.log('API Request URL:', `${backendUrl}/college/b2b/leads`);
+      console.log('API Request Params:', params);
+      console.log('API Request Headers:', { 'x-auth': token });
+      
       const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
-        headers: { 'x-auth': token }
+        headers: { 'x-auth': token },
+        params: params
       });
 
       console.log('Leads response:', response.data.data);
@@ -873,9 +1005,73 @@ const B2BSales = () => {
     }
   };
 
+  // Fetch status counts
+  const fetchStatusCounts = async () => {
+    try {
+      setLoadingStatusCounts(true);
+      const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
+        headers: { 'x-auth': token }
+      });
+
+      console.log('Status counts response:', response.data);
+
+      if (response.data.status) {
+        setStatusCounts(response.data.data.statusCounts || []);
+        setTotalLeads(response.data.data.totalLeads || 0);
+      } else {
+        console.error('Failed to fetch status counts:', response.data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching status counts:', error);
+    } finally {
+      setLoadingStatusCounts(false);
+    }
+  };
+
   useEffect(() => {
     console.log('leads', leads)
   }, [leads])
+
+  useEffect(() => {
+    console.log('selectedStatusFilter changed to:', selectedStatusFilter)
+  }, [selectedStatusFilter])
+
+  // Update lead status
+  const updateLeadStatus = async (leadId, statusData) => {
+    try {
+      // Get current status information for logging
+      const currentStatus = selectedProfile?.status?.name || 'Unknown';
+      const currentSubStatus = selectedProfile?.subStatus?.title || 'No Sub-Status';
+      const newStatus = statuses.find(s => s._id === statusData.status)?.name || 'Unknown';
+      const newSubStatus = subStatuses.find(s => s._id === statusData.subStatus)?.title || 'No Sub-Status';
+      
+      console.log('Calling update API:', `${backendUrl}/college/b2b/leads/${leadId}/status`);
+      console.log('Status data:', statusData);
+      console.log('Status Change:', `${currentStatus} (${currentSubStatus}) → ${newStatus} (${newSubStatus})`);
+      
+      const response = await axios.put(`${backendUrl}/college/b2b/leads/${leadId}/status`, statusData, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        alert(`Lead status updated successfully!\nFrom: ${currentStatus} (${currentSubStatus})\nTo: ${newStatus} (${newSubStatus})`);
+        
+        // Refresh the leads list
+        fetchLeads(selectedStatusFilter);
+        
+        // Refresh status counts
+        fetchStatusCounts();
+        
+        // Close the panel
+        closePanel();
+      } else {
+        alert(response.data.message || 'Failed to update lead status');
+      }
+    } catch (error) {
+      console.error('Error updating lead status:', error);
+      alert('Failed to update lead status. Please try again.');
+    }
+  };
 
   // Handle lead form submission
   const handleLeadSubmit = async () => {
@@ -926,8 +1122,9 @@ const B2BSales = () => {
         // Show success message
         alert('Lead added successfully!');
 
-        // Refresh the leads list
+        // Refresh the leads list and status counts
         fetchLeads();
+        fetchStatusCounts();
 
         // Reset form
         setLeadFormData({
@@ -1412,213 +1609,170 @@ const B2BSales = () => {
     }
   };
 
-  // Render Edit Panel (Desktop Sidebar or Mobile Modal)
-  const renderEditPanel = () => {
+  // Render Status Change Panel
+  const renderStatusChangePanel = () => {
     const panelContent = (
-      <div className="card border-0 shadow-sm " >
+      <div className="card border-0 shadow-sm">
         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
           <div className="d-flex align-items-center">
             <div className="me-2">
-              <i className="fas fa-user-edit text-secondary"></i>
+              <i className="fas fa-edit text-primary"></i>
             </div>
-            <h6 className="mb-0 followUp fw-medium">
-              {(showPanel === 'editPanel' || showPanel === 'followUp') && `${showPanel === 'editPanel' ? 'Edit Status for ' : 'Set Followup for '}${selectedProfile?._candidate?.name || ''}`}
-
-
-              {(showPanel === 'bulkstatuschange') && 'Bulk Status Change'}
-
+            <h6 className="mb-0 fw-medium text-primary">
+              Change Status for {selectedProfile?.businessName || 'Lead'}
             </h6>
           </div>
           <div>
-            <button className="btn-close" type="button" onClick={closePanel}>
-              {/* <i className="fa-solid fa-xmark"></i> */}
-            </button>
+            <button className="btn-close" type="button" onClick={closePanel}></button>
           </div>
         </div>
 
         <div className="card-body">
-          {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading? (
-          <form onSubmit={addFollowUpToGoogleCalendar}>
+          {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
+            <form onSubmit={addFollowUpToGoogleCalendar}>
+            {/* Status Selection */}
+            <div className="mb-3">
+              <label htmlFor="status" className="form-label small fw-medium text-dark">
+                Status<span className="text-danger">*</span>
+              </label>
+              <select
+                className="form-select border-0 bgcolor"
+                id="status"
+                value={seletectedStatus}
+                style={{
+                  height: '42px',
+                  paddingTop: '8px',
+                  paddingInline: '10px',
+                  width: '100%',
+                  backgroundColor: '#f1f2f6'
+                }}
+                onChange={handleStatusChange}
+              >
+                <option value="">Select Status</option>
+                {statuses.map((status, index) => (
+                  <option key={status._id} value={status._id}>{status.name}</option>
+                ))}
+              </select>
+            </div>
 
-            {(showPanel !== 'followUp') && (
-              <>
-                <div className="mb-1">
-                  <label htmlFor="status" className="form-label small fw-medium text-dark">
-                    Status<span className="text-danger">*</span>
-                  </label>
-                  <div className="d-flex">
-                    <div className="form-floating flex-grow-1">
-                      <select
-                        className="form-select border-0  bgcolor"
-                        id="status"
-                        value={seletectedStatus}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          paddingInline: '10px',
-                          width: '100%',
-                          backgroundColor: '#f1f2f6'
-                        }}
-                        onChange={handleStatusChange}
-                      >
-                        <option value="">Select Status</option>
-                        {statuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.name}</option>))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
+            {/* Sub-Status Selection */}
+            <div className="mb-3">
+              <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
+                Sub-Status
+              </label>
+              <select
+                className="form-select border-0 bgcolor"
+                id="subStatus"
+                value={seletectedSubStatus?._id || ''}
+                style={{
+                  height: '42px',
+                  paddingTop: '8px',
+                  backgroundColor: '#f1f2f6',
+                  paddingInline: '10px',
+                  width: '100%'
+                }}
+                onChange={handleSubStatusChange}
+              >
+                <option value="">Select Sub-Status</option>
+                {subStatuses.map((subStatus, index) => (
+                  <option key={subStatus._id} value={subStatus._id}>{subStatus.title}</option>
+                ))}
+              </select>
+            </div>
 
-                <div className="mb-1">
-                  <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                    Sub-Status<span className="text-danger">*</span>
-                  </label>
-                  <div className="d-flex">
-                    <div className="form-floating flex-grow-1">
-                      <select
-                        className="form-select border-0  bgcolor"
-                        id="subStatus"
-                        value={seletectedSubStatus?._id || ''}
-                        style={{
-                          height: '42px',
-                          paddingTop: '8px',
-                          backgroundColor: '#f1f2f6',
-                          paddingInline: '10px',
-                          width: '100%'
-                        }}
-                        onChange={handleSubStatusChange}
-                      >
-                        <option value="">Select Sub-Status</option>
-                        {subStatuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.title}</option>))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-
-            {((seletectedSubStatus && seletectedSubStatus.hasFollowup && (showPanel !== 'bulkstatuschange')) || (showPanel === 'followUp') || (showPanel !== 'bulkstatuschange')) && (
-
-              <div className="row mb-1">
-                <div className="col-6">
-                  <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                    Next Action Date <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
-                    {/* <input
-                    type="date"
-                    className="form-control border-0  bgcolor"
-                    id="nextActionDate"
-                    style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-                    onChange={(e) => setFollowupDate(e.target.value)}
-                  /> */}
+            {/* Follow-up Section (if substatus has followup) */}
+            {seletectedSubStatus && seletectedSubStatus.hasFollowup && (
+              <div className="mb-3">
+                <h6 className="text-dark mb-2">Follow-up Details</h6>
+                <div className="row">
+                  <div className="col-6">
+                    <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
+                      Next Action Date <span className="text-danger">*</span>
+                    </label>
                     <DatePicker
-                      className="form-control border-0  bgcolor"
+                      className="form-control border-0 bgcolor"
                       onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
                       value={followupFormData.followupDate}
                       format="dd/MM/yyyy"
-                      minDate={today}   // Isse past dates disable ho jayengi
-
+                      minDate={today}
                     />
-
                   </div>
-                </div>
-
-                <div className="col-6">
-                  <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                    Time <span className="text-danger">*</span>
-                  </label>
-                  <div className="input-group">
+                  <div className="col-6">
+                    <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
+                      Time <span className="text-danger">*</span>
+                    </label>
                     <input
                       type="time"
-                      className="form-control border-0  bgcolor"
+                      className="form-control border-0 bgcolor"
                       id="actionTime"
                       onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
                       value={followupFormData.followupTime}
                       style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-
                     />
                   </div>
                 </div>
-
-                {/* remark */}
-                <div className="col-12">
-                  <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
-                  <textarea
-                    className="form-control border-0 bgcolor bg-light"
-                    id="comment"
-                    rows="4"
-                    onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                    value={followupFormData.remarks}
-                    placeholder="Enter any additional remarks..."
-                  />
-                </div>
-              </div>)}
-
-            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || (setShowPanel === 'followUp')) && (
-
-              <div className="mb-1">
-                <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
-                <textarea
-                  className="form-control border-0 bgcolor"
-                  id="comment"
-                  rows="4"
-                  onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                  value={followupFormData.remarks}
-                  style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-
-                ></textarea>
               </div>
             )}
 
+            {/* Remarks Section - Only show if substatus has hasRemarks: true */}
+            {seletectedSubStatus && seletectedSubStatus.hasRemarks && (
+              <div className="mb-3">
+                <label htmlFor="remarks" className="form-label small fw-medium text-dark">
+                  Remarks <span className="text-danger">*</span>
+                </label>
+                <textarea
+                  className="form-control border-0 bgcolor"
+                  id="remarks"
+                  rows="4"
+                  onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                  value={followupFormData.remarks}
+                  placeholder="Enter remarks about this status change..."
+                  style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
+                  required
+                />
+              </div>
+            )}
+
+            {/* Action Buttons */}
             <div className="d-flex justify-content-end gap-2 mt-4">
               <button
                 type="button"
-                className="btn"
-                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                className="btn btn-outline-secondary"
                 onClick={closePanel}
               >
-                CLOSE
+                Cancel
               </button>
               <button
-
-                className="btn text-white"
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+                type="submit"
+                className="btn btn-primary"
               >
-
-                {(showPanel === 'editPanel') && 'UPDATE STATUS'}
-                {(showPanel === 'followUp') && 'SET FOLLOWUP '}
-                {(showPanel === 'bulkstatuschange') && 'UPDATE BULK STATUS '}
+                Update Status
               </button>
-              
-              {/* Simple Google Calendar Test Button */}
-            
             </div>
-            </form>
-          ):!isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <button className="btn btn-primary" onClick={handleGoogleLogin}>Login with Google</button>
-              </div>
+          </form>
+        ) : !isgoogleLoginLoading && (
+          <div className="d-flex justify-content-center align-items-center h-100">
+            <div className="text-center">
+              <button className="btn btn-primary" onClick={handleGoogleLogin}>
+                Login with Google to Update Status
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {isgoogleLoginLoading && (
-            <div className="d-flex justify-content-center align-items-center h-100">
-              <div className="text-center">
-                <i className="fas fa-spinner fa-spin"></i>
-              </div>
+        {isgoogleLoginLoading && (
+          <div className="d-flex justify-content-center align-items-center h-100">
+            <div className="text-center">
+              <i className="fas fa-spinner fa-spin"></i>
             </div>
-          )}
+          </div>
+        )}
         </div>
       </div>
     );
 
     if (isMobile) {
-      return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
-
+      return showPanel === 'editPanel' ? (
         <div
           className="modal show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -1635,8 +1789,201 @@ const B2BSales = () => {
       ) : null;
     }
 
-    return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
-      <div className="col-12 transition-col" id="editFollowupPanel">
+    return showPanel === 'editPanel' ? (
+      <div className="col-12 transition-col" id="statusChangePanel">
+        {panelContent}
+      </div>
+    ) : null;
+  };
+
+  // Render Follow-up Panel
+  const renderFollowupPanel = () => {
+    const panelContent = (
+      <div className="card border-0 shadow-sm" style={{
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+        border: '1px solid #e9ecef'
+      }}>
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom" style={{
+          borderRadius: '12px 12px 0 0',
+          borderBottom: '2px solid #f8f9fa',
+          backgroundColor: '#f8f9fa'
+        }}>
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-calendar-plus text-success" style={{ fontSize: '18px' }}></i>
+            </div>
+            <h6 className="mb-0 fw-medium text-success" style={{ fontSize: '16px', fontWeight: '600' }}>
+              Set Follow-up for {selectedProfile?.businessName || 'Lead'}
+            </h6>
+          </div>
+          <div>
+            <button className="btn-close" type="button" onClick={closePanel} style={{
+              fontSize: '14px',
+              padding: '4px',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#f8f9fa',
+              border: 'none',
+              color: '#6c757d'
+            }}></button>
+          </div>
+        </div>
+
+        <div className="card-body" style={{ padding: '24px' }}>
+          {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
+            <form onSubmit={addFollowUpToGoogleCalendar}>
+              {/* Follow-up Date and Time */}
+              <div className="row mb-4">
+                <div className="col-6">
+                  <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                    Follow-up Date <span className="text-danger">*</span>
+                  </label>
+                  <DatePicker
+                    className="form-control border-0 bgcolor"
+                    onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
+                    value={followupFormData.followupDate}
+                    format="dd/MM/yyyy"
+                    minDate={today}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      border: '1.5px solid #ced4da',
+                      borderRadius: '8px',
+                      height: '42px',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}
+                  />
+                </div>
+                <div className="col-6">
+                  <label htmlFor="actionTime" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                    Time <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    className="form-control border-0 bgcolor"
+                    id="actionTime"
+                    onChange={(e) => setFollowupFormData(prev => ({ ...prev, followupTime: e.target.value }))}
+                    value={followupFormData.followupTime}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      border: '1.5px solid #ced4da',
+                      borderRadius: '8px',
+                      height: '42px',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div className="mb-4">
+                <label htmlFor="followupRemarks" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                  Follow-up Notes
+                </label>
+                <textarea
+                  className="form-control border-0 bgcolor"
+                  id="followupRemarks"
+                  rows="4"
+                  onChange={(e) => setFollowupFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                  value={followupFormData.remarks}
+                  placeholder="Enter follow-up notes..."
+                  style={{
+                    resize: 'none',
+                    backgroundColor: '#ffffff',
+                    border: '1.5px solid #ced4da',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    fontSize: '14px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    minHeight: '100px'
+                  }}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="d-flex justify-content-end gap-3 mt-4">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closePanel}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    borderWidth: '1.5px',
+                    minWidth: '100px'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-success"
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    backgroundColor: '#28a745',
+                    borderColor: '#28a745',
+                    minWidth: '120px',
+                    boxShadow: '0 2px 4px rgba(40, 167, 69, 0.2)'
+                  }}
+                >
+                  Set Follow-up
+                </button>
+              </div>
+            </form>
+          ) : !isgoogleLoginLoading && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <button className="btn btn-primary" onClick={handleGoogleLogin}>
+                  Login with Google to Set Follow-up
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isgoogleLoginLoading && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <i className="fas fa-spinner fa-spin"></i>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+
+    if (isMobile) {
+      return showPanel === 'followUp' ? (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      ) : null;
+    }
+
+    return showPanel === 'followUp' ? (
+      <div className="col-12 transition-col" id="followupPanel">
         {panelContent}
       </div>
     ) : null;
@@ -2191,9 +2538,172 @@ const B2BSales = () => {
       margin-top: 1rem;
     }
   }
+
+  /* Status Count Cards Styles */
+  .status-count-card {
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .status-count-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .status-count-card .card-body {
+    padding: 1rem;
+  }
+
+  .status-count-card h4 {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .status-count-card h6 {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .status-count-card small {
+    font-size: 0.75rem;
+  }
+
+  /* Status-specific colors */
+  .status-count-card.total {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+
+  .status-count-card.total h4,
+  .status-count-card.total h6,
+  .status-count-card.total small {
+    color: white;
+  }
+
+  .status-count-card.status {
+    background: white;
+    border: 1px solid #e9ecef;
+  }
+
+  .status-count-card.status:hover {
+    border-color: #007bff;
+  }
+
+  .status-count-card.selected {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
+    border: 2px solid #007bff !important;
+    background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+  }
+
+  .status-count-card.selected.total {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  }
+
+  /* Status Section Styles */
+  .status-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #e9ecef;
+  }
+
+  .status-section .badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  .status-section .btn {
+    font-size: 0.75rem;
+    padding: 4px 12px;
+  }
+
+  /* Filter Panel Styles */
+  .filter-panel {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+  }
+
+  .filter-panel:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  .filter-panel .form-control,
+  .filter-panel .form-select {
+    transition: all 0.2s ease;
+    border-radius: 8px;
+  }
+
+  .filter-panel .form-control:focus,
+  .filter-panel .form-select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    border-color: #007bff;
+  }
+
+  .filter-panel .btn {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .filter-panel .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Global Text Visibility Improvements */
+  .form-control, .form-select {
+    color: #212529 !important;
+    background-color: #ffffff !important;
+    border: 1px solid #ced4da !important;
+  }
+
+  .form-control:focus, .form-select:focus {
+    color: #212529 !important;
+    background-color: #ffffff !important;
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+  }
+
+  .btn {
+    font-weight: 500 !important;
+  }
+
+  .text-dark {
+    color: #212529 !important;
+  }
+
+  .text-muted {
+    color: #6c757d !important;
+  }
+
+  .text-primary {
+    color: #007bff !important;
+  }
+
+  .text-success {
+    color: #28a745 !important;
+  }
+
+  .text-warning {
+    color: #ffc107 !important;
+  }
+
+  .text-danger {
+    color: #dc3545 !important;
+  }
+
+  .text-info {
+    color: #17a2b8 !important;
+  }
 `}</style>
       <div className="row">
-        <div className={isMobile ? 'col-12' : mainContentClass}>
+        <div className={isMobile ? 'col-12' : mainContentClass} style={{
+          width: !isMobile && showPanel ? 'calc(100% - 350px)' : '100%',
+          marginRight: !isMobile && showPanel ? '350px' : '0',
+          transition: 'all 0.3s ease'
+        }}>
           <div
             className="content-blur-overlay"
             style={{
@@ -2238,48 +2748,185 @@ const B2BSales = () => {
 
                   <div className="col-md-6">
                     <div className="d-flex justify-content-end align-items-center gap-2">
+                      {/* Quick Search */}
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="position-relative">
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="Quick search..."
+                            value={filters.search}
+                            onChange={(e) => handleFilterChange('search', e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                applyFilters();
+                              }
+                            }}
+                            style={{ 
+                              width: '200px', 
+                              paddingRight: '30px',
+                              paddingLeft: '12px',
+                              paddingTop: '8px',
+                              paddingBottom: '8px',
+                              backgroundColor: '#ffffff',
+                              border: '1.5px solid #ced4da',
+                              color: '#212529',
+                              fontSize: '13px',
+                              borderRadius: '6px',
+                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                              transition: 'all 0.2s ease'
+                            }}
+                          />
+                          {filters.search && (
+                            <button
+                              type="button"
+                              className="btn btn-sm position-absolute"
+                              onClick={() => {
+                                handleFilterChange('search', '');
+                                applyFilters();
+                              }}
+                              style={{ 
+                                right: '2px', 
+                                top: '50%', 
+                                transform: 'translateY(-50%)', 
+                                padding: '2px 6px',
+                                backgroundColor: '#dc3545',
+                                border: 'none',
+                                color: 'white',
+                                borderRadius: '50%',
+                                width: '20px',
+                                height: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={applyFilters}
+                          disabled={!filters.search}
+                          style={{
+                            backgroundColor: '#007bff',
+                            borderColor: '#007bff',
+                            color: 'white',
+                            fontWeight: '500',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <i className="fas fa-search me-1"></i>
+                         
+                        </button>
+                      </div>
+                      
+                      <button
+                        className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        onClick={() => setShowFilters(!showFilters)}
+                        style={{
+                          backgroundColor: showFilters ? '#007bff' : '#ffffff',
+                          color: showFilters ? '#ffffff' : '#6c757d',
+                          fontWeight: '500',
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          transition: 'all 0.2s ease',
+                          borderWidth: '1.5px'
+                        }}
+                      >
+                        <i className="fas fa-filter me-1"></i>
+                        
+                      </button>
+                      
                       <button className="btn btn-primary" onClick={handleOpenLeadModal} style={{ whiteSpace: 'nowrap' }}>
                         <i className="fas fa-plus me-1"></i> Add Lead
                       </button>
-
                     </div>
-
-
                   </div>
 
 
                   {/* Filter Buttons Row */}
                   <div className="col-12 mt-2">
                     <div className="d-flex flex-wrap gap-2 align-items-center">
-                      {crmFilters.map((filter, index) => (
-                        <div key={index} className="d-flex align-items-center gap-1">
-                          <div className='d-flex position-relative'>
-                            <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
-                            >
-                              {filter.name}
-                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                                ({filter.count})
-                              </span>
-                            </button>
-
-                            {filter.milestone && (
-                              <span
-                                className="position-absolute bg-success text-white px-2 py-1 rounded-pill"
-                                style={{
-                                  fontSize: '0.7rem',
-                                  top: '-8px',
-                                  right: '-10px',
-                                  transform: 'scale(0.8)'
-                                }}
-                                title={`Milestone: ${filter.milestone}`}
-                              >
-                                🚩 {filter.milestone}
-                              </span>
-                            )}
-                          </div>
+                      {/* Status Count Cards */}
+                      {loadingStatusCounts ? (
+                        <div className="d-flex gap-2">
+                          {[1, 2, 3, 4].map((i) => (
+                            <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '120px', height: '80px' }}>
+                              <div className="card-body d-flex align-items-center justify-content-center">
+                                <div className="spinner-border spinner-border-sm text-primary" role="status">
+                                  <span className="visually-hidden">Loading...</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <>
+                          {/* Total Leads Card */}
+                          <div 
+                            className={`card border-0 shadow-sm status-count-card total ${selectedStatusFilter === null ? 'selected' : ''}`}
+                            style={{ 
+                              minWidth: '140px', 
+                              height: '60px',
+                              cursor: 'pointer',
+                              border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent'
+                            }}
+                            onClick={handleTotalCardClick}
+                            title="Click to view all leads"
+                          >
+                            <div className="card-body p-2 text-center d-flex align-items-center justify-content-center">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-chart-line me-2" style={{ color: '#007bff', fontSize: '16px' }}></i>
+                                <div>
+                                  <h6 className="mb-0 fw-bold" style={{ color: '#ffffff', fontSize: '16px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Total</h6>
+                                  <small style={{ color: '#ffffff', fontSize: '12px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{totalLeads} leads</small>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Status Count Cards */}
+                          {statusCounts.map((status, index) => {
+                            const isSelected = selectedStatusFilter === status.statusId;
+                            console.log(`Status ${status.statusName}: isSelected = ${isSelected}, statusId = ${status.statusId}, selectedStatusFilter = ${selectedStatusFilter}`);
+                            return (
+                            <div 
+                              key={status.statusId || index} 
+                              className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
+                              style={{ 
+                                minWidth: '140px', 
+                                height: '60px',
+                                cursor: 'pointer',
+                                border: isSelected ? '2px solid #007bff' : '1px solid transparent',
+                                backgroundColor: isSelected ? '#f8f9ff' : 'white'
+                              }}
+                              onClick={() => handleStatusCardClick(status.statusId)}
+                              title={`Click to view ${status.statusName} leads`}
+                            >
+                              <div className="card-body p-2 text-center d-flex align-items-center justify-content-center">
+                                <div className="d-flex align-items-center">
+                                  <i className="fas fa-tag me-2" style={{ color: '#28a745', fontSize: '16px' }}></i>
+                                  <div>
+                                    <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '14px' }}>{status.statusName}</h6>
+                                    <small style={{ color: '#6c757d', fontSize: '12px' }}>{status.count} leads</small>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                          })}
+                                                </>
+                      )}
+
+
                     </div>
                   </div>
                 </div>
@@ -2308,8 +2955,12 @@ const B2BSales = () => {
               ) : leads.length === 0 ? (
                 <div className="text-center py-5">
                   <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
-                  <h5 className="mt-3 text-muted">No B2B Leads Found</h5>
-                  <p className="text-muted">Start by adding your first B2B lead using the "Add Lead" button.</p>
+                  <h5 className="mt-3 text-muted">
+                    {selectedStatusFilter ? 'No leads found for selected status' : 'No B2B Leads Found'}
+                  </h5>
+                  <p className="text-muted">
+                    {selectedStatusFilter ? 'Try selecting a different status or add new leads.' : 'Start by adding your first B2B lead using the "Add Lead" button.'}
+                  </p>
                 </div>
               ) : (
                 <div className="row g-3">
@@ -2343,6 +2994,36 @@ const B2BSales = () => {
 
                         {/* Card Content */}
                         <div className="lead-content">
+                          {/* Status Section */}
+                          <div className="status-section mb-3">
+                            <div className="d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-tag text-primary me-2"></i>
+                                <span className="fw-bold text-dark">Status:</span>
+                                <span className="ms-2 badge bg-primary">
+                                  {lead.status?.title || lead.status?.name || 'No Status'}
+                                </span>
+                                {lead.subStatus && (
+                                  <span className="ms-2 badge bg-secondary">
+                                    {(() => {
+                                      const substatus = lead.status?.substatuses?.find(sub => sub._id === lead.subStatus);
+                                      console.log('Lead substatus:', lead.subStatus, 'Found substatus:', substatus);
+                                      return substatus?.title || 'No Sub-Status';
+                                    })()}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => openEditPanel(lead, 'StatusChange')}
+                                title="Change Status"
+                              >
+                                <i className="fas fa-edit me-1"></i>
+                                Change Status
+                              </button>
+                            </div>
+                          </div>
+
                           {/* Contact Info Grid */}
                           <div className="contact-grid">
                             <div className="contact-item">
@@ -2587,10 +3268,24 @@ const B2BSales = () => {
 
         {/* Right Sidebar for Desktop - Panels */}
         {
-          !isMobile && (
-            <div className="col-4">
+          !isMobile && showPanel && (
+            <div className="col-4" style={{
+              position: 'fixed',
+              top: '130px',
+              right: '0',
+              width: '350px',
+              maxHeight: 'calc(100vh - 135px)',
+              overflowY: 'auto',
+              backgroundColor: 'white',
+              zIndex: 1000,
+              boxShadow: '-2px 0 10px rgba(0,0,0,0.1)',
+              transform: showPanel ? 'translateX(0)' : 'translateX(100%)',
+              transition: 'transform 0.3s ease',
+              borderRadius: '8px 0 0 8px'
+            }}>
              
-                {renderEditPanel()}
+                {renderStatusChangePanel()}
+                {renderFollowupPanel()}
                 {renderRefferPanel()}
                 {renderLeadHistoryPanel()}
           
@@ -2599,11 +3294,153 @@ const B2BSales = () => {
         }
 
         {/* Mobile Modals */}
-        {isMobile && renderEditPanel()}
+        {isMobile && renderStatusChangePanel()}
+        {isMobile && renderFollowupPanel()}
         {isMobile && renderRefferPanel()}
         {isMobile && renderLeadHistoryPanel()}
 
       </div >
+
+      {/* Filter Modal */}
+      {showFilters && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title">
+                  <i className="fas fa-filter me-2"></i>
+                  Filter Leads
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowFilters(false)}
+                ></button>
+              </div>
+              <div className="modal-body p-4">
+                <div className="row g-3">
+                  <div className="col-md-4">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-tag text-success me-2"></i>
+                      Lead Category
+                    </label>
+                    <select
+                      className="form-select border-0 bg-light"
+                      value={filters.leadCategory}
+                      onChange={(e) => handleFilterChange('leadCategory', e.target.value)}
+                      style={{ backgroundColor: '#f8f9fa' }}
+                    >
+                      <option value="">All Categories</option>
+                      {leadCategoryOptions && leadCategoryOptions.map(category => (
+                        <option key={category.value} value={category.value}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-building text-info me-2"></i>
+                      Type of B2B
+                    </label>
+                    <select
+                      className="form-select border-0 bg-light"
+                      value={filters.typeOfB2B}
+                      onChange={(e) => handleFilterChange('typeOfB2B', e.target.value)}
+                      style={{ backgroundColor: '#f8f9fa' }}
+                    >
+                      <option value="">All Types</option>
+                      {typeOfB2BOptions && typeOfB2BOptions.map(type => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-user text-warning me-2"></i>
+                      Lead Owner
+                    </label>
+                    <select
+                      className="form-select border-0 bg-light"
+                      value={filters.leadOwner}
+                      onChange={(e) => handleFilterChange('leadOwner', e.target.value)}
+                      style={{ backgroundColor: '#f8f9fa' }}
+                    >
+                      <option value="">All Owners</option>
+                      {users && users.map(user => (
+                        <option key={user._id} value={user._id}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-calendar text-danger me-2"></i>
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      className="form-control border-0 bg-light"
+                      value={filters.dateRange.start || ''}
+                      onChange={(e) => handleDateRangeChange('start', e.target.value)}
+                      style={{ backgroundColor: '#f8f9fa' }}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-calendar text-danger me-2"></i>
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      className="form-control border-0 bg-light"
+                      value={filters.dateRange.end || ''}
+                      onChange={(e) => handleDateRangeChange('end', e.target.value)}
+                      style={{ backgroundColor: '#f8f9fa' }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer bg-light">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowFilters(false)}
+                >
+                  <i className="fas fa-times me-1"></i>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={clearFilters}
+                >
+                  <i className="fas fa-eraser me-1"></i>
+                  Clear All
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    applyFilters();
+                    setShowFilters(false);
+                  }}
+                >
+                  <i className="fas fa-check me-1"></i>
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lead Add modal Start*/}
       {
         showAddLeadModal && (

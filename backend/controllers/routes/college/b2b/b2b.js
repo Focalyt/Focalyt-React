@@ -64,6 +64,7 @@ const TypeOfB2B = require("../../../models/b2b/typeOfB2B");
 const LeadCategory = require("../../../models/b2b/leadCategory");
 const Lead = require("../../../models/b2b/lead");
 const FollowUp = require("../../../models/b2b/followUp");
+const StatusB2b = require("../../../models/statusB2b");
 const Candidate = require("../../../models/candidateProfile");
 
 const { generatePassword, sendMail } = require("../../../../helpers");
@@ -437,6 +438,97 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 // ==================== B2B LEAD MANAGEMENT ROUTES ====================
 
 // Get all leads with filtering and pagination
+// Get leads status count
+router.get('/leads/status-count', isCollege, async (req, res) => {
+	try {
+		let teamMembers = await getAllTeamMembers(req.user._id);
+		
+		// Ownership Conditions for team members
+		const ownershipConditions = teamMembers.map(member => ({
+			$or: [{ leadAddedBy: member }, { leadOwner: member }]
+		}));
+
+		// Base query with ownership conditions
+		const baseQuery = {
+			$and: [
+				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or || [c]) }] : [])
+			]
+		};
+
+		// Get all statuses for the college
+		const StatusB2b = require("../../../models/statusB2b");
+		const College = require("../../../models/college");
+		
+		// Find the college that has this user as a concern person
+		const college = await College.findOne({
+			'_concernPerson._id': req.user._id
+		});
+		
+		if (!college) {
+			return res.status(400).json({
+				status: false,
+				message: 'College not found for this user'
+			});
+		}
+		
+		const statuses = await StatusB2b.find({ college: college._id }).sort({ index: 1 });
+		console.log(`Found ${statuses.length} statuses for college: ${college._id}`);
+
+		// Get total count
+		const totalLeads = await Lead.countDocuments(baseQuery);
+		console.log(`Total leads: ${totalLeads}`);
+
+		// Get count by status
+		const statusCounts = await Promise.all(
+			statuses.map(async (status) => {
+				const count = await Lead.countDocuments({
+					...baseQuery,
+					status: status._id
+				});
+				console.log(`Status: ${status.title}, Count: ${count}`);
+				return {
+					statusId: status._id,
+					statusName: status.title,
+					count: count
+				};
+			})
+		);
+
+		// Get count for leads without status (null status)
+		const nullStatusCount = await Lead.countDocuments({
+			...baseQuery,
+			status: null
+		});
+		console.log(`Null status count: ${nullStatusCount}`);
+
+		// Add null status to the results if there are leads without status
+		if (nullStatusCount > 0) {
+			statusCounts.push({
+				statusId: null,
+				statusName: 'No Status',
+				count: nullStatusCount
+			});
+		}
+
+		res.json({
+			status: true,
+			data: {
+				statusCounts,
+				totalLeads,
+				collegeId: college._id
+			},
+			message: 'Lead status counts retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting lead status counts:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve lead status counts',
+			error: error.message
+		});
+	}
+});
+
 router.get('/leads', isCollege, async (req, res) => {
 	try {
 		const {
@@ -460,28 +552,32 @@ router.get('/leads', isCollege, async (req, res) => {
 
 		// Search functionality conditions
 		const searchConditions = search
-			? [{
+			? {
 				$or: [
 					{ concernPersonName: { $regex: search, $options: 'i' } },
 					{ businessName: { $regex: search, $options: 'i' } },
 					{ email: { $regex: search, $options: 'i' } },
 					{ mobile: { $regex: search, $options: 'i' } }
 				]
-			}]
-			: [];
+			}
+			: {};
 
-		// Combine Ownership and Search conditions
-		const combinedConditions = [...ownershipConditions, ...searchConditions];
-
-		// Final Query Object
+		// Build the final query
 		const finalQuery = {
 			$and: [
-				...(combinedConditions.length > 0 ? [{ $or: combinedConditions.flatMap(c => c.$or || [c]) }] : []),
+				// Ownership condition
+				{ $or: ownershipConditions.flatMap(c => c.$or) },
+				// Search condition (if search is provided)
+				...(search ? [searchConditions] : []),
+				// Other filters
 				...(status ? [{ status }] : []),
 				...(leadCategory ? [{ leadCategory }] : []),
 				...(typeOfB2B ? [{ typeOfB2B }] : [])
 			]
 		};
+
+		console.log('Search query:', search);
+		console.log('Final query:', JSON.stringify(finalQuery, null, 2));
 
 		// Sorting options
 		const sortOptions = {};
@@ -494,11 +590,13 @@ router.get('/leads', isCollege, async (req, res) => {
 		const totalLeads = await Lead.countDocuments(finalQuery);
 		const totalPages = Math.ceil(totalLeads / limit);
 
+		console.log('Total leads found:', totalLeads);
+
 		// Fetch leads based on the query, sorted and paginated
 		const leads = await Lead.find(finalQuery)
 			.populate('leadCategory', 'name')
 			.populate('typeOfB2B', 'name')
-			.populate('status', 'name')
+			.populate('status', 'name title substatuses')
 			.populate('followUp', 'scheduledDate status')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email')
@@ -607,7 +705,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			});
 		}
 
-		// Create new lead
+		// Create new lead (default status will be set by schema middleware)
 		const newLead = new Lead({
 			leadCategory,
 			typeOfB2B,
@@ -632,8 +730,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			savedLead.logs.push({
 				user: req.user._id,
 				timestamp: new Date(),
-				action: 'Lead added',
-				remarks: remark
+				action: 'Lead added with default status',
+				remarks: remark || 'Lead created with default status'
 			});
 
 			await savedLead.save();
@@ -657,6 +755,151 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		res.status(500).json({
 			status: false,
 			message: 'Failed to create lead',
+			error: error.message
+		});
+	}
+});
+
+// Update lead status
+router.put('/leads/:id/status', isCollege, async (req, res) => {
+	try {
+		const { id } = req.params;
+		const { status, subStatus, remarks } = req.body;
+		
+		console.log('Status update request:', {
+			leadId: id,
+			status,
+			subStatus,
+			remarks,
+			userId: req.user._id
+		});
+
+		// Validate required fields
+		if (!status) {
+			return res.status(400).json({
+				status: false,
+				message: 'Status is required'
+			});
+		}
+
+		// Find the lead
+		const lead = await Lead.findById(id);
+		console.log('Lead found:', lead ? lead._id : 'Not found');
+		
+		if (!lead) {
+			return res.status(404).json({
+				status: false,
+				message: 'Lead not found'
+			});
+		}
+
+		// Check ownership
+		let teamMembers = await getAllTeamMembers(req.user._id);
+		console.log('Team members:', teamMembers);
+		console.log('Lead ownership:', {
+			leadAddedBy: lead.leadAddedBy,
+			leadOwner: lead.leadOwner
+		});
+		
+		const isOwner = teamMembers.some(member => 
+			lead.leadAddedBy.toString() === member.toString() || 
+			lead.leadOwner.toString() === member.toString()
+		);
+		
+		console.log('Is owner:', isOwner);
+
+		if (!isOwner) {
+			return res.status(403).json({
+				status: false,
+				message: 'You do not have permission to update this lead'
+			});
+		}
+
+		// Get old status for logging
+		const oldStatus = lead.status;
+		const oldSubStatus = lead.subStatus;
+
+		// Get status names for better logging
+		let oldStatusName = 'No Status';
+		let oldSubStatusName = 'No Sub-Status';
+		let newStatusName = 'Unknown';
+		let newSubStatusName = 'No Sub-Status';
+
+		if (oldStatus) {
+			const oldStatusDoc = await StatusB2b.findById(oldStatus);
+			oldStatusName = oldStatusDoc ? oldStatusDoc.name : 'Unknown Status';
+		}
+
+		if (oldSubStatus) {
+			// Find substatus within the old status
+			if (oldStatus) {
+				const oldStatusDoc = await StatusB2b.findById(oldStatus);
+				if (oldStatusDoc && oldStatusDoc.substatuses) {
+					const oldSubStatusDoc = oldStatusDoc.substatuses.find(sub => sub._id.toString() === oldSubStatus.toString());
+					oldSubStatusName = oldSubStatusDoc ? oldSubStatusDoc.title : 'Unknown Sub-Status';
+				}
+			}
+		}
+
+		// Get new status names
+		const newStatusDoc = await StatusB2b.findById(status);
+		newStatusName = newStatusDoc ? newStatusDoc.name : 'Unknown Status';
+
+		if (subStatus) {
+			// Find substatus within the new status
+			if (newStatusDoc && newStatusDoc.substatuses) {
+				const newSubStatusDoc = newStatusDoc.substatuses.find(sub => sub._id.toString() === subStatus.toString());
+				newSubStatusName = newSubStatusDoc ? newSubStatusDoc.title : 'Unknown Sub-Status';
+			}
+		}
+
+		// Update the lead
+		lead.status = status;
+		lead.subStatus = subStatus;
+		lead.updatedBy = req.user._id;
+
+		console.log('Updating lead with:', {
+			status,
+			subStatus,
+			updatedBy: req.user._id
+		});
+
+		console.log('Status Change Details:', {
+			from: `${oldStatusName} (${oldSubStatusName})`,
+			to: `${newStatusName} (${newSubStatusName})`,
+			leadId: id,
+			userId: req.user._id
+		});
+
+		// Add to logs with detailed status change information
+		lead.logs.push({
+			user: req.user._id,
+			timestamp: new Date(),
+			action: `Status changed from ${oldStatusName} (${oldSubStatusName}) to ${newStatusName} (${newSubStatusName})`,
+			remarks: remarks || `Status updated from ${oldStatusName} to ${newStatusName}`
+		});
+
+		await lead.save();
+		console.log('Lead updated successfully');
+
+		// Populate the updated lead
+		const updatedLead = await Lead.findById(id)
+			.populate('leadCategory', 'name')
+			.populate('typeOfB2B', 'name')
+			.populate('status', 'name title substatuses')
+			.populate('leadAddedBy', 'name email')
+			.populate('leadOwner', 'name email');
+
+		res.json({
+			status: true,
+			data: updatedLead,
+			message: 'Lead status updated successfully'
+		});
+	} catch (error) {
+		console.error('Error updating lead status:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to update lead status',
 			error: error.message
 		});
 	}

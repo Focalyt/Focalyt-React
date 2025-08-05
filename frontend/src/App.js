@@ -101,7 +101,7 @@ import ResumeTest from './Pages/Front/Resume/Resume';
 import AttendanceManagement from './Component/Layouts/App/College/ProjectManagement/AttendanceManagement';
 import Whatapp from './Pages/App/College/Whatapp/Whatapp';
 import WhatappTemplate from './Pages/App/College/Whatapp/WhatappTemplate';
-import B2BSales from './Pages/App/College/Course/B2BSales';
+import B2BSales from './Pages/App/College/B2B/B2BSales';
 import StatusB2C from './Pages/App/College/Status/statusB2C'
 import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
 import TermsOfService from './Pages/App/College/Register/termsOfService';

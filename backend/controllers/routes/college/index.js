@@ -225,6 +225,8 @@ router.route("/login")
 
 			const user = await User.findOne(query);
 
+			console.log(user, 'user');
+
 			if (!user) {
 				return res.json({ status: false, error: "User not found" });
 			}
@@ -254,6 +256,8 @@ router.route("/login")
 			userData = {
 				_id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token, isDefaultAdmin, googleAuthToken: user.googleAuthToken
 			};
+
+			console.log(userData, 'userData');
 			return res.json({ status: true, message: "Login successful", userData });
 
 		} catch (err) {
@@ -1554,10 +1558,6 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor
 		} = req.query;
 
-		console.log('req.query', req.query)
-
-		
-
 		// Parse multi-select filters
 		let projectsArray = [];
 		let verticalsArray = [];
@@ -1736,6 +1736,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	if (filters.modifiedFromDate || filters.modifiedToDate) {
 		baseMatch.updatedAt = {};
 		if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
+		console.log('filters.modifiedFromDate', filters.modifiedFromDate)
 		if (filters.modifiedToDate) {
 			const toDate = new Date(filters.modifiedToDate);
 			toDate.setDate(toDate.getDate() + 1);	
@@ -1961,7 +1962,6 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			projects, verticals, course, center, counselor
 		} = req.query;
 
-		console.log('req.query', req.query)
 
 		// Parse multi-select filters
 		let projectsArray = [];
@@ -4581,7 +4581,7 @@ router.put('/update/:id', isCollege, async (req, res) => {
 router.route("/kycCandidates").get(isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-		let teamMembers = await getAllTeamMembers(user._id);
+		let teamMembers = [user._id];
 
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
@@ -4612,7 +4612,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			center,
 			counselor
 		} = req.query;
-		console.log(req.query.kyc, 'req.query.kyc')
 
 		// Parse multi-select filter values
 		let projectsArray = [];
@@ -4629,6 +4628,25 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			if (counselor) counselorArray = JSON.parse(counselor);
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
+		}
+
+		if (projectsArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (verticalsArray.length > 0) {
+			teamMembers = [];
+		}
+		if (courseArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (centerArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (centerArray.length > 0) {
+			teamMembers = [];
 		}
 
 		if (counselorArray.length > 0) {
@@ -6691,7 +6709,7 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 router.route("/admission-list").get(isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-		let teamMembers = await getAllTeamMembers(user._id);
+		let teamMembers = [user._id];
 		const college = await College.findOne({ '_concernPerson._id': user._id });
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 50;
@@ -6734,6 +6752,25 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+
+		if (projectsArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (verticalsArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (courseArray.length > 0) {
+			teamMembers = [];
+		}
+
+		
+
+		if (centerArray.length > 0) {
+			teamMembers = [];
+		}
+
 		if (counselorArray.length > 0) {
 			teamMembers = counselorArray;
 		}
@@ -7830,7 +7867,6 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			counselor
 		} = req.query;
 
-		console.log(req.query, 'req.query');
 
 		// Parse multi-select filter values
 		let projectsArray = [];
@@ -8304,7 +8340,6 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-		console.log(req.query, 'req.query')
 		let { courseId, centerId } = req.params;
 		if (!courseId || !centerId) {
 			return res.status(400).json({ status: false, message: 'Course ID and center ID are required' });
@@ -8870,158 +8905,7 @@ router.route('/refer-leads')
 		}
 	})
 
-router.post('/fix-counselor-names', async (req, res) => {
-	try {
-		//   const { counselors } = req.body;
-		const college = await College.findById('684ff35edc197327bc92deca').populate('_concernPerson._id')
-		const teams = college._concernPerson
-		let counselors = []
-		teams.forEach(team => {
-			counselors.push({ id: team._id._id, name: team._id.name })
-		})
-		console.log(counselors, 'counselors')
 
-		// Validation
-		if (!counselors || !Array.isArray(counselors) || counselors.length === 0) {
-			return res.status(400).json({
-				success: false,
-				message: 'counselors array is required and cannot be empty'
-			});
-		}
-
-		// Validate counselor data
-		for (let i = 0; i < counselors.length; i++) {
-			const counselor = counselors[i];
-			if (!counselor.id || !counselor.name) {
-				return res.status(400).json({
-					success: false,
-					message: `counselors[${i}] must have both 'id' and 'name' fields`
-				});
-			}
-
-			if (!mongoose.Types.ObjectId.isValid(counselor.id)) {
-				return res.status(400).json({
-					success: false,
-					message: `counselors[${i}].id is not a valid ObjectId: ${counselor.id}`
-				});
-			}
-		}
-
-		console.log(`Starting counselor ID assignment for courses with names but missing IDs...`);
-
-		// Create a map for quick lookup: counselorName -> counselorId
-		const counselorNameMap = {};
-		counselors.forEach(counselor => {
-			counselorNameMap[counselor.name.toLowerCase().trim()] = counselor.id;
-		});
-
-		console.log('Counselor name mapping created:', Object.keys(counselorNameMap).length, 'entries');
-
-		// Find applied courses where counsellor name exists but _counsellor ID is missing
-		const appliedCourses = await AppliedCourses.find({
-			'leadAssignment.0': { $exists: true }, // leadAssignment array exists and has at least one element
-			'leadAssignment.counsellorName': { $exists: true, $ne: null, $ne: '' }, // counsellor name exists and is not empty
-			$or: [
-				{ 'leadAssignment._counsellor': { $exists: false } }, // _counsellor field doesn't exist
-				{ 'leadAssignment._counsellor': null }, // _counsellor is null
-			]
-		});
-
-		console.log(`Found ${appliedCourses.length} applied courses with counsellor names but missing IDs`);
-
-		let totalProcessed = 0;
-		let totalAssigned = 0;
-		let totalFailed = 0;
-		const assignmentDetails = [];
-
-		for (const appliedCourse of appliedCourses) {
-			try {
-				totalProcessed++;
-				let hasUpdates = false;
-				const courseAssignments = [];
-
-				// Check each assignment in the leadAssignment array
-				for (let i = 0; i < appliedCourse.leadAssignment.length; i++) {
-					const assignment = appliedCourse.leadAssignment[i];
-
-					// Check if assignment has counsellor name but missing _counsellor ID
-					if (assignment.counsellorName &&
-						assignment.counsellorName.trim() !== '' &&
-						(!assignment._counsellor || assignment._counsellor === null)) {
-
-						const counsellorName = assignment.counsellorName.toLowerCase().trim();
-
-						// Find matching counselor ID from provided list
-						if (counselorNameMap[counsellorName]) {
-							const counselorId = counselorNameMap[counsellorName];
-							console.log(counselorId, 'counselorId')
-
-							// Assign the _counsellor ID
-							assignment._counsellor = new mongoose.Types.ObjectId(counselorId);
-							hasUpdates = true;
-
-							courseAssignments.push({
-								assignmentIndex: i,
-								counsellorName: assignment.counsellorName,
-								assignedCounselorId: counselorId,
-								action: 'ID_assigned'
-							});
-
-							console.log(`Assigned ID to ${appliedCourse._id}: ${assignment.counsellorName} -> ${counselorId}`);
-						} else {
-							courseAssignments.push({
-								assignmentIndex: i,
-								counsellorName: assignment.counsellorName,
-								action: 'no_match_found',
-								error: 'No matching counselor found in provided list'
-							});
-							console.log(`No match found for: ${assignment.counsellorName} in ${appliedCourse._id}`);
-						}
-					}
-				}
-
-				// Save if there are updates
-				if (hasUpdates) {
-					await appliedCourse.save();
-					totalAssigned++;
-
-					assignmentDetails.push({
-						appliedCourseId: appliedCourse._id,
-						assignments: courseAssignments
-					});
-				}
-
-			} catch (error) {
-				console.error(`Error processing ${appliedCourse._id}:`, error.message);
-				totalFailed++;
-			}
-		}
-
-		console.log('Counselor assignment completed');
-
-		// Response with summary
-		res.status(200).json({
-			success: true,
-			message: `Counselor assignment completed successfully!`,
-			data: {
-				providedCounselors: counselors.length,
-				totalProcessed: totalProcessed,
-				totalAssigned: totalAssigned,
-				totalFailed: totalFailed,
-				summary: `Assigned counselors to ${totalAssigned} out of ${totalProcessed} unassigned courses. ${totalFailed} failed.`,
-				assignmentDetails: assignmentDetails.slice(0, 10) // Show first 10 assignments for reference
-			}
-		});
-
-	} catch (error) {
-		console.error('Error in counselor assignment:', error);
-		res.status(500).json({
-			success: false,
-			message: 'Internal server error',
-			error: error.message
-		});
-	}
-});
 
 
 router.get('/counsellor-status-table', [isCollege], async (req, res) => {
@@ -9507,7 +9391,6 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
 
 		const result = await AppliedCourses.aggregate(pipeline);
 
-		console.log(result, 'result')
 		res.json({ success: true, data: result });
 	} catch (err) {
 		console.error(err);
@@ -9519,7 +9402,6 @@ router.get('/counsellor-status-table', [isCollege], async (req, res) => {
 router.post('/lead-details-by-ids', [isCollege], async (req, res) => {
 	try {
 		let { ids } = req.body;
-		console.log(ids, 'ids')
 		if (!ids) return res.json({ success: true, data: [] });
 		if (typeof ids === 'string') ids = JSON.parse(ids);
 		if (!Array.isArray(ids) || ids.length === 0) return res.json({ success: true, data: [] });
@@ -9552,51 +9434,7 @@ router.post('/lead-details-by-ids', [isCollege], async (req, res) => {
 });
 
 
-router.post('/updateAllCounsellors', async (req, res) => {
-	try {
-	  // Fetch all documents that have the leadAssignment array with data
-	  const appliedCourses = await AppliedCourses.find({ "leadAssignment.0": { $exists: true } });
-  
-	  if (!appliedCourses || appliedCourses.length === 0) {
-		return res.status(404).json({ error: 'No applied courses with leadAssignment found' });
-	  }
-  
-	  console.log(`Total documents found with leadAssignment: ${appliedCourses.length}`);
-  
-	  let updatedCount = 0; // To keep track of how many documents are updated
-  
-	  // Iterate over each applied course and update the counsellor
-	  for (const appliedCourse of appliedCourses) {
-		// Get the last counselor from the leadAssignment array
-		const lastCounselor = appliedCourse.leadAssignment[appliedCourse.leadAssignment.length - 1];
-  
-		if (lastCounselor && lastCounselor._counsellor) {
-		  // Check if the counsellor is already set
-		  if (appliedCourse.counsellor !== lastCounselor._counsellor) {
-			// Update the counsellor field in the root of the document
-			appliedCourse.counsellor = lastCounselor._counsellor;
-  
-			// Save the updated document
-			await appliedCourse.save();
-			updatedCount++;
-			console.log(`Document updated: ${appliedCourse._id}`);
-		  }
-		}
-	  }
-  
-	  // Log the result and send the response
-	  console.log(`Total documents processed: ${appliedCourses.length}`);
-	  console.log(`Total documents updated: ${updatedCount}`);
-  
-	  return res.status(200).json({
-		message: `Counsellors updated successfully for ${updatedCount} applied courses out of ${appliedCourses.length}`,
-	  });
-  
-	} catch (error) {
-	  console.error('Error updating counsellors:', error);
-	  return res.status(500).json({ error: 'Internal server error' });
-	}
-  });
+
 
 
 
