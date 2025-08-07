@@ -9,8 +9,7 @@ const AddUserModal = ({
   enhancedEntities
 }) => {
   useEffect(() => {
-  console.log('Users prop:', users);
-  console.log('Users IDs:', users.map(u => u.id));
+
   // Check for duplicate IDs
   const ids = users.map(u => u.id);
   const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);

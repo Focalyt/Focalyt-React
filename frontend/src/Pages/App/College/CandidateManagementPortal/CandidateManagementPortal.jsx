@@ -64,21 +64,32 @@ const CandidateManagementPortal = () => {
   }, []);
 
   const fetchVerticals = async () => {
-    const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, { headers: { 'x-auth': token } });
+    try {
+      const newVertical = await axios.get(`${backendUrl}/college/getVerticals`, { headers: { 'x-auth': token } });
 
-    console.log('token', token)
+      console.log('token', token);
+      console.log('newVertical response:', newVertical);
 
-    const verticalList = newVertical.data.data.map(v => ({
-      id: v._id,
-      name: v.name,
-      status: v.status === true ? 'active' : 'inactive',
-      code: v.description,
-      projects: 2, // Optional: adjust based on real data
-      createdAt: v.createdAt
-    }));
+      // Check if data exists and is an array
+      if (newVertical.data && newVertical.data.data && Array.isArray(newVertical.data.data)) {
+        const verticalList = newVertical.data.data.map(v => ({
+          id: v._id,
+          name: v.name,
+          status: v.status === true ? 'active' : 'inactive',
+          code: v.description,
+          projects: 2, // Optional: adjust based on real data
+          createdAt: v.createdAt
+        }));
 
-    setVerticals(verticalList);
-
+        setVerticals(verticalList);
+      } else {
+        console.warn('No verticals data found or data is not an array');
+        setVerticals([]);
+      }
+    } catch (error) {
+      console.error('Error fetching verticals:', error);
+      setVerticals([]);
+    }
   };
 
   const filteredVerticals = verticals.filter(vertical => {

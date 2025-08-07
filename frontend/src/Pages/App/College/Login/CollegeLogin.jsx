@@ -323,7 +323,14 @@ const CollegeLogin = () => {
                 <div className="tab-content">
                     {activeTab === 'login' && (
                         <>
-                            <div className="login-content">
+                            <form className="login-content" onSubmit={(e) => {
+                                e.preventDefault();
+                                if (showOtpBtn) {
+                                    sendOtp();
+                                } else {
+                                    handleLogin();
+                                }
+                            }}>
                                 <div className="login-method">
                                     <label className="radio-container">
                                         <input
@@ -440,8 +447,8 @@ const CollegeLogin = () => {
                                 </div>
 
                                 <button
+                                    type="submit"
                                     className="login-btn"
-                                    onClick={showOtpBtn ? sendOtp : handleLogin}
                                     ref={loginBtnRef}
                                 >
                                     {showOtpBtn ? "Send OTP" : "Login"}
@@ -454,7 +461,7 @@ const CollegeLogin = () => {
                                 {successMessage && (
                                     <div className="success-message">{successMessage}</div>
                                 )}
-                            </div>
+                            </form>
                         </>
                     )}
                     {activeTab === 'signup' && (
@@ -476,7 +483,16 @@ const CollegeLogin = () => {
                             <button className="close-btn" onClick={closeForgotModal}>×</button>
                         </div>
 
-                        <div className="modal-body">
+                        <form className="modal-body" onSubmit={(e) => {
+                            e.preventDefault();
+                            if (forgotStep === 1) {
+                                sendForgotOtp();
+                            } else if (forgotStep === 2) {
+                                verifyForgotOtp();
+                            } else if (forgotStep === 3) {
+                                resetPassword();
+                            }
+                        }}>
                             {forgotStep === 1 && (
                                 <div>
                                     <div className="input-field">
@@ -491,8 +507,8 @@ const CollegeLogin = () => {
                                         />
                                     </div>
                                     <button
+                                        type="submit"
                                         className="modal-btn"
-                                        onClick={sendForgotOtp}
                                     >
                                         Send OTP
                                     </button>
@@ -514,8 +530,8 @@ const CollegeLogin = () => {
                                         />
                                     </div>
                                     <button
+                                        type="submit"
                                         className="modal-btn"
-                                        onClick={verifyForgotOtp}
                                     >
                                         Verify OTP
                                     </button>
@@ -552,8 +568,8 @@ const CollegeLogin = () => {
                                     </div>
 
                                     <button
+                                        type="submit"
                                         className="modal-btn"
-                                        onClick={resetPassword}
                                     >
                                         Reset Password
                                     </button>
@@ -567,7 +583,7 @@ const CollegeLogin = () => {
                             {successMessage && (
                                 <div className="success-message">{successMessage}</div>
                             )}
-                        </div>
+                        </form>
                     </div>
                 </div>
             )}

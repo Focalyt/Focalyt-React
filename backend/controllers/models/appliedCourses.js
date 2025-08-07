@@ -145,6 +145,10 @@ const appliedCoursesSchema = new Schema(
     }
 
     ],
+    counsellor: {
+      type: ObjectId,
+      ref: "User",
+    },
     leadAssignment: [{
       _counsellor: {
         type: ObjectId,
@@ -378,6 +382,8 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
         assignDate: new Date(),
         assignedBy: this.registeredBy
       });
+
+      this.counsellor = new mongoose.Types.ObjectId(selectedCounselor);
 
       this.courseStatus = 1; // Assigned
 

@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef , useCallback} from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-
-import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
 const MultiSelectCheckbox = ({
   title,
@@ -122,37 +120,188 @@ const MultiSelectCheckbox = ({
     </div>
   );
 };
-const CRMDashboard = () => {
+const useNavHeight = (dependencies = []) => {
+  const navRef = useRef(null);
+  const [navHeight, setNavHeight] = useState(140); // Default fallback
+  const widthRef = useRef(null);
+  const [width, setWidth] = useState(0);
 
-  const candidateRef = useRef();
-
-  const fetchProfile = (id) => {
-    if (candidateRef.current) {
-      console.log('start fetching', id)
-      candidateRef.current.fetchProfile(id);
+  const calculateHeight = useCallback(() => {
+    if (navRef.current) {
+      const height = navRef.current.offsetHeight;
+      setNavHeight(height);
+      console.log('Nav height updated:', height + 'px');
     }
-  };
+  }, []);
 
+  const calculateWidth = useCallback(() => {
 
-  const handleSaveCV = () => {
-    if (candidateRef.current) {
-      candidateRef.current.handleSaveCV();
+    if (widthRef.current) {
+      const width = widthRef.current.offsetWidth;
+      setWidth(width);
+      console.log('Width updated:', width + 'px');
     }
+  }, []);
+
+
+  useEffect(() => {
+    // Initial calculation
+    calculateHeight();
+    calculateWidth();
+    // Resize listener
+    const handleResize = () => {
+      setTimeout(calculateHeight, 100);
+      setTimeout(calculateWidth, 100);
+    };
+
+    // Mutation observer for nav content changes
+    const observer = new MutationObserver(() => {
+      setTimeout(calculateHeight, 50);
+      setTimeout(calculateWidth, 50);
+    });
+
+    window.addEventListener('resize', handleResize);
+    
+    if (navRef.current) {
+      observer.observe(navRef.current, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true 
+      });
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      observer.disconnect();
+    };
+  }, [calculateHeight, calculateWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateHeight, 50);
+    setTimeout(calculateWidth, 50);
+  }, dependencies);
+
+  return { navRef, navHeight, calculateHeight, width };
+};
+const useMainWidth = (dependencies = []) => {// Default fallback
+  const widthRef = useRef(null);
+  const [width, setWidth] = useState(0);
+
+  const calculateWidth = useCallback(() => {
+
+    if (widthRef.current) {
+      const width = widthRef.current.offsetWidth;
+      setWidth(width);
+      console.log('Width updated:', width + 'px');
+    }
+  }, []);
+
+
+  useEffect(() => {
+    calculateWidth();
+    // Resize listener
+    const handleResize = () => {
+      setTimeout(calculateWidth, 100);
+    };
+
+    // Mutation observer for nav content changes
+    const observer = new MutationObserver(() => {
+      setTimeout(calculateWidth, 50);
+    });
+
+    window.addEventListener('resize', handleResize);
+    
+    if (widthRef.current) {
+      observer.observe(widthRef.current, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true 
+      });
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      observer.disconnect();
+    };
+  }, [calculateWidth]);
+
+  // Recalculate when dependencies change
+  useEffect(() => {
+    setTimeout(calculateWidth, 50);
+  }, dependencies); 
+
+  return { widthRef, width };
+};
+const useScrollBlur = (navbarHeight = 140) => {
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [scrollY, setScrollY] = useState(0);
+    const contentRef = useRef(null);
+  
+    useEffect(() => {
+      const handleScroll = () => {
+        const currentScrollY = window.pageYOffset;
+        const shouldBlur = currentScrollY > navbarHeight / 3;
+        
+        setIsScrolled(shouldBlur);
+        setScrollY(currentScrollY);
+      };
+  
+      // Throttle scroll event for better performance
+      let ticking = false;
+      const throttledScroll = () => {
+        if (!ticking) {
+          requestAnimationFrame(() => {
+            handleScroll();
+            ticking = false;
+          });
+          ticking = true;
+        }
+      };
+  
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+      handleScroll(); // Initial check
+  
+      return () => {
+        window.removeEventListener('scroll', throttledScroll);
+      };
+    }, [navbarHeight]);
+  
+    return { isScrolled, scrollY, contentRef };
   };
+const MyFollowups = () => {
+  //Calendar Stats
+  // State management
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  const [isRangeMode, setIsRangeMode] = useState(true); // Set to true by default to show range functionality
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [customDays, setCustomDays] = useState(7);
+  const [rangePreset, setRangePreset] = useState('custom');
+
+  // Sample followup data with different statuses
+  const [followupDates, setFollowupDates] = useState([]);
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
-
-  const [openModalId, setOpenModalId] = useState(null);
 
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
-
-  const [mainContentClass, setMainContentClass] = useState('col-12');
+  const [plannedCount, setPlannedCount] = useState(0);
+  const [doneCount, setDoneCount] = useState(0);
+  const [missedCount, setMissedCount] = useState(0);
+  const [showEditPanel, setShowEditPanel] = useState(false);
+  const [showCalendarModal, setCalendarModal] = useState(true);
+  const [showFollowupPanel, setShowFollowupPanel] = useState(false);
+  const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
+  const [mainContentClass, setMainContentClass] = useState('col-8');
+  const [leadHistoryPanel, setLeadHistoryPanel] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
@@ -161,10 +310,9 @@ const CRMDashboard = () => {
   const [allProfiles, setAllProfiles] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [allProfilesData, setAllProfilesData] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
-  const [selectedCounselor, setSelectedCounselor] = useState(null);
-  const [counselors, setCounselors] = useState([]);
 
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
@@ -187,44 +335,6 @@ const CRMDashboard = () => {
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
 
-
-  //refer lead stats
-  const [concernPersons, setConcernPersons] = useState([]);
-  const [selectedConcernPerson, setSelectedConcernPerson] = useState(null);
-
-  //filter stats
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterSubStatus, setFilterSubStatus] = useState('all');
-  const [filterLeadStatus, setFilterLeadStatus] = useState('all');
-  const [filterCourse, setFilterCourse] = useState('all');
-  const [filterCenter, setFilterCenter] = useState('all');
-  const [filterVertical, setFilterVertical] = useState('all');
-  const [filterProject, setFilterProject] = useState('all');
-  const [filterSector, setFilterSector] = useState('all');
-  const [filterCounselor, setFilterCounselor] = useState('all');
-  const [filterConcernPerson, setFilterConcernPerson] = useState('all');
-  const [filterDate, setFilterDate] = useState(new Date());
-  const [selectedProfiles, setSelectedProfiles] = useState([]);
-
-
-  //side pannel stats
-  const [showPanel, setShowPanel] = useState('')
-
-  // Loading state for fetchProfileData
-  const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
-
-
-
-
-  const handleCheckboxChange = (profile, checked) => {
-    if (checked) {
-      setSelectedProfiles(prev => [...prev, profile._id]);
-    } else {
-      setSelectedProfiles(prev => prev.filter(id => id !== profile._id));
-    }
-  };
-
-
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
     setShowUploadModal(true);
@@ -242,6 +352,75 @@ const CRMDashboard = () => {
     setUploadProgress(0);
     setIsUploading(false);
   };
+
+  
+  const [formData, setFormData] = useState({
+    projects: {
+      type: "includes",
+      values: []
+    },
+    verticals: {
+      type: "includes",
+      values: []
+    },
+    course: {
+      type: "includes",
+      values: []
+    },
+    center: {
+      type: "includes",
+      values: []
+    },
+    counselor: {
+      type: "includes",
+      values: []
+    },
+    sector: {
+      type: "includes",
+      values: []
+    }
+  });
+
+  const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
+  const [verticalOptions, setVerticalOptions] = useState([]);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [courseOptions, setCourseOptions] = useState([]);
+  const [centerOptions, setCenterOptions] = useState([]);
+  const [counselorOptions, setCounselorOptions] = useState([]);
+
+  const handleCriteriaChange = (criteria, values) => {
+    setFormData((prevState) => ({
+      ...prevState,
+      [criteria]: {
+        type: "includes",
+        values: values
+      }
+    }));
+    console.log('Selected verticals:', values);
+    // Reset to first page and fetch with new filters
+  };
+
+  const [dropdownStates, setDropdownStates] = useState({
+    projects: false,
+    verticals: false,
+    course: false,
+    center: false,
+    counselor: false,
+    sector: false
+  });
+
+  const toggleDropdown = (filterName) => {
+    setDropdownStates(prev => {
+      // Close all other dropdowns and toggle the current one
+      const newState = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = key === filterName ? !prev[key] : false;
+        return acc;
+      }, {});
+      return newState;
+    });
+  };
+
+
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -450,252 +629,15 @@ const CRMDashboard = () => {
 
     return { totalDocs, uploadedDocs, pendingDocs, verifiedDocs, rejectedDocs };
   };
-  const DocumentControls = React.memo(({
-    onZoomIn,
-    onZoomOut,
-    onRotate,
-    onReset,
-    onDownload,
-    zoomLevel,
-    fileType
-  }) => {
-    return (
-      <div className="preview-controls">
-        <button
-          onClick={onZoomIn}
-          className="control-btn"
-          style={{ whiteSpace: 'nowrap' }}
-          title="Zoom In"
-        >
-          <i className="fas fa-search-plus"></i> Zoom In
-        </button>
 
-        <button
-          onClick={onZoomOut}
-          className="control-btn"
-          style={{ whiteSpace: 'nowrap' }}
-          title="Zoom Out"
-        >
-          <i className="fas fa-search-minus"></i> Zoom Out
-        </button>
-
-        {/* Show rotation button only for images */}
-        {fileType === 'image' && (
-          <button
-            onClick={onRotate}
-            className="control-btn"
-            style={{ whiteSpace: 'nowrap' }}
-            title="Rotate 90°"
-          >
-            <i className="fas fa-redo"></i> Rotate
-          </button>
-        )}
-
-        {/* Reset View Button */}
-        <button
-          onClick={onReset}
-          className="control-btn"
-          style={{ whiteSpace: 'nowrap' }}
-          title="Reset View"
-        >
-          <i className="fas fa-sync-alt"></i> Reset
-        </button>
-
-        {/* Download Button */}
-        <a
-          href={onDownload}
-          download
-          className="control-btn"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
-          title="Download Document"
-        >
-          <i className="fas fa-download"></i> Download
-        </a>
-
-        {/* Zoom Level Indicator */}
-        <div className="zoom-indicator" style={{
-          fontSize: '12px',
-          color: '#666',
-          marginLeft: '10px',
-          padding: '5px 10px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '4px'
-        }}>
-          {Math.round(zoomLevel * 100)}%
-        </div>
-      </div>
-    );
-  });
-
-
-  // vertical checkboxes option 
-
-  const sectorOptions = [
-    { label: "Tourism and Hospitality", value: "Tourism and Hospitality" },
-    { label: "Information Technology", value: "Information Technology" },
-    { label: "Healthcare", value: "Healthcare" },
-    { label: "Finance", value: "Finance" }
-  ];
-  const verticalOptions = [
-    { label: "Vertical 1", value: "Vertical 1" },
-    { label: "Vertical 2", value: "Vertical 2" },
-    { label: "Vertical 3", value: "Vertical 3" },
-    { label: "Vertical 4", value: "Vertical 4" }
-  ];
-
-  const courseOptions = [
-    { label: "Course 1", value: "Course 1" },
-    { label: "Course 2", value: "Course 2" },
-    { label: "Course 3", value: "Course 3" },
-    { label: "Course 4", value: "Course 4" }
-  ];
-
-  const centerOptions = [
-    { label: "Center 1", value: "Center 1" },
-    { label: "Center 2", value: "Center 2" },
-    { label: "Center 3", value: "Center 3" },
-    { label: "Center 4", value: "Center 4" }
-  ];
-
-  const counselorOptions = [
-    { label: "Counselor 1", value: "Counselor 1" },
-    { label: "Counselor 2", value: "Counselor 2" },
-    { label: "Counselor 3", value: "Counselor 3" },
-    { label: "Counselor 4", value: "Counselor 4" }
-  ];
-  // Form data state
-  const [formData, setFormData] = useState({
-    projects: {
-      type: "includes",
-      values: []
-    },
-    verticals: {
-      type: "includes",
-      values: []
-    },
-    course: {
-      type: "includes",
-      values: []
-    },
-    center: {
-      type: "includes",
-      values: []
-    },
-    counselor: {
-      type: "includes",
-      values: []
-    },
-    sector: {
-      type: "includes",
-      values: []
-    }
-  });
-
-  // Dropdown open state
-  const [dropdownStates, setDropdownStates] = useState({
-    projects: false,
-    verticals: false,
-    course: false,
-    center: false,
-    counselor: false,
-    sector: false
-  });
-
-
-
-  const toggleDropdown = (filterName) => {
-    setDropdownStates(prev => {
-      // Close all other dropdowns and toggle the current one
-      const newState = Object.keys(prev).reduce((acc, key) => {
-        acc[key] = key === filterName ? !prev[key] : false;
-        return acc;
-      }, {});
-      return newState;
-    });
-  };
-
-  // Add this useEffect to handle clicking outside to close dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside any multi-select dropdown
-      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
-
-      if (!isMultiSelectClick) {
-        // Close all dropdowns
-        setDropdownStates(prev =>
-          Object.keys(prev).reduce((acc, key) => {
-            acc[key] = false;
-            return acc;
-          }, {})
-        );
-      }
-    };
-
-    // Add event listener
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Calculate total selected filters
-  const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
 
   // Document Modal Component
   const DocumentModal = () => {
-    const [showRejectionForm, setShowRejectionForm] = useState(false);
-    const [rejectionReason, setRejectionReason] = useState('');
-    const [documentZoom, setDocumentZoom] = useState(1);
-    const [documentRotation, setDocumentRotation] = useState(0);
-
-    const latestUpload = useMemo(() => {
-      if (!selectedDocument) return null;
-      return selectedDocument.uploads && selectedDocument.uploads.length > 0
-        ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-        : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
-    }, [selectedDocument]);
-
-    const handleZoomIn = useCallback(() => {
-      setDocumentZoom(prev => Math.min(prev + 0.1, 2));
-    }, []);
-
-    const handleZoomOut = useCallback(() => {
-      setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
-    }, []);
-
-    const handleRotate = useCallback(() => {
-      setDocumentRotation(prev => (prev + 90) % 360);
-    }, []);
-
-    const handleReset = useCallback(() => {
-      setDocumentZoom(1);
-      setDocumentRotation(0);
-    }, []);
-
-    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-    const fileType = fileUrl ? getFileType(fileUrl) : null;
-
-    const handleRejectClick = useCallback(() => {
-      setShowRejectionForm(true);
-    }, []);
-
-    const handleCancelRejection = useCallback(() => {
-      setShowRejectionForm(false);
-      setRejectionReason('');
-    }, []);
-
-    const handleConfirmRejection = useCallback(() => {
-      if (rejectionReason.trim()) {
-        updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
-        handleCancelRejection();
-      }
-    }, [latestUpload, selectedDocument, rejectionReason, handleCancelRejection]);
-
     if (!showDocumentModal || !selectedDocument) return null;
+
+    const latestUpload = selectedDocument.uploads && selectedDocument.uploads.length > 0
+      ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
+      : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
 
     // Helper function to render document preview thumbnail using iframe/img
     const renderDocumentThumbnail = (upload, isSmall = true) => {
@@ -709,8 +651,8 @@ const CRMDashboard = () => {
             backgroundColor: '#f8f9fa',
             border: '1px solid #dee2e6',
             borderRadius: '4px',
-            width: isSmall ? '100%' : '150px',
-            height: isSmall ? '100%' : '100px',
+            width: isSmall ? '60px' : '150px',
+            height: isSmall ? '40px' : '100px',
             fontSize: isSmall ? '16px' : '24px',
             color: '#6c757d'
           }}>
@@ -728,8 +670,8 @@ const CRMDashboard = () => {
             alt="Document Preview"
             className={`document-thumbnail ${isSmall ? 'small' : ''}`}
             style={{
-              width: isSmall ? '100%' : '150px',
-              height: isSmall ? '100%' : '100px',
+              width: isSmall ? '60px' : '150px',
+              height: isSmall ? '40px' : '100px',
               objectFit: 'cover',
               borderRadius: '4px',
               border: '1px solid #dee2e6',
@@ -745,17 +687,18 @@ const CRMDashboard = () => {
         );
       } else if (fileType === 'pdf') {
         return (
-          <div style={{ position: 'relative', overflow: 'hidden', height: '100%' }}>
+          <div style={{ position: 'relative', overflow: 'hidden' }}>
             <iframe
-              src={fileUrl + '#navpanes=0&toolbar=0'}
+              src={fileUrl}
               className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
-                width: isSmall ? '100%' : '150px',
-                height: isSmall ? '100%' : '100px',
+                width: isSmall ? '60px' : '150px',
+                height: isSmall ? '40px' : '100px',
                 border: '1px solid #dee2e6',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                pointerEvents: 'none',
+                pointerEvents: 'none', // Prevent interaction in thumbnail
+                transform: 'scale(0.3)',
                 transformOrigin: 'top left',
                 overflow: 'hidden'
               }}
@@ -772,6 +715,7 @@ const CRMDashboard = () => {
               left: 0,
               right: 0,
               bottom: 0,
+              backgroundColor: 'rgba(220, 53, 69, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -795,11 +739,11 @@ const CRMDashboard = () => {
         return (
           <div style={{ position: 'relative' }}>
             <iframe
-              src={fileUrl + '#navpanes=0&toolbar=0'}
+              src={fileUrl}
               className={`document-thumbnail ${isSmall ? 'small' : ''}`}
               style={{
-                width: isSmall ? '100%' : '150px',
-                height: isSmall ? '100%' : '100px',
+                width: isSmall ? '60px' : '150px',
+                height: isSmall ? '40px' : '100px',
                 border: '1px solid #dee2e6',
                 borderRadius: '4px',
                 cursor: 'pointer',
@@ -841,6 +785,114 @@ const CRMDashboard = () => {
       }
     };
 
+    // Main preview rendering using iframe/img
+    const renderMainPreview = () => {
+      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+      const hasDocument = fileUrl ||
+        (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
+
+      if (hasDocument) {
+        if (fileUrl) {
+          const fileType = getFileType(fileUrl);
+
+          if (fileType === 'image') {
+            return (
+              <img
+                src={fileUrl}
+                alt="Document Preview"
+                style={{
+                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                  transition: 'transform 0.3s ease',
+                  maxWidth: '100%',
+                  maxHeight: '500px',
+                  objectFit: 'contain'
+                }}
+              />
+            );
+          } else if (fileType === 'pdf') {
+            return (
+              <iframe
+                src={fileUrl}
+                width="100%"
+                height="500px"
+                style={{
+                  border: 'none',
+                  transform: `scale(${documentZoom})`,
+                  transformOrigin: 'top left',
+                  transition: 'transform 0.3s ease',
+                  borderRadius: '4px'
+                }}
+                title="PDF Document"
+              />
+            );
+          } else {
+            // Try iframe for other document types
+            return (
+              <div style={{ position: 'relative' }}>
+                <iframe
+                  src={fileUrl}
+                  width="100%"
+                  height="500px"
+                  style={{
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    transform: `scale(${documentZoom})`,
+                    transformOrigin: 'top left',
+                    transition: 'transform 0.3s ease'
+                  }}
+                  title="Document Preview"
+                />
+                {/* Fallback overlay if iframe doesn't work */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  textAlign: 'center',
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  padding: '20px',
+                  borderRadius: '8px',
+                  display: 'none' // Show this only if iframe fails
+                }}>
+                  <div style={{ fontSize: '60px', marginBottom: '20px' }}>
+                    {fileType === 'document' ? '📄' :
+                      fileType === 'spreadsheet' ? '📊' : '📁'}
+                  </div>
+                  <h4>Document Preview</h4>
+                  <p>Click download to view this file</p>
+                  <a
+                    href={fileUrl}
+                    download
+                    className="btn btn-primary"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <i className="fas fa-download me-2"></i>
+                    Download & View
+                  </a>
+                </div>
+              </div>
+            );
+          }
+        } else {
+          return (
+            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+              <h4>Document Uploaded</h4>
+              <p>Document is available for verification</p>
+              <p><strong>Status:</strong> {selectedDocument?.status}</p>
+            </div>
+          );
+        }
+      } else {
+        return (
+          <div className="no-document">
+            <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
+            <p>No document uploaded</p>
+          </div>
+        );
+      }
+    };
 
     return (
       <div className="document-modal-overlay" onClick={closeDocumentModal}>
@@ -856,114 +908,84 @@ const CRMDashboard = () => {
                 {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
                   (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                   <>
-                    {(() => {
-                      console.log('selectedDocument:', selectedDocument);
-                      console.log('latestUpload:', latestUpload);
+                    {renderMainPreview()}
+                    <div className="preview-controls">
+                      <button
+                        onClick={zoomIn}
+                        className="control-btn"
+                        style={{ whiteSpace: 'nowrap' }}
+                        title="Zoom In"
+                      >
+                        <i className="fas fa-search-plus"></i> Zoom In
+                      </button>
 
-                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-                      const hasDocument = fileUrl ||
-                        (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
+                      <button
+                        onClick={zoomOut}
+                        className="control-btn"
+                        style={{ whiteSpace: 'nowrap' }}
+                        title="Zoom Out"
+                      >
+                        <i className="fas fa-search-minus"></i> Zoom Out
+                      </button>
 
-                      console.log('fileUrl:', fileUrl);
-                      console.log('hasDocument:', hasDocument);
+                      {/* Show rotation button only for images */}
+                      {getFileType(latestUpload?.fileUrl || selectedDocument?.fileUrl) === 'image' && (
+                        <button
+                          onClick={rotateDocument}
+                          className="control-btn"
+                          style={{ whiteSpace: 'nowrap' }}
+                          title="Rotate 90°"
+                        >
+                          <i className="fas fa-redo"></i> Rotate
+                        </button>
+                      )}
 
-                      if (hasDocument) {
-                        // If we have a file URL, show the appropriate viewer
-                        if (fileUrl) {
-                          const fileType = getFileType(fileUrl);
+                      {/* Reset View Button */}
+                      <button
+                        onClick={resetView}
+                        className="control-btn"
+                        style={{ whiteSpace: 'nowrap' }}
+                        title="Reset View"
+                      >
+                        <i className="fas fa-sync-alt"></i> Reset
+                      </button>
 
-                          if (fileType === 'image') {
-                            return (
-                              <img
-                                src={fileUrl}
-                                alt="Document Preview"
-                                style={{
-                                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                                  transition: 'transform 0.3s ease',
-                                  maxWidth: '100%',
-                                  objectFit: 'contain'
-                                }}
-                              />
-                            );
-                          } else if (fileType === 'pdf') {
-                            return (
-                              <div className="pdf-viewer" style={{ width: '100%', height: '500px' }}>
-                                <iframe
-                                  src={fileUrl + '#navpanes=0&toolbar=0'}
-                                  width="100%"
-                                  height="100%"
-                                  style={{
-                                    border: 'none',
-                                    transform: `scale(${documentZoom})`,
-                                    transformOrigin: 'center center',
-                                    transition: 'transform 0.3s ease',
-                                  }}
-                                  title="PDF Document"
-                                />
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                                <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                                  {fileType === 'document' ? '📄' :
-                                    fileType === 'spreadsheet' ? '📊' : '📁'}
-                                </div>
-                                <h4>Document Preview</h4>
-                                <p>Click download to view this file</p>
-                                {fileUrl ? (
-                                  <a
-                                    href={fileUrl}
-                                    download
-                                    className="btn btn-primary"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <i className="fas fa-download me-2"></i>
-                                    Download & View
-                                  </a>
-                                ) : (
-                                  <button
-                                    className="btn btn-secondary"
-                                    disabled
-                                    title="File URL not available"
-                                  >
-                                    <i className="fas fa-download me-2"></i>
-                                    File Not Available
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          }
-                        } else {
-                          // Document exists but no file URL - show document uploaded message
-                          return (
-                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
-                              <h4>Document Uploaded</h4>
-                              <p>Document is available for verification</p>
-                              <p><strong>Status:</strong> {selectedDocument?.status}</p>
-                            </div>
-                          );
-                        }
-                      } else {
-                        return (
-                          <div className="no-document">
-                            <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                            <p>No document uploaded</p>
-                          </div>
-                        );
-                      }
-                    })()}
-                    <DocumentControls
-                      onZoomIn={handleZoomIn}
-                      onZoomOut={handleZoomOut}
-                      onRotate={handleRotate}
-                      onReset={handleReset}
-                      onDownload={fileUrl}
-                      zoomLevel={documentZoom}
-                      fileType={fileType}
-                    />
+                      {/* Download Button */}
+                      {(latestUpload?.fileUrl || selectedDocument?.fileUrl) ? (
+                        <a
+                          href={latestUpload?.fileUrl || selectedDocument?.fileUrl}
+                          download
+                          className="control-btn"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
+                          title="Download Document"
+                        >
+                          <i className="fas fa-download"></i> Download
+                        </a>
+                      ) : (
+                        <button
+                          className="control-btn"
+                          style={{ whiteSpace: 'nowrap', opacity: 0.5 }}
+                          disabled
+                          title="File URL not available"
+                        >
+                          <i className="fas fa-download"></i> Download
+                        </button>
+                      )}
+
+                      {/* Zoom Level Indicator */}
+                      <div className="zoom-indicator" style={{
+                        fontSize: '12px',
+                        color: '#666',
+                        marginLeft: '10px',
+                        padding: '5px 10px',
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '4px'
+                      }}>
+                        {Math.round(documentZoom * 100)}%
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <div className="no-document">
@@ -973,15 +995,15 @@ const CRMDashboard = () => {
                 )}
               </div>
 
-              {/* document preview container  */}
-
-              {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-                <div className="info-card mt-4">
+                {/* Enhanced Document History with iframe/img Preview */}
+                {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
+                <div className="info-card">
                   <h4>Document History</h4>
                   <div className="document-history">
                     {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
                       <div key={index} className="history-item" style={{
-                        display: 'block',
+                        display: 'flex',
+                        alignItems: 'center',
                         padding: '12px',
                         marginBottom: '8px',
                         backgroundColor: '#f8f9fa',
@@ -1005,12 +1027,32 @@ const CRMDashboard = () => {
                           </div>
                           <div className="history-status">
                             <span className={`${getStatusBadgeClass(upload.status)}`} style={{
-                              fontSize: '25px',
+                              fontSize: '12px',
                               padding: '4px 8px'
                             }}>
                               {upload.status}
                             </span>
                           </div>
+                          {upload.fileUrl && (
+                            <div className="history-actions" style={{ marginTop: '8px' }}>
+                              <a
+                                href={upload.fileUrl}
+                                download
+                                className="btn btn-sm btn-outline-primary"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                <i className="fas fa-download me-1"></i>
+                                Download
+                              </a>
+                             
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1039,27 +1081,30 @@ const CRMDashboard = () => {
                     {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
                   </span>
                 </div>
-
-                <button
-                  className="action-btn upload-btn"
-                  title="Upload Document"
-                  onClick={() => {
-                    openUploadModal(selectedDocument);   // Just pass the selectedDocument
-                  }}
-                >
-                  <i className="fas fa-cloud-upload-alt"></i>
-                  Upload
-                </button>
-
               </div>
+
+              {(latestUpload?.status === 'Pending' || selectedDocument?.status === 'Pending') && (
+                <div className="verification-section">
+                  <div className="info-card">
+                    <h4>Verification Steps</h4>
+                    <ol className="verification-steps">
+                      <li>Check if the document is clearly visible</li>
+                      <li>Verify the document belongs to the candidate</li>
+                      <li>Confirm all required details are present</li>
+                      <li>Check the document validity dates</li>
+                      <li>Ensure there are no signs of tampering</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
+            
             </div>
           </div>
         </div>
       </div>
     );
   };
-
-
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
 
@@ -1223,9 +1268,10 @@ const CRMDashboard = () => {
   const [filterData, setFilterData] = useState({
     name: '',
     courseType: '',
-    status: 'true',
     leadStatus: '',
     sector: '',
+    fromDate: null,
+    toDate: null,    
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
@@ -1264,6 +1310,10 @@ const CRMDashboard = () => {
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
+  const { navRef, navHeight } = useNavHeight([isFilterCollapsed ]);
+  const { widthRef, width } = useMainWidth([isFilterCollapsed ]);
+  const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
+  const blurIntensity = Math.min(scrollY / 10, 15);
 
   const tabs = [
     'Lead Details',
@@ -1290,9 +1340,8 @@ const CRMDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (seletectedStatus) {
-      fetchSubStatus()
-    }
+    fetchSubStatus()
+
   }, [seletectedStatus]);
 
   useEffect(() => {
@@ -1341,7 +1390,7 @@ const CRMDashboard = () => {
     setFilterData(newFilterData);
 
     // Apply filters immediately
-    setTimeout(() => fetchProfileData(newFilterData), 100);
+    setTimeout(() => applyFilters(newFilterData), 100);
   };
   const formatDate = (date) => {
     // If the date is not a valid Date object, try to convert it
@@ -1374,7 +1423,7 @@ const CRMDashboard = () => {
     }
 
     setFilterData(newFilterData);
-    setTimeout(() => fetchProfileData(newFilterData), 100);
+    setTimeout(() => applyFilters(newFilterData), 100);
   };
   const handleDateChange = (date, fieldName) => {
     setFilterData(prev => ({
@@ -1388,10 +1437,234 @@ const CRMDashboard = () => {
         ...filterData,
         [fieldName]: date
       };
-      fetchProfileData(newFilterData);
+      applyFilters(newFilterData);
     }, 100);
   };
 
+  // 4. Clear date functions
+  const clearCreatedDate = () => {
+    setFilterData(prev => ({
+      ...prev,
+      createdFromDate: null,
+      createdToDate: null
+    }));
+    setTimeout(() => applyFilters({
+      ...filterData,
+      createdFromDate: null,
+      createdToDate: null
+    }), 100);
+  };
+
+  const clearModifiedDate = () => {
+    setFilterData(prev => ({
+      ...prev,
+      modifiedFromDate: null,
+      modifiedToDate: null
+    }));
+    setTimeout(() => applyFilters({
+      ...filterData,
+      modifiedFromDate: null,
+      modifiedToDate: null
+    }), 100);
+  };
+
+  const clearNextActionDate = () => {
+    setFilterData(prev => ({
+      ...prev,
+      nextActionFromDate: null,
+      nextActionToDate: null
+    }));
+    setTimeout(() => applyFilters({
+      ...filterData,
+      nextActionFromDate: null,
+      nextActionToDate: null
+    }), 100);
+  };
+  // Add after existing functions
+
+
+  const handleSearch = (searchTerm) => {
+    if (!searchTerm.trim()) {
+      applyFilters();
+      return;
+    }
+
+    const searchFiltered = allProfilesData.filter(profile => {
+      try {
+        const name = profile._candidate?.name ? String(profile._candidate.name).toLowerCase() : '';
+        const mobile = profile._candidate?.mobile ? String(profile._candidate.mobile).toLowerCase() : '';
+        const email = profile._candidate?.email ? String(profile._candidate.email).toLowerCase() : '';
+        const searchLower = searchTerm.toLowerCase();
+
+        return name.includes(searchLower) ||
+          mobile.includes(searchLower) ||
+          email.includes(searchLower);
+      } catch (error) {
+        console.error('Search filter error for profile:', profile, error);
+        return false;
+      }
+    });
+
+    setAllProfiles(searchFiltered);
+  };
+
+  const applyFilters = (filters = filterData) => {
+    console.log('Applying filters with data:', filters);
+
+    let filtered = [...allProfilesData];
+
+    try {
+      // Search filter
+      if (filters.name && filters.name.trim()) {
+        const searchTerm = filters.name.toLowerCase();
+        filtered = filtered.filter(profile => {
+          try {
+            const name = profile._candidate?.name ? String(profile._candidate.name).toLowerCase() : '';
+            const mobile = profile._candidate?.mobile ? String(profile._candidate.mobile).toLowerCase() : '';
+            const email = profile._candidate?.email ? String(profile._candidate.email).toLowerCase() : '';
+
+            return name.includes(searchTerm) ||
+              mobile.includes(searchTerm) ||
+              email.includes(searchTerm);
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // Course type filter
+      if (filters.courseType) {
+        filtered = filtered.filter(profile => {
+          try {
+            const courseType = profile._course?.courseType ? String(profile._course.courseType).toLowerCase() : '';
+            return courseType === filters.courseType.toLowerCase();
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // Lead status filter
+      if (filters.leadStatus) {
+        filtered = filtered.filter(profile =>
+          profile._leadStatus?._id === filters.leadStatus
+        );
+      }
+
+      // Status filter
+      if (filters.status && filters.status !== 'true') {
+        filtered = filtered.filter(profile =>
+          profile._leadStatus?._id === filters.status
+        );
+      }
+
+      // Sector filter
+      if (filters.sector) {
+        filtered = filtered.filter(profile => {
+          try {
+            const sectors = profile._course?.sectors ? String(profile._course.sectors).toLowerCase() : '';
+            return sectors === filters.sector.toLowerCase();
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // CREATED DATE filter
+      if (filters.createdFromDate || filters.createdToDate) {
+        filtered = filtered.filter(profile => {
+          try {
+            if (!profile.createdAt) return false;
+
+            const profileDate = new Date(profile.createdAt);
+
+            // From date check
+            if (filters.createdFromDate) {
+              const fromDate = new Date(filters.createdFromDate);
+              fromDate.setHours(0, 0, 0, 0);
+              if (profileDate < fromDate) return false;
+            }
+
+            // To date check
+            if (filters.createdToDate) {
+              const toDate = new Date(filters.createdToDate);
+              toDate.setHours(23, 59, 59, 999);
+              if (profileDate > toDate) return false;
+            }
+
+            return true;
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // MODIFIED DATE filter
+      if (filters.modifiedFromDate || filters.modifiedToDate) {
+        filtered = filtered.filter(profile => {
+          try {
+            if (!profile.updatedAt) return false;
+
+            const profileDate = new Date(profile.updatedAt);
+
+            // From date check
+            if (filters.modifiedFromDate) {
+              const fromDate = new Date(filters.modifiedFromDate);
+              fromDate.setHours(0, 0, 0, 0);
+              if (profileDate < fromDate) return false;
+            }
+
+            // To date check
+            if (filters.modifiedToDate) {
+              const toDate = new Date(filters.modifiedToDate);
+              toDate.setHours(23, 59, 59, 999);
+              if (profileDate > toDate) return false;
+            }
+
+            return true;
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // NEXT ACTION DATE filter
+      if (filters.nextActionFromDate || filters.nextActionToDate) {
+        filtered = filtered.filter(profile => {
+          try {
+            if (!profile.followupDate) return false;
+
+            const profileDate = new Date(profile.followupDate);
+
+            // From date check
+            if (filters.nextActionFromDate) {
+              const fromDate = new Date(filters.nextActionFromDate);
+              fromDate.setHours(0, 0, 0, 0);
+              if (profileDate < fromDate) return false;
+            }
+
+            // To date check
+            if (filters.nextActionToDate) {
+              const toDate = new Date(filters.nextActionToDate);
+              toDate.setHours(23, 59, 59, 999);
+              if (profileDate > toDate) return false;
+            }
+
+            return true;
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      console.log('Filter results:', filtered.length, 'out of', allProfilesData.length);
+      setAllProfiles(filtered);
+
+    } catch (error) {
+      console.error('Filter error:', error);
+      setAllProfiles(allProfilesData);
+    }
+  };
 
   // Helper function for status icons
   const getStatusIcon = (statusName) => {
@@ -1408,7 +1681,7 @@ const CRMDashboard = () => {
 
   //
   const clearAllFilters = () => {
-    const clearedFilters = {
+    setFilterData({
       name: '',
       courseType: '',
       status: 'true',
@@ -1420,20 +1693,8 @@ const CRMDashboard = () => {
       modifiedToDate: null,
       nextActionFromDate: null,
       nextActionToDate: null,
-    };
-
-    setFilterData(clearedFilters);
-    setFormData({
-      projects: { type: "includes", values: [] },
-      verticals: { type: "includes", values: [] },
-      course: { type: "includes", values: [] },
-      center: { type: "includes", values: [] },
-      counselor: { type: "includes", values: [] },
-      sector: { type: "includes", values: [] }
     });
-
-    setCurrentPage(1);
-    fetchProfileData(clearedFilters, 1);
+    setAllProfiles(allProfilesData);
   };
 
   const handleStatusChange = (e) => {
@@ -1492,13 +1753,14 @@ const CRMDashboard = () => {
 
       if (response.data.success) {
         const status = response.data.data;
-        const allFilter = { _id: 'all', name: 'All' };
+        const allFilter = { _id: 'all', name: 'All', count: status.reduce((acc, cur) => acc + (cur.count || 0), 0) || 15 };
 
 
         setCrmFilters([allFilter, ...status.map(r => ({
           _id: r._id,
           name: r.title,
-          milestone: r.milestone,  // agar backend me count nahi hai to 0
+          milestone: r.milestone,
+          count: r.count || 0,  // agar backend me count nahi hai to 0
         }))]);
 
         setStatuses(status.map(r => ({
@@ -1574,74 +1836,7 @@ const CRMDashboard = () => {
     console.log('Function called');
 
     try {
-      if (showPanel === 'bulkstatuschange') {
-        // Validation checks
-        if (!selectedProfiles) {
-          alert('No profile selected');
-          return;
-        }
-
-        if (!seletectedStatus) {
-          alert('Please select a status');
-          return;
-        }
-
-
-        // Prepare the request body
-        const data = {
-          selectedProfiles,
-          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-          _leadSubStatus: seletectedSubStatus?._id || null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/bulk_status_change`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closePanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
-      }
-      if (showPanel === 'editPanel') {
+      if (showEditPanel) {
         // Validation checks
         if (!selectedProfile || !selectedProfile._id) {
           alert('No profile selected');
@@ -1717,14 +1912,14 @@ const CRMDashboard = () => {
 
           // Refresh data and close panel
           await fetchProfileData();
-          closePanel();
+          closeEditPanel();
         } else {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
         }
 
       }
-      if (showPanel === 'followUp') {
+      if (showFollowupPanel) {
 
 
         // Combine date and time into a single Date object (if both are set)
@@ -1789,7 +1984,7 @@ const CRMDashboard = () => {
 
           // Refresh data and close panel
           await fetchProfileData();
-          closePanel();
+          closeEditPanel();
         } else {
           console.error('API returned error:', response.data);
           alert(response.data.message || 'Failed to update status');
@@ -1833,90 +2028,94 @@ const CRMDashboard = () => {
   }, []);
 
   useEffect(() => {
-    fetchProfileData(filterData, currentPage);
-  }, [currentPage]);
-
-  // Add this function in your component:
-  const updateCrmFiltersFromBackend = (backendCounts) => {
-    console.log('Backend counts received:', backendCounts);
-    
-    setCrmFilters(prevFilters => {
-      return prevFilters.map(filter => {
-        if (filter._id === 'all') {
-          return { ...filter, count: backendCounts.all || 0 };
-        }
-        
-        const backendFilter = backendCounts[filter._id];
-        if (backendFilter) {
-          return { 
-            ...filter, 
-            count: backendFilter.count || 0,
-            milestone: backendFilter.milestone 
+    if (allProfilesData) {  // Safe check for response and data
+          const filteredProfiles = (status) => {
+            return allProfilesData?.filter(profile => {  // Safe check for allProfilesData
+              return profile._leadStatus && profile.followupStatus === status;
+            });
           };
-        }
-        
-        return { ...filter, count: 0 };
-      });
-    });
-  };
+
+          // Ensure filteredProfiles is defined and then calculate length
+          const plannedProfiles = filteredProfiles('Planned') || [];
+          const doneProfiles = filteredProfiles('Doen') || [];
+          const missedProfiles = filteredProfiles('Missed') || [];
+          setPlannedCount(plannedProfiles.length);
+          setDoneCount(doneProfiles.length);
+          setMissedCount(missedProfiles.length);
+        } else {
+          console.error("Error: No profile data available or response is malformed.");
+          // Optionally, you can set a fallback or handle empty state:
+          setPlannedCount(0);
+          setDoneCount(0);
+          setMissedCount(0)
+
+        };
+  }, [allProfilesData]);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [filterData]);
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
-      setIsLoadingProfiles(true);
-
+  
       if (!token) {
         console.warn('No token found in session storage.');
-        setIsLoadingProfiles(false);
         return;
       }
-
-      // Prepare query parameters
+  
       const queryParams = new URLSearchParams({
         page: page.toString(),
-        ...(filters.name && { name: filters.name }),
-        ...(filters.courseType && { courseType: filters.courseType }),
-        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
-        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
-        ...(filters.sector && { sector: filters.sector }),
-        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        limit: pageSize.toString(),
+        ...(filters?.name && { name: filters.name }),
+        ...(filters?.courseType && { courseType: filters.courseType }),
+        ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters?.kyc && filters.kyc !== 'false' && { kyc: filters.kyc }),
+        ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters?.sector && { sector: filters.sector }),
+        ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
         // Multi-select filters
-        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) }),
+        // Followup specific date range (if you want to add separate followup date filters)
+        // You can add fromDate and toDate here if needed for followup date filtering
+        ...(filters?.fromDate && { fromDate: filters.fromDate }),
+        ...(filters?.toDate && { toDate: filters.toDate }),
       });
-
-      const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
-        headers: { 'x-auth': token }
+  
+      // Use the My Followups specific API endpoint
+      const response = await axios.get(`${backendUrl}/college/leads/my-followups?${queryParams}`, {
+        headers: {
+          'x-auth': token,
+        },
       });
-
+      
+      console.log('Backend followups data:', response.data);
+      
       if (response.data.success && response.data.data) {
-        const data = response.data;
-        console.log('data', data);
-
-        // Sirf ek state me data set karo - paginated data
-        setAllProfiles(data.data);
-        setTotalPages(data.totalPages);
-        setPageSize(data.limit);
-
-        // Update CRM filter counts from backend
-        if (data.crmFilterCounts) {
-          updateCrmFiltersFromBackend(data.crmFilterCounts);
-        }
+        const data = response.data.data;
+        setAllProfiles(response.data.data);
+        setAllProfilesData(response.data.data); // Store all data for filtering
+        setTotalPages(response.data.totalPages);
+        setCurrentPage(response.data.page);
+        
       } else {
-        console.error('Failed to fetch profile data', response.data.message);
+        console.error('Failed to fetch followups data', response.data.message);
+        setAllProfiles([]);
+        setAllProfilesData([]);
       }
-
     } catch (error) {
-      console.error('Error fetching profile data:', error);
-    } finally {
-      setIsLoadingProfiles(false);
+      console.error('Error fetching followups data:', error);
+      setAllProfiles([]);
+      setAllProfilesData([]);
     }
   };
 
@@ -1970,7 +2169,24 @@ const CRMDashboard = () => {
     });
   }, [allProfiles, totalPages, currentPage, pageSize]);
 
+  const handleCrmFilterClick = (status, index) => {
 
+    setCurrentPage(1);
+
+    // Filter karo jisme leadStatus._id match ho
+    const filteredProfiles = allProfilesData.filter(profile => {
+      return profile._leadStatus && profile.followupStatus === status;
+    });
+
+
+    setActiveCrmFilter(index)
+    setAllProfiles(filteredProfiles);
+    // Calculate total pages
+    const totalPages = Math.ceil(filteredProfiles.length / pageSize);
+    setTotalPages(totalPages > 0 ? totalPages : 1);
+
+
+  };
 
 
   const handleTabClick = (profileIndex, tabIndex) => {
@@ -1991,89 +2207,47 @@ const CRMDashboard = () => {
       const newFilterData = { ...filterData, [name]: value };
       setFilterData(newFilterData);
 
-      // Reset to first page and fetch with new filters
-      setCurrentPage(1);
-      fetchProfileData(newFilterData, 1);
+      // Apply search if there's a search term
+      if (newFilterData.name) {
+        handleSearch(newFilterData.name);
+      } else {
+        applyFilters(newFilterData);
+      }
     } catch (error) {
       console.error('Filter change error:', error);
     }
   };
 
-  const handleCriteriaChange = (criteria, values) => {
-    setFormData((prevState) => ({
-      ...prevState,
-      [criteria]: {
-        type: "includes",
-        values: values
-      }
-    }));
-
-    // Reset to first page and fetch with new filters
-    setCurrentPage(1);
-    setTimeout(() => fetchProfileData(filterData, 1), 100);
-  };
-
-  const handleCrmFilterClick = async (index) => {
-    setActiveCrmFilter(index);
-    setCurrentPage(1);
-
-    let newFilterData = { ...filterData };
-
-    if (index !== 0) {
-      newFilterData.leadStatus = crmFilters[index]._id;
-    } else {
-      // Remove leadStatus filter for "All"
-      delete newFilterData.leadStatus;
-    }
-
-    setFilterData(newFilterData);
-    fetchProfileData(newFilterData, 1);
-  };
-
-
-
-
 
   const openEditPanel = async (profile = null, panel) => {
     console.log('panel', panel);
-    setSelectedProfile(null)
-    setShowPanel('')
-    setSelectedStatus(null)
-    setSelectedSubStatus(null)
-
 
     if (profile) {
       setSelectedProfile(profile);
     }
 
     // Close all panels first
-
-    setShowPopup(null);
-    setSelectedConcernPerson(null);
-
+    setShowEditPanel(false);
+    setCalendarModal(false)
+    setShowFollowupPanel(false);
+    setShowWhatsappPanel(false);
 
     if (panel === 'StatusChange') {
       if (profile) {
         const newStatus = profile?._leadStatus?._id || '';
         setSelectedStatus(newStatus);
 
-        // if (newStatus) {
-        //   await fetchSubStatus(newStatus);
-        // }
+        if (newStatus) {
+          await fetchSubStatus(newStatus);
+        }
 
         setSelectedSubStatus(profile?.selectedSubstatus || '');
       }
-      setShowPanel('editPanel')
-
+      setShowEditPanel(true);
     }
     else if (panel === 'SetFollowup') {
       setShowPopup(null)
-      setShowPanel('followUp')
-    }
-    else if (panel === 'bulkstatuschange') {
-      setShowPopup(null)
-      setShowPanel('bulkstatuschange')
-
+      setShowFollowupPanel(true);
     }
 
     if (!isMobile) {
@@ -2082,154 +2256,62 @@ const CRMDashboard = () => {
   };
 
 
-  const closePanel = () => {
-    setShowPanel('');
-    setShowPopup(null);
-    setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
-    setSelectedProfile(null);
-    setSelectedStatus(null)
-    setSelectedSubStatus(null)
-    if (!isMobile) {
-      setMainContentClass('col-12');
-    }
-  };
 
-
-
-  const openRefferPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
-
-    if (profile) {
-      setSelectedProfile(profile);
-
-
-    }
-
-    setShowPopup(null)
-
-    if (panel === 'RefferAllLeads') {
-
-      setShowPanel('RefferAllLeads');
-
-    } else if (panel === 'Reffer') {
-      setShowPanel('Reffer');
-    }
+  const closeEditPanel = () => {
+    setShowEditPanel(false);
+    setShowFollowupPanel(false);
+    setCalendarModal(true)
 
     if (!isMobile) {
       setMainContentClass('col-8');
     }
-
-
-    const fetchConcernPersons = async () => {
-      const response = await axios.get(`${backendUrl}/college/refer-leads`, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-      console.log(userData, 'userData');
-      let concernPersons = [];
-      await response.data.concernPerson.map(person => {
-        if (person._id._id.toString() !== userData._id.toString()) {
-          concernPersons.push(person);
-        }
-      });
-      setConcernPersons(concernPersons);
-    }
-    fetchConcernPersons();
   };
-  const handleFetchCandidate = async (profile = null) => {
-    setShowPopup(null)
-    setSelectedProfile(profile)
-    setOpenModalId(profile._id);
-  }
-
-  useEffect(() => {
-    console.log('useeffect', selectedProfile);
-    if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
-      fetchProfile(selectedProfile._candidate._id);
-    }
-  }, [selectedProfile]);
-
-
-
-  const handleConcernPersonChange = (e) => {
-    console.log(e.target.value, 'e.target.value');
-    setSelectedConcernPerson(e.target.value);
-  }
-
-  const handleReferLead = async () => {
-    console.log(selectedConcernPerson, 'selectedConcernPerson');
-    try {
-      const response = await axios.post(`${backendUrl}/college/refer-leads`, {
-        counselorId: selectedConcernPerson,
-        appliedCourseId: selectedProfile._id
-      }, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-
-      if (response.data.status) {
-        const message = alert('Lead referred successfully!');
-        if (message) {
-
-
-        }
-      } else {
-        alert(response.data.message || 'Failed to refer lead');
-      }
-      await fetchProfileData();
-      closePanel();
-
-
-
-    } catch (error) {
-      console.error('Error referring lead:', error);
-      alert('Failed to refer lead');
-    }
-  }
-
-
-
-
-
   const openWhatsappPanel = () => {
-    setShowPanel('whatsapp');
+    setCalendarModal(false)
+    setShowEditPanel(false);
+    setShowFollowupPanel(false);
+
+
+
+    setShowWhatsappPanel(true);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
   };
 
+  const closeWhatsappPanel = () => {
+    setShowWhatsappPanel(false);
+    setShowFollowupPanel(false);
+    setShowEditPanel(false);
 
+
+    setCalendarModal(true)
+
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+  };
 
   const openleadHistoryPanel = async (profile = null) => {
+    setCalendarModal(false)
+    setShowWhatsappPanel(false);
+    setShowEditPanel(false);
+    setShowFollowupPanel(false);
+
+
+
+
     if (profile) {
       // Set selected profile
       setSelectedProfile(profile);
 
     }
 
-    setShowPopup(null);
-    setShowPanel('leadHistory');
-    setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
-    if (!isMobile) {
-      setMainContentClass('col-8');
-    }
-  };
+    setShowPopup(null)
 
-  const openProfileEditPanel = async (profile = null) => {
-    if (profile) {
-      // Set selected profile
-      setSelectedProfile(profile);
-
-    }
-
-    setShowPopup(null);
-    setShowPanel('ProfileEdit');
-    setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setLeadHistoryPanel(true)
+    setShowWhatsappPanel(false);
+    setShowEditPanel(false);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -2239,7 +2321,12 @@ const CRMDashboard = () => {
     setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
   };
 
-
+  const closeleadHistoryPanel = () => {
+    setLeadHistoryPanel(false)
+    if (!isMobile) {
+      setMainContentClass('col-8');
+    }
+  };
 
   const scrollLeft = () => {
     const container = document.querySelector('.scrollable-content');
@@ -2257,6 +2344,807 @@ const CRMDashboard = () => {
     }
   };
 
+  const FollowupCalendar = () => {
+
+
+    // Constants
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+    // Range presets
+    const rangePresets = [
+      { value: 'custom', label: 'Custom Range', days: null, icon: '🎯' },
+      { value: '7days', label: '7 Days', days: 7, icon: '📅' },
+      { value: '15days', label: '15 Days', days: 15, icon: '📋' },
+      { value: '20days', label: '20 Days', days: 20, icon: '🗓️' },
+      { value: '30days', label: '30 Days', days: 30, icon: '📊' },
+      { value: '60days', label: '60 Days', days: 60, icon: '📈' },
+      { value: '90days', label: '90 Days', days: 90, icon: '📉' },
+      { value: 'currentMonth', label: 'Current Month', days: null, icon: '🌟' },
+      { value: 'lastMonth', label: 'Last Month', days: null, icon: '⬅️' },
+      { value: 'nextMonth', label: 'Next Month', days: null, icon: '➡️' },
+    ];
+
+    // Utility functions
+    const generateYears = () => {
+      const currentYear = new Date().getFullYear();
+      const years = [];
+      for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+        years.push(i);
+      }
+      return years;
+    };
+
+    const generateCalendarDays = () => {
+      const firstDay = new Date(currentYear, currentMonth, 1);
+      const startDate = new Date(firstDay);
+      startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+      const days = [];
+      for (let i = 0; i < 42; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+        days.push(currentDate);
+      }
+      return days;
+    };
+
+    const formatDate = (date) => {
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    // Date checking functions
+    const isToday = (date) => {
+      const today = new Date();
+      return date.toDateString() === today.toDateString();
+    };
+
+    const isCurrentMonth = (date) => {
+      return date.getMonth() === currentMonth;
+    };
+
+    const hasFollowup = (date) => {
+      return followupDates.some(followup =>
+        followup.date.toDateString() === date.toDateString()
+      );
+    };
+
+    const getFollowupForDate = (date) => {
+      return followupDates.find(followup =>
+        followup.date.toDateString() === date.toDateString()
+      );
+    };
+
+    const isSelected = (date) => {
+      return selectedDate && selectedDate.toDateString() === date.toDateString();
+    };
+
+    const isInRange = (date) => {
+      if (!filterData.fromDate || !filterData.toDate) return false;
+      return date >= filterData.fromDate && date <= filterData.toDate;
+    };
+
+    // Range preset functions
+    const setPresetRange = (presetValue) => {
+      setRangePreset(presetValue);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let start, end;
+
+      switch (presetValue) {
+        case '7days':
+        case '15days':
+        case '20days':
+        case '30days':
+        case '60days':
+        case '90days':
+          const preset = rangePresets.find(p => p.value === presetValue);
+          start = new Date(today);
+          end = new Date(today);
+          end.setDate(today.getDate() + preset.days - 1);
+          break;
+
+        case 'currentMonth':
+          start = new Date(today.getFullYear(), today.getMonth(), 1);
+          end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          break;
+
+        case 'lastMonth':
+          start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          end = new Date(today.getFullYear(), today.getMonth(), 0);
+          break;
+
+        case 'nextMonth':
+          start = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+          end = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+          break;
+
+        default: // custom
+          return;
+      }
+
+      console.log(start, end, 'start, end')
+      setFilterData(prev => ({
+        ...prev,
+        fromDate: start,
+        toDate: end
+      }));
+      
+      setIsRangeMode(true);
+    };
+
+    const setCustomDaysRange = () => {
+      if (!customDays || customDays < 1) return;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const start = new Date(today);
+      const end = new Date(today);
+      end.setDate(today.getDate() + parseInt(customDays) - 1);
+      setFilterData(prev => ({
+        ...prev,
+        fromDate: start,
+        toDate: end
+      }));
+      
+      setRangePreset('custom');
+    };
+
+    // Range and filtering functions
+    const getFollowupsInRange = () => {
+      if (!filterData.fromDate || !filterData.toDate) return [];
+
+      return followupDates.filter(followup => {
+        const followupDate = new Date(followup.date);
+        followupDate.setHours(0, 0, 0, 0);
+        const start = new Date(filterData.fromDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(filterData.toDate);
+        end.setHours(0, 0, 0, 0);
+
+        return followupDate >= start && followupDate <= end;
+      });
+    };
+
+    const getFilteredFollowups = () => {
+      const rangeFollowups = getFollowupsInRange();
+
+      switch (selectedFilter) {
+        case 'done':
+          return rangeFollowups.filter(followup => followup.status === 'done');
+        case 'missed':
+          return rangeFollowups.filter(followup => followup.status === 'missed');
+        case 'planned':
+          return rangeFollowups.filter(followup => followup.status === 'planned');
+        default:
+          return rangeFollowups;
+      }
+    };
+
+    const getStatusCounts = () => {
+      const rangeFollowups = getFollowupsInRange();
+      return {
+        all: rangeFollowups.length,
+        done: rangeFollowups.filter(f => f.status === 'done').length,
+        missed: rangeFollowups.filter(f => f.status === 'missed').length,
+        planned: rangeFollowups.filter(f => f.status === 'planned').length,
+      };
+    };
+
+    const getRangeDays = () => {
+      if (!filterData.fromDate || !filterData.toDate) return 0;
+      const diffTime = Math.abs(filterData.toDate - filterData.fromDate);
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    };
+
+    // Navigation functions
+    const goToPreviousMonth = () => {
+      if (currentMonth === 0) {
+        setCurrentMonth(11);
+        setCurrentYear(currentYear - 1);
+      } else {
+        setCurrentMonth(currentMonth - 1);
+      }
+    };
+
+    const goToNextMonth = () => {
+      if (currentMonth === 11) {
+        setCurrentMonth(0);
+        setCurrentYear(currentYear + 1);
+      } else {
+        setCurrentMonth(currentMonth + 1);
+      }
+    };
+
+    const handleMonthChange = (e) => {
+      setCurrentMonth(parseInt(e.target.value));
+    };
+
+    const handleYearChange = (e) => {
+      setCurrentYear(parseInt(e.target.value));
+    };
+
+    // Event handlers
+    const handleDateClick = (date) => {
+      const clickedDate = new Date(date);
+      clickedDate.setHours(0, 0, 0, 0);
+
+      if (!isRangeMode) {
+        setSelectedDate(new Date(clickedDate));
+        return;
+      }
+
+      if (!filterData.fromDate) {
+        setFilterData(prev => ({
+          ...prev,
+          fromDate: new Date(clickedDate),
+          toDate: null
+        }));
+        setSelectedDate(null);
+        setRangePreset('custom');
+      } else if (!filterData.toDate) {
+        if (clickedDate >= filterData.fromDate) {
+          setFilterData(prev => ({
+            ...prev,
+            toDate: new Date(clickedDate),
+            fromDate: null
+          }));
+        } else {
+          setFilterData(prev => ({
+            ...prev,
+            toDate: new Date(filterData.fromDate),
+            fromDate: new Date(clickedDate)
+          }));
+        }
+        setRangePreset('custom');
+      } else {
+        setFilterData(prev => ({
+          ...prev,
+          fromDate: new Date(clickedDate),
+          toDate: null
+        }));
+        setRangePreset('custom');
+      }
+    };
+
+    const toggleRangeMode = () => {
+      setIsRangeMode(!isRangeMode);
+      setFilterData(prev => ({
+        ...prev,
+        fromDate: null,
+        toDate: null
+      }));
+      setSelectedDate(null);
+      setSelectedFilter('all');
+      setRangePreset('custom');
+    };
+
+    const clearRange = () => {
+        setFilterData(prev => ({
+        ...prev,
+        fromDate: null,
+        toDate: null
+      }));
+      setSelectedFilter('all');
+      setRangePreset('custom');
+    };
+
+    // Generate data for rendering
+    const calendarDays = generateCalendarDays();
+    const years = generateYears();
+    const statusCounts = getStatusCounts();
+
+    const getDayClasses = (date) => {
+      const followup = getFollowupForDate(date);
+      const isCurrentMonthDate = isCurrentMonth(date);
+      const isTodayDate = isToday(date);
+      const isSelectedDate = isSelected(date);
+      const hasFollowupDate = hasFollowup(date);
+      const isInRangeDate = isInRange(date);
+      const isRangeStartDate = filterData.fromDate && date.toDateString() === filterData.fromDate.toDateString();
+      const isRangeEndDate = filterData.toDate && date.toDateString() === filterData.toDate.toDateString();
+
+      let classes = ['calendar-day', 'position-relative', 'text-center', 'p-2', 'border', 'cursor-pointer'];
+
+      if (isRangeMode) {
+        if (!isCurrentMonthDate) {
+          classes.push('text-muted', 'bg-light');
+        } else {
+          classes.push('text-dark', 'bg-white');
+        }
+      } else {
+        if (!isCurrentMonthDate) {
+          classes.push('text-muted', 'bg-light');
+        } else {
+          classes.push('text-dark', 'bg-white');
+        }
+      }
+
+      if (isTodayDate) {
+        classes.push('today');
+      }
+
+      if (isSelectedDate) {
+        classes.push('selected');
+      }
+
+      if (hasFollowupDate && followup) {
+        if (followup.status === 'planned') {
+          classes.push('followup-planned');
+        } else if (followup.status === 'done') {
+          classes.push('followup-done');
+        } else if (followup.status === 'missed') {
+          classes.push('followup-missed');
+        }
+      }
+
+      if (isInRangeDate) {
+        classes.push('in-range');
+      }
+
+      if (isRangeStartDate || isRangeEndDate) {
+        classes.push('range-endpoint');
+      }
+
+      return classes.join(' ');
+    };
+
+
+    const panelContent = (
+      <>
+        <div className="calendar-container rounded">
+          <div className="card shadow">
+            <div className="card-body">
+
+              {/* Header */}
+              <div className="border-bottom pb-3 mb-4">
+                <div className="d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-center">
+                    <span className="me-3 fs-5">📅</span>
+                    <span className="fs-5 fw-bold text-dark">Followup Calendar</span>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Preset Range Controls */}
+              <div className="mb-4 p-3 bg-primary bg-opacity-10 rounded">
+                <div className="row g-2 mb-3">
+                  <div className="col-md-12">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <label className="form-label small fw-semibold mb-0">Quick Range Selection:</label>
+                      {(filterData.fromDate || filterData.toDate) && (
+                        <button
+                          onClick={clearRange}
+                          className="btn btn-outline-danger btn-sm"
+                        >
+                          Clear Range
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="preset-buttons-grid">
+                      {rangePresets.map(preset => (
+                        <button
+                          key={preset.value}
+                          className={`preset-btn ${rangePreset === preset.value ? 'active' : ''}`}
+                          onClick={() => setPresetRange(preset.value)}
+                          disabled={preset.value === 'custom'}
+                        >
+                          <span className="preset-icon">{preset.icon}</span>
+                          <span className="preset-label">{preset.label}</span>
+
+                        </button>
+                      ))}
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation Controls */}
+              <div className="d-flex justify-content-between align-items-center mb-4 py-2">
+                <button
+                  onClick={goToPreviousMonth}
+                  className="btn btn-outline-secondary"
+                >
+                  ←
+                </button>
+
+                <div className="d-flex gap-2">
+                  <select
+                    value={currentMonth}
+                    onChange={handleMonthChange}
+                    className="form-select form-select-sm"
+                    style={{ width: 'auto' }}
+                  >
+                    {monthNames.map((month, index) => (
+                      <option key={index} value={index}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={currentYear}
+                    onChange={handleYearChange}
+                    className="form-select form-select-sm"
+                    style={{ width: 'auto' }}
+                  >
+                    {years.map(year => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={goToNextMonth}
+                  className="btn btn-outline-secondary"
+                >
+                  →
+                </button>
+              </div>
+
+              {/* Range Info with Stats */}
+              {isRangeMode && filterData.fromDate && (
+                <div className="mb-3 p-3 range-stats">
+                  <div className="row">
+                    <div className="col-md-8">
+                      <h6 className="mb-1">📅 Selected Range:</h6>
+                      <p className="mb-0 small text-white">
+                        <strong>{formatDate(filterData.fromDate)}</strong>
+                        {filterData.toDate ? ` to ${formatDate(filterData.toDate)}` : ' (select end date)'}
+                      </p>
+                    </div>
+                    <div className="col-md-4 text-end">
+                      {filterData.toDate && (
+                        <div>
+                          <div className="fw-bold fs-4">{getRangeDays()}</div>
+                          <div className="small">Days Selected</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Week Days Header */}
+              <div className="calendar-grid mb-2">
+                {weekDays.map(day => (
+                  <div key={day} className="week-header">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Grid */}
+              <div className={`calendar-grid ${isRangeMode ? 'range-selection-mode' : ''}`}>
+                {calendarDays.map((date, index) => {
+                  const followup = getFollowupForDate(date);
+                  const isCurrentMonthDate = isCurrentMonth(date);
+                  const hasFollowupDate = hasFollowup(date);
+
+                  let dayClasses = getDayClasses(date);
+                  if (isRangeMode) {
+                    dayClasses += ' range-mode';
+                  }
+
+                  return (
+                    <div
+                      key={index}
+                      className={dayClasses}
+                      onClick={() => handleDateClick(date)}
+                      title={isRangeMode ?
+                        (!filterData.fromDate ? 'Click to set range start' :
+                          !filterData.toDate ? 'Click to set range end' :
+                            'Click to start new range') :
+                        `${formatDate(date)}${hasFollowupDate ? ` - ${followup?.title}` : ''}`
+                      }
+                    >
+                      {date.getDate()}
+                      {hasFollowupDate && isCurrentMonthDate && followup && (
+                        <div className={`followup-indicator ${followup.status}`}>
+                          {followup.status === 'done' ? '✓' : followup.status === 'missed' ? '✗' : '○'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Selected Date Info */}
+              {selectedDate && !isRangeMode && (
+                <div className="mt-4 p-3 bg-info bg-opacity-10 rounded">
+                  <p className="mb-0 small">Selected Date: <strong>{formatDate(selectedDate)}</strong></p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <style>
+          {`
+          .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+          }
+          
+          .calendar-day {
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            border-radius: 4px;
+          }
+          
+          .calendar-day:hover {
+            background-color: #e9ecef !important;
+            transform: scale(1.05);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
+          
+          .calendar-day.range-mode:hover {
+            background-color: #cfe2ff !important;
+            border-color: #0d6efd !important;
+          }
+          
+          .calendar-day.today {
+            background-color: #cfe2ff !important;
+            color: #0a58ca !important;
+            font-weight: bold;
+            border: 2px solid #0d6efd !important;
+          }
+          
+          .calendar-day.selected {
+            background-color: #fd7e14 !important;
+            color: white !important;
+            font-weight: bold;
+          }
+          
+          .calendar-day.followup-planned {
+            background-color: #fff3cd !important;
+            border-color: #ffc107 !important;
+          }
+          
+          .calendar-day.followup-done {
+            background-color: #d1e7dd !important;
+            border-color: #198754 !important;
+          }
+          
+          .calendar-day.followup-missed {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+          }
+          
+          .calendar-day.in-range {
+            background-color: #cfe2ff !important;
+            border-color: #0d6efd !important;
+          }
+          
+          .calendar-day.range-endpoint {
+            background-color: #0d6efd !important;
+            color: white !important;
+            font-weight: bold;
+          }
+          
+          .week-header {
+            background-color: #e9ecef;
+            padding: 8px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #6c757d;
+            text-align: center;
+          }
+          
+          .followup-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            font-size: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+          }
+          
+          .followup-indicator.done {
+            background-color: #198754;
+          }
+          
+          .followup-indicator.missed {
+            background-color: #dc3545;
+          }
+          
+          .followup-indicator.planned {
+            background-color: #ffc107;
+          }
+          
+          .cursor-pointer {
+            cursor: pointer;
+          }
+          
+          .range-stats {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+          }
+          
+          .range-selection-mode {
+            border: 2px dashed #0d6efd;
+            border-radius: 8px;
+            background: rgba(13, 110, 253, 0.05);
+            padding: 4px;
+          }
+          
+          .calendar-day.range-mode {
+            position: relative;
+          }
+          
+          .calendar-day.range-mode::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            transition: all 0.2s;
+          }
+          
+          .calendar-day.range-mode:hover::after {
+            border-color: #0d6efd;
+            background: rgba(13, 110, 253, 0.1);
+          }
+
+          /* Preset Buttons Styling */
+          .preset-buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(45px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+          }
+          
+          .preset-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 8px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            background: white;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            min-height: 70px;
+          }
+          
+          .preset-btn:hover {
+            border-color: #0d6efd;
+            background: #f8f9fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+          }
+          
+          .preset-btn.active {
+            border-color: #0d6efd;
+            background: linear-gradient(135deg, #0d6efd 0%, #6610f2 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(13, 110, 253, 0.3);
+          }
+          
+          .preset-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            border-color: #dee2e6;
+            background: #f8f9fa;
+          }
+          
+          .preset-btn:disabled:hover {
+            transform: none;
+            box-shadow: none;
+          }
+          
+          .preset-icon {
+            font-size: 1.2em;
+            margin-bottom: 4px;
+          }
+          
+          .preset-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
+            line-height: 1.2;
+          }
+          
+          .preset-days {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #ffc107;
+            color: #000;
+            font-size: 0.6rem;
+            padding: 2px 4px;
+            border-radius: 8px;
+            font-weight: bold;
+          }
+          
+          .preset-btn.active .preset-days {
+            background: rgba(255, 255, 255, 0.9);
+            color: #0d6efd;
+          }
+
+          /* Responsive Design */
+          @media (max-width: 768px) {
+            .preset-buttons-grid {
+              grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .preset-btn {
+              min-height: 60px;
+              padding: 8px 6px;
+            }
+            
+            .preset-label {
+              font-size: 0.7rem;
+            }
+          }
+          
+          @media (max-width: 480px) {
+            .preset-buttons-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+        `}
+        </style>
+      </>
+    );
+
+    if (isMobile) {
+      return (
+        <div
+          className={`modal ${showCalendarModal ? 'show d-block' : 'd-none'}`}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeEditPanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return showCalendarModal ? (
+      <div className="col-12 transition-col" id="editFollowupPanel">
+        {panelContent}
+      </div>
+    ) : null;
+  };
+
+
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
   const renderEditPanel = () => {
     const panelContent = (
@@ -2267,15 +3155,13 @@ const CRMDashboard = () => {
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
             <h6 className="mb-0 followUp fw-medium">
-              {(showPanel === 'editPanel' || showPanel === 'followUp') && `${showPanel === 'editPanel' ? 'Edit Status for ' : 'Set Followup for '}${selectedProfile?._candidate?.name || ''}`}
-
-
-              {(showPanel === 'bulkstatuschange') && 'Bulk Status Change'}
-
+              {showEditPanel && 'Edit Status for '}
+              {showFollowupPanel && 'Set Followup for '}
+              {selectedProfile?._candidate?.name || 'Unknown'}
             </h6>
           </div>
           <div>
-            <button className="btn-close" type="button" onClick={closePanel}>
+            <button className="btn-close" type="button" onClick={closeEditPanel}>
               {/* <i className="fa-solid fa-xmark"></i> */}
             </button>
           </div>
@@ -2284,7 +3170,7 @@ const CRMDashboard = () => {
         <div className="card-body">
           <form>
 
-            {(showPanel !== 'followUp') && (
+            {!showFollowupPanel && (
               <>
                 <div className="mb-1">
                   <label htmlFor="status" className="form-label small fw-medium text-dark">
@@ -2343,7 +3229,7 @@ const CRMDashboard = () => {
             )}
 
 
-            {((seletectedSubStatus && seletectedSubStatus.hasFollowup && (showPanel !== 'bulkstatuschange')) || (showPanel === 'followUp') || (showPanel !== 'bulkstatuschange')) && (
+            {((seletectedSubStatus && seletectedSubStatus.hasFollowup) || showFollowupPanel) && (
 
               <div className="row mb-1">
                 <div className="col-6">
@@ -2389,7 +3275,7 @@ const CRMDashboard = () => {
                 </div>
               </div>)}
 
-            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || (setShowPanel === 'followUp')) && (
+            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || showFollowupPanel) && (
 
               <div className="mb-1">
                 <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
@@ -2410,7 +3296,7 @@ const CRMDashboard = () => {
                 type="button"
                 className="btn"
                 style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closePanel}
+                onClick={closeEditPanel}
               >
                 CLOSE
               </button>
@@ -2421,9 +3307,8 @@ const CRMDashboard = () => {
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
 
-                {(showPanel === 'editPanel') && 'UPDATE STATUS'}
-                {(showPanel === 'followUp') && 'SET FOLLOWUP '}
-                {(showPanel === 'bulkstatuschange') && 'UPDATE BULK STATUS '}
+                {showEditPanel && 'UPDATE STATUS'}
+                {showFollowupPanel && 'SET FOLLOWUP '}
               </button>
             </div>
           </form>
@@ -2432,13 +3317,12 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
-
+      return (
         <div
-          className="modal show d-block"
+          className={`modal ${showEditPanel || showFollowupPanel ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closePanel();
+            if (e.target === e.currentTarget) closeEditPanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg">
@@ -2447,123 +3331,15 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      ) : null;
+      );
     }
 
-    return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
+    return showEditPanel || showFollowupPanel ? (
       <div className="col-12 transition-col" id="editFollowupPanel">
         {panelContent}
       </div>
     ) : null;
   };
-
-  // Render Reffer Panel (Desktop Sidebar or Mobile Modal)
-
-  const renderRefferPanel = () => {
-    const panelContent = (
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-user-edit text-secondary"></i>
-            </div>
-            <h6 className="mb-0 followUp fw-medium">
-
-              {showPanel === 'Reffer' && (`Refer Lead ${selectedProfile?._candidate?.name || 'Unknown'} to Counselor`)}
-              {showPanel === 'RefferAllLeads' && (`Refer All Lead to Counselor`)}
-
-            </h6>
-          </div>
-          <div>
-            <button className="btn-close" type="button" onClick={closePanel}>
-              {/* <i className="fa-solid fa-xmark"></i> */}
-            </button>
-          </div>
-        </div>
-
-        <div className="card-body">
-          <form>
-
-
-            <>
-
-              {/* NEW COUNSELOR SELECT DROPDOWN */}
-              <div className="mb-1">
-                <label htmlFor="counselor" className="form-label small fw-medium text-dark">
-                  Select Counselor<span className="text-danger">*</span>
-                </label>
-                <div className="d-flex">
-                  <div className="form-floating flex-grow-1">
-                    <select
-                      className="form-select border-0  bgcolor"
-                      id="counselor"
-                      style={{
-                        height: '42px',
-                        paddingTop: '8px',
-                        paddingInline: '10px',
-                        width: '100%',
-                        backgroundColor: '#f1f2f6'
-                      }}
-                      onChange={handleConcernPersonChange}
-                    >
-                      <option value="">Select Counselor</option>
-                      {concernPersons.map((counselor, index) => (
-                        <option key={index} value={counselor._id._id}>{counselor._id.name}</option>))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </>
-
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <button
-                type="button"
-                className="btn"
-                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closePanel}
-              >
-                CLOSE
-              </button>
-              <button
-                type="submit"
-                className="btn text-white"
-                onClick={handleReferLead}
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
-              >
-
-                {showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-
-    if (isMobile) {
-      return (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
-        <div
-          className={'modal show d-block'}
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closePanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      ) : null;
-    }
-
-    return (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
-      <div className="col-12 transition-col" id="refferPanel">
-        {panelContent}
-      </div>
-    ) : null;
-  };
-
 
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
   const renderWhatsAppPanel = () => {
@@ -2588,7 +3364,7 @@ const CRMDashboard = () => {
             </a>
             <button
               className="btn btn-sm btn-outline-secondary"
-              onClick={closePanel}
+              onClick={closeWhatsappPanel}
               title="Close WhatsApp"
             >
               <i className="fas fa-times"></i>
@@ -2685,12 +3461,12 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return showPanel === 'whatsapp' ? (
+      return (
         <div
-          className='modal show d-block'
+          className={`modal ${showWhatsappPanel ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closePanel();
+            if (e.target === e.currentTarget) closeWhatsappPanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
@@ -2699,10 +3475,10 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      ) : null;
+      );
     }
 
-    return showPanel === 'whatsapp' ? (
+    return showWhatsappPanel ? (
       <div className="col-12 transition-col" id="whatsappPanel">
         {panelContent}
       </div>
@@ -2720,7 +3496,7 @@ const CRMDashboard = () => {
             </div>
             <h6 className="mb-0 fw-medium">Lead History</h6>
           </div>
-          <button className="btn-close" type="button" onClick={closePanel}>
+          <button className="btn-close" type="button" onClick={closeleadHistoryPanel}>
           </button>
         </div>
 
@@ -2749,7 +3525,7 @@ const CRMDashboard = () => {
                     <div className="timeline-content">
                       <div className="card border-0 shadow-sm">
                         <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
+                          <div className="d-flex justify-content-between align-items-start mb-2">
                             <span className="bg-light text-dark border">
                               {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
                                 day: '2-digit',
@@ -2811,7 +3587,7 @@ const CRMDashboard = () => {
               <button
                 type="button"
                 className="btn btn-outline-secondary"
-                onClick={closePanel}
+                onClick={closeleadHistoryPanel}
               >
                 <i className="fas fa-times me-1"></i>
                 Close
@@ -2823,12 +3599,12 @@ const CRMDashboard = () => {
     );
 
     if (isMobile) {
-      return showPanel === 'leadHistory' ? (
+      return (
         <div
-          className="modal show d-block"
+          className={`modal ${leadHistoryPanel ? 'show d-block' : 'd-none'}`}
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) closePanel();
+            if (e.target === e.currentTarget) closeleadHistoryPanel();
           }}
         >
           <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
@@ -2837,17 +3613,15 @@ const CRMDashboard = () => {
             </div>
           </div>
         </div>
-      ) : null;
+      );
     }
 
-    return showPanel === 'leadHistory' ? (
+    return leadHistoryPanel ? (
       <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
         {panelContent}
       </div>
     ) : null;
   };
-
-
 
   return (
     <div className="container-fluid">
@@ -2855,18 +3629,43 @@ const CRMDashboard = () => {
         <div className={isMobile ? 'col-12' : mainContentClass}>
 
           {/* Header */}
-          {/* <div className="bg-white shadow-sm border-bottom mb-3 sticky-header-container" >
+
+          <div 
+            className="content-blur-overlay"
+            style={{
+              position: 'fixed',
+              top:0,
+              left: 0,
+              right: 0,
+              height: `${navHeight + 50}px`,
+              background: `linear-gradient(
+                180deg,
+                rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
+                rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
+                rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
+                transparent 100%
+              )`,
+              backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+              WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+              pointerEvents: 'none',
+              zIndex: 9,
+              transition: 'all 0.3s ease',
+              opacity: isScrolled ? 1 : 0
+            }}
+          />
+
+          <div ref={navRef} className="bg-white shadow-sm border-bottom mb-3 site-header--sticky--my--followup" >
             <div className="container-fluid py-2 " >
               <div className="row align-items-center">
                 <div className="col-md-6 d-md-block d-sm-none">
                   <div className="d-flex align-items-center">
-                    <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                    <h4 className="fw-bold text-dark mb-0 me-3">My Followups</h4>
                     <nav aria-label="breadcrumb">
                       <ol className="breadcrumb mb-0 small">
                         <li className="breadcrumb-item">
                           <a href="/institute/dashboard" className="text-decoration-none">Home</a>
                         </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
+                        <li className="breadcrumb-item active">My Followups</li>
                       </ol>
                     </nav>
                   </div>
@@ -2931,376 +3730,209 @@ const CRMDashboard = () => {
 
                 <div className="card-body p-3">
                   <div className="d-flex flex-wrap gap-2 align-items-center">
-                    {crmFilters.map((filter, index) => (
-                      <div key={index} className="d-flex align-items-center gap-1">
-                        <div className='d-flex'>
-                          <button
-                            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                            onClick={() => handleCrmFilterClick(filter._id, index)}
-                          >
-                            {filter.name}
-                            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                              ({filter.count})
-                            </span>
-                          </button>
-
-                        
-                          {filter.milestone && (
-                            <span
-                              className="bg-success d-flex align-items-center"
-                              style={{
-                                fontSize: '0.75rem', color: 'white', verticalAlign: 'middle', padding: '0.25em 0.5em', transform: 'translate(15%, -100%)',
-                                position: 'absolute'
-                              }}
-                              title={`Milestone: ${filter.milestone}`}
-                            >
-                              🚩 <span style={{ marginLeft: '4px' }}>{filter.milestone}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                </div>
-
-              </div>
-            </div>
-          </div> */}
 
 
+                    <div key={0} className="d-flex align-items-center gap-1">
+                      <div className='d-flex'>
+                        <button
+                          className={`btn btn-sm ${activeCrmFilter === 0 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                          onClick={() => handleCrmFilterClick('Planned', 0)}
 
-          <div className="position-relative">
-            <div className="site-header--sticky--register">
-              <div className="container-fluid">
-                <div className="row align-items-center">
-                  <div className="col-md-6 d-md-block d-sm-none">
-                    <div className="d-flex align-items-center">
-                      <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
-                      <nav aria-label="breadcrumb">
-                        <ol className="breadcrumb mb-0 small">
-                          <li className="breadcrumb-item">
-                            <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                          </li>
-                          <li className="breadcrumb-item active">Admission Cycle</li>
-                        </ol>
-                      </nav>
-                    </div>
-                  </div>
-
-                  <div className="col-md-6">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
-                      <div className="input-group" style={{ maxWidth: '300px' }}>
-                        <span className="input-group-text bg-white border-end-0 input-height">
-                          <i className="fas fa-search text-muted"></i>
-                        </span>
-                        <input
-                          type="text"
-                          name="name"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Quick search..."
-                          value={filterData.name}
-                          onChange={handleFilterChange}
-                        />
-                        {filterData.name && (
-                          <button
-                            className="btn btn-outline-secondary border-start-0"
-                            type="button"
-                            onClick={() => {
-                              setFilterData(prev => ({ ...prev, name: '' }));
-                              fetchProfileData();
-                            }}
-                          >
-                            <i className="fas fa-times"></i>
-                          </button>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
+                        >
+                          Planned Followups
+                          <span className={`ms-1 ${activeCrmFilter === 0 ? 'text-white' : 'text-dark'}`}>
+                            {plannedCount}
                           </span>
-                        )}
-                      </button>
+                        </button>
 
-                      <div className="btn-group">
-                        <button
-                          onClick={() => setViewMode('grid')}
-                          className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                        >
-                          <i className="fas fa-th"></i>
-                        </button>
-                        <button
-                          onClick={() => setViewMode('list')}
-                          className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                        >
-                          <i className="fas fa-list"></i>
-                        </button>
+
                       </div>
+
                     </div>
+
+                    <div key={1} className="d-flex align-items-center gap-1">
+                      <div className='d-flex'>
+                        <button
+                          className={`btn btn-sm ${activeCrmFilter === 1 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                          onClick={() => handleCrmFilterClick('Done', 1)}
+
+                        >
+                          Done Followups
+                          <span className={`ms-1 ${activeCrmFilter === 1 ? 'text-white' : 'text-dark'}`}>
+                          {doneCount}
+                          </span>
+                        </button>
+
+
+                      </div>
+
+                    </div>
+
+                    <div key={2} className="d-flex align-items-center gap-1">
+                      <div className='d-flex'>
+                        <button
+                          className={`btn btn-sm ${activeCrmFilter === 2 ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                          onClick={() => handleCrmFilterClick('Missed', 2)}
+
+                        >
+                          Missed Followups
+                          <span className={`ms-1 ${activeCrmFilter === 2 ? 'text-white' : 'text-dark'}`}>
+                            {missedCount}
+                          </span>
+                        </button>
+
+
+                      </div>
+
+                    </div>
+
                   </div>
 
-                  {/* Filter Buttons Row */}
-                  <div className="col-12 mt-2">
-                    <div className="d-flex flex-wrap gap-2 align-items-center">
-                      {crmFilters.map((filter, index) => (
-                        <div key={index} className="d-flex align-items-center gap-1">
-                          <div className='d-flex position-relative'>
-                            <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
-                              onClick={() => handleCrmFilterClick(index)}
-                            >
-                              {filter.name}
-                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                                ({filter.count})
-                              </span>
-                            </button>
-
-                            {filter.milestone && (
-                              <span
-                                className="position-absolute bg-success text-white px-2 py-1 rounded-pill"
-                                style={{
-                                  fontSize: '0.7rem',
-                                  top: '-8px',
-                                  right: '-10px',
-                                  transform: 'scale(0.8)'
-                                }}
-                                title={`Milestone: ${filter.milestone}`}
-                              >
-                                🚩 {filter.milestone}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
+
               </div>
             </div>
           </div>
-
-
-
-          {/* Advanced Filters */}
-          {/* Advanced Filters - Improved Design */}
           {!isFilterCollapsed && (
-            <div className="bg-white border-bottom shadow-sm" style={{ marginTop: '130px', transition: '0.4s ease' }}>
-              <div className="container-fluid py-4">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <div className="d-flex align-items-center">
-                    <i className="fas fa-filter text-primary me-2"></i>
-                    <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
-                    <span className="bg-light text-dark ms-2">
-                      {Object.values(filterData).filter(val => val && val !== 'true').length} Active
-                    </span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => {
-                        setFilterData({
-                          name: '',
-                          courseType: '',
-                          status: 'true',
-                          leadStatus: '',
-                          sector: '',
-                          createdFromDate: null,
-                          createdToDate: null,
-                          modifiedFromDate: null,
-                          modifiedToDate: null,
-                          nextActionFromDate: null,
-                          nextActionToDate: null,
-                        });
-                        fetchProfileData();
-                      }}
-                    >
-                      <i className="fas fa-times-circle me-1"></i>
-                      Clear All
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-chevron-up"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="row g-4">
-
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-graduation-cap me-1 text-success"></i>
-                      Course Type
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="courseType"
-                        value={filterData.courseType}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Types</option>
-                        <option value="Free">🆓 Free</option>
-                        <option value="Paid">💰 Paid</option>
-                      </select>
+            <div
+              className="modal show fade d-block"
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 1050
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsFilterCollapsed(true);
+              }}
+            >
+              <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
+                <div className="modal-content">
+                  {/* Modal Header - Fixed at top */}
+                  <div className="modal-header bg-white border-bottom">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-filter text-primary me-2"></i>
+                        <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                        {totalSelected > 0 && (
+                          <span className="badge bg-primary ms-2">
+                            {totalSelected} Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={clearAllFilters}
+                        >
+                          <i className="fas fa-times-circle me-1"></i>
+                          Clear All
+                        </button>
+                        <button
+                          className="btn-close"
+                          onClick={() => setIsFilterCollapsed(true)}
+                          aria-label="Close"
+                        ></button>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="col-md-2">
-                    {/* <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Sector
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Sectors</option>
-                        <option value="Tourism and Hospitality">🏨 Tourism & Hospitality</option>
-                        <option value="Information Technology">💻 Information Technology</option>
-                        <option value="Healthcare">🏥 Healthcare</option>
-                        <option value="Finance">💳 Finance</option>
-                      </select>
-                    </div> */}
-                    <MultiSelectCheckbox
-                      title="Project"
-                      options={sectorOptions}
-                      selectedValues={formData.projects.values}
-                      onChange={(values) => handleCriteriaChange('projects', values)}
-                      icon="fas fa-sitemap"
-                      isOpen={dropdownStates.projects}
-                      onToggle={() => toggleDropdown('projects')}
-                    />
-
-                  </div>
-                  <div className="col-md-2">
-                    {/* <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Verticals
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="vertical"
-                        value={filterData.vertical}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Verticals</option>
-                        <option value="Vertical 1">Vertical 1</option>
-                      </select>
-                  </div> */}
-                    <MultiSelectCheckbox
-                      title="Verticals"
-                      options={verticalOptions}
-                      selectedValues={formData.verticals.values}
-                      onChange={(values) => handleCriteriaChange('verticals', values)}
-                      icon="fas fa-sitemap"
-                      isOpen={dropdownStates.verticals}
-                      onToggle={() => toggleDropdown('verticals')}
-                    />
-
-
-                  </div>
-                  <div className="col-md-2">
-                    {/* <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Course
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All course</option>
-                        <option value="Course 1">Course 1</option>
-                        <option value="Course 2">Course 2</option>
-                      </select>
-                    </div> */}
-                    <MultiSelectCheckbox
-                      title="Course"
-                      options={courseOptions}
-                      selectedValues={formData.course.values}
-                      onChange={(values) => handleCriteriaChange('course', values)}
-                      icon="fas fa-graduation-cap"
-                      isOpen={dropdownStates.course}
-                      onToggle={() => toggleDropdown('course')}
-                    />
-                  </div>
-                  <div className="col-md-2">
-                    {/* <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Center
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All centers</option>
-                        <option value="center 1">center 1</option>
-                        <option value="center 2">center 2</option>
-                      </select>
-                    </div> */}
-                    <MultiSelectCheckbox
-                      title="Center"
-                      options={centerOptions}
-                      selectedValues={formData.center.values}
-                      onChange={(values) => handleCriteriaChange('center', values)}
-                      icon="fas fa-building"
-                      isOpen={dropdownStates.center}
-                      onToggle={() => toggleDropdown('center')}
-                    />
-                  </div>
-                  <div className="col-md-2">
-                    {/* <label className="form-label small fw-bold text-dark">
-                      <i className="fas fa-industry me-1 text-primary"></i>
-                      Councellor Name
-                    </label>
-                    <div className="position-relative">
-                      <select
-                        className="form-select"
-                        name="sector"
-                        value={filterData.sector}
-                        onChange={handleFilterChange}
-                      >
-                        <option value="">All Sectors</option>
-                        <option value="Councellor 1">Councellor 1</option>
-                        <option value="Councellor 2">Councellor 2</option>
-                      </select>
-                    </div> */}
-                    <MultiSelectCheckbox
-                      title="Counselor"
-                      options={counselorOptions}
-                      selectedValues={formData.counselor.values}
-                      onChange={(values) => handleCriteriaChange('counselor', values)}
-                      icon="fas fa-user-tie"
-                      isOpen={dropdownStates.counselor}
-                      onToggle={() => toggleDropdown('counselor')}
-                    />
-                  </div>
-
-                  {/* Date Range */}
-                  {/* Date Filters Section */}
-                  {/* REPLACE your existing Date Filters Section with this */}
-                  {/* Date Filters Section - Facebook Style */}
-                  <div className="col-12">
+                  {/* Modal Body - Scrollable content */}
+                  <div className="modal-body p-4">
                     <div className="row g-4">
+                      {/* Course Type Filter */}
+                      <div className="col-md-3">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-graduation-cap me-1 text-success"></i>
+                          Course Type
+                        </label>
+                        <div className="position-relative">
+                          <select
+                            className="form-select"
+                            name="courseType"
+                            value={filterData.courseType}
+                            onChange={handleFilterChange}
+                          >
+                            <option value="">All Types</option>
+                            <option value="Free">🆓 Free</option>
+                            <option value="Paid">💰 Paid</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Project Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Project"
+                          options={projectOptions}
+                          selectedValues={formData.projects.values}
+                          onChange={(values) => handleCriteriaChange('projects', values)}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.projects}
+                          onToggle={() => toggleDropdown('projects')}
+                        />
+                      </div>
+
+                      {/* Verticals Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Verticals"
+                          options={verticalOptions}
+                          selectedValues={formData.verticals.values}
+                          icon="fas fa-sitemap"
+                          isOpen={dropdownStates.verticals}
+                          onToggle={() => toggleDropdown('verticals')}
+                          onChange={(values) => handleCriteriaChange('verticals', values)}
+                        />
+                      </div>
+
+                      {/* Course Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Course"
+                          options={courseOptions}
+                          selectedValues={formData.course.values}
+                          onChange={(values) => handleCriteriaChange('course', values)}
+                          icon="fas fa-graduation-cap"
+                          isOpen={dropdownStates.course}
+                          onToggle={() => toggleDropdown('course')}
+                        />
+                      </div>
+
+                      {/* Center Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Center"
+                          options={centerOptions}
+                          selectedValues={formData.center.values}
+                          onChange={(values) => handleCriteriaChange('center', values)}
+                          icon="fas fa-building"
+                          isOpen={dropdownStates.center}
+                          onToggle={() => toggleDropdown('center')}
+                        />
+                      </div>
+
+                      {/* Counselor Filter */}
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Counselor"
+                          options={counselorOptions}
+                          selectedValues={formData.counselor.values}
+                          onChange={(values) => handleCriteriaChange('counselor', values)}
+                          icon="fas fa-user-tie"
+                          isOpen={dropdownStates.counselor}
+                          onToggle={() => toggleDropdown('counselor')}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Date Filters Section */}
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Date Range Filters
+                        </h6>
+                      </div>
+
                       {/* Created Date Range */}
                       <div className="col-md-4">
                         <label className="form-label small fw-bold text-dark">
@@ -3486,141 +4118,97 @@ const CRMDashboard = () => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Results Summary */}
+                    <div className="row mt-4">
+                      <div className="col-12">
+                        <div className="alert alert-info">
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-info-circle me-2"></i>
+                            <div>
+                              <strong>Results Summary:</strong> Showing {allProfiles.length} results on page {currentPage} of {totalPages}
+
+                              {/* Active filter indicators */}
+                              <div className="mt-2">
+                                {(filterData.createdFromDate || filterData.createdToDate) && (
+                                  <span className="badge bg-success me-2">
+                                    <i className="fas fa-calendar-plus me-1"></i>
+                                    Created Date Filter Active
+                                  </span>
+                                )}
+
+                                {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                                  <span className="badge bg-warning me-2">
+                                    <i className="fas fa-calendar-edit me-1"></i>
+                                    Modified Date Filter Active
+                                  </span>
+                                )}
+
+                                {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                                  <span className="badge bg-info me-2">
+                                    <i className="fas fa-calendar-check me-1"></i>
+                                    Next Action Date Filter Active
+                                  </span>
+                                )}
+
+                                {totalSelected > 0 && (
+                                  <span className="badge bg-primary me-2">
+                                    <i className="fas fa-filter me-1"></i>
+                                    {totalSelected} Multi-Select Filters Active
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Update the Clear All button in your existing filters section */}
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={clearAllFilters}
-                  >
-                    <i className="fas fa-times-circle me-1"></i>
-                    Clear All Filters
-                  </button>
-
-                  {/* Update the results summary section */}
-                  <div className="text-muted small">
-                    <i className="fas fa-info-circle me-1"></i>
-                    Showing {allProfiles.length} results on page {currentPage} of {totalPages}
-
-                    {/* Active filter indicators */}
-                    {(filterData.createdFromDate || filterData.createdToDate) && (
-                      <div className="mt-1">
-                        <span className="badge bg-success me-2">
-                          <i className="fas fa-calendar-plus me-1"></i>
-                          Created:
-                          {filterData.createdFromDate && ` From ${formatDate(filterData.createdFromDate)}`}
-                          {filterData.createdFromDate && filterData.createdToDate && ' to '}
-                          {filterData.createdToDate && formatDate(filterData.createdToDate)}
-                        </span>
+                  {/* Modal Footer - Fixed at bottom */}
+                  <div className="modal-footer bg-light border-top">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="text-muted small">
+                        <i className="fas fa-filter me-1"></i>
+                        {Object.values(filterData).filter(val => val && val !== 'true').length + totalSelected} filters applied
                       </div>
-                    )}
-
-                    {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-warning me-2">
-                          <i className="fas fa-calendar-edit me-1"></i>
-                          Modified:
-                          {filterData.modifiedFromDate && ` From ${formatDate(filterData.modifiedFromDate)}`}
-                          {filterData.modifiedFromDate && filterData.modifiedToDate && ' to '}
-                          {filterData.modifiedToDate && formatDate(filterData.modifiedToDate)}
-                        </span>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-outline-secondary"
+                          onClick={() => setIsFilterCollapsed(true)}
+                        >
+                          <i className="fas fa-eye-slash me-1"></i>
+                          Hide Filters
+                        </button>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => {
+                            fetchProfileData(filterData);
+                            setIsFilterCollapsed(true);
+                          }}
+                        >
+                          <i className="fas fa-search me-1"></i>
+                          Apply Filters
+                        </button>
                       </div>
-                    )}
-
-                    {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
-                      <div className="mt-1">
-                        <span className="bg-info me-2">
-                          <i className="fas fa-calendar-check me-1"></i>
-                          Next Action:
-                          {filterData.nextActionFromDate && ` From ${formatDate(filterData.nextActionFromDate)}`}
-                          {filterData.nextActionFromDate && filterData.nextActionToDate && ' to '}
-                          {filterData.nextActionToDate && formatDate(filterData.nextActionToDate)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={() => setIsFilterCollapsed(true)}
-                    >
-                      <i className="fas fa-eye-slash me-1"></i>
-                      Hide Filters
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => fetchProfileData(filterData)}
-                    >
-                      <i className="fas fa-search me-1"></i>
-                      Apply Filters
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
-
+         
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: '185px' }}>
+          <div className="content-body" style={{marginTop:'150px'}}>
             <section className="list-view">
-              <div className="row">
-                <div className="d-flex justify-content-end gap-2">
-                  <button
-                    className="btn btn-sm btn-outline-primary"
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    onClick={() => {
-                      openRefferPanel(null, 'RefferAllLeads');
-                      console.log('selectedProfile', null);
-                    }}
-                  >
-                    <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
-                    Refer All Leads
-                  </button>
-                  <button
-                    className="btn btn-sm btn-outline-secondary"
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
-                  >
-                    <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
-                    Bulk Action
-                  </button>
-                </div>
-              </div>
+
               <div className='row'>
                 <div>
                   <div className="col-12 rounded equal-height-2 coloumn-2">
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
 
-                        {/* Loading State */}
-                        {isLoadingProfiles && (
-                          <div className="col-12 text-center py-5">
-                            <div className="d-flex flex-column align-items-center">
-                              <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
-                                <span className="visually-hidden">Loading...</span>
-                              </div>
-                              <h5 className="text-muted">Loading profiles...</h5>
-                              <p className="text-muted small">Please wait while we fetch the latest data</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Profiles List */}
-                        {!isLoadingProfiles && allProfiles.map((profile, profileIndex) => (
+                        {allProfiles.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
                             {/* Profile Header Card */}
@@ -3630,7 +4218,7 @@ const CRMDashboard = () => {
                                   <div className="col-md-6">
                                     <div className="d-flex align-items-center">
                                       <div className="form-check me-3">
-                                        <input onChange={(e) => handleCheckboxChange(profile, e.target.checked)} className="form-check-input" type="checkbox" />
+                                        <input className="form-check-input" type="checkbox" />
                                       </div>
                                       <div className="me-3">
                                         <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
@@ -3647,9 +4235,7 @@ const CRMDashboard = () => {
                                       </div>
                                       <div style={{ marginLeft: '15px' }}>
                                         <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                          <a href={`tel:${profile._candidate?.mobile}`} target="_blank" rel="noopener noreferrer">
-                                            <i className="fas fa-phone"></i>
-                                          </a>
+                                          <i className="fas fa-phone"></i>
                                         </button>
                                         {/* <button
                                         className="btn btn-outline-success btn-sm border-0"
@@ -3659,14 +4245,6 @@ const CRMDashboard = () => {
                                       >
                                         <i className="fab fa-whatsapp"></i>
                                       </button> */}
-                                        <a
-                                          className="btn btn-outline-success btn-sm border-0"
-                                          href={`https://wa.me/${profile._candidate?.mobile}`}
-                                          style={{ fontSize: '20px' }}
-                                          title="WhatsApp"
-                                        >
-                                          <i className="fab fa-whatsapp"></i>
-                                        </a>
                                       </div>
                                     </div>
                                   </div>
@@ -3789,10 +4367,7 @@ const CRMDashboard = () => {
                                               fontSize: "12px",
                                               fontWeight: "600"
                                             }}
-                                            onClick={() => {
-                                              openRefferPanel(profile, 'Reffer');
-                                              console.log('selectedProfile', profile);
-                                            }}
+                                            onClick={() => alert("Reffer")}
                                           >
                                             Reffer
                                           </button>
@@ -3810,7 +4385,7 @@ const CRMDashboard = () => {
                                             }}
 
                                             onClick={() => {
-                                              openRefferPanel(profile);
+                                              openleadHistoryPanel(profile);
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
@@ -3829,49 +4404,11 @@ const CRMDashboard = () => {
                                               fontWeight: "600"
                                             }}
                                             onClick={() => {
-                                              openRefferPanel(profile, 'SetFollowup');
+                                              openEditPanel(profile, 'SetFollowup');
                                               console.log('selectedProfile', profile);
                                             }}
                                           >
                                             Set Followup
-                                          </button>
-
-                                          {/* <button type="button" className="btn btn-primary border-0 text-black" data-bs-toggle="modal" data-bs-target={`#profileModal-${profile._id}`} style={{
-                                            width: "100%",
-                                            padding: "8px 16px",
-                                            border: "none",
-                                            background: "none",
-                                            textAlign: "left",
-                                            cursor: "pointer",
-                                            fontSize: "12px",
-                                            fontWeight: "600"
-                                          }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-
-                                            }}
-                                          >
-
-                                            Profile Edit
-                                          </button> */}
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-
-                                            }}
-                                          >
-                                            Profile Edit
                                           </button>
 
 
@@ -3965,11 +4502,7 @@ const CRMDashboard = () => {
                                               fontSize: "12px",
                                               fontWeight: "600"
                                             }}
-                                            onClick={() => {
-                                              setShowPopup(null)
-                                              openRefferPanel(profile, 'Reffer');
-                                              console.log('selectedProfile', profile);
-                                            }}
+                                            onClick={() => alert("Reffer")}
                                           >
                                             Reffer
                                           </button>
@@ -4007,42 +4540,6 @@ const CRMDashboard = () => {
                                             }}
                                           >
                                             Set Followup
-                                          </button>
-                                          {/* <button type="button" className="btn btn-primary border-0 text-black" data-bs-toggle="modal" data-bs-target={`profileModal-${profile._id}`} style={{
-                                            width: "100%",
-                                            padding: "8px 16px",
-                                            border: "none",
-                                            background: "none",
-                                            textAlign: "left",
-                                            cursor: "pointer",
-                                            fontSize: "12px",
-                                            fontWeight: "600"
-                                          }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-
-                                            }}
-                                          >
-                                            Profile Edit
-                                          </button> */}
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-                                              // open modal for this profile
-                                            }}
-                                          >
-                                            Profile Edit
                                           </button>
 
 
@@ -4139,15 +4636,15 @@ const CRMDashboard = () => {
                                           <div className="info-card">
                                             <div className="info-group">
                                               <div className="info-label">STATE</div>
-                                              <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                              <div className="info-value">{profile._course?.state}</div>
                                             </div>
                                             <div className="info-group">
                                               <div className="info-label">City</div>
-                                              <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                              <div className="info-value">{profile._course?.city}</div>
                                             </div>
                                             <div className="info-group">
                                               <div className="info-label">BRANCH NAME</div>
-                                              <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                              <div className="info-value">PSD Chandauli Center</div>
                                             </div>
                                             <div className="info-group">
                                               <div className="info-label">LEAD MODIFICATION DATE</div>
@@ -4213,15 +4710,15 @@ const CRMDashboard = () => {
                                                 <div className="info-card">
                                                   <div className="info-group">
                                                     <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                    <div className="info-value">{profile._course?.state}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">City</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                    <div className="info-value">{profile._course?.city}</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                    <div className="info-value">PSD Chandauli Center</div>
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">LEAD MODIFICATION DATE</div>
@@ -4234,7 +4731,7 @@ const CRMDashboard = () => {
                                                   </div>
                                                   <div className="info-group">
                                                     <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                    <div className="info-value">{profile._course?.counslername}</div>
                                                   </div>
                                                 </div>
                                               </div>
@@ -4256,13 +4753,13 @@ const CRMDashboard = () => {
                                                 <div className="col-xl-3 col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                    <div className="info-value">{profile._course?.state}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">CITY</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                    <div className="info-value">{profile._course?.city}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
@@ -4289,12 +4786,17 @@ const CRMDashboard = () => {
                                                     <div className="info-value">{profile._course?.name}</div>
                                                   </div>
                                                 </div>
-
+                                                <div className="col-xl- col-3">
+                                                  <div className="info-group">
+                                                    <div className="info-label">BATCH NAME</div>
+                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                  </div>
+                                                </div>
 
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                    <div className="info-value">{profile._course?.college || 'N/A'}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
@@ -4371,7 +4873,7 @@ const CRMDashboard = () => {
                                                 <div className="col-xl- col-3">
                                                   <div className="info-group">
                                                     <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                    <div className="info-value">{profile._course?.counslername}</div>
                                                   </div>
                                                 </div>
                                                 <div className="col-xl- col-3">
@@ -4684,8 +5186,6 @@ const CRMDashboard = () => {
                                         </div>
                                       </div>
                                     </div>
-
-
                                   )}
 
                                   {/* Job History Tab */}
@@ -5099,58 +5599,7 @@ const CRMDashboard = () => {
                                 </div>
                               )}
                             </div>
-
-                            {/* <div class="modal fade" id={`profileModal-${profile._id}`} data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby={`profileModalLabel-${profile._id}`} aria-hidden="true">
-                              <div class="modal-dialog modal-dialog-scrollable">
-                                <div class="modal-content new-modal-content">
-                                  <div class="modal-header">
-                                    <h1 class="modal-title fs-5" id={`profileModalLabel-${profile._id}`}>Modal title</h1>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                  </div>
-                                  <div class="modal-body">
-                                    <CandidateProfile ref={candidateRef} />
-                                  </div>
-                                  <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                    <button onClick={handleSaveCV} type="button" class="btn btn-primary">Save CV</button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div> */}
-
-                            {openModalId === profile._id && (
-                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                                <div className="modal-dialog modal-dialog-scrollable">
-                                  <div className="modal-content new-modal-content">
-                                    <div className="modal-header">
-                                      <h1 className="modal-title fs-5">Modal title</h1>
-                                      <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
-                                    </div>
-                                    <div className="modal-body">
-                                      <CandidateProfile ref={candidateRef} />
-                                    </div>
-                                    <div className="modal-footer">
-                                      <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
-                                      <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-
-                            <style>
-                              {
-                                `.new-modal-content{
-                                 width:1000px!important;
-                                 transform: translateX(25%);
-                                 }
-                                  `
-                              }
-                            </style>
                           </div>
-
-
                         ))}
 
 
@@ -5160,9 +5609,7 @@ const CRMDashboard = () => {
                     </div>
                   </div>
                 </div>
-
               </div>
-
               <nav aria-label="Page navigation" className="mt-4">
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <small className="text-muted">
@@ -5220,15 +5667,14 @@ const CRMDashboard = () => {
               </nav>
             </section>
           </div>
-
         </div>
 
         {/* Right Sidebar for Desktop - Panels */}
         {!isMobile && (
           <div className="col-4">
-            <div className="row site-header--sticky--register--panels w-25">
+            <div className="row site-header--sticky--my--followup--panels">
               {renderEditPanel()}
-              {renderRefferPanel()}
+              {FollowupCalendar()}
               {renderWhatsAppPanel()}
               {renderLeadHistoryPanel()}
             </div>
@@ -5237,32 +5683,23 @@ const CRMDashboard = () => {
 
         {/* Mobile Modals */}
         {isMobile && renderEditPanel()}
-        {isMobile && renderRefferPanel()}
+        {isMobile && FollowupCalendar()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderLeadHistoryPanel()}
       </div>
-
-      {/* <div style={{ background: 'rgba(0, 0, 0, 0.5)', width: '100%', position: 'absolute', minHeight: '100vh', top: '0', zIndex: '13', position: 'fixed' }}>
-        <div className='card' style={{ border: '1px solid red', width: '70%', height: '100%' }}>
-          <CandidateProfile />
-        </div>
-      </div> */}
-
-      {/* <!-- Button trigger modal --> */}
-
-
-
-
       <style>
         {
           `
+        html body .content .content-wrapper {
+    padding: calc(0.9rem - 0.1rem) 1.2rem
+}
 
-    /* Clean Sticky Header CSS - Replace your entire style section with this */
-
-/* Main wrapper styling */
-html body .content .content-wrapper {
-    padding: calc(0.9rem - 0.1rem) 1.2rem;
-    overflow: visible !important;
+.container-fluid.py-2 {
+    position: sticky !important;
+    top: 0;
+    z-index: 1020;
+    background-color: white;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .bg-gradient-primary {
@@ -7792,36 +8229,19 @@ background: #fd2b5a;
     }
   }
 
-/* Sticky Header Container */
-.sticky-header-container {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 1020 !important;
-    background-color: white !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
-    width: 100% !important;
-    margin-bottom: 1rem !important;
-}
-
-/* Header Content Styling */
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-}
-
-/* Secondary Sticky Elements (Side Panels) */
 .stickyBreakpoints {
-    position: sticky !important;
-    top: 120px !important;
-    z-index: 11 !important;
+    position: sticky;
+    top: 20px;
+    /* default top */
+    z-index: 11;
 }
 
-/* Date Picker Styles */
 .react-date-picker__wrapper {
     border: none;
 }
 
 .react-date-picker__inputGroup input {
-    border: none !important;
+    border: none !important
 }
 
 .react-date-picker__inputGroup {
@@ -7837,495 +8257,184 @@ background: #fd2b5a;
 
 /* Upload Modal Styles */
 .upload-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1050;
-    backdrop-filter: blur(2px);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+  backdrop-filter: blur(2px);
 }
 
 .upload-modal-content {
-    background-color: white;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    position: relative;
+  background-color: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  position: relative;
 }
 
 .upload-modal-header {
-    padding: 24px 24px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .upload-modal-body {
-    padding: 24px;
+  padding: 24px;
 }
 
 .upload-modal-footer {
-    padding: 16px 24px 24px;
-    border-top: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .file-drop-zone {
-    border: 2px dashed #d1d5db;
-    border-radius: 8px;
-    padding: 48px 24px;
-    text-align: center;
-    background-color: #f9fafb;
-    transition: all 0.3s ease;
-    cursor: pointer;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  background-color: #f9fafb;
+  transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .file-drop-zone:hover {
-    border-color: #3b82f6;
-    background-color: #eff6ff;
+  border-color: #3b82f6;
+  background-color: #eff6ff;
 }
 
 .drop-zone-content .upload-icon {
-    font-size: 48px;
-    color: #3b82f6;
-    margin-bottom: 16px;
-    display: block;
+  font-size: 48px;
+  color: #3b82f6;
+  margin-bottom: 16px;
+  display: block;
 }
 
 .file-details {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background-color: #f3f4f6;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
 }
 
 .file-icon {
-    width: 48px;
-    height: 48px;
-    background-color: #3b82f6;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 20px;
+  width: 48px;
+  height: 48px;
+  background-color: #3b82f6;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
 }
 
 .file-info {
-    flex: 1;
+  flex: 1;
 }
 
 .file-name {
-    margin: 0 0 4px;
-    font-weight: 500;
-    color: #1f2937;
-    font-size: 0.875rem;
+  margin: 0 0 4px;
+  font-weight: 500;
+  color: #1f2937;
+  font-size: 0.875rem;
 }
 
 .file-size {
-    margin: 0;
-    color: #6b7280;
-    font-size: 0.75rem;
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.75rem;
 }
 
 .preview-image {
-    max-width: 100%;
-    max-height: 200px;
-    object-fit: contain;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 }
 
 .progress-bar-container {
-    width: 100%;
-    height: 8px;
-    background-color: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 8px;
+  width: 100%;
+  height: 8px;
+  background-color: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
 }
 
 .progress-bar {
-    height: 100%;
-    background-color: #3b82f6;
-    transition: width 0.3s ease;
-    border-radius: 4px;
+  height: 100%;
+  background-color: #3b82f6;
+  transition: width 0.3s ease;
+  border-radius: 4px;
 }
 
-/* Document Modal Styles */
-.document-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1500;
-    backdrop-filter: blur(2px);
+.site-header--sticky--my--followup:not(.mobile-sticky-enable){
+  top: 100px;
+  z-index: 10;
 }
 
-.document-modal-content {
-    background-color: white;
-    border-radius: 12px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    position: relative;
-    z-index: 1501;
+.site-header--sticky--my--followup--panels:not(.mobile-sticky-enable){
+  top: 258px;
+  position: fixed !important;
+  
 }
-         .react-date-picker__calendar.react-date-picker__calendar--open{
-    inset: 0 !important;
-    width: 300px !important;
-}
-/* Responsive Design */
-@media (max-width: 1920px) {
-    .stickyBreakpoints {
-        top: 120px !important;
-    }
-}
-
-@media (max-width: 1400px) {
-    .stickyBreakpoints {
-        top: 110px !important;
-    }
-}
-
-@media (max-width: 768px) {
-    .sticky-header-container {
-        position: sticky !important;
-        top: 0 !important;
-    }
-    
-    .stickyBreakpoints {
-        position: relative !important;
-    }
-    
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
-}
-
-@media (max-width: 576px) {
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
-}
-
-    /* Final Complete CSS - Replace entire <style> section with this */
-
-html body .content .content-wrapper {
-    padding: calc(0.9rem - 0.1rem) 1.2rem;
-    overflow: visible !important;
-}
-
-
-/* ========== STICKY HEADER STYLES ========== */
-.sticky-header-container {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 1020 !important;
-    background-color: white !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
-    width: 100% !important;
-    margin-bottom: 1rem !important;
-}
-
-.sticky-header-container .container-fluid {
-    padding: 0.5rem 1.2rem !important;
-}
-.site-header--sticky--register:not(.mobile-sticky-enable) {
-    /* position: absolute !important; */
-    top: 97px;
-    z-index: 10;
-}
-    .site-header--sticky--register--panels{
-     top: 258px;
-    z-index: 10;
-    }
-
-@media (min-width: 992px) {
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        /* position: absolute !important; */
-        /* min-height: 200px; */
-        background: white;
-    }
-    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        /* position: absolute !important; */
-        /* min-height: 200px; */
-        background: white;
-    }
-}
-    @media (max-width: 767px) {
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-        width: 100%;
-        left: 0;
-        right: 0;
-    }
-    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-        width: 100%;
-        left: 0;
-        right: 0;
-    }
-    
-    /* Adjust content margin to avoid overlap */
-    .content-body {
-        margin-top: 120px; /* Adjust based on your header height */
-    }
-}
-
-.stickyBreakpoints {
-    position: sticky !important;
-    top: 120px !important;
-    z-index: 11 !important;
-}
-
-/* ========== DATE PICKER STYLES ========== */
-.react-date-picker__wrapper {
-    border: none;
-}
-
-.react-date-picker__inputGroup input {
-    border: none !important;
-}
-
-.react-date-picker__inputGroup {
-    width: 100%;
-    white-space: nowrap;
-    background: transparent;
-    border: none;
-}
-
-.react-date-picker__clear-button {
-    display: none;
-}
-
-/* ========== UPLOAD MODAL STYLES ========== */
-.upload-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1050;
-    backdrop-filter: blur(2px);
-}
-
-.upload-modal-content {
-    background-color: white;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    position: relative;
-}
-
-.upload-modal-header {
-    padding: 24px 24px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.upload-modal-body {
-    padding: 24px;
-}
-
-.upload-modal-footer {
-    padding: 16px 24px 24px;
-    border-top: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-}
-
-.file-drop-zone {
-    border: 2px dashed #d1d5db;
-    border-radius: 8px;
-    padding: 48px 24px;
-    text-align: center;
-    background-color: #f9fafb;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.file-drop-zone:hover {
-    border-color: #3b82f6;
-    background-color: #eff6ff;
-}
-
-.drop-zone-content .upload-icon {
-    font-size: 48px;
-    color: #3b82f6;
-    margin-bottom: 16px;
-    display: block;
-}
-
-.file-details {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background-color: #f3f4f6;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-}
-
-.file-icon {
-    width: 48px;
-    height: 48px;
-    background-color: #3b82f6;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 20px;
-}
-
-.file-info {
-    flex: 1;
-}
-
-.file-name {
-    margin: 0 0 4px;
-    font-weight: 500;
-    color: #1f2937;
-    font-size: 0.875rem;
-}
-
-.file-size {
-    margin: 0;
-    color: #6b7280;
-    font-size: 0.75rem;
-}
-
-.preview-image {
-    max-width: 100%;
-    max-height: 200px;
-    object-fit: contain;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-}
-
-.progress-bar-container {
-    width: 100%;
-    height: 8px;
-    background-color: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 8px;
-}
-
-.progress-bar {
-    height: 100%;
-    background-color: #3b82f6;
-    transition: width 0.3s ease;
-    border-radius: 4px;
-}
-
-/* ========== DOCUMENT MODAL STYLES ========== */
-.document-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1500;
-    backdrop-filter: blur(2px);
-}
-
-.document-modal-content {
-    background-color: white;
-    border-radius: 12px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    position: relative;
-    z-index: 1501;
-}
-    #editFollowupPanel {
+     #editFollowupPanel {
     max-height: calc(100vh - 220px); /* Adjust based on your header height */
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin; /* For Firefox */
     scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
 }
+             .react-date-picker__calendar.react-date-picker__calendar--open{
+    inset: 0 !important;
+    width: 300px !important;
+}
+  @media (min-width: 992px) {
+    .site-header--sticky--my--followup:not(.mobile-sticky-enable) {
+      position: fixed !important;
+      transition: 0.4s;
+      background: white;
+      {/* left:15.9%;
+      right:3%; */}
+    }
+  }
 
-/* ========== RESPONSIVE DESIGN ========== */
-@media (max-width: 1920px) {
+
+@media(max-width:1920px) {
     .stickyBreakpoints {
-        top: 120px !important;
+        top: 20%
     }
 }
 
-@media (max-width: 1400px) {
+@media(max-width:1400px) {
     .stickyBreakpoints {
-        top: 110px !important;
+        top: 17%
     }
 }
 
-@media (max-width: 768px) {
-    .sticky-header-container {
-        position: sticky !important;
-        top: 0 !important;
-    }
-    
-    .stickyBreakpoints {
-        position: relative !important;
-    }
-    
-    .sticky-header-container .container-fluid {
-        padding: 0.5rem 1rem !important;
-    }
-}
 
-@media (max-width: 576px) {
-    .sticky-header-container .container-fluid {
-        padding: 0.25rem 0.5rem !important;
-    }
-}
-    
-    `
+        `
         }
       </style>
+
       <style>
         {
           `
@@ -8630,5 +8739,5 @@ html body .content .content-wrapper {
   );
 };
 
-export default CRMDashboard;
+export default MyFollowups;
 

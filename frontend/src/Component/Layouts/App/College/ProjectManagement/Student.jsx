@@ -50,7 +50,8 @@ const useNavHeight = (dependencies = []) => {
       const totalMarginTop = height + (subTabsElement ? subTabsElement.offsetHeight : 0);
       setContentMarginTop(totalMarginTop);
     } else {
-      console.log('❌ navRef.current is null');
+      // Don't log this error as it's expected during initial render
+      // console.log('❌ navRef.current is null');
     }
   }, []);
 
@@ -4572,10 +4573,10 @@ const Student = ({
                                         </div>
                                         <div>
                                           <h6 className="mb-0 fw-bold text-black">
-                                            {profile._candidate.name}
+                                            {profile._candidate?.name || 'N/A'}
                                           </h6>
                                           <small className="text-muted text-black">
-                                            {profile._candidate.mobile}
+                                            {profile._candidate?.mobile || 'N/A'}
                                           </small>
                                           <div className="mt-1">
                                             {getAdmissionStatusBadge(profile)}
@@ -5335,7 +5336,7 @@ const Student = ({
                                                         <h2 className="resume-section-title">
                                                           Work Experience
                                                         </h2>
-                                                        {profile._candidate.experiences.map(
+                                                        {profile._candidate?.experiences?.map(
                                                           (exp, index) => (
                                                             <div
                                                               className="resume-experience-item"
@@ -5411,7 +5412,7 @@ const Student = ({
                                                         <h2 className="resume-section-title">
                                                           Education
                                                         </h2>
-                                                        {profile._candidate.qualifications.map(
+                                                        {profile._candidate?.qualifications?.map(
                                                           (edu, index) => (
                                                             <div
                                                               className="resume-education-item"
@@ -5482,7 +5483,7 @@ const Student = ({
                                                           Skills
                                                         </h2>
                                                         <div className="resume-skills-list">
-                                                          {profile._candidate.personalInfo.skills.map(
+                                                          {profile._candidate?.personalInfo?.skills?.map(
                                                             (skill, index) => (
                                                               <div
                                                                 className="resume-skill-item"
@@ -5522,7 +5523,7 @@ const Student = ({
                                                           Languages
                                                         </h2>
                                                         <div className="resume-languages-list">
-                                                          {profile._candidate.personalInfo.languages.map(
+                                                          {profile._candidate?.personalInfo?.languages?.map(
                                                             (lang, index) => (
                                                               <div
                                                                 className="resume-language-item"
@@ -5565,7 +5566,7 @@ const Student = ({
                                                           Certifications
                                                         </h2>
                                                         <ul className="resume-certifications-list">
-                                                          {profile._candidate.personalInfo.certifications.map(
+                                                          {profile._candidate?.personalInfo?.certifications?.map(
                                                             (cert, index) => (
                                                               <li
                                                                 key={`resume-cert-${index}`}
@@ -5607,7 +5608,7 @@ const Student = ({
                                                         <h2 className="resume-section-title">
                                                           Projects
                                                         </h2>
-                                                        {profile._candidate.personalInfo.projects.map(
+                                                        {profile._candidate?.personalInfo?.projects?.map(
                                                           (proj, index) => (
                                                             <div
                                                               className="resume-project-item"
@@ -5645,7 +5646,7 @@ const Student = ({
                                                           Interests
                                                         </h2>
                                                         <div className="resume-interests-tags">
-                                                          {profile._candidate.personalInfo.interest.map(
+                                                          {profile._candidate?.personalInfo?.interest?.map(
                                                             (interest, index) => (
                                                               <span
                                                                 className="resume-interest-tag"

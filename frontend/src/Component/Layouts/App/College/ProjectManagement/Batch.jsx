@@ -240,6 +240,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [isBatchAssigning, setIsBatchAssigning] = useState(false);
 
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
@@ -449,8 +450,17 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       alert('Please select a batch');
       return;
     }
+    
+    // Check if student is already assigned to a batch
+    if (selectedProfile?.isBatchAssigned) {
+      alert('This student is already assigned to a batch!');
+      return;
+    }
+    
     e?.preventDefault(); // Prevent form submission
     e?.stopPropagation(); // Stop event bubbling
+    
+    setIsBatchAssigning(true);
     
     console.log(selectedBatch, 'selectedBatch');
     console.log(selectedProfile, 'selectedProfile');
@@ -465,20 +475,20 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       });
 
       if (response.data.status) {
-        const message = alert('Batch assigned successfully!');
-        if (message) {
-
-
-        }
+        alert('Batch assigned successfully!');
       } else {
         alert(response.data.message || 'Failed to assign batch');
       }
     } catch (error) {
       console.error('Error assigning batch:', error);
       alert('Failed to assign batch');
+    } finally {
+      setIsBatchAssigning(false);
+      closePanel();
+      await fetchAdmissionsData();
     }
-    await fetchAdmissionsData();
-    closePanel();
+   
+    
   }
 
 
@@ -504,8 +514,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   };
   const [showPanel, setShowPanel] = useState(null);
-  const [concernPersons, setConcernPersons] = useState([]);
-  const [selectedConcernPerson, setSelectedConcernPerson] = useState(null);
+
   const closePanel = () => {
     setShowPanel(null);
     setSelectedProfile(null);
@@ -519,6 +528,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
 
   const renderBatchAssignPanel = () => {
+    // Check if student is already assigned to a batch
+    const isAlreadyAssigned = selectedProfile?.isBatchAssigned;
+    
     const panelContent = (
       <div className="card border-0 shadow-sm">
         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
@@ -527,9 +539,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
               <i className="fas fa-user-edit text-secondary"></i>
             </div>
             <h6 className="mb-0 followUp fw-medium">
-
               {showPanel === 'BatchAssign' && (`Assign Batch`)}
-
             </h6>
           </div>
           <div>
@@ -540,12 +550,30 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         </div>
 
         <div className="card-body">
-          <form>
-
-
-            <>
-
-              {/* NEW COUNSELOR SELECT DROPDOWN */}
+          {isAlreadyAssigned ? (
+            // Show message if already assigned
+            <div className="text-center py-4">
+              <div className="mb-3">
+                <i className="fas fa-check-circle text-success" style={{ fontSize: '3rem' }}></i>
+              </div>
+              <h6 className="text-success mb-2">Student Already Assigned</h6>
+              <p className="text-muted mb-0">
+                This student is already assigned to a batch and cannot be reassigned.
+              </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closePanel}
+                  style={{ padding: '8px 24px', fontSize: '14px' }}
+                >
+                  CLOSE
+                </button>
+              </div>
+            </div>
+          ) : (
+            // Show batch assignment form if not assigned
+            <form>
               <div className="mb-1">
                 <label htmlFor="counselor" className="form-label small fw-medium text-dark">
                   Select Batch<span className="text-danger">*</span>
@@ -553,9 +581,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                 <div className="d-flex">
                   <div className="form-floating flex-grow-1">
                     <select
-                      className="form-select border-0  bgcolor"
+                      className="form-select border-0 bgcolor"
                       id="counselor"
                       required
+                      disabled={isBatchAssigning}
                       style={{
                         height: '42px',
                         paddingTop: '8px',
@@ -567,33 +596,47 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                     >
                       <option value="">Select Batch</option>
                       {batches.map((batch, index) => (
-                        <option key={index} value={batch._id}>{batch.name}</option>))}
+                        <option key={index} value={batch._id}>{batch.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
               </div>
-            </>
 
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <button
-                type="button"
-                className="btn"
-                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closePanel}
-              >
-                CLOSE
-              </button>
-              <button
-                type="button"
-                className="btn text-white"
-                onClick={(e) => handleBatchAssign(e)}
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
-              >
-
-                BatchAssign
-              </button>
-            </div>
-          </form>
+              <div className="d-flex justify-content-end gap-2 mt-4">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={isBatchAssigning}
+                  style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                  onClick={closePanel}
+                >
+                  CLOSE
+                </button>
+                <button
+                  type="button"
+                  className="btn text-white"
+                  disabled={isBatchAssigning || !selectedBatch}
+                  onClick={(e) => handleBatchAssign(e)}
+                  style={{ 
+                    backgroundColor: isBatchAssigning || !selectedBatch ? '#ccc' : '#fd7e14', 
+                    border: 'none', 
+                    padding: '8px 24px', 
+                    fontSize: '14px' 
+                  }}
+                >
+                  {isBatchAssigning ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Assigning...
+                    </>
+                  ) : (
+                    'BatchAssign'
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     );
@@ -1187,22 +1230,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
 
 
-    const fetchConcernPersons = async () => {
-      const response = await axios.get(`${backendUrl}/college/refer-leads`, {
-        headers: {
-          'x-auth': token,
-        },
-      });
-      console.log(userData, 'userData');
-      let concernPersons = [];
-      await response.data.concernPerson.map(person => {
-        if (person._id._id.toString() !== userData._id.toString()) {
-          concernPersons.push(person);
-        }
-      });
-      setConcernPersons(concernPersons);
-    }
-    fetchConcernPersons();
   };
   const openleadHistoryPanel = async (profile = null) => {
     if (profile) {
@@ -1772,7 +1799,15 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                         </div>
                                       </div>
                                       <div>
-                                        <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
+                                        <div className="d-flex align-items-center">
+                                          <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
+                                          {(profile?.batch?.name || profile?.isBatchAssigned) && (
+                                            <span className="badge bg-success ms-2" style={{ fontSize: '10px' }}>
+                                              <i className="fas fa-check-circle me-1"></i>
+                                              Assigned
+                                            </span>
+                                          )}
+                                        </div>
                                         <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                       </div>
                                       <div style={{ marginLeft: '15px' }}>
@@ -1788,8 +1823,17 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                           <i className="fab fa-whatsapp"></i>
                                         </button>
                                       </div>
-                                      <div style={{ marginLeft: '15px', backgroundColor: `${profile?.batch?.name ? 'green' : 'red'}`,margin: '0px 10px', padding: '0px 10px', borderRadius: '10px', color: 'white' }}>
-                                      <h6>{profile?.batch?.name || 'Batch Assiment Pending'}</h6>
+                                      <div style={{ 
+                                        marginLeft: '15px', 
+                                        backgroundColor: `${(profile?.batch?.name || profile?.isBatchAssigned) ? 'green' : 'red'}`, 
+                                        margin: '0px 10px', 
+                                        padding: '0px 10px', 
+                                        borderRadius: '10px', 
+                                        color: 'white' 
+                                      }}>
+                                        <h6>
+                                          {profile?.batch?.name || (profile?.isBatchAssigned ? 'Batch Assigned' : 'Batch Assignment Pending')}
+                                        </h6>
                                       </div>
                                     </div>
                                   </div>
@@ -1864,26 +1908,44 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                           >
                                             History List
                                           </button>
-                                          {!profile?.batch && (
-                                          <button
-                                            className="dropdown-item"
-                                            onClick={() => {
-                                              openBatchAssignPanel(profile);
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                          >
-                                            Assign Batch
-                                          </button>
+                                          {!profile?.batch && !profile?.isBatchAssigned ? (
+                                            <button
+                                              className="dropdown-item"
+                                              onClick={() => {
+                                                openBatchAssignPanel(profile);
+                                                console.log('selectedProfile', profile);
+                                              }}
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                            >
+                                              Assign Batch
+                                            </button>
+                                          ) : (
+                                            <div
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                fontSize: "12px",
+                                                fontWeight: "600",
+                                                color: "#28a745",
+                                                cursor: "default"
+                                              }}
+                                            >
+                                              <i className="fas fa-check-circle me-1"></i>
+                                              Batch Assigned
+                                            </div>
                                           )}
 
 
