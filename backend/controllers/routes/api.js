@@ -1,4 +1,6 @@
 const express = require("express");
+const { google } = require('googleapis')
+
 const multer  = require('multer')
 var multipleUpload = multer().array('file');
 const { authenti, authCollege, authCommon, isCandidate, isAdmin, authentiAdmin, auth1 } = require("../../helpers");
@@ -22,7 +24,7 @@ const {
 	teamFunc
 } = require("./functions");
 
-const { getGoogleAuthToken, getNewGoogleAccessToken, getGoogleCalendarEvents, createGoogleCalendarEvent } = require("./services/googleservice");
+const {getAllGoogleCalendarEvents, getGoogleAuthToken, getNewGoogleAccessToken, getGoogleCalendarEvents, createGoogleCalendarEvent, validateAndRefreshGoogleToken } = require("./services/googleservice");
 
 const apiRoutes = express.Router();
 const commonRoutes = express.Router();
@@ -138,9 +140,31 @@ commonRoutes.post("/getgoogleauth", async (req, res) => {
 
 commonRoutes.post("/getgooglecalendarevents", async (req, res) => {
 	try {
-		const { accessToken } = req.body;
+		const { user,accessToken, startDate, endDate } = req.body;
 
-		const events = await getGoogleCalendarEvents(accessToken);
+		if (!accessToken) {
+			return res.status(400).json({ 
+				success: false,
+				error: 'Access token is required' 
+			});
+		}
+
+		// Set default date range if not provided
+		const timeMin = startDate ? new Date(startDate) : new Date();
+		const timeMax = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+		const events = await getAllGoogleCalendarEvents({
+			user,
+			timeMin: timeMin.toISOString(),
+			timeMax: timeMax.toISOString()
+		});
+
+		if (events.error) {
+			return res.status(400).json({ 
+				success: false,
+				error: events.error 
+			});
+		}
 
 		res.json({ 
 			success: true, 
@@ -149,6 +173,7 @@ commonRoutes.post("/getgooglecalendarevents", async (req, res) => {
 	} catch (error) {
 		console.error('Google Calendar Events Error:', error);
 		res.status(500).json({ 
+			success: false,
 			error: 'Failed to get Google calendar events',
 			message: error.message 
 		});
@@ -200,7 +225,10 @@ commonRoutes.post("/creategooglecalendarevent", async (req, res) => {
 // Get B2B followup events from Google Calendar
 commonRoutes.post("/getb2bcalendarevents", async (req, res) => {
 	try {
-		const { accessToken, startDate, endDate } = req.body;
+		const {user, accessToken, startDate, endDate } = req.body;
+
+		console.log(startDate, endDate,'startDate, endDate');
+		
 
 		if (!accessToken) {
 			return res.status(400).json({ 
@@ -213,14 +241,17 @@ commonRoutes.post("/getb2bcalendarevents", async (req, res) => {
 		const timeMin = startDate ? new Date(startDate) : new Date();
 		const timeMax = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
-		const events = await getGoogleCalendarEvents({
-			accessToken,
-			timeMin: timeMin.toISOString(),
-			timeMax: timeMax.toISOString()
-		});
+		const b2bEvents = await getAllGoogleCalendarEvents(req.body);
+		
+		if (b2bEvents.error) {
+			return res.status(400).json({ 
+				success: false,
+				error: b2bEvents.error 
+			});
+		}
 
 		// Filter events that are B2B related
-		const b2bEvents = events.data?.items?.filter(event => {
+		const filteredB2BEvents = b2bEvents.events?.filter(event => {
 			const summary = event.summary?.toLowerCase() || '';
 			const description = event.description?.toLowerCase() || '';
 			return summary.includes('b2b') || 
@@ -234,8 +265,8 @@ commonRoutes.post("/getb2bcalendarevents", async (req, res) => {
 		res.json({ 
 			success: true, 
 			data: {
-				events: b2bEvents,
-				totalEvents: b2bEvents.length,
+				events: filteredB2BEvents,
+				totalEvents: filteredB2BEvents.length,
 				dateRange: {
 					start: timeMin,
 					end: timeMax
@@ -247,6 +278,155 @@ commonRoutes.post("/getb2bcalendarevents", async (req, res) => {
 		res.status(500).json({ 
 			success: false,
 			error: 'Failed to get B2B calendar events',
+			message: error.message 
+		});
+	}
+});
+
+// Update calendar event (complete/reschedule)
+commonRoutes.post("/updatecalendarevent", async (req, res) => {
+	try {
+		const { user, eventId, action, newStartTime, newEndTime, notes } = req.body;
+
+		if (!user || !eventId || !action) {
+			return res.status(400).json({ 
+				success: false,
+				error: 'Missing required parameters (user, eventId, action)' 
+			});
+		}
+
+		// Validate that user has Google auth token
+		if (!user.googleAuthToken) {
+			return res.status(400).json({ 
+				success: false,
+				error: 'User does not have Google authentication token' 
+			});
+		}
+
+		// Validate environment variables
+		if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+			console.error('Missing Google OAuth environment variables');
+			return res.status(500).json({ 
+				success: false,
+				error: 'Google OAuth configuration missing' 
+			});
+		}
+
+		// Use the validateAndRefreshGoogleToken function to handle token refresh
+		let tokenData;
+		try {
+			tokenData = await validateAndRefreshGoogleToken(user);
+		} catch (error) {
+			console.error('Token validation/refresh error:', error);
+			return res.status(401).json({ 
+				success: false,
+				error: 'Failed to validate or refresh Google token: ' + error.message 
+			});
+		}
+
+		// Create OAuth2 client
+		const oauth2Client = new google.auth.OAuth2(
+			process.env.GOOGLE_CLIENT_ID,
+			process.env.GOOGLE_CLIENT_SECRET,
+			process.env.GOOGLE_REDIRECT_URI
+		);
+
+		// Set credentials with refreshed token data
+		const credentials = {
+			access_token: tokenData.accessToken,
+			refresh_token: tokenData.refreshToken,
+		};
+
+		// Add expiry_date if we have a valid timestamp
+		if (tokenData.expiresAt && tokenData.expiresAt > 0) {
+			credentials.expiry_date = tokenData.expiresAt;
+		}
+
+		oauth2Client.setCredentials(credentials);
+
+		const calendar = google.calendar({ 
+			version: 'v3', 
+			auth: oauth2Client
+		});
+
+		if (action === 'complete') {
+			// Mark event as completed by updating description
+			const event = await calendar.events.get({
+				calendarId: 'primary',
+				eventId: eventId
+			});
+
+			const updatedDescription = event.data.description 
+				? `${event.data.description}\n\n✅ COMPLETED: ${notes || 'Marked as completed'}`
+				: `✅ COMPLETED: ${notes || 'Marked as completed'}`;
+
+			await calendar.events.update({
+				calendarId: 'primary',
+				eventId: eventId,
+				resource: {
+					...event.data,
+					description: updatedDescription,
+					colorId: '9' // Green color for completed events
+				}
+			});
+
+			res.json({ 
+				success: true, 
+				message: 'Event marked as completed successfully' 
+			});
+
+		} else if (action === 'reschedule') {
+			// Reschedule event
+			if (!newStartTime || !newEndTime) {
+				return res.status(400).json({ 
+					success: false,
+					error: 'New start and end times are required for rescheduling' 
+				});
+			}
+
+			const event = await calendar.events.get({
+				calendarId: 'primary',
+				eventId: eventId
+			});
+
+			const updatedDescription = event.data.description 
+				? `${event.data.description}\n\n🔄 RESCHEDULED: ${notes || 'Event rescheduled'}`
+				: `🔄 RESCHEDULED: ${notes || 'Event rescheduled'}`;
+
+			await calendar.events.update({
+				calendarId: 'primary',
+				eventId: eventId,
+				resource: {
+					...event.data,
+					start: {
+						dateTime: newStartTime,
+						timeZone: 'Asia/Kolkata'
+					},
+					end: {
+						dateTime: newEndTime,
+						timeZone: 'Asia/Kolkata'
+					},
+					description: updatedDescription
+				}
+			});
+
+			res.json({ 
+				success: true, 
+				message: 'Event rescheduled successfully' 
+			});
+
+		} else {
+			res.status(400).json({ 
+				success: false,
+				error: 'Invalid action. Use "complete" or "reschedule"' 
+			});
+		}
+
+	} catch (error) {
+		console.error('Update Calendar Event Error:', error);
+		res.status(500).json({ 
+			success: false,
+			error: 'Failed to update calendar event',
 			message: error.message 
 		});
 	}

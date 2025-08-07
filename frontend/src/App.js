@@ -54,7 +54,8 @@ import CollegeLayout from './Component/Layouts/App/College';
 import CollegeLogin from './Pages/App/College/Login/CollegeLogin';
 import CollegeRegister from './Pages/App/College/Register/CollegeRegister';
 import Dashboard from './Pages/App/College/Dashboard/Dashboard';
-import DashboardB2B from './Pages/App/College/Dashboard/DashboardB2B';
+import DashboardB2B from './Pages/App/College/B2B/DashboardB2B';
+import B2BFollowUp from './Pages/App/College/B2B/B2BFollowUp';
 
 import Profile from './Pages/App/College/Profile/Profile';
 import UploadCandidates from './Pages/App/College/UploadCandidates/UploadCandidates';
@@ -202,6 +203,7 @@ const Layout = () => {
         <Route path="/institute" element={<CollegeLayout  />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="dashboardb2b" element={<DashboardB2B />} />
+          <Route path="b2bfollowup" element={<B2BFollowUp />} />
           <Route path="myprofile" element={<Profile/>}/>
           <Route path="uploadCandidates" element={<UploadCandidates/>}/>
           <Route path="uploadTemplates" element={<UploadTemplates/>}/>

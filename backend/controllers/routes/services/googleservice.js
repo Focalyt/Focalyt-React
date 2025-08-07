@@ -18,6 +18,8 @@ module.exports = {
   updateSpreadSheetRequestCallValues,
   getGoogleAuthToken,
   createGoogleCalendarEvent,
+  getAllGoogleCalendarEvents,
+  validateAndRefreshGoogleToken
   
 }
 
@@ -148,7 +150,6 @@ async function getGoogleAuthToken(data) {
       'googleAuthToken.scopes': tokens.scope
     }
   
-    console.log(updatedData,'updatedData');
   
     const updateUser = await User.findByIdAndUpdate(user._id,updatedData,{new: true});
   
@@ -204,7 +205,6 @@ async function getNewGoogleAccessToken(data) {
       'googleAuthToken.scopes': tokens.scope
     }
   
-    console.log(updatedData,'updatedData');
   
     const updateUser = await User.findByIdAndUpdate(user._id,updatedData,{new: true});
   
@@ -216,27 +216,214 @@ async function getNewGoogleAccessToken(data) {
   }
 }
 
-async function getGoogleCalendarEvents(data) {
-  const { accessToken, timeMin, timeMax, maxResults = 100 } = data;
 
-  if(!accessToken){
-    return {
-      error: 'Access token is required'
-    };
+
+
+async function getAllGoogleCalendarEvents(data, options = {}) {
+  
+
+    let {user, maxResults = 100, startDate, endDate } = data;
+
+    let timeMin = startDate ? new Date(startDate) : new Date().toISOString();
+    let timeMax = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+console.log(timeMin, timeMax,'timeMin, timeMax');
+
+  if (!user || !user.googleAuthToken) {
+    return { error: 'User or Google Auth Token is missing' };
   }
+
+  let accessToken = user.googleAuthToken.accessToken;
+  let expiresAt = user.googleAuthToken.expiresAt;
+  const refreshToken = user.googleAuthToken.refreshToken;
+
+
+  // Fix expiry date format - ensure it's a proper timestamp
+  let expiryTimestamp;
+  if (typeof expiresAt === 'string') {
+    const match = expiresAt.match(/(\d{13})/);
+    if (match) {
+      expiryTimestamp = parseInt(match[1]);
+    } else {
+      expiryTimestamp = 0;
+    }
+  } else if (typeof expiresAt === 'number') {
+    expiryTimestamp = expiresAt;
+  } else {
+    console.log('Unknown expiry format, treating as expired');
+    expiryTimestamp = 0;
+  }
+
+ 
+
+  // Check if token is expired and refresh if needed (with 5 minute buffer)
+  const bufferTime = 5 * 60 * 1000;
+  if (expiryTimestamp < (Date.now() + bufferTime)) {
+    try {
+      const newTokenData = await getNewGoogleAccessToken({ refreshToken, user });
+      if (newTokenData && newTokenData.accessToken) {
+        accessToken = newTokenData.accessToken;
+        expiresAt = newTokenData.expiresAt;
+        console.log('Token refreshed successfully');
+      } else {
+        console.error('Token refresh returned invalid data:', newTokenData);
+        return { error: 'Failed to refresh access token - invalid response' };
+      }
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return { error: 'Failed to refresh access token: ' + error.message };
+    }
+  }
+
+  if (!accessToken) {
+    return { error: 'Access token is required' };
+  }
+
+  // Validate environment variables
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.error('Missing Google OAuth environment variables');
+    return { error: 'Google OAuth configuration missing' };
+  }
+
+  // Create OAuth2 client and set credentials
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+
+  const credentials = {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  };
+
+  if (expiryTimestamp && expiryTimestamp > 0) {
+    credentials.expiry_date = expiryTimestamp;
+  }
+
+  
+
+  oauth2Client.setCredentials(credentials);
 
   const calendar = google.calendar({
     version: 'v3',
-    auth: accessToken
+    auth: oauth2Client
   });
 
-  const events = await calendar.events.list({
-    calendarId: 'primary',
-    timeMin: new Date().toISOString(),
-    maxResults: 100,
-  });
+  try {
+    // Test authentication first
+    try {
+      const calendarList = await calendar.calendarList.list({ maxResults: 1 });
+      console.log('Authentication test passed');
+    } catch (authError) {
+      console.error('Authentication test failed:', authError.message);
+      return { error: 'Authentication failed during test: ' + authError.message };
+    }
 
-  return events;
+    let allEvents = [];
+    let nextPageToken = null;
+    let totalFetched = 0;
+    const maxEventsPerRequest = 2500; // Google Calendar API max
+    const absoluteMax = options.maxEvents || 10000; // Prevent infinite loops
+
+    // Set time range with flexible date filtering options
+    const now = new Date();
+    timeMin = timeMin || now.toISOString();
+    timeMax = timeMax || now.toISOString();
+
+    // Default fallback if no dates set
+    if (!timeMin || !timeMax) {
+      const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+      const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+      timeMin = timeMin || oneYearAgo.toISOString();
+      timeMax = timeMax || oneYearFromNow.toISOString();
+    }
+
+    const eventOptions = {
+      calendarId: options.calendarId || 'primary',
+      timeMin: timeMin,
+      timeMax: timeMax,
+      maxResults: Math.min(maxEventsPerRequest, absoluteMax),
+      singleEvents: true, // Expand recurring events
+      orderBy: 'startTime',
+      showDeleted: false,
+      showHiddenInvitations: false,
+    };
+
+
+    do {
+      if (nextPageToken) {
+        eventOptions.pageToken = nextPageToken;
+      }
+
+      const eventsResponse = await calendar.events.list(eventOptions);
+      const events = eventsResponse.data.items || [];
+      
+      allEvents = allEvents.concat(events);
+      nextPageToken = eventsResponse.data.nextPageToken;
+      totalFetched += events.length;
+
+
+      // Safety check to prevent infinite loops
+      if (totalFetched >= absoluteMax) {
+        console.log(`Reached maximum limit of ${absoluteMax} events`);
+        break;
+      }
+
+    } while (nextPageToken);
+
+
+
+    return { 
+      success: true, 
+      events: allEvents,
+      totalCount: allEvents.length,
+      timeRange: {
+        from: eventOptions.timeMin,
+        to: eventOptions.timeMax
+      }
+    };
+
+  } catch (error) {
+    console.error('Error getting all events:', error);
+    
+    if (error.response) {
+      console.error('Error response:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+    }
+    
+    // Handle specific error cases with retry logic
+    if (error.code === 401 || error.status === 401) {
+      console.log('Got 401, attempting token refresh...');
+      try {
+        const newTokenData = await getNewGoogleAccessToken({ refreshToken, user });
+        if (newTokenData && newTokenData.accessToken) {
+          console.log('Re-attempting with refreshed token...');
+          oauth2Client.setCredentials({
+            access_token: newTokenData.accessToken,
+            refresh_token: refreshToken,
+            expiry_date: newTokenData.expiresAt
+          });
+          
+          // Retry the request
+          return await getAllGoogleCalendarEvents(user, options);
+        }
+      } catch (retryError) {
+        console.error('Retry after token refresh failed:', retryError);
+      }
+      
+      return { error: 'Authentication failed. Please re-authenticate with Google.' };
+    } else if (error.code === 403 || error.status === 403) {
+      return { error: 'Permission denied. Check calendar access permissions.' };
+    } else if (error.code === 400 || error.status === 400) {
+      return { error: 'Invalid request parameters: ' + (error.message || 'Unknown validation error') };
+    }
+    
+    return { error: `Error getting events: ${error.message}` };
+  }
 }
 
 async function createGoogleCalendarEvent(data) {
@@ -264,7 +451,6 @@ async function createGoogleCalendarEvent(data) {
     if (match) {
       expiryTimestamp = parseInt(match[1]);
     } else {
-      console.log('Invalid expiry format, treating as expired');
       expiryTimestamp = 0; // Force refresh
     }
   } else if (typeof expiresAt === 'number') {
@@ -280,7 +466,6 @@ async function createGoogleCalendarEvent(data) {
   // Check if token is expired and refresh if needed (with 5 minute buffer)
   const bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
   if (expiryTimestamp < (Date.now() + bufferTime)) {
-    console.log('Token expired or expiring soon, refreshing...');
     try {
       const newTokenData = await getNewGoogleAccessToken({ refreshToken, user });
       if (newTokenData && newTokenData.accessToken) {
