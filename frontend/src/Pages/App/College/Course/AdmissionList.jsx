@@ -286,7 +286,31 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   //     }
   //   }
   // };
+  // Add this useEffect to handle clicking outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside any multi-select dropdown
+      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
 
+      if (!isMultiSelectClick) {
+        // Close all dropdowns
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
@@ -861,7 +885,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       ...filterData,
       [fieldName]: date
     };
-    setFilterData(newFilterData);
+
   };
 
 
@@ -932,14 +956,6 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       modifiedToDate: null,
       nextActionFromDate: null,
       nextActionToDate: null,
-    });
-    setFormData({
-      projects: { type: "includes", values: [] },
-      verticals: { type: "includes", values: [] },
-      course: { type: "includes", values: [] },
-      center: { type: "includes", values: [] },
-      counselor: { type: "includes", values: [] },
-      sector: { type: "includes", values: [] }
     });
   };
 
@@ -1367,7 +1383,6 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
         return;
       }
       console.log('filters', filters)
-      console.log('formData', formData)
       const queryParams = new URLSearchParams({
         page: page.toString(),
         ...(filters?.name && { name: filters.name }),
@@ -2641,7 +2656,7 @@ console.log("upload modal render....")
                         </label>
                         <div className="card border-0 bg-light p-3">
                           <div className="row g-2">
-                            <div className="col-6 firstDatepicker">
+                            <div className="col-6">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -7428,16 +7443,9 @@ background: #fd2b5a;
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
-.firstDatepicker .react-calendar {
-    width: 250px !important;
-    height: min-content !important;
-    transform: translateX(0px)!important;
-}
 .react-calendar{
-// width:min-content !important;
+width:min-content !important;
 height:min-content !important;
-transform: translateX(-110px)!important;
-    width: 250px !important;
 }
 @media (max-width: 768px) {
   .multi-select-options-new {
@@ -8860,6 +8868,7 @@ max-width: 600px;
 
 .position-relative {
   transition: width 0.3s ease !important;
+      
           `
         }
       </style>

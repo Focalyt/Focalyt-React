@@ -1558,6 +1558,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor
 		} = req.query;
 
+		console.log('req.query', req.query)
+
 		// Parse multi-select filters
 		let projectsArray = [];
 		let verticalsArray = [];
@@ -1701,13 +1703,27 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
 	const pipeline = [];
+	let baseMatch = {};
+	filters.leadStatus = String(filters.leadStatus);
+	if (filters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
+		baseMatch = {
+			kycStage: { $in: [true] },
+		};
+	}
 
-	// Base match with essential filters
-	let baseMatch = {
-		kycStage: { $ne: true },
-		kyc: { $ne: true },
-		admissionDone: { $ne: true },
-	};
+	else {
+		// Base match with essential filters
+		baseMatch = {
+			kycStage: { $ne: true },
+			kyc: { $ne: true },
+			admissionDone: { $ne: true },
+		};
+	}
+
+
+	console.log('baseMatch', JSON.stringify(baseMatch))
+
+
 
 	if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
@@ -1756,13 +1772,22 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		}
 	}
 
-	// Status filters
-	if (filters.status && filters.status !== 'true') {
-		baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.status);
-	}
-	if (filters.leadStatus) {
-		baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.leadStatus);
-	}
+	console.log('filters', filters)
+
+	console.log('filters:', filters);
+console.log('filters.leadStatus:', filters.leadStatus);
+
+if (filters.leadStatus && filters.leadStatus !== 'undefined' && filters.leadStatus !== '6894825c9fc1425f4d5e2fc5') {
+    // Only set _leadStatus if it's a valid ObjectId string
+    if (mongoose.Types.ObjectId.isValid(filters.leadStatus)) {
+        console.log('Valid leadStatus:', filters.leadStatus);
+        baseMatch._leadStatus = new mongoose.Types.ObjectId(filters.leadStatus);
+    } else {
+        console.log('Invalid leadStatus:', filters.leadStatus);
+    }
+} else {
+    console.log('leadStatus is undefined or has invalid value.');
+}
 
 	pipeline.push({ $match: baseMatch });
 
@@ -2020,7 +2045,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		const allStatuses = await Status.find({}).select('_id title milestone').lean();
 
 		// Build base pipeline
-		const basePipeline = [
+		let basePipeline = [
 			{
 				$match: {
 					kycStage: { $ne: true },
@@ -2043,8 +2068,37 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			{ $unwind: '$_course' }
 		];
 
+		let movedInKYCPipeline = [
+			{
+				$match: {
+					kycStage: { $in: [true] },
+				}
+			},
+			{
+				$lookup: {
+					from: 'courses',
+					localField: '_course',
+					foreignField: '_id',
+					as: '_course',
+					pipeline: [
+						{ $match: { college: collegeId } },
+						{ $project: { courseFeeType: 1, college: 1, project: 1, vertical: 1 } }
+					]
+				}
+			},
+			{ $unwind: '$_course' }
+		];
+
+		// if (appliedFilters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
+		// 	basePipeline[0].$match.kycStage = { $in: [true] };
+		// }
+
 		if (teamMemberIds && teamMemberIds.length > 0) {
 			basePipeline[0].$match.$or = [
+				{ registeredBy: { $in: teamMemberIds } },
+				{ counsellor: { $in: teamMemberIds } }
+			];
+			movedInKYCPipeline[0].$match.$or = [
 				{ registeredBy: { $in: teamMemberIds } },
 				{ counsellor: { $in: teamMemberIds } }
 			];
@@ -2096,6 +2150,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 		if (Object.keys(dateFilters).length > 0) {
 			basePipeline[0].$match = { ...basePipeline[0].$match, ...dateFilters };
+			movedInKYCPipeline[0].$match = { ...movedInKYCPipeline[0].$match, ...dateFilters };
 		}
 
 		// Apply other filters if needed
@@ -2117,11 +2172,24 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 
 			basePipeline.push({ $match: filterMatch });
+			movedInKYCPipeline.push({ $match: filterMatch });
 		}
 
 		// Add candidate lookup for name search
 		if (appliedFilters.name && appliedFilters.name.trim()) {
 			basePipeline.push(
+				{
+					$lookup: {
+						from: 'candidateprofiles',
+						localField: '_candidate',
+						foreignField: '_id',
+						as: '_candidate',
+						pipeline: [{ $project: { name: 1, email: 1, mobile: 1 } }]
+					}
+				},
+				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
+			);
+			movedInKYCPipeline.push(
 				{
 					$lookup: {
 						from: 'candidateprofiles',
@@ -2145,10 +2213,26 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 					]
 				}
 			});
+			movedInKYCPipeline.push({
+				$match: {
+					$or: [
+						{ '_candidate.name': searchRegex },
+						{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
+						{ '_candidate.email': searchRegex }
+					]
+				}
+			});
 		}
 
+
+
+
+		console.log('movedInKYCPipeline', JSON.stringify(movedInKYCPipeline[0].$match))
+
+
+
 		// Single aggregation to get all counts
-		const [allCount, statusCounts] = await Promise.all([
+		const [allCount, statusCounts, movedInKYCCount] = await Promise.all([
 			AppliedCourses.aggregate([...basePipeline, { $count: "total" }]),
 			AppliedCourses.aggregate([
 				...basePipeline,
@@ -2158,19 +2242,30 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 						count: { $sum: 1 }
 					}
 				}
-			])
+			]),
+			AppliedCourses.aggregate([...movedInKYCPipeline, { $count: "total" }])
 		]);
 
 		// Process results
 		const counts = { all: allCount[0]?.total || 0 };
 
+
 		allStatuses.forEach(status => {
-			counts[status._id.toString()] = {
-				_id: status._id,
-				name: status.title,
-				milestone: status.milestone,
-				count: 0
-			};
+			if (status._id.toString() === '6894825c9fc1425f4d5e2fc5') {
+				counts[status._id.toString()] = {
+					_id: status._id,
+					name: status.title,
+					milestone: status.milestone,
+					count: movedInKYCCount[0]?.total || 0
+				};
+			} else {
+				counts[status._id.toString()] = {
+					_id: status._id,
+					name: status.title,
+					milestone: status.milestone,
+					count: 0
+				};
+			}
 		});
 
 		statusCounts.forEach(({ _id, count }) => {
