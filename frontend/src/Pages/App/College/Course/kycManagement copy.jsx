@@ -229,6 +229,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const user = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
   const [setPreVerification, showSetPreVerification] = useState(false);
+
   const [showPanel, setShowPanel] = useState('')
 
   const candidateRef = useRef();
@@ -252,31 +253,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   //     }
   //   }
   // };
-  // Add this useEffect to handle clicking outside to close dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Check if click is outside any multi-select dropdown
-      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
-
-      if (!isMultiSelectClick) {
-        // Close all dropdowns
-        setDropdownStates(prev =>
-          Object.keys(prev).reduce((acc, key) => {
-            acc[key] = false;
-            return acc;
-          }, {})
-        );
-      }
-    };
-
-    // Add event listener
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const handleSaveCV = async () => {
     if (candidateRef.current) {
@@ -348,6 +324,33 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [uploadedByUser, setUploadedByUser] = useState(null);
   const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
   const [userDetailsError, setUserDetailsError] = useState(false);
+
+
+  // Add this useEffect to handle clicking outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside any multi-select dropdown
+      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
+
+      if (!isMultiSelectClick) {
+        // Close all dropdowns
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Static document data for demonstration
   useEffect(() => {
@@ -834,15 +837,24 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       setActiveCrmFilter(index);
       return;
     } else if (index === 2) {
+      // Placement Verification filter
+      setFilterData({
+        ...filterData,
+        stage: 'placementVerification',
+      })
+      setActiveCrmFilter(index);
+      return;
+    } else if (index === 3) {
+      // All profiles filter
       setFilterData({
         ...filterData,
         kyc: 'all',
+        stage: '',
       })
       setActiveCrmFilter(index);
       return;
     }
     setActiveCrmFilter(index);
-
   };
 
   // Filter state from Registration component
@@ -888,7 +900,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     'Profile',
     'Job History',
     'Course History',
-    'Documents',    
+    'Documents',
     'Pre Verification'
   ];
 
@@ -1057,6 +1069,76 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     setSelectedStatus(e.target.value);
   };
 
+  const handleMoveToPlacementVerification = async (profile) => {
+    try {
+      if (!profile || !profile._id) {
+        alert('No profile selected');
+        return;
+      }
+
+      const uploadedDocs = profile.uploadedDocs;
+
+      for (const doc of uploadedDocs) {
+        const docStatus = doc.status;
+        if (doc.mandatory && !docStatus) {
+          console.log('Document requiring verification:', doc);  // Log the document
+          alert('All documents must be verified before moving to placement verification list');
+          return;
+        }
+      }
+
+      // Show confirmation dialog
+      const confirmMove = window.confirm('Do you really want to move this profile to placement verification list?');
+      if (!confirmMove) {
+        return;
+      }
+
+      // Check if backend URL and token exist
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      const payload = {
+        stage: 'placementVerification', // Set placement verification as done
+        remarks: 'Moved to placement verification'
+      };
+
+      // console.log('Sending data to backend:', payload);  
+
+      // Send PUT request to backend API to update status
+      const response = await axios.put(
+        `${backendUrl}/college/update/${profile._id}`,
+        payload,
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // console.log('API Response:', response.data);  
+      if (response.data.success) {
+        alert('Profile moved to placement verification successfully!');
+        await fetchProfileData();
+      } else {
+        console.error('API returned error:', response.data);
+        alert(response.data.message || 'Failed to move to placement verification');
+      }
+    } catch (error) {
+      console.error('Error moving to placement verification:', error);
+      alert('Failed to move to placement verification');
+    }
+  };
+
+
+
   const handleMoveToAdmission = async (profile) => {
     try {
       if (!profile || !profile._id) {
@@ -1074,7 +1156,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           return;
         }
       }
-
 
       // Show confirmation dialog
       const confirmMove = window.confirm('Do you really want to move this profile to admission list?');
@@ -1399,6 +1480,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         ...(filters.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
         ...(filters.sector && { sector: filters.sector }),
+        ...(filters.stage && { stage: filters.stage }),
         ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
         ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
         ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
@@ -1725,6 +1807,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
     const handleRejectClick = useCallback(() => {
       setShowRejectionForm(true);
+      console.log('reupload')
     }, []);
 
     const handleCancelRejection = useCallback(() => {
@@ -2203,7 +2286,43 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       </div>
                     </div>
                   )}
-                </div>)}
+                </div>
+              )}
+
+              {/* Static buttons for accidentally approved documents */}
+              {(latestUpload?.status || selectedDocument?.status) === 'Verified' && (
+                <div className="document-actions mt-4">
+                  {!showRejectionForm ? (
+                    <div className="action-buttons">
+                      <button className="btn btn-warning me-2" onClick={handleRejectClick}>
+                        <i className="fas fa-undo"></i> Reject Document
+                      </button>
+                      <button className="btn btn-info">
+                        <i className="fas fa-eye"></i>  Reupload Document
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+                      <textarea
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        placeholder="Please provide a detailed reason for rejection..."
+                        rows="8"
+                        className="form-control mb-3"
+                      />
+                      <div className="d-flex gap-2">
+                        <button className="btn btn-danger" onClick={handleConfirmRejection}>
+                          Confirm Rejection
+                        </button>
+                        <button className="btn btn-secondary" onClick={handleCancelRejection}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
 
 
             </div>
@@ -2442,7 +2561,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
               backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
               WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
               pointerEvents: 'none',
-              zIndex: 9,
+              zIndex: 8,
               transition: 'all 0.3s ease',
               opacity: isScrolled ? 1 : 0
             }}
@@ -3058,13 +3177,34 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                                   borderRadius: "4px",
                                                   padding: "8px 0",
-                                                  zIndex: 9,
+                                                  zIndex: 8,
                                                   transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                                   transition: "transform 0.3s ease-in-out",
                                                   pointerEvents: showPopup ? "auto" : "none",
                                                   display: showPopup === profileIndex ? "block" : "none"
                                                 }}
                                               >
+
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
+                                                  }}
+                                                  onClick={() => handleMoveToPlacementVerification(profile)}
+                                                >
+                                                  Move to Placement Verification
+                                                </button>
+
+
+
                                                 {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
                                                   <button
                                                     className="dropdown-item"
@@ -3076,7 +3216,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       textAlign: "left",
                                                       cursor: "pointer",
                                                       fontSize: "12px",
-                                                      fontWeight: "600"
+                                                      fontWeight: "600",
+                                                      textWrap: "auto"
                                                     }}
                                                     onClick={() => handleMoveToAdmission(profile)}
                                                   >
@@ -3092,7 +3233,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600"
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
                                                   }}
                                                   onClick={() => handleMarkDropout(profile)}
                                                 >
@@ -3108,7 +3250,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600"
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
                                                   }}
                                                   // onClick={() => {
                                                   //   openleadHistoryPanel(profile);
@@ -3131,7 +3274,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600"
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
                                                   }}
                                                   // onClick={() => {
                                                   //   openEditPanel(profile, 'SetFollowup');
@@ -3154,7 +3298,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600"
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
                                                   }}
                                                   onClick={() => {
                                                     handleFetchCandidate(profile);
@@ -3180,7 +3325,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     showSetPreVerification(true)
                                                   }}
                                                 >
-                                                  Add Pre Verification
+                                                  Add Pre QV Verification
                                                 </button>
                                               </div>
                                             </div>
@@ -3235,13 +3380,32 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                                   borderRadius: "4px",
                                                   padding: "8px 0",
-                                                  zIndex: 9,
+                                                  zIndex: 8,
                                                   transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
                                                   transition: "transform 0.3s ease-in-out",
                                                   pointerEvents: showPopup === profileIndex ? "auto" : "none",
                                                   display: showPopup === profileIndex ? "block" : "none"
                                                 }}
                                               >
+
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
+                                                  }}
+                                                  onClick={() => handleMoveToPlacementVerification(profile)}
+                                                >
+                                                  Move to Placement Verification
+                                                </button>
+
                                                 {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
                                                   <button
                                                     className="dropdown-item"
@@ -3253,12 +3417,14 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       textAlign: "left",
                                                       cursor: "pointer",
                                                       fontSize: "12px",
-                                                      fontWeight: "600"
+                                                      fontWeight: "600",
+                                                      textWrap: "auto"
                                                     }}
                                                     onClick={() => handleMoveToAdmission(profile)}
                                                   >
                                                     Move to Admission
                                                   </button>)}
+
                                                 <button
                                                   className="dropdown-item"
                                                   style={{
@@ -3269,7 +3435,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600"
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
                                                   }}
                                                   onClick={() => handleMarkDropout(profile)}
                                                 >
@@ -3285,7 +3452,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600"
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
                                                   }}
                                                   // onClick={() => openleadHistoryPanel(profile)}
                                                   onClick={() => {
@@ -3329,7 +3497,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     textAlign: "left",
                                                     cursor: "pointer",
                                                     fontSize: "12px",
-                                                    fontWeight: "600"
+                                                    fontWeight: "600",
+                                                    textWrap: "auto"
                                                   }}
                                                   onClick={() => {
                                                     handleFetchCandidate(profile);
@@ -3355,7 +3524,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     showSetPreVerification(true)
                                                   }}
                                                 >
-                                                  Add Pre Verification
+                                                  Add Pre QV Verification
                                                 </button>
                                               </div>
                                             </div>
@@ -4360,7 +4529,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                               })()}
                                             </div>
                                           )}
-
                                           {(activeTab[profileIndex] || 0) === 5 && (
                                             <div className="tab-pane active" id='preverification'>
                                               <div className="row">
@@ -4657,143 +4825,197 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           </div>
         )}
 
-        {setPreVerification && (
-          <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered  mt-2">
-              <div className="modal-content p-0 w-100">
-                <div className="modal-header">
-                  <h1 className="modal-title fs-5">Pre Verification</h1>
-                  <button type="button" className="btn-close" onClick={() => { showSetPreVerification(false) }}></button>
-                </div>
-                <div className="modal-body">
+      </div>
 
 
-                  <div className="table-responsive">
-
-                    <table className="verification-table">
-                      <thead>
-                        <tr>
-                          <th>S.NO</th>
-                          <th>Questions</th>
-                          <th>Answer</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="s-no">1</td>
-                          <td className="question">Is the Candidate Aware of the Course</td>
-                          <td>
-                            <div className="checkbox-group">
-                          
-                              <select name="" id="">
-                                <option value="">Select option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not Sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">2</td>
-                          <td className="question">Is the Candidate Aware from the Course Curriculum</td>
-                          <td>
-                            <div className="checkbox-group">
-                             
-                              <select name="" id="">
-                                <option value="">Select option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not Sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">3</td>
-                          <td className="question">Currently Work Status</td>
-                          <td>
-                            <div className="checkbox-group">
-                            
-                              <select name="" id="">
-                                <option value="">Select option</option>
-                                <option value="Working">Working</option>
-                                <option value="Not Working">Not Working</option>
-                                <option value="Study">Study</option>
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="s-no">4</td>
-                          <td className="question">Is Candidate Interested for Course</td>
-                          <td>
-                            <div className="checkbox-group">
-                              
-                              <select name="" id="">
-                                <option value="">Select option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not Sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td class="s-no">5</td>
-                          <td class="question">If we offered a job outside Odisha, would you be</td>
-                          <td>
-                            <div class="checkbox-group">
-                             
-                              <select name="" id="">
-                                <option value="">Select option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not Sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td class="s-no">6</td>
-                          <td class="question">Parent Confirmation</td>
-                          <td>
-                            <div class="checkbox-group">
-                              
-                              <select name="" id="">
-                                <option value="">Select option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not Sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td class="s-no">7</td>
-                          <td class="question">Recommendation from Placement</td>
-                          <td>
-                            <div class="checkbox-group">
-                              
-                              <select name="" id="">
-                                <option value="">Select option</option>
-                                  <option value="Selected">Selected</option>
-                                <option value="Rejected">Rejected</option>
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
+      {setPreVerification && (
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered  mt-2">
+            <div className="modal-content p-0 w-100">
+              <div className="modal-header">
+                <h1 className="modal-title fs-5">Pre QV Verification</h1>
+                <button type="button" className="btn-close" onClick={() => { showSetPreVerification(false) }}></button>
               </div>
+              <div className="modal-body">
+
+
+                <div className="table-responsive">
+
+                  <table className="verification-table">
+                    <thead>
+                      <tr>
+                        <th>S.NO</th>
+                        <th>Questions</th>
+                        <th>Answer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="s-no">1</td>
+                        <td className="question">Is the Candidate Aware of the Course</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <label className="checkbox-wrapper positive">
+                              <input type="radio" name="q1" value="Yes" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Yes</span>
+                            </label>
+                            <label className="checkbox-wrapper negative">
+                              <input type="radio" name="q1" value="No" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">No</span>
+                            </label>
+                            <label className="checkbox-wrapper neutral">
+                              <input type="radio" name="q1" value="Not Sure" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Not Sure</span>
+                            </label>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">2</td>
+                        <td className="question">Is the Candidate Aware from the Course Curriculum</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <label className="checkbox-wrapper positive">
+                              <input type="radio" name="q2" value="Yes" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Yes</span>
+                            </label>
+                            <label className="checkbox-wrapper negative">
+                              <input type="radio" name="q2" value="No" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">No</span>
+                            </label>
+                            <label className="checkbox-wrapper neutral">
+                              <input type="radio" name="q2" value="Not Sure" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Not Sure</span>
+                            </label>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">3</td>
+                        <td className="question">Currently Work Status</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <label className="checkbox-wrapper positive">
+                              <input type="radio" name="q3" value="Working" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Working</span>
+                            </label>
+                            <label className="checkbox-wrapper negative">
+                              <input type="radio" name="q3" value="Not Working" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Not Working</span>
+                            </label>
+                            <label className="checkbox-wrapper neutral">
+                              <input type="radio" name="q3" value="Study" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Study</span>
+                            </label>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="s-no">4</td>
+                        <td className="question">Is Candidate Interested for Course</td>
+                        <td>
+                          <div className="checkbox-group">
+                            <label className="checkbox-wrapper positive">
+                              <input type="radio" name="q4" value="Yes" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Yes</span>
+                            </label>
+                            <label className="checkbox-wrapper negative">
+                              <input type="radio" name="q4" value="No" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">No</span>
+                            </label>
+                            <label className="checkbox-wrapper neutral">
+                              <input type="radio" name="q4" value="Not Sure" />
+                              <span className="custom-checkbox"></span>
+                              <span className="checkbox-label">Not Sure</span>
+                            </label>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="s-no">5</td>
+                        <td class="question">If we offered a job outside Odisha, would you be</td>
+                        <td>
+                          <div class="checkbox-group">
+                            <label class="checkbox-wrapper positive">
+                              <input type="radio" name="q5" value="Yes" />
+                              <span class="custom-checkbox"></span>
+                              <span class="checkbox-label">Yes</span>
+                            </label>
+                            <label class="checkbox-wrapper negative">
+                              <input type="radio" name="q5" value="No" />
+                              <span class="custom-checkbox"></span>
+                              <span class="checkbox-label">No</span>
+                            </label>
+                            <label class="checkbox-wrapper neutral">
+                              <input type="radio" name="q5" value="Not Sure" />
+                              <span class="custom-checkbox"></span>
+                              <span class="checkbox-label">Not Sure</span>
+                            </label>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="s-no">6</td>
+                        <td class="question">Parent Confirmation</td>
+                        <td>
+                          <div class="checkbox-group">
+                            <label class="checkbox-wrapper positive">
+                              <input type="radio" name="q6" value="Yes" />
+                              <span class="custom-checkbox"></span>
+                              <span class="checkbox-label">Yes</span>
+                            </label>
+                            <label class="checkbox-wrapper negative">
+                              <input type="radio" name="q6" value="No" />
+                              <span class="custom-checkbox"></span>
+                              <span class="checkbox-label">No</span>
+                            </label>
+                            <label class="checkbox-wrapper neutral">
+                              <input type="radio" name="q6" value="Not Sure" />
+                              <span class="custom-checkbox"></span>
+                              <span class="checkbox-label">Not Sure</span>
+                            </label>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="s-no">7</td>
+                        <td class="question">Recommendation from Placement</td>
+                        <td>
+                          <div class="checkbox-group">
+                            <label class="checkbox-wrapper positive">
+                              <input type="radio" name="q7" value="Selected" />
+                              <span class="custom-checkbox"></span>
+                              <span class="checkbox-label">Selected</span>
+                            </label>
+                            <label class="checkbox-wrapper negative">
+                              <input type="radio" name="q7" value="Rejected" />
+                              <span class="custom-checkbox"></span>
+                              <span class="checkbox-label">Rejected</span>
+                            </label>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-      </div>
 
       <style>
         {`
@@ -9605,6 +9827,7 @@ max-width: 600px;
 `
         }
       </style>
+
       <style>
         {
 
