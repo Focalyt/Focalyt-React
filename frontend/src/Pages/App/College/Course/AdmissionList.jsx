@@ -1374,11 +1374,11 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
         ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
         // Multi-select filters
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(filters.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(filters.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(filters.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(filters.center.values) }),
-        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(filters.counselor.values) })
+        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
 
 
